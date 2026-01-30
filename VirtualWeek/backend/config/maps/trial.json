@@ -1,6 +1,7 @@
 {
     "map_id": "trial",
     "description": "Virtual Week Trial - Tutorial",
+    "dice_sequence": [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
     "total_steps": 120,
     "steps_per_hour": 8,
     "events": {

@@ -26,9 +26,21 @@ print(f"Logs Directory: {LOGS_DIR}")
 app = Flask(__name__, static_folder=STATIC_DIR)
 CORS(app)
 
+# --- Global Session State ---
+SESSION_STATE = {
+    "status": "IDLE", # IDLE, READY (waiting for client to pick up), RUNNING
+    "config": {},     # Stores map_id, participant_id
+    "logs_buffer": [], # In-memory logs for dashboard (last 100)
+    "game_state": None # Stores the latest frontend state for restoration
+}
+
 @app.route('/')
 def serve_index():
     return send_from_directory(app.static_folder, 'main.html')
+
+@app.route('/dashboard')
+def serve_dashboard():
+    return send_from_directory(app.static_folder, 'dashboard.html')
 
 @app.route('/<path:path>')
 def serve_static(path):
@@ -114,6 +126,17 @@ def log_event():
     details = data.get('details', '')
     metadata = json.dumps(data.get('metadata', {}), ensure_ascii=False)
     
+    # Add to in-memory buffer for dashboard
+    log_entry = {
+        "server_timestamp": server_time,
+        "client_timestamp": client_time,
+        "event_type": event_type,
+        "details": details
+    }
+    SESSION_STATE['logs_buffer'].append(log_entry)
+    if len(SESSION_STATE['logs_buffer']) > 100:
+        SESSION_STATE['logs_buffer'].pop(0)
+
     try:
         with open(file_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
@@ -121,6 +144,64 @@ def log_event():
         return jsonify({"status": "logged"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# --- Dashboard Control API ---
+
+@app.route('/api/admin/status', methods=['GET'])
+def get_admin_status():
+    """Dashboard polls this to see status and get logs."""
+    return jsonify({
+        "status": SESSION_STATE['status'],
+        "config": SESSION_STATE['config'],
+        "recent_logs": SESSION_STATE['logs_buffer']
+    })
+
+@app.route('/api/admin/start', methods=['POST'])
+def start_session():
+    """Dashboard commands to start a session."""
+    data = request.json
+    SESSION_STATE['config'] = {
+        "map_id": data.get('map_id'),
+        "participant_id": data.get('participant_id')
+    }
+    SESSION_STATE['status'] = "RUNNING"
+    SESSION_STATE['logs_buffer'] = [] # Clear logs for new session
+    SESSION_STATE['game_state'] = None # Clear previous game state
+    
+    # Log the start internally
+    SESSION_STATE['logs_buffer'].append({
+        "server_timestamp": datetime.now().isoformat(),
+        "event_type": "SYSTEM",
+        "details": f"Session initialized for {data.get('participant_id')} on map {data.get('map_id')}"
+    })
+    
+    return jsonify({"status": "ok"})
+
+@app.route('/api/admin/reset', methods=['POST'])
+def reset_session():
+    """Dashboard commands to reset."""
+    SESSION_STATE['status'] = "IDLE"
+    SESSION_STATE['config'] = {}
+    SESSION_STATE['game_state'] = None
+    return jsonify({"status": "reset"})
+
+@app.route('/api/client/check', methods=['GET'])
+def check_session_status():
+    """Client polls this to know when to start."""
+    return jsonify({
+        "status": SESSION_STATE['status'],
+        "config": SESSION_STATE['config'],
+        "game_state": SESSION_STATE.get('game_state')
+    })
+
+@app.route('/api/client/sync', methods=['POST'])
+def sync_game_state():
+    """Client sends its state here to persist it."""
+    data = request.json
+    if SESSION_STATE['status'] == 'RUNNING':
+        SESSION_STATE['game_state'] = data
+        return jsonify({"status": "synced"})
+    return jsonify({"status": "ignored", "reason": "session_not_running"})
 
 if __name__ == '__main__':
     print(f"Experiment Server running on port 5001")

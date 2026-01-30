@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Week Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-100 p-6">
+    <div id="app" class="max-w-6xl mx-auto">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-black text-slate-800">🔬 实验控制台</h1>
+            <div class="flex items-center gap-4">
+                <span class="px-3 py-1 rounded-full text-sm font-bold" 
+                    :class="statusColor">
+                    {{ sessionStatus }}
+                </span>
+                <button @click="resetSession" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg font-bold transition-colors">
+                    重置会话
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Control Panel -->
+            <div class="card bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-1">
+                <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i data-lucide="settings-2" class="w-5 h-5"></i> 实验配置
+                </h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-500 mb-1">受试者 ID</label>
+                        <input v-model="participantId" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="例如: sub_001">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-slate-500 mb-1">选择地图</label>
+                        <select v-model="selectedMap" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                            <option v-for="map in maps" :key="map" :value="map">{{ map }}</option>
+                        </select>
+                    </div>
+
+                    <button @click="startExperiment" :disabled="isSessionActive" 
+                        class="w-full py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2"
+                        :class="isSessionActive ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200'">
+                        <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+                        启动实验
+                    </button>
+                </div>
+            </div>
+
+            <!-- Live Logs -->
+            <div class="card bg-slate-900 text-slate-200 p-6 rounded-2xl shadow-sm border border-slate-800 lg:col-span-2 flex flex-col h-[600px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="activity" class="w-5 h-5 text-green-400"></i> 实时监控
+                    </h2>
+                    <span class="text-xs font-mono text-slate-500">Auto-refreshing</span>
+                </div>
+                
+                <div class="flex-grow overflow-y-auto font-mono text-xs space-y-2 pr-2" ref="logContainer">
+                    <div v-if="logs.length === 0" class="text-slate-600 text-center mt-20 italic">等待数据...</div>
+                    <div v-for="(log, idx) in logs" :key="idx" class="border-l-2 pl-3 py-1" :class="getLogColor(log.event_type)">
+                        <div class="flex gap-3 opacity-60 text-[10px] mb-0.5">
+                            <span>{{ formatTime(log.server_timestamp) }}</span>
+                            <span class="uppercase tracking-wider">{{ log.event_type }}</span>
+                        </div>
+                        <div class="font-medium text-slate-100 break-words">
+                            {{ log.details }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
+        const API_BASE = '/api';
+
+        createApp({
+            setup() {
+                const sessionStatus = ref('IDLE'); // IDLE, RUNNING
+                const maps = ref([]);
+                const selectedMap = ref('');
+                const participantId = ref('sub_' + Math.floor(Math.random() * 1000));
+                const logs = ref([]);
+                const logContainer = ref(null);
+                
+                let pollInterval = null;
+
+                const isSessionActive = computed(() => sessionStatus.value === 'RUNNING');
+                const statusColor = computed(() => {
+                    switch(sessionStatus.value) {
+                        case 'RUNNING': return 'bg-green-100 text-green-700';
+                        case 'IDLE': return 'bg-slate-200 text-slate-600';
+                        default: return 'bg-amber-100 text-amber-700';
+                    }
+                });
+
+                const fetchMaps = async () => {
+                    const res = await fetch(`${API_BASE}/maps`);
+                    const data = await res.json();
+                    maps.value = data.maps;
+                    if (maps.value.length > 0) selectedMap.value = maps.value[0];
+                };
+
+                const fetchState = async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/admin/status`);
+                        const data = await res.json();
+                        sessionStatus.value = data.status;
+                        
+                        // Merge logs
+                        if (data.recent_logs && data.recent_logs.length > 0) {
+                            // Simple dedupe or replace strategy? 
+                            // Since we want full history in dashboard, let's just replace for now or append if we track last index.
+                            // For simplicity in this prototype, backend returns ALL recent buffer logs.
+                            logs.value = data.recent_logs.reverse(); // Newest at bottom usually? No, logs usually newest bottom.
+                        }
+                    } catch (e) {
+                        console.error("Poll error", e);
+                    } finally {
+                        if (pollInterval !== 'STOPPED') { // Simple flag to control stopping if needed, or just rely on component unmount
+                             pollInterval = setTimeout(fetchState, 1500);
+                        }
+                    }
+                };
+
+                const startExperiment = async () => {
+                    if (!selectedMap.value) return;
+                    await fetch(`${API_BASE}/admin/start`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            map_id: selectedMap.value,
+                            participant_id: participantId.value
+                        })
+                    });
+                    // fetchState loop is already running
+                };
+
+                const resetSession = async () => {
+                    if(!confirm('确定要强制重置当前会话吗？受试者页面将重新等待。')) return;
+                    await fetch(`${API_BASE}/admin/reset`, { method: 'POST' });
+                    logs.value = [];
+                    // fetchState loop is already running
+                };
+
+                const getLogColor = (type) => {
+                    if (type.includes('error')) return 'border-red-500 text-red-300';
+                    if (type.includes('start')) return 'border-green-500 text-green-300';
+                    if (type.includes('end')) return 'border-purple-500 text-purple-300';
+                    if (type.includes('event')) return 'border-amber-500 text-amber-300';
+                    return 'border-blue-500';
+                };
+
+                const formatTime = (iso) => {
+                    if (!iso) return '';
+                    return iso.split('T')[1].split('.')[0];
+                };
+
+                onMounted(() => {
+                    lucide.createIcons();
+                    fetchMaps();
+                    // Start the polling loop
+                    fetchState(); 
+                });
+
+                onUnmounted(() => {
+                    pollInterval = 'STOPPED'; // Signal to stop recursion
+                });
+
+                return {
+                    sessionStatus, maps, selectedMap, participantId, logs, logContainer,
+                    isSessionActive, statusColor,
+                    startExperiment, resetSession, getLogColor, formatTime
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

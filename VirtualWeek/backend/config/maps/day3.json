@@ -1,6 +1,7 @@
 {
     "map_id": "day_3",
     "description": "Virtual Week Day 3 - Wednesday",
+    "dice_sequence": [2, 6, 1, 5, 3, 4, 2, 6, 5, 1, 4, 3, 2, 6, 1, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3],
     "total_steps": 120,
     "steps_per_hour": 8,
     "events": {
