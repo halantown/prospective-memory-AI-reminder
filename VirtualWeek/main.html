@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Virtual Week - Perfect Layout</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Game Components -->
+    <script src="js/components/SupermarketGame.js"></script>
+
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            touch-action: manipulation;
+            background-color: #f1f5f9;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* 22列 x 14行 网格 - 填满屏幕 */
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(22, 1fr);
+            grid-template-rows: repeat(14, 1fr);
+            gap: 2px;
+            width: 98vw;
+            height: 85vh; /* 留出头部空间 */
+            max-width: 1400px;
+            margin: 50px auto 0; /* 顶部留白给状态栏 */
+            padding: 4px;
+        }
+
+        .cell {
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            box-shadow: 0 2px 0 #94a3b8;
+            font-weight: 700;
+            color: #64748b;
+            font-size: 0.7rem;
+            transition: all 0.2s ease;
+            z-index: 1; /* 默认层级 */
+        }
+
+        /* 关键修复：拥有时间标记的格子层级更高，防止被上方/下方的格子遮挡 */
+        .cell.has-marker {
+            z-index: 30 !important;
+        }
+
+        /* 动态箭头样式 */
+        .path-arrow {
+            position: absolute;
+            color: #0f172a;
+            opacity: 0.15;
+            width: 14px;
+            height: 14px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .cell.active-cell {
+            background-color: #dbeafe;
+            border-color: #3b82f6;
+            box-shadow: 0 2px 0 #2563eb;
+            z-index: 20; /* 激活时层级也很高 */
+        }
+
+        .cell.event { 
+            background-color: #fff7ed; 
+            border-color: #f97316; 
+            box-shadow: 0 2px 0 #c2410c;
+        }
+        
+        .cell.start { 
+            background-color: #f0fdf4; 
+            border-color: #16a34a;
+            box-shadow: 0 2px 0 #15803d;
+        }
+
+        .cell.hour { 
+            background-color: #cbd5e1; /* slate-300 - Distinct gray */
+            border-color: #94a3b8;
+            box-shadow: 0 2px 0 #64748b;
+        }
+
+        .token {
+            width: 16px;
+            height: 16px;
+            background-color: #1e293b;
+            border: 2px solid #60a5fa; 
+            border-radius: 50%;
+            position: absolute;
+            z-index: 50;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* 中控台 - 严格居中，不与路径重叠 */
+        .center-hub {
+            grid-column: 5 / 19; /* 宽跨度 */
+            grid-row: 5 / 11;    /* 高跨度 */
+            background-color: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+            padding: 8px 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 5;
+            border: 1px solid #e2e8f0;
+            margin: 4px;
+        }
+
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 1rem;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 4px 0 #1d4ed8;
+            transition: transform 0.1s;
+        }
+        .btn-primary:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #1d4ed8;
+        }
+        
+        .btn-option {
+            background-color: white;
+            border: 2px solid #e2e8f0;
+            padding: 14px;
+            border-radius: 10px;
+            text-align: left;
+            margin-bottom: 8px;
+            width: 100%;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        .btn-option:active {
+            background-color: #f1f5f9;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 550px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            border: 1px solid #e2e8f0;
+        }
+
+        @keyframes rattle {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            50% { transform: translate(-1px, 2px) rotate(-3deg); }
+            100% { transform: translate(1px, -2px) rotate(3deg); }
+        }
+        .rolling-anim { animation: rattle 0.08s infinite; }
+        .dice-display { font-variant-numeric: tabular-nums; }
+        
+        /* 修复后的时间标记样式 */
+        .hour-marker {
+            font-size: 9px;
+            font-weight: 800;
+            background-color: #334155;
+            color: #f8fafc;
+            padding: 2px 6px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+            border: 1px solid white; /* 增加白色描边增强对比 */
+        }
+
+        /* Minigame Styles */
+        .item-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .item-card.selected {
+            border-color: #ef4444; 
+            background-color: #fef2f2;
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.2);
+        }
+        .pop-in { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.5); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="w-full h-full flex flex-col relative">
+
+        <!-- Top Status Bar (Floating) - Only Day Indicator remains -->
+        <div class="absolute top-0 left-0 right-0 z-40 px-4 py-3 pointer-events-none flex justify-center">
+            <!-- Day Indicator -->
+            <div class="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-b-xl px-6 py-2 pointer-events-auto mt-[-12px] border-t-0">
+                    <span class="text-sm font-bold text-slate-600 tracking-wide">Day {{ currentDay }} <span class="text-slate-300 mx-1">|</span> Mon</span>
+            </div>
+        </div>
+
+        <!-- The Board -->
+        <div class="game-board">
+            <div v-for="(cell, index) in boardCells" :key="index"
+                class="cell"
+                :class="[
+                    cell.type === 'E' ? 'event' : '',
+                    cell.type === 'Start' ? 'start' : '',
+                    cell.type === 'Hour' ? 'hour' : '',
+                    playerPos === index ? 'active-cell' : '',
+                    cell.hourMarker ? 'has-marker' : '' 
+                ]"
+                :style="getCellStyle(cell)"
+            >
+                <!-- Arrow (Dynamic Rotation) -->
+                <svg v-if="cell.rotation !== undefined" class="path-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" 
+                    :style="{ transform: `rotate(${cell.rotation}deg)` }">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+
+                <!-- Labels -->
+                <span v-if="cell.type === 'E'" class="text-lg font-black text-amber-600/90 relative z-10">E</span>
+                <span v-else-if="cell.type === 'Start'" class="text-[9px] font-black text-green-700 uppercase relative z-10">Start</span>
+                
+                <!-- Time Markers -->
+                <div v-if="cell.hourMarker" 
+                    class="absolute left-1/2 -translate-x-1/2 z-20 hour-marker"
+                    :class="index === 0 ? '-bottom-4' : '-top-4'">
+                    {{ cell.hourMarker }}
+                </div>
+                
+                <!-- Player Token -->
+                <div v-if="playerPos === index" class="token"></div>
+            </div>
+
+            <!-- Center Hub -->
+            <div class="center-hub relative">
+                
+                <!-- Top Left: Virtual Clock -->
+                <div class="absolute top-4 left-5 flex items-center gap-3">
+                    <div class="bg-blue-50 p-2 rounded-lg">
+                        <i data-lucide="clock" class="w-6 h-6 text-blue-600"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400 font-bold uppercase leading-none mb-1">虚拟时间</div>
+                        <div class="text-2xl font-black text-slate-800 leading-none">{{ formattedVirtualTime }}</div>
+                    </div>
+                </div>
+
+                <!-- Top Right: Real Timer -->
+                <div class="absolute top-4 right-5 flex items-center gap-3 flex-row-reverse text-right">
+                    <div class="bg-red-50 p-2 rounded-lg">
+                        <i data-lucide="timer" class="w-6 h-6 text-red-500"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-red-300 font-bold uppercase leading-none mb-1">真实计时</div>
+                        <div class="text-2xl font-mono font-bold text-red-500 leading-none">{{ formattedRealTime }}</div>
+                    </div>
+                </div>
+
+                <!-- Status Text -->
+                <div class="w-full text-center mt-16">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-2 transition-all">{{ statusMessage }}</h2>
+                    <p class="text-lg text-slate-400 font-medium">{{ subMessage }}</p>
+                </div>
+
+                <!-- Action Area -->
+                <div class="flex-grow flex items-center justify-center w-full min-h-0 relative py-2">
+                    
+                    <!-- Idle: Dice (Larger Size) -->
+                    <button v-if="phase === 'idle'" @click="rollDice" 
+                        class="relative w-32 h-32 bg-white border-2 border-slate-200 rounded-2xl flex flex-col items-center justify-center shadow-[0_6px_0_#cbd5e1] active:translate-y-1 active:shadow-none transition-all group overflow-hidden hover:border-blue-400">
+                        
+                        <div v-if="isRolling" class="rolling-anim text-5xl font-black text-blue-500 dice-display">
+                            {{ rollingDisplayValue }}
+                        </div>
+                        <div v-else class="flex flex-col items-center">
+                            <i data-lucide="dices" class="w-10 h-10 text-slate-400 group-hover:text-blue-500 transition-colors mb-2"></i>
+                            <span class="text-lg font-bold text-slate-500 uppercase tracking-wider">掷骰子</span>
+                            <span class="text-xs text-slate-300 mt-1 font-mono">(1-6)</span>
+                        </div>
+                        <div v-if="isRolling" class="absolute bottom-0 left-0 h-1.5 bg-blue-500 transition-all duration-100 ease-linear" :style="{ width: rollingProgress + '%' }"></div>
+                    </button>
+
+                    <!-- Moving State (Fixed overlap issue) -->
+                    <div v-if="phase === 'moving'" class="flex flex-col items-center justify-center">
+                        <div class="w-20 h-20 rounded-full bg-blue-50 border-4 border-blue-100 flex items-center justify-center mb-1">
+                            <span class="text-4xl font-black text-blue-600">{{ diceResult }}</span>
+                        </div>
+                        <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest bg-white px-2 py-0.5 rounded-full border border-blue-100">移动中...</span>
+                    </div>
+
+                    <!-- Confirm -->
+                    <div v-if="phase === 'waiting_confirm'" class="w-full max-w-[14rem]">
+                        <button @click="confirmContinue" class="btn-primary">
+                            继续下一步
+                        </button>
+                    </div>
+
+                    <!-- Event Resolve -->
+                    <div v-if="phase === 'resolving_event'" class="w-full max-w-[16rem] text-center">
+                        <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl mb-4">
+                            <p class="text-xs text-amber-600 font-bold uppercase mb-1">检定目标</p>
+                            <p class="text-2xl font-bold text-amber-900">{{ requiredRollText }}</p>
+                        </div>
+                        <button @click="rollForEvent" class="btn-primary bg-amber-500 shadow-amber-700">
+                            掷骰子判定
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bottom Task Button -->
+                <div class="w-full flex justify-between items-center border-t border-slate-100 pt-4 mt-2 flex-shrink-0">
+                    <div class="text-sm text-slate-400 leading-tight font-medium bg-slate-50 px-4 py-3 rounded-xl max-w-[50%]">
+                        <span class="text-amber-500 font-bold block mb-1 text-base">⚠️ 规则提示</span>
+                        遇到 'E' 格子会自动暂停
+                    </div>
+                    <button @click="openTaskMenu" :disabled="!isGameActive" 
+                        class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-3 rounded-2xl font-bold shadow-[0_4px_0_#be123c] active:shadow-none active:translate-y-[4px] disabled:opacity-50 disabled:shadow-none flex items-center gap-2 transition-all text-lg">
+                        <i data-lucide="brain-circuit" class="w-6 h-6"></i>
+                        汇报任务
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Card Modal -->
+        <div v-if="showStartCard" class="modal-overlay">
+            <div class="card bg-white border-t-8 border-green-500">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="bg-green-100 p-3 rounded-xl text-green-600"><i data-lucide="sun" class="w-8 h-8"></i></div>
+                    <div>
+                        <h2 class="text-2xl font-black text-slate-800">周一: 早安</h2>
+                        <p class="text-slate-500 text-sm font-medium">请大声朗读以下任务</p>
+                    </div>
+                </div>
+                <div class="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+                    <div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">今日专属任务</p>
+                        </div>
+                        <ul class="space-y-3">
+                            <li v-for="task in dayScenario.irregularTasks" :key="task.id" class="flex items-start gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                <span class="bg-white text-green-600 font-bold px-2 py-0.5 rounded border border-green-200 text-[10px] mt-0.5 uppercase tracking-wide">Task</span>
+                                <span class="text-slate-700 font-bold text-sm">{{ task.description }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                         <div class="flex items-center gap-2 mb-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">常规重复任务</p>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 grid grid-cols-2 gap-3 text-xs text-blue-800 font-medium">
+                            <div class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 opacity-60"></i> 11:00 AM 哮喘药</div>
+                            <div class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 opacity-60"></i> 9:00 PM 哮喘药</div>
+                            <div class="flex items-center gap-1.5"><i data-lucide="utensils" class="w-3.5 h-3.5 opacity-60"></i> 早餐时 抗生素</div>
+                            <div class="flex items-center gap-1.5"><i data-lucide="utensils" class="w-3.5 h-3.5 opacity-60"></i> 晚餐时 抗生素</div>
+                            <div class="col-span-2 text-red-500 mt-2 flex items-center gap-1.5 font-bold border-t border-blue-200 pt-3"><i data-lucide="timer" class="w-3.5 h-3.5"></i> 真实时间 2:30 & 4:15 肺活量测试</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8">
+                    <button @click="dismissStartCard" class="btn-primary bg-green-600 shadow-green-800">开始这一天</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Card Modal -->
+        <div v-if="showEventCard" class="modal-overlay">
+            <div class="card bg-white border-t-8 border-amber-500">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <span class="inline-block bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold mb-2 tracking-wide uppercase">EVENT CARD</span>
+                        <h2 class="text-3xl font-black text-slate-800 leading-none">{{ currentEvent.category || 'Event' }}</h2>
+                    </div>
+                    <div class="bg-amber-50 p-3 rounded-full text-amber-500"><i data-lucide="alert-circle" class="w-8 h-8"></i></div>
+                </div>
+                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 mb-6">
+                    <p class="text-xl text-slate-700 font-medium leading-relaxed">{{ currentEvent.text }}</p>
+                </div>
+                <div v-if="currentEvent.choices" class="space-y-3">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">请选择一个行动</p>
+                    <button v-for="(choice, idx) in currentEvent.choices" :key="idx" @click="selectEventChoice(choice)" class="btn-option hover:border-blue-400 flex items-center justify-between group py-4">
+                        <span class="font-bold text-slate-700 text-base">{{ choice.text }}</span>
+                        <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors font-bold">需: {{ choice.rollReq }}</span>
+                    </button>
+                </div>
+                <button v-else @click="closeEventCard" class="btn-primary bg-amber-500 shadow-amber-700 mt-4">知道了</button>
+            </div>
+        </div>
+
+        <!-- Generic Minigame Modal -->
+        <div v-if="showMinigame" class="modal-overlay" style="z-index: 200;">
+            <div class="card w-full max-w-5xl h-[85vh] flex flex-col relative overflow-hidden p-0 border-4 border-slate-800 shadow-2xl" 
+                 :style="{ backgroundImage: `url('${minigameBackground}')`, backgroundSize: 'cover', backgroundPosition: 'center' }">
+                
+                <!-- Semi-transparent overlay -->
+                <div class="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-0"></div>
+
+                <!-- Header -->
+                <div class="bg-blue-600/90 p-4 text-white shrink-0 relative z-10 flex justify-between items-center shadow-lg backdrop-blur-md">
+                    <div class="flex items-center gap-4">
+                        <div class="bg-white/20 p-2 rounded-xl">
+                            <i class="w-8 h-8 text-white" :data-lucide="minigameIcon || 'gamepad-2'"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl font-black tracking-tight">{{ minigameTitle }}</h1>
+                            <p class="text-blue-100 font-medium text-sm opacity-90">{{ minigameSubtitle }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Component Loader -->
+                <div class="flex-grow relative z-10 overflow-hidden">
+                    <component 
+                        :is="activeGameComponent" 
+                        :scenario="activeGameScenario" 
+                        @complete="handleMinigameComplete">
+                    </component>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Task Menu -->
+        <div v-if="showTaskMenu" class="modal-overlay" @click.self="showTaskMenu = false">
+            <div class="card max-w-md bg-white">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-black text-slate-800">记录记忆任务</h3>
+                    <button @click="showTaskMenu = false" class="p-2 hover:bg-slate-100 rounded-full"><i data-lucide="x" class="w-6 h-6 text-slate-400"></i></button>
+                </div>
+                <div class="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto p-1">
+                    <button @click="performTask('Asthma Medication')" class="p-4 bg-blue-50 text-blue-800 rounded-xl font-bold text-sm text-left hover:bg-blue-100 transition-colors flex items-center gap-3">
+                        <i data-lucide="pill" class="w-4 h-4 opacity-50"></i> 哮喘药 (Asthma)
+                    </button>
+                    <button @click="performTask('Antibiotics')" class="p-4 bg-indigo-50 text-indigo-800 rounded-xl font-bold text-sm text-left hover:bg-indigo-100 transition-colors flex items-center gap-3">
+                        <i data-lucide="pill" class="w-4 h-4 opacity-50"></i> 抗生素 (Antibiotics)
+                    </button>
+                    <button @click="performTask('Lung Test')" class="p-4 bg-red-50 text-red-800 rounded-xl font-bold text-sm text-left hover:bg-red-100 transition-colors flex items-center gap-3">
+                        <i data-lucide="wind" class="w-4 h-4 opacity-50"></i> 肺活量测试 (Lung Test)
+                    </button>
+                    <div class="h-px bg-slate-100 my-2"></div>
+                    <button @click="performTask('Dry Cleaning')" class="p-4 bg-emerald-50 text-emerald-800 rounded-xl font-bold text-sm text-left hover:bg-emerald-100 transition-colors flex items-center gap-3">
+                        <i data-lucide="shirt" class="w-4 h-4 opacity-50"></i> 送干洗
+                    </button>
+                    <button @click="performTask('Phone Bank')" class="p-4 bg-emerald-50 text-emerald-800 rounded-xl font-bold text-sm text-left hover:bg-emerald-100 transition-colors flex items-center gap-3">
+                        <i data-lucide="phone" class="w-4 h-4 opacity-50"></i> 预约银行
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+        function generatePath() {
+            // Grid 22x14
+            // Coordinates: x: 0..21, y: 0..13
+            // Path target: 8 steps per hour * 15 hours = 120 steps.
+            // Bumps extend towards center up to 3 units.
+            
+            let p = [];
+            let x = 21; 
+            let y = 13;
+            p.push({x, y}); // Start point
+
+            const move = (dx, dy) => {
+                x += dx;
+                y += dy;
+                p.push({x, y});
+            };
+
+            // Bump functions (Inward/Center-ward)
+            const bumpUp = (depth) => { // From Bottom
+                for(let i=0; i<depth; i++) move(0, -1);
+                move(-1, 0);
+                for(let i=0; i<depth; i++) move(0, 1);
+            };
+            const bumpRight = (depth) => { // From Left
+                for(let i=0; i<depth; i++) move(1, 0);
+                move(0, -1);
+                for(let i=0; i<depth; i++) move(-1, 0);
+            };
+            const bumpDown = (depth) => { // From Top
+                for(let i=0; i<depth; i++) move(0, 1);
+                move(1, 0);
+                for(let i=0; i<depth; i++) move(0, -1);
+            };
+            const bumpLeft = (depth) => { // From Right
+                for(let i=0; i<depth; i++) move(-1, 0);
+                move(0, 1);
+                for(let i=0; i<depth; i++) move(1, 0);
+            };
+
+            // 1. Bottom Edge (Right to Left)
+            // Sequence: 4 - B(3) - 5 - B(3) - 5 - B(3) - 4
+            for(let i=0; i<4; i++) move(-1, 0);
+            bumpUp(3);
+            for(let i=0; i<5; i++) move(-1, 0);
+            bumpUp(3);
+            for(let i=0; i<5; i++) move(-1, 0);
+            bumpUp(3);
+            for(let i=0; i<4; i++) move(-1, 0);
+
+            // 2. Left Edge (Bottom to Top)
+            // Sequence: 4 - B(3) - 4 - B(1) - 3
+            for(let i=0; i<4; i++) move(0, -1);
+            bumpRight(3);
+            for(let i=0; i<4; i++) move(0, -1);
+            bumpRight(1);
+            for(let i=0; i<3; i++) move(0, -1);
+
+            // 3. Top Edge (Left to Right)
+            // Sequence: 4 - B(3) - 5 - B(3) - 5 - B(3) - 4
+            for(let i=0; i<4; i++) move(1, 0);
+            bumpDown(3);
+            for(let i=0; i<5; i++) move(1, 0);
+            bumpDown(3);
+            for(let i=0; i<5; i++) move(1, 0);
+            bumpDown(3);
+            for(let i=0; i<4; i++) move(1, 0);
+
+            // 4. Right Edge (Top to Bottom)
+            // Sequence: 4 - B(3) - 4 - B(1) - 3
+            for(let i=0; i<4; i++) move(0, 1);
+            bumpLeft(3);
+            for(let i=0; i<4; i++) move(0, 1);
+            bumpLeft(1);
+            for(let i=0; i<3; i++) move(0, 1);
+
+            // Start point duplication check
+            if (p.length > 1 && p[p.length-1].x === 21 && p[p.length-1].y === 13) {
+                p.pop();
+            }
+
+            return p;
+        }
+
+        // Calculate Rotation for each cell to point to next
+        function calculateRotations(path) {
+            return path.map((curr, i) => {
+                const next = path[(i + 1) % path.length];
+                const dx = next.x - curr.x;
+                const dy = next.y - curr.y;
+                let deg = 0;
+                if (dx === 1) deg = 0;      // Right
+                else if (dx === -1) deg = 180; // Left
+                else if (dy === 1) deg = 90;   // Down
+                else if (dy === -1) deg = 270; // Up
+                return { ...curr, rotation: deg };
+            });
+        }
+
+        const rawPath = calculateRotations(generatePath());
+        const STEPS_PER_HOUR = rawPath.length / 15;
+        
+        const getIdx = (hrOffset) => Math.floor(hrOffset * STEPS_PER_HOUR);
+
+        const EVENT_LOCATIONS = {
+            [getIdx(1)]: { type: 'E', time: '8:00' },   
+            [getIdx(4)]: { type: 'E', time: '11:00' }, 
+            [getIdx(6)]: { type: 'E', time: '13:00' },  
+            [getIdx(11)]: { type: 'E', time: '18:00' }, 
+            [getIdx(13)]: { type: 'E', time: '20:00' }, 
+            [getIdx(14)]: { type: 'E', time: '21:00' }  
+        };
+
+        // Game Registry: Maps event category to game components details
+        const GAME_REGISTRY = {
+            'Shopping': {
+                component: window.SupermarketGame,
+                title: '超市大采购',
+                subtitle: '请帮忙检查购物篮',
+                icon: 'shopping-cart',
+                background: 'pics/ah.png',
+                defaultScenario: {
+                    context: "准备做一份水果沙拉招待朋友",
+                    items: [
+                        { id: 101, name: "红苹果", emoji: "🍎", isReasonable: true },
+                        { id: 102, name: "甜香蕉", emoji: "🍌", isReasonable: true },
+                        { id: 103, name: "酸奶", emoji: "🥛", isReasonable: true },
+                        { id: 104, name: "大蒜头", emoji: "🧄", isReasonable: false },
+                        { id: 105, name: "大碗", emoji: "🥣", isReasonable: true },
+                        { id: 106, name: "葡萄", emoji: "🍇", isReasonable: true },
+                    ]
+                }
+            }
+            // Future games: 'Library': { ... }, 'Social': { ... }
+        };
+
+        const HOUR_MARKERS = {};
+        for (let i = 0; i <= 15; i++) {
+            const idx = Math.min(Math.floor(i * STEPS_PER_HOUR), rawPath.length - 1);
+            const hour = 7 + i;
+            const label = hour > 12 ? (hour - 12) + 'pm' : hour + (hour === 12 ? 'pm' : 'am');
+            HOUR_MARKERS[idx] = label;
+        }
+
+        // Backend will provide map config, this is just a placeholder to init ref
+        const generatedBoard = []; 
+
+
+        const DAY_1_SCENARIO = { irregularTasks: [], events: {} };\n
+        const API_BASE = "/api";
+
+        createApp({
+            setup() {
+                const boardCells = ref([]);
+                const playerPos = ref(0);
+                const currentDay = ref(1);
+                
+                // Game States
+                const phase = ref('loading'); // loading, start_card, idle, moving, processing_event, minigame, finished
+                const statusMessage = ref('连接服务器...');
+                const subMessage = ref('');
+                
+                // Event & Minigame
+                const showStartCard = ref(false); 
+                const showEventCard = ref(false);
+                const showTaskMenu = ref(false);
+                const currentEvent = ref({});
+                const requiredRollText = ref('');
+                
+                // Minigame State
+                const showMinigame = ref(false);
+                const activeGameComponent = ref(null);
+                const activeGameScenario = ref({}); 
+                const minigameTitle = ref('');
+                const minigameSubtitle = ref('');
+                const minigameIcon = ref('');
+                const minigameBackground = ref('');
+
+                // Rolling
+                const isRolling = ref(false);
+                const rollingDisplayValue = ref(1);
+                const rollingProgress = ref(0);
+                const diceResult = ref(0);
+
+                // Timers
+                const realTimeSeconds = ref(0);
+                let timerInterval = null;
+                
+                // Backend Config Data
+                const totalSteps = ref(120);
+                const eventMap = ref({}); // Position -> Event Data
+                const dayScenario = ref({ irregularTasks: [] }); 
+
+                // --- Initial Load ---
+                onMounted(async () => {
+                    lucide.createIcons();
+                    await fetchGameConfig();
+                    
+                    // Build Board Cells
+                    boardCells.value = rawPath.map((pos, index) => {
+                       let cell = { ...pos, type: 'Normal', label: '' };
+                       
+                       if (index === 0) cell.type = 'Start';
+                       else if (eventMap.value[index]) cell.type = 'E'; // Known from backend
+                       else if (index > 0 && index % 8 === 0) cell.type = 'Hour'; 
+                       
+                       // Time Marker Visuals
+                       const stepsPerHour = 8;
+                       if (index % stepsPerHour === 0) {
+                           const hour = 7 + (index / stepsPerHour);
+                           if (hour <= 22) {
+                               const label = hour > 12 ? (hour - 12) + 'pm' : hour + (hour === 12 ? 'pm' : 'am');
+                               cell.hourMarker = label;
+                           }
+                       }
+                       return cell;
+                    });
+                    
+                    phase.value = 'idle'; 
+                    statusMessage.value = "准备就绪";
+                    subMessage.value = "点击骰子开始";
+                    
+                    if (dayScenario.value && dayScenario.value.irregularTasks.length > 0) {
+                         showStartCard.value = true;
+                    }
+                    startTimer();
+                });
+
+                const startTimer = () => {
+                    if (timerInterval) clearInterval(timerInterval);
+                    timerInterval = setInterval(() => { realTimeSeconds.value++; }, 1000);
+                };
+
+                const fetchGameConfig = async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/config/init`);
+                        const data = await res.json();
+                        totalSteps.value = data.map_size;
+                    
+                        const posMap = {};
+                        if (data.event_positions) {
+                           for (const [pos, id] of Object.entries(data.event_positions)) {
+                               posMap[parseInt(pos)] = true;
+                           }
+                        }
+                        eventMap.value = posMap;
+                        
+                        // Mock Day Scenario for now until API is ready
+                        dayScenario.value = {
+                             irregularTasks: [
+                                { id: 'irr_1', description: "API: 购物时送干洗", target: 'Shopping' },
+                                { id: 'irr_2', description: "API: 12:00 银行预约", target: '12:00' }
+                            ]
+                        };
+
+                    } catch (e) {
+                        console.error("Backend Error", e);
+                        statusMessage.value = "服务器连接失败";
+                    }
+                };
+
+                // --- Actions ---
+
+                const rollDice = async () => {
+                    if (isRolling.value) return;
+                    isRolling.value = true;
+                    statusMessage.value = "请求随机数...";
+                    
+                    try {
+                        const res = await fetch(`${API_BASE}/game/roll`, { method: 'POST' });
+                        const data = await res.json();
+                        const serverRoll = data.roll;
+
+                        // Animation
+                        subMessage.value = "掷骰子中...";
+                        rollingProgress.value = 0;
+                        const flashInterval = setInterval(() => {
+                            rollingDisplayValue.value = Math.floor(Math.random() * 6) + 1;
+                            rollingProgress.value += 10; 
+                        }, 80);
+
+                        setTimeout(() => {
+                            clearInterval(flashInterval);
+                            rollingDisplayValue.value = serverRoll; 
+                            diceResult.value = serverRoll;
+                            rollingProgress.value = 100;
+                            
+                            setTimeout(() => {
+                                isRolling.value = false;
+                                moveToken(serverRoll);
+                            }, 500);
+                        }, 800);
+                        
+                    } catch (e) {
+                         console.error(e);
+                         isRolling.value = false;
+                         statusMessage.value = "骰子服务异常";
+                    }
+                };
+
+                const moveToken = async (steps) => {
+                    phase.value = 'moving';
+                    subMessage.value = `向前移动 ${steps} 步`;
+
+                    for (let i = 0; i < steps; i++) {
+                        await new Promise(r => setTimeout(r, 400));
+                        playerPos.value++;
+                        
+                        if (eventMap.value[playerPos.value]) {
+                             await reportPosition(playerPos.value, 'Event');
+                             return; 
+                        }
+                    }
+                    await reportPosition(playerPos.value, 'Normal');
+                };
+
+                const reportPosition = async (pos, typeStr) => {
+                    try {
+                        const res = await fetch(`${API_BASE}/game/log_position`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                player_pos: pos,
+                                cell_type: typeStr,
+                                timestamp: Date.now() / 1000
+                            })
+                        });
+                        const result = await res.json();
+                        
+                        if (result.triggered) {
+                            handleServerEventTrigger(result);
+                        } else {
+                            phase.value = 'waiting_confirm';
+                            statusMessage.value = "移动结束";
+                            subMessage.value = "点击继续";
+                        }
+                        
+                    } catch (e) {
+                         console.error(e);
+                         phase.value = 'waiting_confirm';
+                    }
+                };
+
+                const handleServerEventTrigger = (turnResult) => {
+                    const evtDef = turnResult.event_data;
+                    
+                    statusMessage.value = "事件触发";
+                    subMessage.value = evtDef.description || "未知事件";
+
+                    if (GAME_REGISTRY[evtDef.category] && window.SupermarketGame) {
+                        startMinigame(evtDef.category);
+                    } else {
+                         currentEvent.value = {
+                             category: evtDef.category,
+                             text: evtDef.description || "普通事件",
+                             choices: [{ text: "确定", rollReq: "自动" }]
+                         };
+                         showEventCard.value = true;
+                    }
+                };
+
+                const startMinigame = (category) => {
+                    const gameConfig = GAME_REGISTRY[category];
+                    if (!gameConfig) return;
+
+                    activeGameComponent.value = gameConfig.component;
+                    activeGameScenario.value = gameConfig.defaultScenario; 
+                    minigameTitle.value = gameConfig.title;
+                    minigameSubtitle.value = gameConfig.subtitle;
+                    minigameIcon.value = gameConfig.icon;
+                    minigameBackground.value = gameConfig.background;
+                    
+                    showMinigame.value = true;
+                    setTimeout(() => lucide.createIcons(), 100);
+                };
+
+                // --- Helpers ---
+                const handleMinigameComplete = (result) => {
+                    showMinigame.value = false;
+                    phase.value = 'waiting_confirm';
+                    statusMessage.value = "任务完成";
+                };
+
+                const dismissStartCard = () => {
+                    showStartCard.value = false;
+                    phase.value = 'idle';
+                    statusMessage.value = "准备出发";
+                    subMessage.value = "点击骰子";
+                };
+
+                const confirmContinue = () => { phase.value='idle'; statusMessage.value="轮到您了"; subMessage.value="掷骰子"; };
+                const openTaskMenu = () => { showTaskMenu.value = true; };
+                const closeEventCard = () => { showEventCard.value = false; phase.value='waiting_confirm'; };
+                const selectEventChoice = () => { closeEventCard(); }; 
+                const performTask = () => { showTaskMenu.value=false; };
+                const rollForEvent = () => {};
+
+                const getCellStyle = (cell) => ({
+                    gridColumnStart: cell.x + 1,
+                    gridRowStart: cell.y + 1
+                });
+                
+                const formattedVirtualTime = computed(() => {
+                    const startMin = 7 * 60;
+                    const minsPerStep = (15 * 60) / 120; 
+                    const currentTotalMins = startMin + (playerPos.value * minsPerStep);
+                    const h = Math.floor(currentTotalMins / 60) % 24;
+                    const m = Math.floor(currentTotalMins % 60);
+                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                });
+                const formattedRealTime = computed(() => {
+                    const m = Math.floor(realTimeSeconds.value / 60);
+                    const s = realTimeSeconds.value % 60;
+                    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                });
+                const isGameActive = computed(() => !showStartCard.value && !showEventCard.value && !showMinigame.value);
+
+                return {
+                    boardCells, playerPos, currentDay, phase, statusMessage, subMessage,
+                    showStartCard, showEventCard, showTaskMenu, showMinigame,
+                    activeGameComponent, activeGameScenario, minigameTitle, minigameSubtitle, minigameIcon, minigameBackground,
+                    currentEvent, isRolling, rollingDisplayValue, rollingProgress, diceResult,
+                    formattedVirtualTime, formattedRealTime, dayScenario, requiredRollText, isGameActive,
+                    dismissStartCard, rollDice, confirmContinue, handleMinigameComplete,
+                    openTaskMenu, closeEventCard, selectEventChoice, getCellStyle, performTask, rollForEvent
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

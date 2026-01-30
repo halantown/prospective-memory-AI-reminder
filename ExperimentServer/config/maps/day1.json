@@ -1,0 +1,55 @@
+{
+    "map_id": "day_1",
+    "description": "Virtual Week Day 1 - Practice",
+    "total_steps": 120,
+    "steps_per_hour": 8,
+    "events": {
+        "8": {
+            "type": "event",
+            "category": "Breakfast",
+            "name": "早餐时间",
+            "description": "早餐时间到啦，请选择您的早餐。",
+            "choices": [
+                { "text": "吃吐司和咖啡", "rollReq": "任意" },
+                { "text": "吃培根和煎蛋", "rollReq": "偶数" }
+            ]
+        },
+        "32": {
+            "type": "event",
+            "category": "Shopping",
+            "name": "超市购物",
+            "description": "您需要去超市完成采购任务。",
+            "minigame": "SupermarketGame"
+        },
+        "48": {
+            "type": "event",
+            "category": "Social",
+            "name": "邻居来访",
+            "description": "邻居 Brian 来了，询问能否帮忙。",
+            "choices": [
+                { "text": "帮忙", "rollReq": "任意" },
+                { "text": "拒绝", "rollReq": "任意" }
+            ]
+        },
+        "88": {
+            "type": "event",
+            "category": "Dinner",
+            "name": "晚餐时间",
+            "description": "准备晚餐的时候到了。",
+             "choices": [
+                { "text": "做意面", "rollReq": "奇数" },
+                { "text": "叫外卖", "rollReq": "任意" }
+            ]
+        },
+        "104": {
+            "type": "event",
+            "category": "Library",
+            "name": "图书馆",
+            "description": "在图书馆查阅资料。"
+        }
+    },
+    "irregular_tasks": [
+        { "id": "irr_1", "description": "购物时，把干洗衣服送去。", "target_event": "Shopping" },
+        { "id": "irr_2", "description": "中午 12:00 给银行打电话预约。", "target_time": "12:00" }
+    ]
+}
