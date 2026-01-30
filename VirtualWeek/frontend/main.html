@@ -484,6 +484,21 @@
     <script>
         const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
 
+        const API_BASE_URL = '/api';
+
+        // --- API Helpers ---
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const options = { method, headers: { 'Content-Type': 'application/json' } };
+                if (body) options.body = JSON.stringify(body);
+                const res = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                return await res.json();
+            } catch (e) {
+                console.error(`API Error (${endpoint}):`, e);
+                return null;
+            }
+        }
+
         function generatePath() {
             // Grid 22x14
             // Coordinates: x: 0..21, y: 0..13
@@ -585,17 +600,6 @@
         const rawPath = calculateRotations(generatePath());
         const STEPS_PER_HOUR = rawPath.length / 15;
         
-        const getIdx = (hrOffset) => Math.floor(hrOffset * STEPS_PER_HOUR);
-
-        const EVENT_LOCATIONS = {
-            [getIdx(1)]: { type: 'E', time: '8:00' },   
-            [getIdx(4)]: { type: 'E', time: '11:00' }, 
-            [getIdx(6)]: { type: 'E', time: '13:00' },  
-            [getIdx(11)]: { type: 'E', time: '18:00' }, 
-            [getIdx(13)]: { type: 'E', time: '20:00' }, 
-            [getIdx(14)]: { type: 'E', time: '21:00' }  
-        };
-
         // Game Registry: Maps event category to game components details
         const GAME_REGISTRY = {
             'Shopping': {
@@ -616,23 +620,7 @@
                     ]
                 }
             }
-            // Future games: 'Library': { ... }, 'Social': { ... }
         };
-
-        const HOUR_MARKERS = {};
-        for (let i = 0; i <= 15; i++) {
-            const idx = Math.min(Math.floor(i * STEPS_PER_HOUR), rawPath.length - 1);
-            const hour = 7 + i;
-            const label = hour > 12 ? (hour - 12) + 'pm' : hour + (hour === 12 ? 'pm' : 'am');
-            HOUR_MARKERS[idx] = label;
-        }
-
-        // Backend will provide map config, this is just a placeholder to init ref
-        const generatedBoard = []; 
-
-
-        const DAY_1_SCENARIO = { irregularTasks: [], events: {} };\n
-        const API_BASE = "/api";
 
         createApp({
             setup() {
@@ -641,11 +629,14 @@
                 const currentDay = ref(1);
                 
                 // Game States
-                const phase = ref('loading'); // loading, start_card, idle, moving, processing_event, minigame, finished
+                const phase = ref('loading');
                 const statusMessage = ref('连接服务器...');
                 const subMessage = ref('');
                 
-                // Event & Minigame
+                const logFileName = ref(null);
+                const participantId = ref('guest_' + Math.floor(Math.random() * 1000));
+
+                // UI Visibility
                 const showStartCard = ref(false); 
                 const showEventCard = ref(false);
                 const showTaskMenu = ref(false);
@@ -671,177 +662,194 @@
                 const realTimeSeconds = ref(0);
                 let timerInterval = null;
                 
-                // Backend Config Data
-                const totalSteps = ref(120);
-                const eventMap = ref({}); // Position -> Event Data
-                const dayScenario = ref({ irregularTasks: [] }); 
+                // Data
+                const dayScenario = ref({ irregularTasks: [], events: {} }); 
 
-                // --- Initial Load ---
+                // --- Initialization ---
                 onMounted(async () => {
                     lucide.createIcons();
-                    await fetchGameConfig();
-                    
-                    // Build Board Cells
-                    boardCells.value = rawPath.map((pos, index) => {
-                       let cell = { ...pos, type: 'Normal', label: '' };
-                       
-                       if (index === 0) cell.type = 'Start';
-                       else if (eventMap.value[index]) cell.type = 'E'; // Known from backend
-                       else if (index > 0 && index % 8 === 0) cell.type = 'Hour'; 
-                       
-                       // Time Marker Visuals
-                       const stepsPerHour = 8;
-                       if (index % stepsPerHour === 0) {
-                           const hour = 7 + (index / stepsPerHour);
-                           if (hour <= 22) {
-                               const label = hour > 12 ? (hour - 12) + 'pm' : hour + (hour === 12 ? 'pm' : 'am');
-                               cell.hourMarker = label;
-                           }
-                       }
-                       return cell;
-                    });
-                    
-                    phase.value = 'idle'; 
-                    statusMessage.value = "准备就绪";
-                    subMessage.value = "点击骰子开始";
-                    
-                    if (dayScenario.value && dayScenario.value.irregularTasks.length > 0) {
-                         showStartCard.value = true;
-                    }
-                    startTimer();
+                    await initGameSession();
                 });
+
+                const initGameSession = async () => {
+                    // 1. Initialize Logging
+                    const logRes = await apiCall('/log/init', 'POST', {
+                        participant_id: participantId.value,
+                        session_id: 1
+                    });
+                    if (logRes && logRes.log_file) {
+                        logFileName.value = logRes.log_file;
+                        console.log("Logging to:", logFileName.value);
+                    }
+
+                    // 2. Fetch Map Config
+                    statusMessage.value = "加载地图数据";
+                    const mapConfig = await apiCall('/map/day_1'); // Default to day_1
+                    if (mapConfig) {
+                        setupBoard(mapConfig);
+                    } else {
+                        statusMessage.value = "加载失败";
+                        subMessage.value = "无法连接服务器";
+                    }
+                };
+
+                const setupBoard = (config) => {
+                    // Parse Events from Config
+                    const eventLocations = {};
+                    const eventsMap = {};
+                    
+                    if (config.events) {
+                        for (const [stepIdx, evt] of Object.entries(config.events)) {
+                            eventLocations[stepIdx] = { type: 'E', time: evt.time || '' };
+                            eventsMap[stepIdx] = evt;
+                        }
+                    }
+
+                    // Setup Scenario Data
+                    dayScenario.value = {
+                        irregularTasks: config.irregular_tasks || [],
+                        events: eventsMap
+                    };
+
+                    // Build Board Cells
+                    const hourMarkers = {};
+                    for (let i = 0; i <= 15; i++) {
+                        const idx = Math.min(Math.floor(i * STEPS_PER_HOUR), rawPath.length - 1);
+                        const hour = 7 + i;
+                        const label = hour > 12 ? (hour - 12) + 'pm' : hour + (hour === 12 ? 'pm' : 'am');
+                        hourMarkers[idx] = label;
+                    }
+
+                    boardCells.value = rawPath.map((pos, index) => {
+                        let cell = { ...pos, type: '', label: '' };
+                        if (index === 0) {
+                            cell.type = 'Start';
+                        } else if (eventLocations[index]) {
+                            cell.type = 'E';
+                        } else if (hourMarkers[index]) {
+                            cell.type = 'Hour';
+                        }
+                        if (hourMarkers[index]) cell.hourMarker = hourMarkers[index];
+                        return cell;
+                    });
+
+                    // Start Game
+                    showStartCard.value = true;
+                    phase.value = 'start_card';
+                    statusMessage.value = "阅读早安卡";
+                    subMessage.value = "";
+                    
+                    logAction('game_start', { map_id: config.map_id });
+                };
+
+                const logAction = (type, details = {}) => {
+                    if (!logFileName.value) return;
+                    apiCall('/log', 'POST', {
+                        log_file: logFileName.value,
+                        client_timestamp: new Date().toISOString(),
+                        event_type: type,
+                        details: typeof details === 'string' ? details : JSON.stringify(details),
+                        metadata: details
+                    });
+                };
 
                 const startTimer = () => {
                     if (timerInterval) clearInterval(timerInterval);
                     timerInterval = setInterval(() => { realTimeSeconds.value++; }, 1000);
+                    logAction('timer_start');
                 };
 
-                const fetchGameConfig = async () => {
-                    try {
-                        const res = await fetch(`${API_BASE}/config/init`);
-                        const data = await res.json();
-                        totalSteps.value = data.map_size;
-                    
-                        const posMap = {};
-                        if (data.event_positions) {
-                           for (const [pos, id] of Object.entries(data.event_positions)) {
-                               posMap[parseInt(pos)] = true;
-                           }
-                        }
-                        eventMap.value = posMap;
-                        
-                        // Mock Day Scenario for now until API is ready
-                        dayScenario.value = {
-                             irregularTasks: [
-                                { id: 'irr_1', description: "API: 购物时送干洗", target: 'Shopping' },
-                                { id: 'irr_2', description: "API: 12:00 银行预约", target: '12:00' }
-                            ]
-                        };
-
-                    } catch (e) {
-                        console.error("Backend Error", e);
-                        statusMessage.value = "服务器连接失败";
-                    }
+                const dismissStartCard = () => {
+                    showStartCard.value = false;
+                    phase.value = 'idle';
+                    statusMessage.value = "准备出发";
+                    subMessage.value = "点击骰子";
+                    startTimer();
+                    logAction('start_card_dismissed');
                 };
 
                 // --- Actions ---
 
-                const rollDice = async () => {
+                const rollDice = () => {
                     if (isRolling.value) return;
                     isRolling.value = true;
-                    statusMessage.value = "请求随机数...";
-                    
-                    try {
-                        const res = await fetch(`${API_BASE}/game/roll`, { method: 'POST' });
-                        const data = await res.json();
-                        const serverRoll = data.roll;
+                    statusMessage.value = "掷骰子中...";
+                    subMessage.value = "等待结果...";
+                    rollingProgress.value = 0;
+                    logAction('dice_roll_start');
 
-                        // Animation
-                        subMessage.value = "掷骰子中...";
-                        rollingProgress.value = 0;
-                        const flashInterval = setInterval(() => {
-                            rollingDisplayValue.value = Math.floor(Math.random() * 6) + 1;
-                            rollingProgress.value += 10; 
-                        }, 80);
+                    const flashInterval = setInterval(() => {
+                        rollingDisplayValue.value = Math.floor(Math.random() * 6) + 1;
+                        rollingProgress.value += 10; 
+                    }, 80);
+
+                    setTimeout(() => {
+                        clearInterval(flashInterval);
+                        const finalResult = Math.floor(Math.random() * 6) + 1;
+                        rollingDisplayValue.value = finalResult;
+                        diceResult.value = finalResult;
+                        rollingProgress.value = 100;
+                        
+                        logAction('dice_roll_result', { result: finalResult });
 
                         setTimeout(() => {
-                            clearInterval(flashInterval);
-                            rollingDisplayValue.value = serverRoll; 
-                            diceResult.value = serverRoll;
-                            rollingProgress.value = 100;
-                            
-                            setTimeout(() => {
-                                isRolling.value = false;
-                                moveToken(serverRoll);
-                            }, 500);
-                        }, 800);
-                        
-                    } catch (e) {
-                         console.error(e);
-                         isRolling.value = false;
-                         statusMessage.value = "骰子服务异常";
-                    }
+                            isRolling.value = false;
+                            moveTokenWithPassCheck(finalResult);
+                        }, 500);
+                    }, 800);
                 };
 
-                const moveToken = async (steps) => {
+                const moveTokenWithPassCheck = async (steps) => {
                     phase.value = 'moving';
                     subMessage.value = `向前移动 ${steps} 步`;
 
+                    let interrupted = false;
                     for (let i = 0; i < steps; i++) {
                         await new Promise(r => setTimeout(r, 400));
                         playerPos.value++;
                         
-                        if (eventMap.value[playerPos.value]) {
-                             await reportPosition(playerPos.value, 'Event');
-                             return; 
+                        if (playerPos.value >= boardCells.value.length - 1) {
+                            playerPos.value = boardCells.value.length - 1;
+                            handleDayEnd();
+                            return;
+                        }
+
+                        if (dayScenario.value.events[playerPos.value]) {
+                            interrupted = true;
+                            statusMessage.value = "事件触发";
+                            subMessage.value = "请处理";
+                            
+                            logAction('event_trigger', { 
+                                pos: playerPos.value, 
+                                event_id: dayScenario.value.events[playerPos.value].id || 'unknown' 
+                            });
+
+                            await new Promise(r => setTimeout(r, 500));
+                            triggerEvent(dayScenario.value.events[playerPos.value]);
+                            break; 
                         }
                     }
-                    await reportPosition(playerPos.value, 'Normal');
-                };
 
-                const reportPosition = async (pos, typeStr) => {
-                    try {
-                        const res = await fetch(`${API_BASE}/game/log_position`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                player_pos: pos,
-                                cell_type: typeStr,
-                                timestamp: Date.now() / 1000
-                            })
-                        });
-                        const result = await res.json();
-                        
-                        if (result.triggered) {
-                            handleServerEventTrigger(result);
-                        } else {
-                            phase.value = 'waiting_confirm';
-                            statusMessage.value = "移动结束";
-                            subMessage.value = "点击继续";
-                        }
-                        
-                    } catch (e) {
-                         console.error(e);
-                         phase.value = 'waiting_confirm';
+                    if (!interrupted) {
+                        statusMessage.value = "移动结束";
+                        subMessage.value = "等待继续";
+                        phase.value = 'waiting_confirm';
+                        logAction('move_end', { pos: playerPos.value });
                     }
                 };
 
-                const handleServerEventTrigger = (turnResult) => {
-                    const evtDef = turnResult.event_data;
-                    
-                    statusMessage.value = "事件触发";
-                    subMessage.value = evtDef.description || "未知事件";
-
-                    if (GAME_REGISTRY[evtDef.category] && window.SupermarketGame) {
-                        startMinigame(evtDef.category);
-                    } else {
-                         currentEvent.value = {
-                             category: evtDef.category,
-                             text: evtDef.description || "普通事件",
-                             choices: [{ text: "确定", rollReq: "自动" }]
-                         };
-                         showEventCard.value = true;
+                const triggerEvent = (eventData) => {
+                    // Check if this event category maps to a minigame
+                    if (GAME_REGISTRY[eventData.category]) {
+                        startMinigame(eventData.category);
+                        return;
                     }
+                    currentEvent.value = {
+                        category: eventData.category,
+                        text: eventData.description,
+                        choices: eventData.choices
+                    };
+                    showEventCard.value = true;
                 };
 
                 const startMinigame = (category) => {
@@ -856,7 +864,9 @@
                     minigameBackground.value = gameConfig.background;
                     
                     showMinigame.value = true;
+                    // Ensure Lucide icons re-render inside the new component
                     setTimeout(() => lucide.createIcons(), 100);
+                    logAction('minigame_start', { category });
                 };
 
                 // --- Helpers ---
@@ -864,21 +874,60 @@
                     showMinigame.value = false;
                     phase.value = 'waiting_confirm';
                     statusMessage.value = "任务完成";
+                    logAction('minigame_complete', result);
                 };
 
-                const dismissStartCard = () => {
-                    showStartCard.value = false;
+                const handleDayEnd = () => {
+                    statusMessage.value = "今日结束";
+                    subMessage.value = "通知实验员";
+                    phase.value = 'finished';
+                    clearInterval(timerInterval);
+                    logAction('day_end');
+                };
+
+                const selectEventChoice = (choice) => {
+                    showEventCard.value = false;
+                    phase.value = 'resolving_event';
+                    requiredRollText.value = choice.rollReq;
+                    statusMessage.value = "需要检定";
+                    subMessage.value = `目标: ${choice.rollReq}`;
+                    logAction('event_choice_selected', { choice: choice.text });
+                };
+
+                const closeEventCard = () => {
+                    showEventCard.value = false;
+                    phase.value = 'waiting_confirm';
+                    statusMessage.value = "事件完成";
+                    subMessage.value = "点击继续";
+                    logAction('event_closed');
+                };
+
+                const rollForEvent = () => {
+                    statusMessage.value = "判定中...";
+                    logAction('event_roll_start');
+                    setTimeout(() => {
+                        statusMessage.value = "判定通过"; 
+                        subMessage.value = "通过";
+                        phase.value = 'waiting_confirm';
+                        logAction('event_roll_pass');
+                    }, 800);
+                };
+
+                const confirmContinue = () => {
                     phase.value = 'idle';
-                    statusMessage.value = "准备出发";
-                    subMessage.value = "点击骰子";
+                    statusMessage.value = "轮到您了";
+                    subMessage.value = "掷骰子";
+                    logAction('turn_continue');
                 };
 
-                const confirmContinue = () => { phase.value='idle'; statusMessage.value="轮到您了"; subMessage.value="掷骰子"; };
-                const openTaskMenu = () => { showTaskMenu.value = true; };
-                const closeEventCard = () => { showEventCard.value = false; phase.value='waiting_confirm'; };
-                const selectEventChoice = () => { closeEventCard(); }; 
-                const performTask = () => { showTaskMenu.value=false; };
-                const rollForEvent = () => {};
+                const openTaskMenu = () => { showTaskMenu.value = true; logAction('task_menu_opened'); };
+                const performTask = (task) => {
+                    showTaskMenu.value = false;
+                    const originalStatus = statusMessage.value;
+                    statusMessage.value = `已记录`;
+                    setTimeout(() => { statusMessage.value = originalStatus; }, 1500);
+                    logAction('task_performed', { task: task });
+                };
 
                 const getCellStyle = (cell) => ({
                     gridColumnStart: cell.x + 1,
@@ -912,5 +961,3 @@
             }
         }).mount('#app');
     </script>
-</body>
-</html>

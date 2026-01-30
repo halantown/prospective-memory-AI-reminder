@@ -1,0 +1,37 @@
+{
+    "map_id": "trial",
+    "description": "Virtual Week Trial - Tutorial",
+    "total_steps": 120,
+    "steps_per_hour": 8,
+    "events": {
+        "8": {
+            "type": "event",
+            "category": "Breakfast",
+            "name": "早餐时间",
+            "description": "这是练习关卡。请尝试选择一个早餐选项。",
+            "choices": [
+                { "text": "简单的早餐", "rollReq": "任意" }
+            ]
+        },
+        "32": {
+            "type": "event",
+            "category": "Shopping",
+            "name": "练习购物",
+            "description": "这将启动购物小游戏，请熟悉操作。",
+            "minigame": "SupermarketGame"
+        },
+        "88": {
+            "type": "event",
+            "category": "Dinner",
+            "name": "晚餐时间",
+            "description": "一天的结束。请选择晚餐。",
+             "choices": [
+                { "text": "健康沙拉", "rollReq": "任意" },
+                { "text": "炸鸡", "rollReq": "任意" }
+            ]
+        }
+    },
+    "irregular_tasks": [
+        { "id": "irr_trial_1", "description": "练习任务：购物时，记得买一份报纸。", "target_event": "Shopping" }
+    ]
+}

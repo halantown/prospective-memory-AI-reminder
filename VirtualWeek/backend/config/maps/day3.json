@@ -1,0 +1,61 @@
+{
+    "map_id": "day_3",
+    "description": "Virtual Week Day 3 - Wednesday",
+    "total_steps": 120,
+    "steps_per_hour": 8,
+    "events": {
+        "8": {
+            "type": "event",
+            "category": "Breakfast",
+            "name": "迟到的早晨",
+            "description": "闹钟没响，你起晚了！",
+            "choices": [
+                { "text": "不吃早餐直接走", "rollReq": "任意" },
+                { "text": "抓个面包", "rollReq": "奇数" }
+            ]
+        },
+        "24": {
+            "type": "event",
+            "category": "Work",
+            "name": "提交报告",
+            "description": "需要向主管提交一份工作报告。",
+            "choices": [
+                { "text": "仔细检查后提交", "rollReq": ">3点" },
+                { "text": "直接提交", "rollReq": "任意" }
+            ]
+        },
+        "48": {
+            "type": "event",
+            "category": "Lunch",
+            "name": "商务午餐",
+            "description": "和客户一起吃午饭。",
+            "choices": [
+                { "text": "推荐特色菜", "rollReq": "偶数" },
+                { "text": "听客户安排", "rollReq": "任意" }
+            ]
+        },
+        "88": {
+            "type": "event",
+            "category": "Dinner",
+            "name": "剩菜大作战",
+            "description": "清理冰箱里的食材。",
+             "choices": [
+                { "text": "做个大杂烩", "rollReq": "任意" }
+            ]
+        },
+        "112": {
+            "type": "event",
+            "category": "Sleep",
+            "name": "早点休息",
+            "description": "这一天很累，早点上床睡觉。",
+            "choices": [
+                { "text": "立刻睡觉", "rollReq": "任意" },
+                { "text": "玩会儿手机", "rollReq": "任意" }
+            ]
+        }
+    },
+    "irregular_tasks": [
+        { "id": "irr_5", "description": "午餐时，记得问客户要名片。", "target_event": "Lunch" },
+        { "id": "irr_6", "description": "早上 10:00 吃维生素片。", "target_time": "10:00" }
+    ]
+}

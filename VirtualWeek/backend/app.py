@@ -3,19 +3,36 @@ import csv
 import json
 import time
 from datetime import datetime
-from flask import Flask, jsonify, request, abort
+from flask import Flask, jsonify, request, abort, send_from_directory
 from flask_cors import CORS
-
-app = Flask(__name__)
-CORS(app)
 
 # Configuration Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_DIR = os.path.join(BASE_DIR, 'config', 'maps')
-LOGS_DIR = os.path.join(BASE_DIR, 'logs')
+
+# Maps: Prefer external config, fallback to local 'config/maps' for dev
+CONFIG_DIR = os.environ.get('VW_MAPS_DIR', os.path.join(BASE_DIR, 'config', 'maps'))
+
+# Logs: Prefer external log dir, fallback to user home directory
+default_log_dir = os.path.join(os.path.expanduser('~'), 'VirtualWeek_Logs')
+LOGS_DIR = os.environ.get('VW_LOGS_DIR', default_log_dir)
+
+STATIC_DIR = os.path.join(BASE_DIR, '..', 'frontend') # Point to sibling directory
 
 # Ensure logs directory exists
 os.makedirs(LOGS_DIR, exist_ok=True)
+print(f"Maps Directory: {CONFIG_DIR}")
+print(f"Logs Directory: {LOGS_DIR}")
+
+app = Flask(__name__, static_folder=STATIC_DIR)
+CORS(app)
+
+@app.route('/')
+def serve_index():
+    return send_from_directory(app.static_folder, 'main.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_from_directory(app.static_folder, path)
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -85,7 +102,7 @@ def log_event():
     file_path = os.path.join(LOGS_DIR, log_file)
     
     # Validation: prevent directory traversal
-    if os.path.dirname(os.path.abspath(file_path)) != LOGS_DIR:
+    if os.path.commonpath([os.path.abspath(file_path), os.path.abspath(LOGS_DIR)]) != os.path.abspath(LOGS_DIR):
          return jsonify({"error": "Invalid log file path"}), 403
 
     if not os.path.exists(file_path):

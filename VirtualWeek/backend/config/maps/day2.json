@@ -1,0 +1,59 @@
+{
+    "map_id": "day_2",
+    "description": "Virtual Week Day 2 - Tuesday",
+    "total_steps": 120,
+    "steps_per_hour": 8,
+    "events": {
+        "8": {
+            "type": "event",
+            "category": "Breakfast",
+            "name": "早餐会议",
+            "description": "今天有一个早起的会议。",
+            "choices": [
+                { "text": "快速吃燕麦粥", "rollReq": "任意" },
+                { "text": "边开会边吃", "rollReq": "6点" }
+            ]
+        },
+        "32": {
+            "type": "event",
+            "category": "Shopping",
+            "name": "药店采购",
+            "description": "需要去药店买些生活用品。",
+            "minigame": "SupermarketGame"
+        },
+        "64": {
+            "type": "event",
+            "category": "Social",
+            "name": "朋友聚会",
+            "description": "下午茶时间，朋友邀请你去咖啡馆。",
+            "choices": [
+                { "text": "接受邀请", "rollReq": "偶数" },
+                { "text": "婉拒", "rollReq": "任意" }
+            ]
+        },
+        "88": {
+            "type": "event",
+            "category": "Dinner",
+            "name": "尝试新菜谱",
+            "description": "今晚想尝试做一道复杂的菜。",
+             "choices": [
+                { "text": "成功做出来", "rollReq": ">4点" },
+                { "text": "放弃，煮面", "rollReq": "任意" }
+            ]
+        },
+        "104": {
+            "type": "event",
+            "category": "Relax",
+            "name": "看电影",
+            "description": "晚上放松一下，看部电影。",
+            "choices": [
+                { "text": "看喜剧", "rollReq": "任意" },
+                { "text": "看恐怖片", "rollReq": "奇数" }
+            ]
+        }
+    },
+    "irregular_tasks": [
+        { "id": "irr_3", "description": "在下午茶聚会时，把借的书还给朋友。", "target_event": "Social" },
+        { "id": "irr_4", "description": "晚上 8:00 (20:00) 给父母打个电话。", "target_time": "20:00" }
+    ]
+}
