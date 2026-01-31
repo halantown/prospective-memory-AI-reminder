@@ -3,6 +3,7 @@ import csv
 import json
 import time
 import requests
+import uuid
 from datetime import datetime
 from flask import Flask, jsonify, request, abort, send_from_directory
 from flask_cors import CORS
@@ -37,7 +38,8 @@ SESSION_STATE = {
     "config": {},     # Stores map_id, participant_id
     "logs_buffer": [], # In-memory logs for dashboard (last 100)
     "game_state": None, # Stores the latest frontend state for restoration
-    "admin_command": None # Admin commands to be executed by client
+    "admin_command": None, # Admin commands to be executed by client
+    "session_id": None # Unique session identifier to invalidate old sessions
 }
 
 # --- WebSocket Connection Tracking ---
@@ -217,20 +219,27 @@ def get_admin_status():
 def start_session():
     """Dashboard commands to start a session."""
     data = request.json
+    
+    # Generate new session ID
+    session_id = str(uuid.uuid4())
+    
     SESSION_STATE['config'] = {
         "map_id": data.get('map_id'),
         "participant_id": data.get('participant_id'),
-        "language": data.get('language', 'zh')
+        "language": data.get('language', 'zh'),
+        "group_number": data.get('group_number', 1),  # New: group number
+        "session_id": session_id
     }
     SESSION_STATE['status'] = "RUNNING"
     SESSION_STATE['logs_buffer'] = [] # Clear logs for new session
     SESSION_STATE['game_state'] = None # Clear previous game state
+    SESSION_STATE['session_id'] = session_id
     
     # Log the start internally
     SESSION_STATE['logs_buffer'].append({
         "server_timestamp": datetime.now().isoformat(),
         "event_type": "SYSTEM",
-        "details": f"Session initialized for {data.get('participant_id')} on map {data.get('map_id')}"
+        "details": f"Session initialized for {data.get('participant_id')} on map {data.get('map_id')} (Group {data.get('group_number', 1)}, session_id: {session_id})"
     })
 
     # Initialize Reminder List
@@ -239,7 +248,7 @@ def start_session():
     # Trigger Game Start Reminder
     check_and_trigger_reminder("game_start", None)
     
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok", "session_id": session_id})
 
 @app.route('/api/admin/update_language', methods=['POST'])
 def update_language():
@@ -264,10 +273,22 @@ def update_language():
 @app.route('/api/admin/reset', methods=['POST'])
 def reset_session():
     """Dashboard commands to reset."""
+    # Generate new session ID to invalidate old sessions
+    new_session_id = str(uuid.uuid4())
+    
     SESSION_STATE['status'] = "IDLE"
     SESSION_STATE['config'] = {}
     SESSION_STATE['game_state'] = None
-    return jsonify({"status": "reset"})
+    SESSION_STATE['logs_buffer'] = []
+    SESSION_STATE['session_id'] = new_session_id
+    
+    # Notify all game clients to reload
+    socketio.emit('game:session_reset', room='all_games')
+    socketio.emit('game:session_reset', room='game')
+    
+    print(f"[Reset] Session reset, new session_id: {new_session_id}")
+    
+    return jsonify({"status": "reset", "session_id": new_session_id})
 
 @app.route('/api/client/check', methods=['GET'])
 def check_session_status():
@@ -619,14 +640,21 @@ def handle_dashboard_join():
         'game_state': SESSION_STATE.get('game_state')
     })
 
+@socketio.on('game:join_waiting')
+def handle_game_join_waiting():
+    """Game board joins waiting room (for language updates before session starts)"""
+    join_room('all_games')
+    print(f"[WebSocket] Game board joined waiting room: {request.sid}")
+    emit('game:waiting_joined', {'status': 'ok'})
+
 @socketio.on('game:join')
 def handle_game_join(data):
-    """Game board joins with participant ID"""
+    """Game board joins active game room with participant ID"""
     participant_id = data.get('participant_id')
     CONNECTIONS['game_sid'] = request.sid
     CONNECTIONS['participant_id'] = participant_id
     join_room('game')
-    print(f"[WebSocket] Game board joined: {request.sid}, participant: {participant_id}")
+    print(f"[WebSocket] Game board joined game room: {request.sid}, participant: {participant_id}")
     emit('game:joined', {'status': 'ok'})
 
 @socketio.on('admin:command')
@@ -646,20 +674,27 @@ def handle_admin_command(data):
 def handle_language_change(data):
     """Admin changes language"""
     language = data.get('language')
-    print(f"[WebSocket] Language change: {language}")
+    print(f"[WebSocket] Language change request: {language}")
     
     # Update session state
     if SESSION_STATE.get('config'):
         SESSION_STATE['config']['language'] = language
     
-    # Broadcast to ALL connected clients (not just game room)
-    # This allows language change even during waiting state
-    socketio.emit('game:config_update', {'language': language}, broadcast=True)
-    print(f"[WebSocket] Language change broadcasted to all clients")
+    # Send to both waiting room (pre-session) and game room (active session)
+    socketio.emit('game:config_update', {'language': language}, room='all_games')
+    socketio.emit('game:config_update', {'language': language}, room='game')
+    print(f"[WebSocket] Language change sent to all_games and game rooms")
 
 @socketio.on('game:action')
 def handle_game_action(data):
     """Game board sends action log"""
+    # Validate session
+    client_session_id = data.get('session_id')
+    if client_session_id != SESSION_STATE.get('session_id'):
+        print(f"[WebSocket] Invalid session_id in game:action: {client_session_id} != {SESSION_STATE.get('session_id')}")
+        emit('game:session_invalid', {'reason': 'Session has been reset'})
+        return
+    
     log_file = data.get('log_file')
     if not log_file:
         return
@@ -706,6 +741,13 @@ def handle_game_action(data):
 @socketio.on('game:state_sync')
 def handle_state_sync(data):
     """Game board syncs current state"""
+    # Validate session
+    client_session_id = data.get('session_id')
+    if client_session_id != SESSION_STATE.get('session_id'):
+        print(f"[WebSocket] Invalid session_id in game:state_sync: {client_session_id}")
+        emit('game:session_invalid', {'reason': 'Session has been reset'})
+        return
+    
     SESSION_STATE['game_state'] = data
     
     # Forward to dashboard for real-time display
