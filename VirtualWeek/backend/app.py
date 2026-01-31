@@ -6,6 +6,7 @@ import requests
 from datetime import datetime
 from flask import Flask, jsonify, request, abort, send_from_directory
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit, join_room, leave_room
 
 # Configuration Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,6 +28,9 @@ print(f"Logs Directory: {LOGS_DIR}")
 app = Flask(__name__, static_folder=STATIC_DIR)
 CORS(app)
 
+# Initialize SocketIO with CORS support
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', logger=True, engineio_logger=False)
+
 # --- Global Session State ---
 SESSION_STATE = {
     "status": "IDLE", # IDLE, READY (waiting for client to pick up), RUNNING
@@ -35,6 +39,14 @@ SESSION_STATE = {
     "game_state": None, # Stores the latest frontend state for restoration
     "admin_command": None # Admin commands to be executed by client
 }
+
+# --- WebSocket Connection Tracking ---
+CONNECTIONS = {
+    'dashboard_sid': None,
+    'game_sid': None,
+    'participant_id': None
+}
+
 
 @app.route('/')
 def serve_index():
@@ -569,6 +581,140 @@ def robot_status():
     except requests.exceptions.RequestException:
         return jsonify({"status": "disconnected", "bridge_url": ROBOT_BRIDGE_URL})
 
+# ============================================================================
+# WebSocket Event Handlers
+# ============================================================================
+
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection"""
+    print(f"[WebSocket] Client connected: {request.sid}")
+    emit('connected', {'sid': request.sid})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection"""
+    print(f"[WebSocket] Client disconnected: {request.sid}")
+    
+    # Clean up connection tracking
+    if CONNECTIONS['dashboard_sid'] == request.sid:
+        CONNECTIONS['dashboard_sid'] = None
+        print("[WebSocket] Dashboard disconnected")
+    elif CONNECTIONS['game_sid'] == request.sid:
+        CONNECTIONS['game_sid'] = None
+        print("[WebSocket] Game board disconnected")
+
+@socketio.on('dashboard:join')
+def handle_dashboard_join():
+    """Dashboard joins to receive updates"""
+    CONNECTIONS['dashboard_sid'] = request.sid
+    join_room('dashboard')
+    print(f"[WebSocket] Dashboard joined: {request.sid}")
+    emit('dashboard:joined', {'status': 'ok'})
+    
+    # Send current session state
+    emit('dashboard:session_state', {
+        'status': SESSION_STATE['status'],
+        'config': SESSION_STATE['config'],
+        'game_state': SESSION_STATE.get('game_state')
+    })
+
+@socketio.on('game:join')
+def handle_game_join(data):
+    """Game board joins with participant ID"""
+    participant_id = data.get('participant_id')
+    CONNECTIONS['game_sid'] = request.sid
+    CONNECTIONS['participant_id'] = participant_id
+    join_room('game')
+    print(f"[WebSocket] Game board joined: {request.sid}, participant: {participant_id}")
+    emit('game:joined', {'status': 'ok'})
+
+@socketio.on('admin:command')
+def handle_admin_command(data):
+    """Admin sends command to game board"""
+    command = data.get('command')
+    print(f"[WebSocket] Admin command received: {command}")
+    
+    # Send directly to game board
+    if CONNECTIONS['game_sid']:
+        socketio.emit('game:command', command, room=CONNECTIONS['game_sid'])
+        print(f"[WebSocket] Command sent to game: {command}")
+    else:
+        print("[WebSocket] Warning: No game board connected")
+
+@socketio.on('admin:language_change')
+def handle_language_change(data):
+    """Admin changes language"""
+    language = data.get('language')
+    print(f"[WebSocket] Language change: {language}")
+    
+    # Update session state
+    if SESSION_STATE.get('config'):
+        SESSION_STATE['config']['language'] = language
+    
+    # Notify game board
+    if CONNECTIONS['game_sid']:
+        socketio.emit('game:config_update', {'language': language}, room=CONNECTIONS['game_sid'])
+
+@socketio.on('game:action')
+def handle_game_action(data):
+    """Game board sends action log"""
+    log_file = data.get('log_file')
+    if not log_file:
+        return
+    
+    file_path = os.path.join(LOGS_DIR, log_file)
+    
+    # Validation
+    if os.path.commonpath([os.path.abspath(file_path), os.path.abspath(LOGS_DIR)]) != os.path.abspath(LOGS_DIR):
+        return
+    
+    if not os.path.exists(file_path):
+        return
+    
+    server_time = datetime.now().isoformat()
+    client_time = data.get('client_timestamp', '')
+    client_time_ms = data.get('client_time_ms', '')
+    event_type = data.get('event_type', 'info')
+    details = data.get('details', '')
+    metadata = json.dumps(data.get('metadata', {}), ensure_ascii=False)
+    
+    # Add to in-memory buffer
+    log_entry = {
+        "server_timestamp": server_time,
+        "client_timestamp": client_time,
+        "event_type": event_type,
+        "details": details
+    }
+    SESSION_STATE['logs_buffer'].append(log_entry)
+    if len(SESSION_STATE['logs_buffer']) > 100:
+        SESSION_STATE['logs_buffer'].pop(0)
+    
+    # Write to CSV
+    try:
+        with open(file_path, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow([server_time, client_time, client_time_ms, event_type, details, metadata])
+        
+        # Notify dashboard in real-time
+        if CONNECTIONS['dashboard_sid']:
+            socketio.emit('dashboard:log', log_entry, room=CONNECTIONS['dashboard_sid'])
+    except Exception as e:
+        print(f"[WebSocket] Log write error: {e}")
+
+@socketio.on('game:state_sync')
+def handle_state_sync(data):
+    """Game board syncs current state"""
+    SESSION_STATE['game_state'] = data
+    
+    # Forward to dashboard for real-time display
+    if CONNECTIONS['dashboard_sid']:
+        socketio.emit('dashboard:game_state', data, room=CONNECTIONS['dashboard_sid'])
+
+# ============================================================================
+# Run Server
+# ============================================================================
+
 if __name__ == '__main__':
     print(f"Experiment Server running on port 5001")
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5001, debug=True, allow_unsafe_werkzeug=True)

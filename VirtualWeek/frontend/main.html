@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Vue 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <!-- Tutorial System -->
     <script src="js/tutorial.js"></script>
     <!-- Lucide Icons -->
@@ -635,6 +637,31 @@
 
         createApp({
             setup() {
+                // --- WebSocket Connection ---
+                let socket = null;
+                const initSocket = () => {
+                    socket = io('http://localhost:5001', {
+                        transports: ['websocket', 'polling'],
+                        reconnection: true,
+                        reconnectionDelay: 1000,
+                        reconnectionAttempts: 5
+                    });
+                    
+                    socket.on('connect', () => {
+                        console.log('[WebSocket] Connected:', socket.id);
+                    });
+                    
+                    socket.on('disconnect', () => {
+                        console.log('[WebSocket] Disconnected');
+                    });
+                    
+                    socket.on('connected', (data) => {
+                        console.log('[WebSocket] Server confirmed connection:', data.sid);
+                    });
+                    
+                    return socket;
+                };
+                
                 // --- I18n System (Safe Implementation) ---
                 const locales = ref({});
                 const currentLang = ref('zh');
@@ -1068,15 +1095,16 @@
                 };
 
                 const logAction = (type, details = {}) => {
-                    if (!logFileName.value) return;
+                    if (!logFileName.value || !socket) return;
                     
                     // High-precision timestamp: milliseconds since session start
                     const preciseTime = performance.now();
                     
-                    apiCall('/log', 'POST', {
+                    // Send via WebSocket instead of HTTP
+                    socket.emit('game:action', {
                         log_file: logFileName.value,
-                        client_timestamp: new Date().toISOString(), // Human-readable absolute time
-                        client_time_ms: preciseTime.toFixed(3),     // High-precision relative time (microsecond precision)
+                        client_timestamp: new Date().toISOString(),
+                        client_time_ms: preciseTime.toFixed(3),
                         event_type: type,
                         details: typeof details === 'string' ? details : JSON.stringify(details),
                         metadata: details
