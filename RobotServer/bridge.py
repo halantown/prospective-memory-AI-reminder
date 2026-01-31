@@ -59,6 +59,16 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._set_headers()
 
+    def do_GET(self):
+        """Health check endpoint."""
+        self._set_headers()
+        response = {
+            'status': 'ok',
+            'naoqi_available': HAS_NAOQI,
+            'robot_ip': ROBOT_IP
+        }
+        self.wfile.write(json.dumps(response))
+
     def do_POST(self):
         content_length = int(self.headers.getheader('content-length'))
         post_data = self.rfile.read(content_length)
@@ -90,7 +100,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             print "Error processing request: " + str(e)
 
 def run(server_class=HTTPServer, handler_class=RequestHandler, port=8001):
-    server_address = ('', port)
+    server_address = ('0.0.0.0', port)
     httpd = server_class(server_address, handler_class)
     print 'Starting Robot Bridge Server on port %d...' % port
     httpd.serve_forever()

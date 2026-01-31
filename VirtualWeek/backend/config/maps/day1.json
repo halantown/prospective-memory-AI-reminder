@@ -4,6 +4,74 @@
     "dice_sequence": [4, 2, 5, 3, 6, 1, 4, 3, 2, 5, 6, 1, 3, 4, 2, 5, 1, 6, 2, 4, 3, 5, 1, 6, 4, 2, 5, 3, 6, 1, 4, 3, 2, 5, 6, 1, 3, 4, 2, 5, 1, 6, 2, 4, 3, 5, 1, 6],
     "total_steps": 120,
     "steps_per_hour": 8,
+    "reminders": {
+        "game_start": {
+            "zh": "欢迎参加虚拟一周实验。我会在旁边陪伴你完成这个游戏。",
+            "en": "Welcome to the Virtual Week experiment. I will accompany you through this game.",
+            "nl": "Welkom bij het Virtual Week experiment. Ik zal je begeleiden tijdens dit spel."
+        },
+        "first_roll": {
+            "zh": "请点击骰子开始游戏。",
+            "en": "Please click the dice to start the game.",
+            "nl": "Klik op de dobbelsteen om te beginnen."
+        },
+        "position": {
+            "16": {
+                "zh": "你已经走过了两个小时，继续加油。",
+                "en": "You've passed two hours. Keep going.",
+                "nl": "Je bent twee uur verder. Ga zo door."
+            },
+            "60": {
+                "zh": "已经是中午了，你做得很好。",
+                "en": "It's noon now. You're doing great.",
+                "nl": "Het is nu middag. Je doet het geweldig."
+            },
+            "100": {
+                "zh": "快要结束了，再坚持一下。",
+                "en": "Almost there. Just a little more.",
+                "nl": "Bijna klaar. Nog even volhouden."
+            }
+        },
+        "event_enter": {
+            "Breakfast": {
+                "zh": "早餐时间到了，请做出你的选择。",
+                "en": "It's breakfast time. Please make your choice.",
+                "nl": "Het is ontbijttijd. Maak je keuze."
+            },
+            "Shopping": {
+                "zh": "现在是购物时间，请完成购物任务。",
+                "en": "It's shopping time. Please complete the shopping task.",
+                "nl": "Het is tijd om te winkelen. Voltooi de taak."
+            },
+            "Social": {
+                "zh": "有人来拜访你了。",
+                "en": "Someone is visiting you.",
+                "nl": "Er is bezoek voor je."
+            },
+            "Dinner": {
+                "zh": "晚餐时间到了。",
+                "en": "It's dinner time.",
+                "nl": "Het is etenstijd."
+            },
+            "Library": {
+                "zh": "你到达了图书馆。",
+                "en": "You've arrived at the library.",
+                "nl": "Je bent bij de bibliotheek."
+            }
+        },
+        "event_complete": {
+            "default": {
+                "zh": "做得好，请继续掷骰子。",
+                "en": "Well done. Please continue rolling the dice.",
+                "nl": "Goed gedaan. Gooi de dobbelsteen opnieuw."
+            }
+        },
+        "game_end": {
+            "zh": "恭喜你完成了今天的虚拟一周！谢谢参与。",
+            "en": "Congratulations on completing today's Virtual Week! Thank you for participating.",
+            "nl": "Gefeliciteerd met het voltooien van de Virtual Week! Bedankt voor je deelname."
+        }
+    },
     "events": {
         "8": {
             "type": "event",

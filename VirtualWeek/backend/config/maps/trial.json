@@ -4,6 +4,54 @@
     "dice_sequence": [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
     "total_steps": 120,
     "steps_per_hour": 8,
+    "reminders": {
+        "game_start": {
+            "zh": "欢迎来到练习模式。我会教你怎么玩。",
+            "en": "Welcome to practice mode. I'll teach you how to play.",
+            "nl": "Welkom bij de oefenmodus. Ik leer je hoe je moet spelen."
+        },
+        "first_roll": {
+            "zh": "点击那个骰子图标，试试看。",
+            "en": "Click that dice icon and give it a try.",
+            "nl": "Klik op het dobbelsteenpictogram en probeer het."
+        },
+        "position": {
+            "20": {
+                "zh": "这是练习，不用担心选错。",
+                "en": "This is practice. Don't worry about wrong choices.",
+                "nl": "Dit is een oefening. Maak je geen zorgen over foute keuzes."
+            }
+        },
+        "event_enter": {
+            "Breakfast": {
+                "zh": "看，这是一个早餐事件。选择你喜欢的。",
+                "en": "Look, this is a breakfast event. Choose what you like.",
+                "nl": "Kijk, dit is een ontbijtevenement. Kies wat je lekker vindt."
+            },
+            "Shopping": {
+                "zh": "这是一个小游戏事件，试着玩一下。",
+                "en": "This is a minigame event. Try playing it.",
+                "nl": "Dit is een minigame. Probeer het te spelen."
+            },
+            "Dinner": {
+                "zh": "这是最后一个练习事件了。",
+                "en": "This is the last practice event.",
+                "nl": "Dit is het laatste oefenevenement."
+            }
+        },
+        "event_complete": {
+            "default": {
+                "zh": "很好，就是这样。",
+                "en": "Good, just like that.",
+                "nl": "Goed, precies zo."
+            }
+        },
+        "game_end": {
+            "zh": "练习结束！你准备好开始正式实验了吗？",
+            "en": "Practice over! Are you ready for the real experiment?",
+            "nl": "Oefening voorbij! Ben je klaar voor het echte experiment?"
+        }
+    },
     "events": {
         "8": {
             "type": "event",

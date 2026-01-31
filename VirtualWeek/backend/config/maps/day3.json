@@ -4,6 +4,69 @@
     "dice_sequence": [2, 6, 1, 5, 3, 4, 2, 6, 5, 1, 4, 3, 2, 6, 1, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3],
     "total_steps": 120,
     "steps_per_hour": 8,
+    "reminders": {
+        "game_start": {
+            "zh": "今天是第三天，也许会有一些挑战。",
+            "en": "Today is Day 3. There might be some challenges.",
+            "nl": "Vandaag is dag 3. Er kunnen wat uitdagingen zijn."
+        },
+        "first_roll": {
+            "zh": "让我们开始吧。",
+            "en": "Let's get started.",
+            "nl": "Laten we beginnen."
+        },
+        "position": {
+            "10": {
+                "zh": "今天起晚了，要注意时间哦。",
+                "en": "Got up late today. Watch the time.",
+                "nl": "Laat opgestaan vandaag. Let op de tijd."
+            },
+            "50": {
+                "zh": "午餐时间到了，好好享受。",
+                "en": "Lunch time. Enjoy it.",
+                "nl": "Lunchtijd. Geniet ervan."
+            }
+        },
+        "event_enter": {
+            "Breakfast": {
+                "zh": "糟糕，闹钟没响！",
+                "en": "Oops, the alarm didn't go off!",
+                "nl": "Oeps, de wekker ging niet af!"
+            },
+            "Work": {
+                "zh": "该提交工作报告了。",
+                "en": "Time to submit the work report.",
+                "nl": "Tijd om het werkrapport in te dienen."
+            },
+            "Lunch": {
+                "zh": "这是一顿重要的商务午餐。",
+                "en": "This is an important business lunch.",
+                "nl": "Dit is een belangrijke zakenlunch."
+            },
+            "Dinner": {
+                "zh": "清理一下冰箱里的剩菜。",
+                "en": "Clear out the leftovers in the fridge.",
+                "nl": "Maak de restjes in de koelkast op."
+            },
+            "Sleep": {
+                "zh": "早点休息吧，晚安。",
+                "en": "Go to bed early. Good night.",
+                "nl": "Ga vroeg naar bed. Welterusten."
+            }
+        },
+        "event_complete": {
+            "default": {
+                "zh": "任务完成，继续。",
+                "en": "Task completed. Continue.",
+                "nl": "Taak voltooid. Ga door."
+            }
+        },
+        "game_end": {
+            "zh": "第三天也完成了，辛苦了。",
+            "en": "Day 3 completed. Good work.",
+            "nl": "Dag 3 voltooid. Goed gewerkt."
+        }
+    },
     "events": {
         "8": {
             "type": "event",

@@ -4,6 +4,69 @@
     "dice_sequence": [5, 3, 4, 1, 6, 2, 5, 3, 1, 4, 2, 6, 5, 1, 3, 4, 6, 2, 1, 5, 4, 3, 6, 2, 1, 5, 3, 4, 6, 2, 1, 5, 4, 3, 2, 6, 1, 5, 3, 4, 2, 6, 1, 5, 3, 4, 2, 6],
     "total_steps": 120,
     "steps_per_hour": 8,
+    "reminders": {
+        "game_start": {
+            "zh": "欢迎参加第二天实验。希望你今天也有好心情。",
+            "en": "Welcome to Day 2. Hope you have a good mood today.",
+            "nl": "Welkom op dag 2. Ik hoop dat je een goed humeur hebt."
+        },
+        "first_roll": {
+            "zh": "请点击骰子开始今天的旅程。",
+            "en": "Please click the dice to start today's journey.",
+            "nl": "Klik op de dobbelsteen om de reis van vandaag te beginnen."
+        },
+        "position": {
+            "40": {
+                "zh": "上午过半了，别忘了休息一下。",
+                "en": "Halfway through the morning. Don't forget to take a break.",
+                "nl": "Halverwege de ochtend. Vergeet niet te rusten."
+            },
+            "80": {
+                "zh": "下午时间过得真快。",
+                "en": "The afternoon is passing quickly.",
+                "nl": "De middag gaat snel voorbij."
+            }
+        },
+        "event_enter": {
+            "Breakfast": {
+                "zh": "早餐会议要开始了。",
+                "en": "The breakfast meeting is about to start.",
+                "nl": "De ontbijtvergadering gaat beginnen."
+            },
+            "Shopping": {
+                "zh": "你需要去药店买点东西。",
+                "en": "You need to buy something at the pharmacy.",
+                "nl": "Je moet iets kopen bij de apotheek."
+            },
+            "Social": {
+                "zh": "朋友邀请你喝下午茶。",
+                "en": "A friend invited you for afternoon tea.",
+                "nl": "Een vriend heeft je uitgenodigd voor thee."
+            },
+            "Dinner": {
+                "zh": "今晚尝试做新菜谱吧。",
+                "en": "Let's try a new recipe tonight.",
+                "nl": "Laten we vanavond een nieuw recept proberen."
+            },
+            "Relax": {
+                "zh": "看个电影放松一下。",
+                "en": "Watch a movie to relax.",
+                "nl": "Kijk een film om te ontspannen."
+            }
+        },
+        "event_complete": {
+            "default": {
+                "zh": "继续前进吧。",
+                "en": "Let's move on.",
+                "nl": "Laten we verder gaan."
+            }
+        },
+        "game_end": {
+            "zh": "第二天结束了，你表现得很棒。",
+            "en": "Day 2 is over. You did a great job.",
+            "nl": "Dag 2 is voorbij. Je hebt het geweldig gedaan."
+        }
+    },
     "events": {
         "8": {
             "type": "event",

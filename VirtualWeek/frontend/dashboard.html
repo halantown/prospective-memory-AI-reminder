@@ -9,8 +9,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="bg-slate-100 p-6">
-    <div id="app" class="max-w-6xl mx-auto">
-        <header class="flex justify-between items-center mb-8">
+    <div id="app" class="max-w-7xl mx-auto">
+        <header class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-black text-slate-800">🔬 实验控制台</h1>
             <div class="flex items-center gap-4">
                 <span class="px-3 py-1 rounded-full text-sm font-bold" 
@@ -23,57 +23,280 @@
             </div>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Control Panel -->
-            <div class="card bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-1">
-                <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <i data-lucide="settings-2" class="w-5 h-5"></i> 实验配置
-                </h2>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-bold text-slate-500 mb-1">受试者 ID</label>
-                        <input v-model="participantId" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="例如: sub_001">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-bold text-slate-500 mb-1">选择地图</label>
-                        <select v-model="selectedMap" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-                            <option v-for="map in maps" :key="map" :value="map">{{ map }}</option>
-                        </select>
-                    </div>
-
-                    <button @click="startExperiment" :disabled="isSessionActive" 
-                        class="w-full py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2"
-                        :class="isSessionActive ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200'">
-                        <i data-lucide="play" class="w-5 h-5 fill-current"></i>
-                        启动实验
-                    </button>
-                </div>
-            </div>
-
-            <!-- Live Logs -->
-            <div class="card bg-slate-900 text-slate-200 p-6 rounded-2xl shadow-sm border border-slate-800 lg:col-span-2 flex flex-col h-[600px]">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                        <i data-lucide="activity" class="w-5 h-5 text-green-400"></i> 实时监控
+        <!-- Main Layout: 3 Columns -->
+        <div class="grid grid-cols-12 gap-6 items-start">
+            
+            <!-- Left Column: Config (3 cols) -->
+            <div class="col-span-12 lg:col-span-3 space-y-6">
+                <!-- Experiment Config -->
+                <div class="card bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <i data-lucide="settings-2" class="w-5 h-5"></i> 实验配置
                     </h2>
-                    <span class="text-xs font-mono text-slate-500">Auto-refreshing</span>
-                </div>
-                
-                <div class="flex-grow overflow-y-auto font-mono text-xs space-y-2 pr-2" ref="logContainer">
-                    <div v-if="logs.length === 0" class="text-slate-600 text-center mt-20 italic">等待数据...</div>
-                    <div v-for="(log, idx) in logs" :key="idx" class="border-l-2 pl-3 py-1" :class="getLogColor(log.event_type)">
-                        <div class="flex gap-3 opacity-60 text-[10px] mb-0.5">
-                            <span>{{ formatTime(log.server_timestamp) }}</span>
-                            <span class="uppercase tracking-wider">{{ log.event_type }}</span>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-500 mb-1">受试者 ID</label>
+                            <input v-model="participantId" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="例如: sub_001">
                         </div>
-                        <div class="font-medium text-slate-100 break-words">
-                            {{ log.details }}
+
+                        <div>
+                            <label class="block text-sm font-bold text-slate-500 mb-1">语言 / Language</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button @click="sessionLang = 'zh'" 
+                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
+                                    :class="sessionLang === 'zh' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                                    中文
+                                </button>
+                                <button @click="sessionLang = 'en'" 
+                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
+                                    :class="sessionLang === 'en' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                                    English
+                                </button>
+                                <button @click="sessionLang = 'nl'" 
+                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
+                                    :class="sessionLang === 'nl' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                                    Dutch
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-bold text-slate-500 mb-1">选择地图</label>
+                            <select v-model="selectedMap" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                                <option v-for="map in maps" :key="map" :value="map">{{ map }}</option>
+                            </select>
+                        </div>
+
+                        <button @click="startExperiment" :disabled="isSessionActive" 
+                            class="w-full py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2"
+                            :class="isSessionActive ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200'">
+                            <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+                            启动实验
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Robot Control -->
+                <div class="card bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="bot" class="w-4 h-4"></i> 机器人控制
+                        </h2>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold" 
+                            :class="robotConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                            {{ robotConnected ? '已连接' : '未连接' }}
+                        </span>
+                    </div>
+                    
+                    <!-- Language Selector -->
+                    <div class="mb-3">
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">语言 / Language</label>
+                        <div class="grid grid-cols-3 gap-1">
+                            <button @click="robotLang = 'zh'" 
+                                class="px-2 py-1.5 rounded text-xs font-bold transition-colors"
+                                :class="robotLang === 'zh' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
+                                中文
+                            </button>
+                            <button @click="robotLang = 'en'" 
+                                class="px-2 py-1.5 rounded text-xs font-bold transition-colors"
+                                :class="robotLang === 'en' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
+                                English
+                            </button>
+                            <button @click="robotLang = 'nl'" 
+                                class="px-2 py-1.5 rounded text-xs font-bold transition-colors"
+                                :class="robotLang === 'nl' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
+                                Nederlands
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Phrases -->
+                    <div class="mb-3">
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">快捷短语</label>
+                        <div class="flex flex-wrap gap-1">
+                            <button v-for="(phrase, key) in quickPhrases" :key="key"
+                                @click="robotSay(phrase[robotLang])"
+                                class="px-2 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded text-[10px] font-medium transition-colors">
+                                {{ key }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Custom Text Input -->
+                    <div class="space-y-2">
+                        <textarea v-model="robotText" rows="2" 
+                            class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs resize-none focus:ring-2 focus:ring-blue-500 outline-none"
+                            :placeholder="robotLang === 'zh' ? '输入要说的内容...' : robotLang === 'en' ? 'Enter text to speak...' : 'Voer tekst in...'">
+                        </textarea>
+                        <button @click="robotSay(robotText)" :disabled="!robotText.trim()"
+                            class="w-full py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                            :class="robotText.trim() ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'">
+                            <i data-lucide="volume-2" class="w-3 h-3"></i> 发送语音
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Admin Toggle -->
+                <div v-if="isSessionActive" class="card bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                    <button @click="showAdmin = !showAdmin" class="w-full flex items-center justify-between font-bold text-slate-600 hover:text-blue-600 transition-colors">
+                        <span class="flex items-center gap-2"><i data-lucide="shield" class="w-4 h-4"></i> 超级管理员</span>
+                        <i :data-lucide="showAdmin ? 'chevron-up' : 'chevron-down'" class="w-4 h-4"></i>
+                    </button>
+                    
+                    <div v-if="showAdmin" class="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                         <!-- Row 1: Display & Input -->
+                        <div class="flex items-center gap-2">
+                             <div class="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 shrink-0">
+                                <span class="text-[10px] text-slate-400 font-bold block leading-none mb-0.5">位置</span>
+                                <span class="text-lg font-black text-slate-800 leading-none">{{ currentPosition }}</span>
+                            </div>
+                            <div class="flex flex-1 gap-1">
+                                <input v-model.number="targetPosition" type="number" min="0" max="119" 
+                                    class="w-full min-w-0 border border-slate-300 rounded px-2 py-1 text-xs font-mono" 
+                                    placeholder="0-119">
+                                <button @click="setPosition" 
+                                    class="bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-xs font-bold whitespace-nowrap">
+                                    跳转
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Steps -->
+                        <div class="grid grid-cols-4 gap-1">
+                             <button @click="moveSteps(-10)" class="bg-slate-100 hover:bg-slate-200 text-slate-500 px-1 py-1.5 rounded text-[10px] font-bold">
+                                -10
+                            </button>
+                            <button @click="moveSteps(-1)" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-1 py-1.5 rounded text-[10px] font-bold">
+                                -1
+                            </button>
+                            <button @click="moveSteps(1)" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-1 py-1.5 rounded text-[10px] font-bold">
+                                +1
+                            </button>
+                            <button @click="moveSteps(10)" class="bg-slate-100 hover:bg-slate-200 text-slate-500 px-1 py-1.5 rounded text-[10px] font-bold">
+                                +10
+                            </button>
+                        </div>
+
+                        <!-- Row 3: End -->
+                        <button @click="jumpToEnd" class="w-full bg-red-50 hover:bg-red-100 text-red-600 px-2 py-1.5 rounded text-[10px] font-bold border border-red-100 flex items-center justify-center gap-1">
+                            ⚠ 跳到结尾
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle Column: Monitor (2 cols) -->
+            <div v-if="isSessionActive" class="col-span-12 lg:col-span-2 space-y-6">
+                 <div class="card bg-white p-4 rounded-2xl shadow-sm border border-slate-200 h-[400px] overflow-y-auto">
+                    <h2 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                        <i data-lucide="monitor" class="w-4 h-4"></i> 状态监视
+                    </h2>
+                    
+                    <div class="flex flex-col gap-3">
+                        <!-- Current Position -->
+                        <div class="bg-blue-200 p-3 rounded-lg border border-blue-400">
+                            <div class="text-[10px] text-blue-800 font-bold uppercase mb-0.5">当前位置</div>
+                            <div class="text-xl font-black text-blue-950 leading-none">{{ monitor.current_position }} <span class="text-[10px] font-medium opacity-70">/ 119</span></div>
+                        </div>
+
+                        <!-- Next Dice -->
+                        <div class="bg-amber-200 p-3 rounded-lg border border-amber-400">
+                            <div class="text-[10px] text-amber-800 font-bold uppercase mb-0.5">下一骰子</div>
+                            <div class="text-xl font-black text-amber-950 leading-none">🎲 {{ monitor.next_dice || '-' }}</div>
+                            <div class="text-[10px] text-amber-900 mt-0.5">余 {{ monitor.dice_remaining || 0 }} 次</div>
+                        </div>
+
+                         <!-- Next Position -->
+                        <div class="bg-green-200 p-3 rounded-lg border border-green-400">
+                            <div class="text-[10px] text-green-800 font-bold uppercase mb-0.5">下一位置</div>
+                            <div class="text-xl font-black text-green-950 leading-none">→ {{ monitor.next_position ?? '-' }}</div>
+                        </div>
+
+                        <!-- Real Time -->
+                        <div class="bg-red-200 p-3 rounded-lg border border-red-400">
+                            <div class="text-[10px] text-red-800 font-bold uppercase mb-0.5">真实计时</div>
+                            <div class="text-lg font-mono font-bold text-red-950 leading-none">{{ formatRealTime(monitor.real_time_seconds) }}</div>
+                        </div>
+
+                        <!-- Current Phase -->
+                        <div class="bg-purple-200 p-3 rounded-lg border border-purple-400">
+                            <div class="text-[10px] text-purple-800 font-bold uppercase mb-0.5">当前阶段</div>
+                            <div class="text-sm font-bold text-purple-950 truncate">{{ monitor.current_phase }}</div>
+                            <div class="text-[10px] text-purple-900 mt-0.5 truncate">{{ monitor.status_message }}</div>
+                        </div>
+                        
+                         <!-- UI State -->
+                        <div class="bg-slate-200 p-3 rounded-lg border border-slate-400">
+                            <div class="text-[10px] text-slate-700 font-bold uppercase mb-1">UI 状态</div>
+                            <div class="flex flex-wrap gap-1">
+                                <span v-if="monitor.show_start_card" class="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px] font-bold shadow-sm">开始卡</span>
+                                <span v-if="monitor.show_event_card" class="px-1.5 py-0.5 bg-amber-600 text-white rounded text-[10px] font-bold shadow-sm">事件卡</span>
+                                <span v-if="monitor.show_minigame" class="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px] font-bold shadow-sm">小游戏</span>
+                                <span v-if="!monitor.show_start_card && !monitor.show_event_card && !monitor.show_minigame" class="text-[10px] text-slate-500 font-bold">常规</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reminders Control -->
+                <div class="card bg-white p-4 rounded-2xl shadow-sm border border-slate-200 h-[calc(100%-424px)] overflow-hidden flex flex-col">
+                    <h2 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 shrink-0">
+                        <i data-lucide="bell" class="w-4 h-4"></i> 消息控制
+                    </h2>
+                    <div class="overflow-y-auto space-y-2 pr-1 flex-1">
+                        <div v-for="rem in reminders" :key="rem.id" 
+                            class="p-2 rounded-lg border text-xs relative group transition-all"
+                            :class="rem.status === 'PENDING' ? 'bg-slate-50 border-slate-200' : 'bg-green-50 border-green-200 opacity-60'">
+                            
+                            <div class="flex justify-between items-start mb-1">
+                                <span class="font-bold uppercase text-[10px] px-1.5 py-0.5 rounded"
+                                    :class="rem.status === 'PENDING' ? 'bg-slate-200 text-slate-600' : 'bg-green-200 text-green-700'">
+                                    {{ rem.condition }}
+                                </span>
+                                <div v-if="rem.status === 'PENDING'" class="opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-2">
+                                     <button @click="triggerReminder(rem.id)" title="立即发送"
+                                        class="bg-blue-600 text-white p-1 rounded hover:bg-blue-700 shadow-sm">
+                                        <i data-lucide="send" class="w-3 h-3"></i>
+                                     </button>
+                                </div>
+                                <i v-else data-lucide="check" class="w-3 h-3 text-green-600"></i>
+                            </div>
+                            
+                            <div class="text-slate-700 font-medium leading-tight">
+                                {{ rem.text }}
+                            </div>
+                        </div>
+                        <div v-if="reminders.length === 0" class="text-center text-slate-400 italic py-4">无预设消息</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Logs (7 cols) -->
+            <div class="col-span-12 lg:col-span-7 h-full min-h-[500px]">
+                 <div class="card bg-slate-900 text-slate-200 p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-col h-full max-h-[85vh]">
+                    <div class="flex justify-between items-center mb-4 shrink-0">
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i data-lucide="activity" class="w-5 h-5 text-green-400"></i> 实时日志
+                        </h2>
+                        <span class="text-xs font-mono text-slate-500">Auto-refreshing</span>
+                    </div>
+                    
+                    <div class="flex-grow overflow-y-auto font-mono text-xs space-y-2 pr-2" ref="logContainer">
+                        <div v-if="logs.length === 0" class="text-slate-600 text-center mt-20 italic">等待数据...</div>
+                        <div v-for="(log, idx) in logs" :key="idx" class="border-l-2 pl-3 py-1" :class="getLogColor(log.event_type)">
+                            <div class="flex gap-3 opacity-60 text-[10px] mb-0.5">
+                                <span>{{ formatTime(log.server_timestamp) }}</span>
+                                <span class="uppercase tracking-wider">{{ log.event_type }}</span>
+                            </div>
+                            <div class="font-medium text-slate-100 break-words">
+                                {{ log.details }}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 
@@ -87,8 +310,43 @@
                 const maps = ref([]);
                 const selectedMap = ref('');
                 const participantId = ref('sub_' + Math.floor(Math.random() * 1000));
+                const sessionLang = ref('zh'); // New: Session Language
                 const logs = ref([]);
                 const logContainer = ref(null);
+                
+                // Admin Control State
+                const currentPosition = ref(0);
+                const targetPosition = ref(0);
+                const showAdmin = ref(false);
+                
+                // Monitor State
+                const monitor = ref({
+                    current_position: 0,
+                    current_phase: 'unknown',
+                    next_dice: null,
+                    next_position: null,
+                    dice_remaining: 0,
+                    real_time_seconds: 0,
+                    status_message: '',
+                    show_start_card: false,
+                    show_event_card: false,
+                    show_minigame: false
+                });
+
+                // Reminder State
+                const reminders = ref([]);
+
+                // Robot Control State
+                const robotConnected = ref(false);
+                const robotLang = ref('zh');
+                const robotText = ref('');
+                const quickPhrases = ref({
+                    '你好': { zh: '你好，欢迎参加实验', en: 'Hello, welcome to the experiment', nl: 'Hallo, welkom bij het experiment' },
+                    '掷骰子': { zh: '请点击骰子', en: 'Please click the dice', nl: 'Klik alstublieft op de dobbelsteen' },
+                    '做得好': { zh: '做得很好，继续加油', en: 'Well done, keep going', nl: 'Goed gedaan, ga zo door' },
+                    '休息': { zh: '现在可以休息一下', en: 'You can take a break now', nl: 'Je kunt nu even pauze nemen' },
+                    '结束': { zh: '实验结束了，谢谢参与', en: 'The experiment is over, thank you', nl: 'Het experiment is afgelopen, bedankt' }
+                });
                 
                 let pollInterval = null;
 
@@ -114,17 +372,36 @@
                         const data = await res.json();
                         sessionStatus.value = data.status;
                         
+                        // Update current position from game_state
+                        if (data.game_state && data.game_state.playerPos !== undefined) {
+                            currentPosition.value = data.game_state.playerPos;
+                        }
+                        
+                        // Update monitor data
+                        if (data.monitor) {
+                            monitor.value = data.monitor;
+                        }
+                        
+                        // Update reminders
+                        if (data.reminders) {
+                            reminders.value = data.reminders;
+                        }
+                        
                         // Merge logs
                         if (data.recent_logs && data.recent_logs.length > 0) {
-                            // Simple dedupe or replace strategy? 
-                            // Since we want full history in dashboard, let's just replace for now or append if we track last index.
-                            // For simplicity in this prototype, backend returns ALL recent buffer logs.
-                            logs.value = data.recent_logs.reverse(); // Newest at bottom usually? No, logs usually newest bottom.
+                            logs.value = data.recent_logs; // Keep chronological order (oldest -> newest)
+                            
+                            // Auto scroll to bottom if we were already near bottom or it's a fresh load
+                            nextTick(() => {
+                                if (logContainer.value) {
+                                    logContainer.value.scrollTop = logContainer.value.scrollHeight;
+                                }
+                            });
                         }
                     } catch (e) {
                         console.error("Poll error", e);
                     } finally {
-                        if (pollInterval !== 'STOPPED') { // Simple flag to control stopping if needed, or just rely on component unmount
+                        if (pollInterval !== 'STOPPED') {
                              pollInterval = setTimeout(fetchState, 1500);
                         }
                     }
@@ -137,7 +414,8 @@
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
                             map_id: selectedMap.value,
-                            participant_id: participantId.value
+                            participant_id: participantId.value,
+                            language: sessionLang.value // Pass language to backend
                         })
                     });
                     // fetchState loop is already running
@@ -147,7 +425,65 @@
                     if(!confirm('确定要强制重置当前会话吗？受试者页面将重新等待。')) return;
                     await fetch(`${API_BASE}/admin/reset`, { method: 'POST' });
                     logs.value = [];
+                    currentPosition.value = 0;
                     // fetchState loop is already running
+                };
+
+                // --- Admin Control Functions ---
+                const sendCommand = async (cmd) => {
+                    await fetch(`${API_BASE}/admin/command`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(cmd)
+                    });
+                };
+
+                const setPosition = () => {
+                    const pos = Math.max(0, Math.min(119, targetPosition.value));
+                    sendCommand({ type: 'SET_POSITION', position: pos });
+                };
+
+                const moveSteps = (delta) => {
+                    const newPos = Math.max(0, Math.min(119, currentPosition.value + delta));
+                    sendCommand({ type: 'SET_POSITION', position: newPos });
+                };
+
+                const jumpToEnd = () => {
+                    sendCommand({ type: 'SET_POSITION', position: 119 });
+                };
+
+                // --- Reminder Control ---
+                const triggerReminder = async (id) => {
+                    await fetch(`${API_BASE}/admin/trigger_reminder`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ reminder_id: id })
+                    });
+                };
+
+                // --- Robot Control Functions ---
+                const checkRobotStatus = async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/robot/status`);
+                        const data = await res.json();
+                        robotConnected.value = data.status === 'connected';
+                    } catch (e) {
+                        robotConnected.value = false;
+                    }
+                };
+
+                const robotSay = async (text) => {
+                    if (!text || !text.trim()) return;
+                    try {
+                        await fetch(`${API_BASE}/robot/say`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ text: text.trim(), lang: robotLang.value })
+                        });
+                        robotText.value = ''; // Clear after sending
+                    } catch (e) {
+                        console.error('Robot say error:', e);
+                    }
                 };
 
                 const getLogColor = (type) => {
@@ -155,6 +491,7 @@
                     if (type.includes('start')) return 'border-green-500 text-green-300';
                     if (type.includes('end')) return 'border-purple-500 text-purple-300';
                     if (type.includes('event')) return 'border-amber-500 text-amber-300';
+                    if (type.includes('ADMIN')) return 'border-yellow-500 text-yellow-300';
                     return 'border-blue-500';
                 };
 
@@ -163,9 +500,17 @@
                     return iso.split('T')[1].split('.')[0];
                 };
 
+                const formatRealTime = (seconds) => {
+                    if (!seconds && seconds !== 0) return '--:--';
+                    const m = Math.floor(seconds / 60);
+                    const s = seconds % 60;
+                    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                };
+
                 onMounted(() => {
                     lucide.createIcons();
                     fetchMaps();
+                    checkRobotStatus();
                     // Start the polling loop
                     fetchState(); 
                 });
@@ -175,9 +520,11 @@
                 });
 
                 return {
-                    sessionStatus, maps, selectedMap, participantId, logs, logContainer,
-                    isSessionActive, statusColor,
-                    startExperiment, resetSession, getLogColor, formatTime
+                    sessionStatus, maps, selectedMap, participantId, sessionLang, logs, logContainer, monitor, reminders,
+                    isSessionActive, statusColor, currentPosition, targetPosition, showAdmin,
+                    robotConnected, robotLang, robotText, quickPhrases,
+                    startExperiment, resetSession, getLogColor, formatTime, formatRealTime,
+                    setPosition, moveSteps, jumpToEnd, robotSay, triggerReminder
                 };
             }
         }).mount('#app');
