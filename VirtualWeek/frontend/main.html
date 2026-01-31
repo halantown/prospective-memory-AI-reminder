@@ -232,7 +232,7 @@
         <div class="absolute top-0 left-0 right-0 z-40 px-4 py-3 pointer-events-none flex justify-center">
             <!-- Day Indicator -->
             <div class="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-b-xl px-6 py-2 pointer-events-auto mt-[-12px] border-t-0">
-                    <span class="text-sm font-bold text-slate-600 tracking-wide">Day {{ currentDay }} <span class="text-slate-300 mx-1">|</span> Mon</span>
+                    <span class="text-sm font-bold text-slate-600 tracking-wide">{{ i18n.dayLabel }} <span class="text-slate-300 mx-1">|</span> {{ i18n.weekdayLabel }}</span>
             </div>
         </div>
 
@@ -279,7 +279,7 @@
                     <div class="bg-blue-50 p-2 rounded-lg mb-1">
                         <i data-lucide="clock" class="w-6 h-6 text-blue-600"></i>
                     </div>
-                    <div class="text-xs text-slate-400 font-bold uppercase leading-none mb-1">当前时间</div>
+                    <div class="text-xs text-slate-400 font-bold uppercase leading-none mb-1">{{ i18n.currentTimeLabel }}</div>
                     <div class="text-3xl font-black text-slate-800 leading-none">{{ formattedVirtualTime }}</div>
                 </div>
 
@@ -289,7 +289,7 @@
                         <i data-lucide="timer" class="w-4 h-4 text-red-500"></i>
                     </div>
                     <div>
-                        <div class="text-[10px] text-red-300 font-bold uppercase leading-none mb-0.5">真实计时</div>
+                        <div class="text-[10px] text-red-300 font-bold uppercase leading-none mb-0.5">{{ i18n.realTimeLabel }}</div>
                         <div class="text-lg font-mono font-bold text-red-500 leading-none">{{ formattedRealTime }}</div>
                     </div>
                 </div>
@@ -314,7 +314,7 @@
                         </div>
                         <div v-else class="flex flex-col items-center">
                             <i data-lucide="dices" class="w-8 h-8 text-slate-400 group-hover:text-blue-500 transition-colors mb-1"></i>
-                            <span class="text-sm font-bold text-slate-500 uppercase tracking-wider">掷骰子</span>
+                            <span class="text-sm font-bold text-slate-500 uppercase tracking-wider">{{ i18n.rollButton }}</span>
                             <span class="text-[10px] text-slate-300 font-mono">(1-6)</span>
                         </div>
                         <div v-if="isRolling" class="absolute bottom-0 left-0 h-1.5 bg-blue-500 transition-all duration-100 ease-linear" :style="{ width: rollingProgress + '%' }"></div>
@@ -331,7 +331,7 @@
                     <!-- Confirm (Elevated Z-Index) -->
                     <div v-if="phase === 'waiting_confirm'" class="w-full max-w-[14rem] relative z-30">
                         <button id="btn-confirm-step" @click="confirmContinue" class="btn-primary">
-                            继续下一步
+                            {{ i18n.continueButton }}
                         </button>
                     </div>
 
@@ -356,7 +356,7 @@
                     <button @click="openTaskMenu" :disabled="!isGameActive" 
                         class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-[0_3px_0_#be123c] active:shadow-none active:translate-y-[3px] disabled:opacity-50 disabled:shadow-none flex items-center gap-1.5 transition-all text-sm">
                         <i data-lucide="brain-circuit" class="w-5 h-5"></i>
-                        汇报任务
+                        {{ i18n.taskButton }}
                     </button>
                 </div>
             </div>
@@ -635,6 +635,48 @@
 
         createApp({
             setup() {
+                // --- I18n System (Safe Implementation) ---
+                const locales = ref({});
+                const currentLang = ref('zh');
+                
+                // Helper to get translated text with fallback
+                const getText = (key, params = {}) => {
+                    const lang = currentLang.value;
+                    if (!locales.value[lang]) return key;
+                    
+                    const keys = key.split('.');
+                    let value = locales.value[lang];
+                    for (const k of keys) {
+                        value = value?.[k];
+                        if (!value) return key;
+                    }
+                    
+                    // Replace {param} placeholders
+                    if (typeof value === 'string') {
+                        return value.replace(/\{(\w+)\}/g, (match, param) => params[param] || match);
+                    }
+                    return value || key;
+                };
+                
+                // Preload all locales
+                const loadAllLocales = async () => {
+                    try {
+                        const langs = ['zh', 'en', 'nl'];
+                        const results = await Promise.all(
+                            langs.map(async (lang) => {
+                                const res = await fetch(`/locales/${lang}.json`);
+                                return { lang, data: await res.json() };
+                            })
+                        );
+                        results.forEach(({ lang, data }) => {
+                            locales.value[lang] = data;
+                        });
+                        console.log('Locales loaded:', Object.keys(locales.value));
+                    } catch (e) {
+                        console.error('Failed to load locales:', e);
+                    }
+                };
+                
                 const boardCells = ref([]);
                 const playerPos = ref(0);
                 const currentDay = ref(1);
@@ -684,6 +726,9 @@
 
                 // --- Initialization ---
                 onMounted(async () => {
+                    // Preload all locales first
+                    await loadAllLocales();
+                    
                     lucide.createIcons();
                     // Initialize Tutorial System
                     if (window.TutorialSystem) {
@@ -754,6 +799,13 @@
                             if (data.status === 'RUNNING' && data.config.map_id) {
                                 // Session Started or Running
                                 participantId.value = data.config.participant_id;
+                                
+                                // Switch language if specified
+                                if (data.config.language && locales.value[data.config.language]) {
+                                    currentLang.value = data.config.language;
+                                    console.log(`Language switched to: ${currentLang.value}`);
+                                }
+                                
                                 console.log("Session Status:", data.status, "Config:", data.config);
                                 
                                 if (data.game_state) {
@@ -821,10 +873,19 @@
                         try {
                             const res = await fetch(`${API_BASE}/client/check`);
                             const data = await res.json();
+                            
                             // If server goes back to IDLE while we think we are running, Reset.
                             if (data.status === 'IDLE') {
                                 console.warn("Session reset by admin. Reloading...");
                                 window.location.reload();
+                            }
+                            
+                            // Check for language change
+                            if (data.config && data.config.language) {
+                                if (data.config.language !== currentLang.value && locales.value[data.config.language]) {
+                                    console.log(`Language changed from ${currentLang.value} to ${data.config.language}`);
+                                    currentLang.value = data.config.language;
+                                }
                             }
                         } catch(e) { 
                             // Ignore network errors during active play to prevent accidental resets
@@ -1233,6 +1294,19 @@
                 });
                 const isGameActive = computed(() => !showStartCard.value && !showEventCard.value && !showMinigame.value);
 
+                // --- I18n Computed Properties ---
+                const i18n = {
+                    dayLabel: computed(() => getText('ui.day', { day: currentDay.value })),
+                    weekdayLabel: computed(() => getText('ui.weekday')),
+                    currentTimeLabel: computed(() => getText('ui.currentTime')),
+                    realTimeLabel: computed(() => getText('ui.realTime')),
+                    rollButton: computed(() => getText('hub.roll')),
+                    continueButton: computed(() => getText('common.clickContinue')),
+                    taskButton: computed(() => getText('ui.taskBtn')),
+                    infoLabel: computed(() => getText('ui.info')),
+                    infoContent: computed(() => getText('ui.infoContent'))
+                };
+
                 return {
                     boardCells, playerPos, currentDay, phase, statusMessage, subMessage,
                     showStartCard, showEventCard, showTaskMenu, showMinigame,
@@ -1240,7 +1314,8 @@
                     currentEvent, isRolling, rollingDisplayValue, rollingProgress, diceResult,
                     formattedVirtualTime, formattedRealTime, dayScenario, requiredRollText, isGameActive,
                     dismissStartCard, rollDice, confirmContinue, handleMinigameComplete,
-                    openTaskMenu, closeEventCard, selectEventChoice, getCellStyle, performTask, rollForEvent
+                    openTaskMenu, closeEventCard, selectEventChoice, getCellStyle, performTask, rollForEvent,
+                    currentLang, i18n // Expose i18n computed properties
                 };
             }
         }).mount('#app');

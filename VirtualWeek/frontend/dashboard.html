@@ -43,17 +43,17 @@
                         <div>
                             <label class="block text-sm font-bold text-slate-500 mb-1">语言 / Language</label>
                             <div class="grid grid-cols-3 gap-2">
-                                <button @click="sessionLang = 'zh'" 
+                                <button @click="updateLanguage('zh')" 
                                     class="py-2 rounded-lg text-sm font-bold border transition-all"
                                     :class="sessionLang === 'zh' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
                                     中文
                                 </button>
-                                <button @click="sessionLang = 'en'" 
+                                <button @click="updateLanguage('en')" 
                                     class="py-2 rounded-lg text-sm font-bold border transition-all"
                                     :class="sessionLang === 'en' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
                                     English
                                 </button>
-                                <button @click="sessionLang = 'nl'" 
+                                <button @click="updateLanguage('nl')" 
                                     class="py-2 rounded-lg text-sm font-bold border transition-all"
                                     :class="sessionLang === 'nl' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
                                     Dutch
@@ -420,6 +420,31 @@
                     });
                     // fetchState loop is already running
                 };
+                
+                const updateLanguage = async (lang) => {
+                    console.log(`[Dashboard] updateLanguage called with: ${lang}`);
+                    console.log(`[Dashboard] isSessionActive: ${isSessionActive.value}`);
+                    
+                    sessionLang.value = lang;
+                    
+                    // If session is active, update backend immediately
+                    if (isSessionActive.value) {
+                        try {
+                            console.log(`[Dashboard] Sending POST to /api/admin/update_language`);
+                            const response = await fetch(`${API_BASE}/admin/update_language`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ language: lang })
+                            });
+                            const data = await response.json();
+                            console.log(`[Dashboard] Language updated successfully:`, data);
+                        } catch (e) {
+                            console.error('[Dashboard] Failed to update language:', e);
+                        }
+                    } else {
+                        console.log(`[Dashboard] Session not active, language will be used when starting`);
+                    }
+                };
 
                 const resetSession = async () => {
                     if(!confirm('确定要强制重置当前会话吗？受试者页面将重新等待。')) return;
@@ -523,7 +548,7 @@
                     sessionStatus, maps, selectedMap, participantId, sessionLang, logs, logContainer, monitor, reminders,
                     isSessionActive, statusColor, currentPosition, targetPosition, showAdmin,
                     robotConnected, robotLang, robotText, quickPhrases,
-                    startExperiment, resetSession, getLogColor, formatTime, formatRealTime,
+                    startExperiment, updateLanguage, resetSession, getLogColor, formatTime, formatRealTime,
                     setPosition, moveSteps, jumpToEnd, robotSay, triggerReminder
                 };
             }

@@ -228,6 +228,26 @@ def start_session():
     
     return jsonify({"status": "ok"})
 
+@app.route('/api/admin/update_language', methods=['POST'])
+def update_language():
+    """Update session language dynamically."""
+    data = request.json
+    new_lang = data.get('language', 'zh')
+    
+    if SESSION_STATE.get('config'):
+        SESSION_STATE['config']['language'] = new_lang
+        
+        # Log the change
+        SESSION_STATE['logs_buffer'].append({
+            "server_timestamp": datetime.now().isoformat(),
+            "event_type": "SYSTEM",
+            "details": f"Language changed to {new_lang}"
+        })
+        
+        return jsonify({"status": "ok", "language": new_lang})
+    
+    return jsonify({"error": "No active session"}), 400
+
 @app.route('/api/admin/reset', methods=['POST'])
 def reset_session():
     """Dashboard commands to reset."""
