@@ -6,6 +6,8 @@
     <title>Virtual Week Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Socket.IO Client (v4 compatible with Flask-SocketIO 5.x) -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="bg-slate-100 p-6">
@@ -306,6 +308,64 @@
 
         createApp({
             setup() {
+                // --- WebSocket Connection ---
+                let socket = null;
+                const isSocketReady = ref(false);
+                
+                const initSocket = () => {
+                    return new Promise((resolve) => {
+                        socket = io('http://localhost:5001', {
+                            transports: ['websocket', 'polling'],
+                            reconnection: true,
+                            reconnectionDelay: 1000
+                        });
+                        
+                        socket.on('connect', () => {
+                            console.log('[Dashboard WebSocket] ✅ Connected:', socket.id);
+                            isSocketReady.value = true;
+                            
+                            // Join dashboard room immediately after connection
+                            socket.emit('dashboard:join');
+                            resolve(socket);
+                        });
+                        
+                        socket.on('disconnect', () => {
+                            console.log('[Dashboard WebSocket] ❌ Disconnected');
+                            isSocketReady.value = false;
+                        });
+                        
+                        socket.on('dashboard:joined', () => {
+                            console.log('[Dashboard WebSocket] 🎯 Joined dashboard room');
+                        });
+                        
+                        socket.on('dashboard:session_state', (data) => {
+                            console.log('[Dashboard WebSocket] 📊 Session state:', data);
+                            sessionStatus.value = data.status;
+                            if (data.game_state) {
+                                currentPosition.value = data.game_state.playerPos || 0;
+                            }
+                        });
+                        
+                        socket.on('dashboard:game_state', (data) => {
+                            console.log('[Dashboard WebSocket] ⚡ Real-time game state:', data);
+                            currentPosition.value = data.playerPos || 0;
+                            monitor.value.current_position = data.playerPos || 0;
+                            monitor.value.current_phase = data.phase || 'unknown';
+                        });
+                        
+                        socket.on('dashboard:log', (logEntry) => {
+                            // Real-time log update
+                            logs.value.push(logEntry);
+                            if (logs.value.length > 100) logs.value.shift();
+                            scrollToBottom();
+                        });
+                        
+                        socket.on('error', (error) => {
+                            console.error('[Dashboard WebSocket] ❌ Error:', error);
+                        });
+                    });
+                };
+                
                 const sessionStatus = ref('IDLE'); // IDLE, RUNNING
                 const maps = ref([]);
                 const selectedMap = ref('');
@@ -422,27 +482,18 @@
                 };
                 
                 const updateLanguage = async (lang) => {
-                    console.log(`[Dashboard] updateLanguage called with: ${lang}`);
-                    console.log(`[Dashboard] isSessionActive: ${isSessionActive.value}`);
+                    console.log(`[Dashboard] 🌐 updateLanguage called with: ${lang}`);
+                    console.log(`[Dashboard] Socket exists: ${!!socket}`);
+                    console.log(`[Dashboard] Socket connected: ${socket?.connected}`);
                     
                     sessionLang.value = lang;
                     
-                    // If session is active, update backend immediately
-                    if (isSessionActive.value) {
-                        try {
-                            console.log(`[Dashboard] Sending POST to /api/admin/update_language`);
-                            const response = await fetch(`${API_BASE}/admin/update_language`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ language: lang })
-                            });
-                            const data = await response.json();
-                            console.log(`[Dashboard] Language updated successfully:`, data);
-                        } catch (e) {
-                            console.error('[Dashboard] Failed to update language:', e);
-                        }
+                    // Send via WebSocket if connected
+                    if (socket && socket.connected) {
+                        console.log(`[Dashboard] ✅ Sending language change via WebSocket to: ${lang}`);
+                        socket.emit('admin:language_change', { language: lang });
                     } else {
-                        console.log(`[Dashboard] Session not active, language will be used when starting`);
+                        console.warn('[Dashboard] ⚠️ WebSocket not connected, language will be set on next session start');
                     }
                 };
 
@@ -455,12 +506,13 @@
                 };
 
                 // --- Admin Control Functions ---
-                const sendCommand = async (cmd) => {
-                    await fetch(`${API_BASE}/admin/command`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(cmd)
-                    });
+                const sendCommand = (command) => {
+                    if (socket && socket.connected) {
+                        console.log('[Dashboard WebSocket] Sending command:', command);
+                        socket.emit('admin:command', { command });
+                    } else {
+                        console.error('[Dashboard] WebSocket not connected');
+                    }
                 };
 
                 const setPosition = () => {
@@ -532,7 +584,11 @@
                     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
                 };
 
-                onMounted(() => {
+                onMounted(async () => {
+                    // Initialize WebSocket and wait for connection
+                    socket = await initSocket();
+                    console.log('[Dashboard] 🚀 WebSocket initialized and ready');
+                    
                     lucide.createIcons();
                     fetchMaps();
                     checkRobotStatus();

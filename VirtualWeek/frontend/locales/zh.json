@@ -74,7 +74,17 @@
         "recurringTasks": "常规重复任务",
         "taskBadge": "任务",
         "req": "需",
-        "lungTestInfo": "真实时间 2:30 & 4:15 肺活量测试"
+        "lungTestInfo": "真实时间 2:30 & 4:15 肺活量测试",
+        "readyToGo": "准备出发",
+        "rolling": "掷骰子中...",
+        "waitResult": "等待结果...",
+        "eventTriggered": "事件触发",
+        "pleaseHandle": "请处理",
+        "taskComplete": "任务完成",
+        "loadFailed": "加载失败",
+        "cannotConnect": "无法连接服务器",
+        "ruleHint": "规则提示",
+        "eventPause": "遇到 'E' 格子会自动暂停"
     },
     "tasks": {
         "asthma": "哮喘药",

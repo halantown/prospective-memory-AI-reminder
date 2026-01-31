@@ -28,8 +28,8 @@ print(f"Logs Directory: {LOGS_DIR}")
 app = Flask(__name__, static_folder=STATIC_DIR)
 CORS(app)
 
-# Initialize SocketIO with CORS support
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', logger=True, engineio_logger=False)
+# Initialize SocketIO with CORS support and eventlet for better WebSocket compatibility
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', logger=True, engineio_logger=False)
 
 # --- Global Session State ---
 SESSION_STATE = {
@@ -652,9 +652,10 @@ def handle_language_change(data):
     if SESSION_STATE.get('config'):
         SESSION_STATE['config']['language'] = language
     
-    # Notify game board
-    if CONNECTIONS['game_sid']:
-        socketio.emit('game:config_update', {'language': language}, room=CONNECTIONS['game_sid'])
+    # Broadcast to ALL connected clients (not just game room)
+    # This allows language change even during waiting state
+    socketio.emit('game:config_update', {'language': language}, broadcast=True)
+    print(f"[WebSocket] Language change broadcasted to all clients")
 
 @socketio.on('game:action')
 def handle_game_action(data):

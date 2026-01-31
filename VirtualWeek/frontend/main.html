@@ -8,8 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Vue 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- Socket.IO Client -->
-    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <!-- Socket.IO Client (v4 compatible with Flask-SocketIO 5.x) -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <!-- Tutorial System -->
     <script src="js/tutorial.js"></script>
     <!-- Lucide Icons -->
@@ -352,8 +352,8 @@
                 <!-- Bottom Task Button -->
                 <div class="w-full flex justify-between items-center border-t border-slate-100 pt-3 mt-1 flex-shrink-0">
                     <div class="text-xs text-slate-400 leading-tight font-medium bg-slate-50 px-3 py-2 rounded-xl max-w-[50%]">
-                        <span class="text-amber-500 font-bold block mb-0.5 text-sm">⚠️ 规则提示</span>
-                        遇到 'E' 格子会自动暂停
+                        <span class="text-amber-500 font-bold block mb-0.5 text-sm">⚠️ {{ i18n.ruleHint }}</span>
+                        {{ i18n.eventPause }}
                     </div>
                     <button @click="openTaskMenu" :disabled="!isGameActive" 
                         class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-[0_3px_0_#be123c] active:shadow-none active:translate-y-[3px] disabled:opacity-50 disabled:shadow-none flex items-center gap-1.5 transition-all text-sm">
@@ -639,27 +639,36 @@
             setup() {
                 // --- WebSocket Connection ---
                 let socket = null;
+                let isSocketReady = ref(false);
+                
                 const initSocket = () => {
-                    socket = io('http://localhost:5001', {
-                        transports: ['websocket', 'polling'],
-                        reconnection: true,
-                        reconnectionDelay: 1000,
-                        reconnectionAttempts: 5
+                    return new Promise((resolve) => {
+                        socket = io('http://localhost:5001', {
+                            transports: ['websocket', 'polling'],
+                            reconnection: true,
+                            reconnectionDelay: 1000,
+                            reconnectionAttempts: 10
+                        });
+                        
+                        socket.on('connect', () => {
+                            console.log('[WebSocket] Connected:', socket.id);
+                            isSocketReady.value = true;
+                            resolve(socket);
+                        });
+                        
+                        socket.on('disconnect', () => {
+                            console.log('[WebSocket] Disconnected');
+                            isSocketReady.value = false;
+                        });
+                        
+                        socket.on('connected', (data) => {
+                            console.log('[WebSocket] Server confirmed connection:', data.sid);
+                        });
+                        
+                        socket.on('error', (error) => {
+                            console.error('[WebSocket] Connection error:', error);
+                        });
                     });
-                    
-                    socket.on('connect', () => {
-                        console.log('[WebSocket] Connected:', socket.id);
-                    });
-                    
-                    socket.on('disconnect', () => {
-                        console.log('[WebSocket] Disconnected');
-                    });
-                    
-                    socket.on('connected', (data) => {
-                        console.log('[WebSocket] Server confirmed connection:', data.sid);
-                    });
-                    
-                    return socket;
                 };
                 
                 // --- I18n System (Safe Implementation) ---
@@ -825,10 +834,41 @@
                      }
                 });
 
-                const waitForSessionStart = () => {
-                    statusMessage.value = "等待实验员指令...";
-                    subMessage.value = "请稍候";
+                const waitForSessionStart = async () => {
+                    statusMessage.value = i18n.waiting.value;
+                    subMessage.value = i18n.pleaseWait.value;
                     
+                    // Initialize WebSocket connection and wait for it to be ready
+                    socket = await initSocket();
+                    
+                    // Setup WebSocket event listeners IMMEDIATELY (before joining room)
+                    // This allows language changes to work even in waiting state
+                    socket.on('game:config_update', (config) => {
+                        console.log('[WebSocket] 🔧 Config update (waiting stage):', config);
+                        if (config.language && config.language !== currentLang.value) {
+                            console.log(`[WebSocket] 🌐 Language switched: ${currentLang.value} → ${config.language}`);
+                            currentLang.value = config.language;
+                            // Update status messages with new language
+                            statusMessage.value = i18n.waiting.value;
+                            subMessage.value = i18n.pleaseWait.value;
+                        }
+                    });
+                    
+                    socket.on('game:joined', () => {
+                        console.log('[WebSocket] ✅ Successfully joined game room');
+                    });
+                    
+                    socket.on('game:command', (command) => {
+                        console.log('[WebSocket] ⚡ Received admin command:', command);
+                        executeAdminCommand(command);
+                    });
+                    
+                    socket.on('game:session_reset', () => {
+                        console.warn('[WebSocket] 🔄 Session reset by admin, reloading...');
+                        window.location.reload();
+                    });
+                    
+                    // Poll once to get session status (no more continuous polling)
                     const checkStatus = async () => {
                         try {
                             const res = await fetch(`${API_BASE}/client/check`);
@@ -837,6 +877,10 @@
                             if (data.status === 'RUNNING' && data.config.map_id) {
                                 // Session Started or Running
                                 participantId.value = data.config.participant_id;
+                                
+                                // Join game room via WebSocket (NOW socket is definitely connected)
+                                console.log('[WebSocket] 📡 Joining game room with participant:', data.config.participant_id);
+                                socket.emit('game:join', { participant_id: data.config.participant_id });
                                 
                                 // Switch language if specified
                                 if (data.config.language && locales.value[data.config.language]) {
@@ -868,12 +912,13 @@
                     checkStatus();
                 };
 
-                // --- State Persistence ---
+                // --- State Persistence via WebSocket ---
                 let saveStateTimeout = null;
                 const saveState = () => {
                     if (phase.value === 'loading' || phase.value === 'finished') return;
+                    if (!socket || !socket.connected) return;
                     
-                    // Debounce to reduce API calls
+                    // Debounce to reduce traffic
                     if (saveStateTimeout) clearTimeout(saveStateTimeout);
                     
                     saveStateTimeout = setTimeout(() => {
@@ -888,13 +933,12 @@
                             showStartCard: showStartCard.value,
                             showEventCard: showEventCard.value,
                             showMinigame: showMinigame.value,
-                            // Persist current event details if needed
                             currentEvent: currentEvent.value,
                             requiredRollText: requiredRollText.value
                         };
                         
-                        // Fire and forget sync
-                        apiCall('/client/sync', 'POST', state);
+                        // Send state sync via WebSocket
+                        socket.emit('game:state_sync', state);
                     }, 300); // Debounce by 300ms
                 };
 
@@ -903,40 +947,7 @@
                     saveState();
                 });
 
-                // --- Remote Reset Watcher ---
-                let activePollHandle = null;
-                const startActivePolling = () => {
-                    if (activePollHandle) clearInterval(activePollHandle);
-                    activePollHandle = setInterval(async () => {
-                        try {
-                            const res = await fetch(`${API_BASE}/client/check`);
-                            const data = await res.json();
-                            
-                            // If server goes back to IDLE while we think we are running, Reset.
-                            if (data.status === 'IDLE') {
-                                console.warn("Session reset by admin. Reloading...");
-                                window.location.reload();
-                            }
-                            
-                            // Check for language change
-                            if (data.config && data.config.language) {
-                                if (data.config.language !== currentLang.value && locales.value[data.config.language]) {
-                                    console.log(`Language changed from ${currentLang.value} to ${data.config.language}`);
-                                    currentLang.value = data.config.language;
-                                }
-                            }
-                            
-                            // Handle admin commands
-                            if (data.admin_command) {
-                                console.log('[Admin] Received command:', data.admin_command);
-                                executeAdminCommand(data.admin_command);
-                            }
-                        } catch(e) { 
-                            // Ignore network errors during active play to prevent accidental resets
-                        }
-                    }, 5000); // Changed from 2000ms to 5000ms for less frequent polling
-                };
-
+                // --- Admin Command Executor (called by WebSocket) ---
                 const executeAdminCommand = (cmd) => {
                     if (!cmd || !cmd.type) return;
                     
@@ -957,10 +968,10 @@
 
                 const restoreGameSession = async (mapId, savedState) => {
                     // 1. Fetch Map Config (Same as init)
-                    statusMessage.value = "恢复会话...";
+                    statusMessage.value = i18n.restoring.value;
                     const mapConfig = await apiCall(`/map/${mapId}`); 
                     if (!mapConfig) {
-                        statusMessage.value = "恢复失败";
+                        statusMessage.value = i18n.restoreFailed.value;
                         return;
                     }
 
@@ -988,7 +999,6 @@
 
                     // Restart timer if needed
                     startTimer();
-                    startActivePolling(); // <--- Start watching for resets
                     
                     // Check if tutorial needs to catch up (simple restart for now)
                     if (isTrialMode.value && tutorial) {
@@ -1013,7 +1023,7 @@
                     }
 
                     // 2. Fetch Map Config
-                    statusMessage.value = "加载地图数据";
+                    statusMessage.value = i18n.loading.value;
                     const mapConfig = await apiCall(`/map/${mapId}`); 
                     if (mapConfig) {
                         // Strict check for trial map id
@@ -1026,10 +1036,9 @@
                             setTimeout(() => tutorial.start(), 500);
                         }
                         setupBoard(mapConfig);
-                        startActivePolling(); // <--- Start watching for resets
                     } else {
-                        statusMessage.value = "加载失败";
-                        subMessage.value = "无法连接服务器";
+                        statusMessage.value = i18n.loadFailed.value;
+                        subMessage.value = i18n.cannotConnect.value;
                     }
                 };
 
@@ -1088,7 +1097,7 @@
                     initSessionTiming();  // Initialize high-precision timing
                     showStartCard.value = true;
                     phase.value = 'start_card';
-                    statusMessage.value = "阅读早安卡";
+                    statusMessage.value = getText('cards.startTitle') || '阅读早安卡';
                     subMessage.value = "";
                     
                     logAction('game_start', { map_id: config.map_id, session_start: sessionStartISO.value });
@@ -1125,8 +1134,8 @@
                 const dismissStartCard = () => {
                     showStartCard.value = false;
                     phase.value = 'idle';
-                    statusMessage.value = "准备出发";
-                    subMessage.value = "点击骰子";
+                    statusMessage.value = i18n.readyToGo.value;
+                    subMessage.value = i18n.clickDice.value;
                     startTimer();
                     logAction('start_card_dismissed');
                 };
@@ -1154,8 +1163,8 @@
                 const rollDice = () => {
                     if (isRolling.value) return;
                     isRolling.value = true;
-                    statusMessage.value = "掷骰子中...";
-                    subMessage.value = "等待结果...";
+                    statusMessage.value = i18n.rolling.value;
+                    subMessage.value = i18n.waitResult.value;
                     rollingProgress.value = 0;
                     logAction('dice_roll_start');
 
@@ -1266,7 +1275,7 @@
                 const handleMinigameComplete = (result) => {
                     showMinigame.value = false;
                     phase.value = 'waiting_confirm';
-                    statusMessage.value = "任务完成";
+                    statusMessage.value = i18n.taskComplete.value;
                     logAction('minigame_complete', result);
                 };
 
@@ -1317,8 +1326,8 @@
 
                 const confirmContinue = () => {
                     phase.value = 'idle';
-                    statusMessage.value = "轮到您了";
-                    subMessage.value = "掷骰子";
+                    statusMessage.value = i18n.yourTurn.value;
+                    subMessage.value = i18n.clickDice.value;
                     logAction('turn_continue');
                 };
 
@@ -1326,7 +1335,7 @@
                 const performTask = (task) => {
                     showTaskMenu.value = false;
                     const originalStatus = statusMessage.value;
-                    statusMessage.value = `已记录`;
+                    statusMessage.value = i18n.recorded.value;
                     setTimeout(() => { statusMessage.value = originalStatus; }, 1500);
                     logAction('task_performed', { task: task });
                 };
@@ -1365,6 +1374,7 @@
 
                 // --- I18n Computed Properties ---
                 const i18n = {
+                    // UI labels
                     dayLabel: computed(() => getText('ui.day', { day: currentDay.value })),
                     weekdayLabel: computed(() => getText('ui.weekday')),
                     currentTimeLabel: computed(() => getText('ui.currentTime')),
@@ -1373,7 +1383,27 @@
                     continueButton: computed(() => getText('common.clickContinue')),
                     taskButton: computed(() => getText('ui.taskBtn')),
                     infoLabel: computed(() => getText('ui.info')),
-                    infoContent: computed(() => getText('ui.infoContent'))
+                    infoContent: computed(() => getText('ui.infoContent')),
+                    ruleHint: computed(() => getText('ui.ruleHint')),
+                    eventPause: computed(() => getText('ui.eventPause')),
+                    
+                    // Status messages
+                    waiting: computed(() => getText('common.waiting')),
+                    pleaseWait: computed(() => getText('common.loading')),
+                    readyToGo: computed(() => getText('ui.readyToGo') || '准备出发'),
+                    clickDice: computed(() => getText('common.clickDice')),
+                    rolling: computed(() => getText('ui.rolling') || '掷骰子中...'),
+                    waitResult: computed(() => getText('ui.waitResult') || '等待结果...'),
+                    eventTriggered: computed(() => getText('ui.eventTriggered') || '事件触发'),
+                    pleaseHandle: computed(() => getText('ui.pleaseHandle') || '请处理'),
+                    taskComplete: computed(() => getText('ui.taskComplete') || '任务完成'),
+                    yourTurn: computed(() => getText('common.yourTurn')),
+                    recorded: computed(() => getText('common.recorded')),
+                    restoring: computed(() => getText('common.restoring')),
+                    restoreFailed: computed(() => getText('common.restoreFailed')),
+                    loading: computed(() => getText('common.loading')),
+                    loadFailed: computed(() => getText('ui.loadFailed') || '加载失败'),
+                    cannotConnect: computed(() => getText('ui.cannotConnect') || '无法连接服务器')
                 };
 
                 return {

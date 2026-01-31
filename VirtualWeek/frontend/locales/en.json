@@ -74,7 +74,17 @@
         "recurringTasks": "Recurring Tasks",
         "taskBadge": "Task",
         "req": "Req",
-        "lungTestInfo": "Real Time 2:30 & 4:15 Lung Test"
+        "lungTestInfo": "Real Time 2:30 & 4:15 Lung Test",
+        "readyToGo": "Ready to Go",
+        "rolling": "Rolling...",
+        "waitResult": "Waiting for result...",
+        "eventTriggered": "Event Triggered",
+        "pleaseHandle": "Please Handle",
+        "taskComplete": "Task Complete",
+        "loadFailed": "Load Failed",
+        "cannotConnect": "Cannot Connect to Server",
+        "ruleHint": "Rule Hint",
+        "eventPause": "Game pauses automatically at 'E' cells"
     },
     "tasks": {
         "asthma": "Asthma Medication",

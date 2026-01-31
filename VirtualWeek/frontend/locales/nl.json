@@ -74,7 +74,17 @@
         "recurringTasks": "Herhalende Taken",
         "taskBadge": "Taak",
         "req": "Req",
-        "lungTestInfo": "Echte Tijd 2:30 & 4:15 Longtest"
+        "lungTestInfo": "Echte Tijd 2:30 & 4:15 Longtest",
+        "readyToGo": "Klaar om te gaan",
+        "rolling": "Dobbelstenen gooien...",
+        "waitResult": "Wachten op resultaat...",
+        "eventTriggered": "Gebeurtenis geactiveerd",
+        "pleaseHandle": "Graag afhandelen",
+        "taskComplete": "Taak voltooid",
+        "loadFailed": "Laden mislukt",
+        "cannotConnect": "Kan geen verbinding maken met server",
+        "ruleHint": "Regelwenk",
+        "eventPause": "Spel pauzeert automatisch bij 'E' cellen"
     },
     "tasks": {
         "asthma": "Astma Medicatie",
