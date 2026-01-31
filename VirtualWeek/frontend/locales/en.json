@@ -21,7 +21,8 @@
         "clickContinue": "Click to Continue",
         "checking": "Checking...",
         "yourTurn": "Your Turn",
-        "recorded": "Recorded"
+        "recorded": "Recorded",
+        "understood": "Understood"
     },
     "hub": {
         "title": "Virtual Week",
@@ -56,6 +57,7 @@
         "startDay": "Good morning! Please read today's tasks aloud, then click here to start.",
         "rollDice": "Your turn! Click this dice to move forward.",
         "wait": "Please wait...",
+        "pleaseWait": "Please wait...",
         "confirm": "Great! Click here to continue.",
         "eventRoll": "A check is required. Please click to roll the dice.",
         "eventChoice": "An event occurred! Please read carefully and choose an option."
@@ -63,6 +65,9 @@
     "ui": {
         "day": "Day {day}",
         "weekday": "Mon",
+        "monday": "Monday",
+        "tuesday": "Tuesday",
+        "wednesday": "Wednesday",
         "currentTime": "Current Time",
         "realTime": "Real Time",
         "info": "INFO",
@@ -84,13 +89,33 @@
         "loadFailed": "Load Failed",
         "cannotConnect": "Cannot Connect to Server",
         "ruleHint": "Rule Hint",
-        "eventPause": "Game pauses automatically at 'E' cells"
+        "eventPause": "Game pauses automatically at 'E' cells",
+        "moveForwardSteps": "Move forward {steps} steps",
+        "moveEnded": "Move ended",
+        "waitContinue": "Wait to continue",
+        "recordMemoryTask": "Record Memory Task",
+        "mondayMorning": "Monday: Good Morning",
+        "readTasksAloud": "Please read the following tasks aloud",
+        "todaysTasks": "Today's Tasks",
+        "recurringTasks": "Recurring Tasks",
+        "startDay": "Start the Day",
+        "pleaseChooseAction": "Please choose an action",
+        "moving": "Moving...",
+        "checkTarget": "Check Target",
+        "rollToCheck": "Roll to Check"
     },
     "tasks": {
         "asthma": "Asthma Medication",
         "antibiotics": "Antibiotics",
         "lungTest": "Lung Test",
         "dryCleaning": "Dry Cleaning",
-        "phoneBank": "Phone Bank"
+        "phoneBank": "Phone Bank",
+        "asthma11am": "11:00 AM Asthma Medication",
+        "asthma9pm": "9:00 PM Asthma Medication",
+        "antibioticsBreakfast": "Antibiotics at Breakfast",
+        "antibioticsDinner": "Antibiotics at Dinner",
+        "asthmaButton": "Asthma Medication",
+        "antibioticsButton": "Antibiotics",
+        "lungTestButton": "Lung Test"
     }
 }

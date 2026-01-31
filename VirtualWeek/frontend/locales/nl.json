@@ -56,6 +56,7 @@
         "startDay": "Goedemorgen! Lees de taken van vandaag hardop voor en klik hier om te beginnen.",
         "rollDice": "Jouw beurt! Klik op deze dobbelsteen om vooruit te gaan.",
         "wait": "Even geduld...",
+        "pleaseWait": "Even geduld...",
         "confirm": "Goed zo! Klik hier om verder te gaan.",
         "eventRoll": "Er is een check nodig. Klik om de dobbelsteen te gooien.",
         "eventChoice": "Er is iets gebeurd! Lees aandachtig en kies een optie."
@@ -63,6 +64,9 @@
     "ui": {
         "day": "Dag {day}",
         "weekday": "Ma",
+        "monday": "Maandag",
+        "tuesday": "Dinsdag",
+        "wednesday": "Woensdag",
         "currentTime": "Huidige Tijd",
         "realTime": "Echte Tijd",
         "info": "INFO",
@@ -84,13 +88,33 @@
         "loadFailed": "Laden mislukt",
         "cannotConnect": "Kan geen verbinding maken met server",
         "ruleHint": "Regelwenk",
-        "eventPause": "Spel pauzeert automatisch bij 'E' cellen"
+        "eventPause": "Spel pauzeert automatisch bij 'E' cellen",
+        "moveForwardSteps": "Beweeg {steps} stappen vooruit",
+        "moveEnded": "Beweging beëindigd",
+        "waitContinue": "Wacht om door te gaan",
+        "recordMemoryTask": "Geheugentaak Registreren",
+        "mondayMorning": "Maandag: Goedemorgen",
+        "readTasksAloud": "Lees de volgende taken hardop voor",
+        "todaysTasks": "Taken Vandaag",
+        "recurringTasks": "Herhalende Taken",
+        "startDay": "Start de Dag",
+        "pleaseChooseAction": "Kies een actie",
+        "moving": "Bewegen...",
+        "checkTarget": "Check Doel",
+        "rollToCheck": "Gooi om te controleren"
     },
     "tasks": {
         "asthma": "Astma Medicatie",
         "antibiotics": "Antibiotica",
         "lungTest": "Longtest",
         "dryCleaning": "Stomerij",
-        "phoneBank": "Bank Bellen"
+        "phoneBank": "Bank Bellen",
+        "asthma11am": "11:00 Astma Medicatie",
+        "asthma9pm": "21:00 Astma Medicatie",
+        "antibioticsBreakfast": "Antibiotica bij ontbijt",
+        "antibioticsDinner": "Antibiotica bij diner",
+        "asthmaButton": "Astma Medicatie",
+        "antibioticsButton": "Antibiotica",
+        "lungTestButton": "Longtest"
     }
 }

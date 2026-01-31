@@ -1,5 +1,5 @@
 {
-    "map_id": "day_2",
+    "map_id": "B - High Focality - Low Detail - Day 2",
     "description": "Virtual Week Day 2 - Tuesday",
     "dice_sequence": [5, 3, 4, 1, 6, 2, 5, 3, 1, 4, 2, 6, 5, 1, 3, 4, 6, 2, 1, 5, 4, 3, 6, 2, 1, 5, 3, 4, 6, 2, 1, 5, 4, 3, 2, 6, 1, 5, 3, 4, 2, 6, 1, 5, 3, 4, 2, 6],
     "total_steps": 120,

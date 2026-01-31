@@ -70,6 +70,27 @@
                             </select>
                         </div>
 
+                        <div>
+                            <label class="block text-sm font-bold text-slate-500 mb-1">组数 / Group Number</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button @click="groupNumber = 1" 
+                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
+                                    :class="groupNumber === 1 ? 'bg-green-50 border-green-500 text-green-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                                    第1组 (Day 1)
+                                </button>
+                                <button @click="groupNumber = 2" 
+                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
+                                    :class="groupNumber === 2 ? 'bg-green-50 border-green-500 text-green-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                                    第2组 (Day 2)
+                                </button>
+                                <button @click="groupNumber = 3" 
+                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
+                                    :class="groupNumber === 3 ? 'bg-green-50 border-green-500 text-green-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                                    第3组 (Day 3)
+                                </button>
+                            </div>
+                        </div>
+
                         <button @click="startExperiment" :disabled="isSessionActive" 
                             class="w-full py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2"
                             :class="isSessionActive ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200'">
@@ -371,6 +392,7 @@
                 const selectedMap = ref('');
                 const participantId = ref('sub_' + Math.floor(Math.random() * 1000));
                 const sessionLang = ref('zh'); // New: Session Language
+                const groupNumber = ref(1); // New: Group Number (1, 2, or 3)
                 const logs = ref([]);
                 const logContainer = ref(null);
                 
@@ -462,7 +484,8 @@
                         console.error("Poll error", e);
                     } finally {
                         if (pollInterval !== 'STOPPED') {
-                             pollInterval = setTimeout(fetchState, 1500);
+                             // Reduced polling frequency since WebSocket handles real-time updates
+                             pollInterval = setTimeout(fetchState, 5000); // Changed from 1500ms
                         }
                     }
                 };
@@ -475,7 +498,8 @@
                         body: JSON.stringify({
                             map_id: selectedMap.value,
                             participant_id: participantId.value,
-                            language: sessionLang.value // Pass language to backend
+                            language: sessionLang.value, // Pass language to backend
+                            group_number: groupNumber.value // Pass group number to backend
                         })
                     });
                     // fetchState loop is already running
@@ -601,7 +625,7 @@
                 });
 
                 return {
-                    sessionStatus, maps, selectedMap, participantId, sessionLang, logs, logContainer, monitor, reminders,
+                    sessionStatus, maps, selectedMap, participantId, sessionLang, groupNumber, logs, logContainer, monitor, reminders,
                     isSessionActive, statusColor, currentPosition, targetPosition, showAdmin,
                     robotConnected, robotLang, robotText, quickPhrases,
                     startExperiment, updateLanguage, resetSession, getLogColor, formatTime, formatRealTime,

@@ -21,7 +21,8 @@
         "clickContinue": "点击继续",
         "checking": "判定中...",
         "yourTurn": "轮到您了",
-        "recorded": "已记录"
+        "recorded": "已记录",
+        "understood": "知道了"
     },
     "hub": {
         "title": "虚拟一周",
@@ -56,6 +57,7 @@
         "startDay": "早安！请大声朗读今天的任务，然后点击这里开始。",
         "rollDice": "轮到您了！请点击这个骰子向前移动。",
         "wait": "请稍候...",
+        "pleaseWait": "请稍候...",
         "confirm": "很好！请点击这里继续下一步。",
         "eventRoll": "需要进行检定，请点击掷骰子。",
         "eventChoice": "发生了事件！请仔细阅读描述并点击一个选项。"
@@ -63,6 +65,9 @@
     "ui": {
         "day": "第 {day} 天",
         "weekday": "周一",
+        "monday": "周一",
+        "tuesday": "周二",
+        "wednesday": "周三",
         "currentTime": "虚拟时间",
         "realTime": "真实时间",
         "info": "提示",
@@ -84,13 +89,33 @@
         "loadFailed": "加载失败",
         "cannotConnect": "无法连接服务器",
         "ruleHint": "规则提示",
-        "eventPause": "遇到 'E' 格子会自动暂停"
+        "eventPause": "遇到 'E' 格子会自动暂停",
+        "moveForwardSteps": "向前移动 {steps} 步",
+        "moveEnded": "移动结束",
+        "waitContinue": "等待继续",
+        "recordMemoryTask": "记录记忆任务",
+        "mondayMorning": "周一: 早安",
+        "readTasksAloud": "请大声朗读以下任务",
+        "todaysTasks": "今日专属任务",
+        "recurringTasks": "常规重复任务",
+        "startDay": "开始这一天",
+        "pleaseChooseAction": "请选择一个行动",
+        "moving": "移动中...",
+        "checkTarget": "检定目标",
+        "rollToCheck": "掷骰子判定"
     },
     "tasks": {
         "asthma": "哮喘药",
         "antibiotics": "抗生素",
         "lungTest": "肺活量测试",
         "dryCleaning": "送干洗",
-        "phoneBank": "预约银行"
+        "phoneBank": "预约银行",
+        "asthma11am": "11:00 AM 哮喘药",
+        "asthma9pm": "9:00 PM 哮喘药",
+        "antibioticsBreakfast": "早餐时 抗生素",
+        "antibioticsDinner": "晚餐时 抗生素",
+        "asthmaButton": "哮喘药 (Asthma)",
+        "antibioticsButton": "抗生素 (Antibiotics)",
+        "lungTestButton": "肺活量测试 (Lung Test)"
     }
 }
