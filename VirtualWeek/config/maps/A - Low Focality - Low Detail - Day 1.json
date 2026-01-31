@@ -38,20 +38,45 @@
                 "en": "It's breakfast time. Please make your choice.",
                 "nl": "Het is ontbijttijd. Maak je keuze."
             },
+            "Commute": {
+                "zh": "该出门了。",
+                "en": "Time to head out.",
+                "nl": "Tijd om te vertrekken."
+            },
             "Shopping": {
                 "zh": "现在是购物时间，请完成购物任务。",
                 "en": "It's shopping time. Please complete the shopping task.",
                 "nl": "Het is tijd om te winkelen. Voltooi de taak."
+            },
+            "Work": {
+                "zh": "工作会议要开始了。",
+                "en": "Work meeting is about to start.",
+                "nl": "De werkvergadering begint zo."
             },
             "Social": {
                 "zh": "有人来拜访你了。",
                 "en": "Someone is visiting you.",
                 "nl": "Er is bezoek voor je."
             },
+            "Lunch": {
+                "zh": "午餐时间到了。",
+                "en": "It's lunch time.",
+                "nl": "Het is lunchtijd."
+            },
+            "Exercise": {
+                "zh": "锻炼身体的时间到了。",
+                "en": "Time for some exercise.",
+                "nl": "Tijd voor wat beweging."
+            },
             "Dinner": {
                 "zh": "晚餐时间到了。",
                 "en": "It's dinner time.",
                 "nl": "Het is etenstijd."
+            },
+            "Hobby": {
+                "zh": "休闲时间到了。",
+                "en": "Time for leisure.",
+                "nl": "Tijd voor ontspanning."
             },
             "Library": {
                 "zh": "你到达了图书馆。",
@@ -83,12 +108,32 @@
                 { "text": "吃培根和煎蛋", "rollReq": "偶数" }
             ]
         },
+        "16": {
+            "type": "event",
+            "category": "Commute",
+            "name": "出门上班",
+            "description": "该出门上班了，选择出行方式。",
+            "choices": [
+                { "text": "开车", "rollReq": "任意" },
+                { "text": "骑自行车", "rollReq": "奇数" }
+            ]
+        },
         "32": {
             "type": "event",
             "category": "Shopping",
             "name": "超市购物",
             "description": "您需要去超市完成采购任务。",
             "minigame": "SupermarketGame"
+        },
+        "40": {
+            "type": "event",
+            "category": "Work",
+            "name": "工作会议",
+            "description": "上午有一个重要的团队会议。",
+            "choices": [
+                { "text": "积极发言", "rollReq": ">3点" },
+                { "text": "安静记录", "rollReq": "任意" }
+            ]
         },
         "48": {
             "type": "event",
@@ -100,21 +145,55 @@
                 { "text": "拒绝", "rollReq": "任意" }
             ]
         },
+        "56": {
+            "type": "event",
+            "category": "Lunch",
+            "name": "午餐时间",
+            "description": "中午了，该吃午饭了。",
+            "choices": [
+                { "text": "去食堂", "rollReq": "任意" },
+                { "text": "叫外卖", "rollReq": "偶数" }
+            ]
+        },
+        "72": {
+            "type": "event",
+            "category": "Exercise",
+            "name": "下午锻炼",
+            "description": "下午休息时间，可以做些运动。",
+            "choices": [
+                { "text": "散步20分钟", "rollReq": "任意" },
+                { "text": "跑步", "rollReq": ">4点" }
+            ]
+        },
         "88": {
             "type": "event",
             "category": "Dinner",
             "name": "晚餐时间",
             "description": "准备晚餐的时候到了。",
-             "choices": [
+            "choices": [
                 { "text": "做意面", "rollReq": "奇数" },
                 { "text": "叫外卖", "rollReq": "任意" }
+            ]
+        },
+        "96": {
+            "type": "event",
+            "category": "Hobby",
+            "name": "看电视",
+            "description": "晚饭后的休闲时光。",
+            "choices": [
+                { "text": "看新闻", "rollReq": "任意" },
+                { "text": "看连续剧", "rollReq": "任意" }
             ]
         },
         "104": {
             "type": "event",
             "category": "Library",
             "name": "图书馆",
-            "description": "在图书馆查阅资料。"
+            "description": "在图书馆查阅资料。",
+            "choices": [
+                { "text": "借书", "rollReq": "任意" },
+                { "text": "阅读杂志", "rollReq": "任意" }
+            ]
         }
     },
     "irregular_tasks": [

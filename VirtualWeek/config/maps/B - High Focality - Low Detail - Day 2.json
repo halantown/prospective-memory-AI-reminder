@@ -33,20 +33,45 @@
                 "en": "The breakfast meeting is about to start.",
                 "nl": "De ontbijtvergadering gaat beginnen."
             },
+            "Email": {
+                "zh": "有新邮件需要处理。",
+                "en": "You have new emails to handle.",
+                "nl": "Je hebt nieuwe e-mails om te behandelen."
+            },
             "Shopping": {
                 "zh": "你需要去药店买点东西。",
                 "en": "You need to buy something at the pharmacy.",
                 "nl": "Je moet iets kopen bij de apotheek."
+            },
+            "Doctor": {
+                "zh": "是时候去医生那里了。",
+                "en": "Time for your doctor's appointment.",
+                "nl": "Tijd voor je doktersafspraak."
+            },
+            "Lunch": {
+                "zh": "午餐时间到了。",
+                "en": "It's lunch time.",
+                "nl": "Het is lunchtijd."
             },
             "Social": {
                 "zh": "朋友邀请你喝下午茶。",
                 "en": "A friend invited you for afternoon tea.",
                 "nl": "Een vriend heeft je uitgenodigd voor thee."
             },
+            "Errand": {
+                "zh": "有事情要办。",
+                "en": "You have an errand to run.",
+                "nl": "Je moet een boodschap doen."
+            },
             "Dinner": {
                 "zh": "今晚尝试做新菜谱吧。",
                 "en": "Let's try a new recipe tonight.",
                 "nl": "Laten we vanavond een nieuw recept proberen."
+            },
+            "Chore": {
+                "zh": "有家务活要做。",
+                "en": "There are chores to do.",
+                "nl": "Er zijn klusjes te doen."
             },
             "Relax": {
                 "zh": "看个电影放松一下。",
@@ -78,12 +103,42 @@
                 { "text": "边开会边吃", "rollReq": "6点" }
             ]
         },
+        "20": {
+            "type": "event",
+            "category": "Email",
+            "name": "检查邮件",
+            "description": "早上需要处理一些重要邮件。",
+            "choices": [
+                { "text": "立即回复紧急邮件", "rollReq": "任意" },
+                { "text": "稍后处理", "rollReq": "任意" }
+            ]
+        },
         "32": {
             "type": "event",
             "category": "Shopping",
             "name": "药店采购",
             "description": "需要去药店买些生活用品。",
             "minigame": "SupermarketGame"
+        },
+        "44": {
+            "type": "event",
+            "category": "Doctor",
+            "name": "医生预约",
+            "description": "上午预约了体检。",
+            "choices": [
+                { "text": "准时到达", "rollReq": "偶数" },
+                { "text": "迟到10分钟", "rollReq": "任意" }
+            ]
+        },
+        "56": {
+            "type": "event",
+            "category": "Lunch",
+            "name": "午餐时间",
+            "description": "该吃午饭了。",
+            "choices": [
+                { "text": "吃带的便当", "rollReq": "任意" },
+                { "text": "去餐厅吃", "rollReq": "奇数" }
+            ]
         },
         "64": {
             "type": "event",
@@ -95,14 +150,34 @@
                 { "text": "婉拒", "rollReq": "任意" }
             ]
         },
+        "76": {
+            "type": "event",
+            "category": "Errand",
+            "name": "取快递",
+            "description": "有一个快递到了，需要去取。",
+            "choices": [
+                { "text": "现在去取", "rollReq": "任意" },
+                { "text": "下班后再取", "rollReq": "任意" }
+            ]
+        },
         "88": {
             "type": "event",
             "category": "Dinner",
             "name": "尝试新菜谱",
             "description": "今晚想尝试做一道复杂的菜。",
-             "choices": [
+            "choices": [
                 { "text": "成功做出来", "rollReq": ">4点" },
                 { "text": "放弃，煮面", "rollReq": "任意" }
+            ]
+        },
+        "96": {
+            "type": "event",
+            "category": "Chore",
+            "name": "洗衣服",
+            "description": "洗衣机已经满了，需要洗衣服。",
+            "choices": [
+                { "text": "现在洗", "rollReq": "任意" },
+                { "text": "明天再洗", "rollReq": "任意" }
             ]
         },
         "104": {

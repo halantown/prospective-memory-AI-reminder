@@ -75,7 +75,7 @@
                             </select>
                         </div>
 
-                        <div v-if="!isTrialMap">
+                        <div>
                             <label class="block text-sm font-bold text-slate-500 mb-1">组数 / Group Number</label>
                             <div class="grid grid-cols-3 gap-2">
                                 <button @click="groupNumber = 1" :disabled="isSessionActive"
@@ -94,10 +94,6 @@
                                     第3组 (Day 3)
                                 </button>
                             </div>
-                        </div>
-                        
-                        <div v-else class="bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
-                            <span class="text-sm font-medium text-purple-700">🧪 练习模式 (Trial) - 星期日 / Sunday</span>
                         </div>
 
                         <button @click="startExperiment" :disabled="isSessionActive" 
@@ -213,6 +209,21 @@
                         <!-- Row 3: End -->
                         <button @click="jumpToEnd" class="w-full bg-red-50 hover:bg-red-100 text-red-600 px-2 py-1.5 rounded text-[10px] font-bold border border-red-100 flex items-center justify-center gap-1">
                             ⚠ 跳到结尾
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Minigame Test Panel -->
+                <div class="card bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                        <i data-lucide="gamepad-2" class="w-4 h-4"></i> 小游戏测试
+                    </h2>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button v-for="game in minigames" :key="game.id"
+                            @click="triggerMinigame(game.id)"
+                            class="p-2 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-lg text-left transition-colors">
+                            <div class="text-base mb-0.5">{{ game.icon }}</div>
+                            <div class="text-[10px] font-bold text-slate-700 leading-tight">{{ game.name }}</div>
                         </button>
                     </div>
                 </div>
@@ -439,10 +450,19 @@
                     '结束': { zh: '实验结束了，谢谢参与', en: 'The experiment is over, thank you', nl: 'Het experiment is afgelopen, bedankt' }
                 });
                 
+                // Minigame Test List
+                const minigames = ref([
+                    { id: 'Shopping', icon: '🛒', name: '超市采购' },
+                    { id: 'PillBox', icon: '💊', name: '药盒检查' },
+                    { id: 'RouteChoice', icon: '🗺️', name: '路线选择' },
+                    { id: 'Schedule', icon: '📅', name: '日程冲突' },
+                    { id: 'Priority', icon: '📋', name: '优先级' },
+                    { id: 'PhotoSpot', icon: '🔍', name: '场景检查' }
+                ]);
+                
                 let pollInterval = null;
 
                 const isSessionActive = computed(() => sessionStatus.value === 'RUNNING');
-                const isTrialMap = computed(() => selectedMap.value && selectedMap.value.toLowerCase() === 'trial');
                 const statusColor = computed(() => {
                     switch(sessionStatus.value) {
                         case 'RUNNING': return 'bg-green-100 text-green-700';
@@ -590,6 +610,14 @@
                     });
                 };
 
+                // --- Minigame Test ---
+                const triggerMinigame = (gameId) => {
+                    if (socket) {
+                        socket.emit('admin:trigger_minigame', { category: gameId });
+                        console.log(`[Dashboard] Triggered minigame: ${gameId}`);
+                    }
+                };
+
                 // --- Robot Control Functions ---
                 const checkRobotStatus = async () => {
                     try {
@@ -661,10 +689,10 @@
 
                 return {
                     sessionStatus, maps, selectedMap, participantId, sessionLang, groupNumber, logs, logContainer, monitor, reminders,
-                    isSessionActive, isTrialMap, statusColor, currentPosition, targetPosition, showAdmin,
-                    robotConnected, robotLang, robotText, quickPhrases,
+                    isSessionActive, statusColor, currentPosition, targetPosition, showAdmin,
+                    robotConnected, robotLang, robotText, quickPhrases, minigames,
                     startExperiment, updateLanguage, resetSession, getLogColor, formatTime, formatRealTime,
-                    setPosition, moveSteps, jumpToEnd, robotSay, triggerReminder
+                    setPosition, moveSteps, jumpToEnd, robotSay, triggerReminder, triggerMinigame
                 };
             }
         }).mount('#app');

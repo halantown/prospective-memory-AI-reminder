@@ -28,10 +28,25 @@
                 "en": "Look, this is a breakfast event. Choose what you like.",
                 "nl": "Kijk, dit is een ontbijtevenement. Kies wat je lekker vindt."
             },
+            "Walk": {
+                "zh": "这是散步事件，试着选一个。",
+                "en": "This is a walking event. Try to choose one.",
+                "nl": "Dit is een wandelevenement. Probeer er een te kiezen."
+            },
             "Shopping": {
                 "zh": "这是一个小游戏事件，试着玩一下。",
                 "en": "This is a minigame event. Try playing it.",
                 "nl": "Dit is een minigame. Probeer het te spelen."
+            },
+            "Lunch": {
+                "zh": "午餐事件，选择你想吃什么。",
+                "en": "Lunch event. Choose what you want to eat.",
+                "nl": "Lunchevenement. Kies wat je wilt eten."
+            },
+            "Reading": {
+                "zh": "阅读事件，看看书放松一下。",
+                "en": "Reading event. Relax with a book.",
+                "nl": "Leesevenement. Ontspan met een boek."
             },
             "Dinner": {
                 "zh": "这是最后一个练习事件了。",
@@ -62,6 +77,16 @@
                 { "text": "简单的早餐", "rollReq": "任意" }
             ]
         },
+        "24": {
+            "type": "event",
+            "category": "Walk",
+            "name": "散步",
+            "description": "早上出去散散步。",
+            "choices": [
+                { "text": "去公园", "rollReq": "任意" },
+                { "text": "绕街区走一圈", "rollReq": "任意" }
+            ]
+        },
         "32": {
             "type": "event",
             "category": "Shopping",
@@ -69,12 +94,32 @@
             "description": "这将启动购物小游戏，请熟悉操作。",
             "minigame": "SupermarketGame"
         },
+        "48": {
+            "type": "event",
+            "category": "Lunch",
+            "name": "午餐时间",
+            "description": "中午了，该吃点东西。",
+            "choices": [
+                { "text": "做三明治", "rollReq": "任意" },
+                { "text": "吃水果", "rollReq": "任意" }
+            ]
+        },
+        "64": {
+            "type": "event",
+            "category": "Reading",
+            "name": "阅读时间",
+            "description": "下午看会儿书。",
+            "choices": [
+                { "text": "看小说", "rollReq": "任意" },
+                { "text": "看杂志", "rollReq": "任意" }
+            ]
+        },
         "88": {
             "type": "event",
             "category": "Dinner",
             "name": "晚餐时间",
             "description": "一天的结束。请选择晚餐。",
-             "choices": [
+            "choices": [
                 { "text": "健康沙拉", "rollReq": "任意" },
                 { "text": "炸鸡", "rollReq": "任意" }
             ]

@@ -33,20 +33,45 @@
                 "en": "Oops, the alarm didn't go off!",
                 "nl": "Oeps, de wekker ging niet af!"
             },
+            "Commute": {
+                "zh": "得赶紧出门了。",
+                "en": "Need to head out quickly.",
+                "nl": "Je moet snel vertrekken."
+            },
             "Work": {
                 "zh": "该提交工作报告了。",
                 "en": "Time to submit the work report.",
                 "nl": "Tijd om het werkrapport in te dienen."
+            },
+            "Meeting": {
+                "zh": "电话会议要开始了。",
+                "en": "The conference call is starting.",
+                "nl": "De telefonische vergadering begint."
             },
             "Lunch": {
                 "zh": "这是一顿重要的商务午餐。",
                 "en": "This is an important business lunch.",
                 "nl": "Dit is een belangrijke zakenlunch."
             },
+            "Coffee": {
+                "zh": "来杯咖啡提提神吧。",
+                "en": "Let's get some coffee to wake up.",
+                "nl": "Laten we koffie halen om wakker te worden."
+            },
+            "Gym": {
+                "zh": "是时候锻炼一下了。",
+                "en": "Time to work out.",
+                "nl": "Tijd om te trainen."
+            },
             "Dinner": {
                 "zh": "清理一下冰箱里的剩菜。",
                 "en": "Clear out the leftovers in the fridge.",
                 "nl": "Maak de restjes in de koelkast op."
+            },
+            "Phone": {
+                "zh": "有人联系你。",
+                "en": "Someone is reaching out to you.",
+                "nl": "Iemand probeert je te bereiken."
             },
             "Sleep": {
                 "zh": "早点休息吧，晚安。",
@@ -78,6 +103,16 @@
                 { "text": "抓个面包", "rollReq": "奇数" }
             ]
         },
+        "16": {
+            "type": "event",
+            "category": "Commute",
+            "name": "赶地铁",
+            "description": "因为迟到，需要赶紧去地铁站。",
+            "choices": [
+                { "text": "跑步去", "rollReq": ">3点" },
+                { "text": "打车", "rollReq": "任意" }
+            ]
+        },
         "24": {
             "type": "event",
             "category": "Work",
@@ -86,6 +121,16 @@
             "choices": [
                 { "text": "仔细检查后提交", "rollReq": ">3点" },
                 { "text": "直接提交", "rollReq": "任意" }
+            ]
+        },
+        "36": {
+            "type": "event",
+            "category": "Meeting",
+            "name": "客户电话会议",
+            "description": "有一通重要的客户电话会议。",
+            "choices": [
+                { "text": "主动汇报进度", "rollReq": "偶数" },
+                { "text": "等客户提问", "rollReq": "任意" }
             ]
         },
         "48": {
@@ -98,13 +143,43 @@
                 { "text": "听客户安排", "rollReq": "任意" }
             ]
         },
+        "60": {
+            "type": "event",
+            "category": "Coffee",
+            "name": "咖啡时间",
+            "description": "下午需要提提神。",
+            "choices": [
+                { "text": "喝杯拿铁", "rollReq": "任意" },
+                { "text": "喝杯浓缩", "rollReq": "奇数" }
+            ]
+        },
+        "72": {
+            "type": "event",
+            "category": "Gym",
+            "name": "健身房",
+            "description": "下班后去健身房锻炼。",
+            "choices": [
+                { "text": "跑步30分钟", "rollReq": "任意" },
+                { "text": "举重训练", "rollReq": ">4点" }
+            ]
+        },
         "88": {
             "type": "event",
             "category": "Dinner",
             "name": "剩菜大作战",
             "description": "清理冰箱里的食材。",
-             "choices": [
+            "choices": [
                 { "text": "做个大杂烩", "rollReq": "任意" }
+            ]
+        },
+        "100": {
+            "type": "event",
+            "category": "Phone",
+            "name": "给朋友打电话",
+            "description": "好久没联系的朋友来了消息。",
+            "choices": [
+                { "text": "打个电话聊聊", "rollReq": "任意" },
+                { "text": "发个微信", "rollReq": "任意" }
             ]
         },
         "112": {

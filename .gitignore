@@ -2,3 +2,6 @@
 /robot_test
 /archive
 /.github
+/docs
+__pycache__/
+*.pyc

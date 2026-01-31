@@ -91,7 +91,7 @@
         "loadFailed": "Load Failed",
         "cannotConnect": "Cannot Connect to Server",
         "ruleHint": "Rule Hint",
-        "eventPause": "Game pauses automatically at 'E' cells",
+        "eventPause": "Landing on 'E' cells triggers events",
         "moveForwardSteps": "Move forward {steps} steps",
         "moveEnded": "Move ended",
         "waitContinue": "Wait to continue",

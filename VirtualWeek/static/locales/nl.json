@@ -90,7 +90,7 @@
         "loadFailed": "Laden mislukt",
         "cannotConnect": "Kan geen verbinding maken met server",
         "ruleHint": "Regelwenk",
-        "eventPause": "Spel pauzeert automatisch bij 'E' cellen",
+        "eventPause": "Landen op 'E' cellen activeert gebeurtenissen",
         "moveForwardSteps": "Beweeg {steps} stappen vooruit",
         "moveEnded": "Beweging beëindigd",
         "waitContinue": "Wacht om door te gaan",

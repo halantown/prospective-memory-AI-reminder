@@ -86,6 +86,21 @@ def register_handlers(socketio):
         socketio.emit('game:config_update', {'language': language}, room='game')
         print(f"[WebSocket] Language change sent to all rooms")
     
+    @socketio.on('admin:trigger_minigame')
+    def handle_trigger_minigame(data):
+        """Admin triggers a minigame on the game client for testing."""
+        category = data.get('category')
+        print(f"[WebSocket] Admin triggered minigame: {category}")
+        
+        # Emit to game room to trigger minigame
+        socketio.emit('game:trigger_event', {
+            'category': category,
+            'title': f'测试: {category}',
+            'description': '',
+            'scenario': None  # 使用小游戏默认场景
+        }, room='game')
+        print(f"[WebSocket] Minigame trigger sent to game room")
+    
     @socketio.on('game:action')
     def handle_game_action(data):
         """Game board sends action log."""
