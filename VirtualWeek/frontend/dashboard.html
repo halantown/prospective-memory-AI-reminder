@@ -39,23 +39,26 @@
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm font-bold text-slate-500 mb-1">受试者 ID</label>
-                            <input v-model="participantId" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="例如: sub_001">
+                            <input v-model="participantId" :disabled="isSessionActive" type="text" 
+                                class="w-full border border-slate-300 rounded-lg px-3 py-2 font-mono text-sm outline-none transition-all"
+                                :class="isSessionActive ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'"
+                                placeholder="例如: sub_001">
                         </div>
 
                         <div>
                             <label class="block text-sm font-bold text-slate-500 mb-1">语言 / Language</label>
                             <div class="grid grid-cols-3 gap-2">
-                                <button @click="updateLanguage('zh')" 
+                                <button @click="updateLanguage('zh')"
                                     class="py-2 rounded-lg text-sm font-bold border transition-all"
                                     :class="sessionLang === 'zh' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
                                     中文
                                 </button>
-                                <button @click="updateLanguage('en')" 
+                                <button @click="updateLanguage('en')"
                                     class="py-2 rounded-lg text-sm font-bold border transition-all"
                                     :class="sessionLang === 'en' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
                                     English
                                 </button>
-                                <button @click="updateLanguage('nl')" 
+                                <button @click="updateLanguage('nl')"
                                     class="py-2 rounded-lg text-sm font-bold border transition-all"
                                     :class="sessionLang === 'nl' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
                                     Dutch
@@ -65,7 +68,9 @@
 
                         <div>
                             <label class="block text-sm font-bold text-slate-500 mb-1">选择地图</label>
-                            <select v-model="selectedMap" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                            <select v-model="selectedMap" :disabled="isSessionActive"
+                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm transition-all"
+                                :class="isSessionActive ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'">
                                 <option v-for="map in maps" :key="map" :value="map">{{ map }}</option>
                             </select>
                         </div>
@@ -73,19 +78,19 @@
                         <div>
                             <label class="block text-sm font-bold text-slate-500 mb-1">组数 / Group Number</label>
                             <div class="grid grid-cols-3 gap-2">
-                                <button @click="groupNumber = 1" 
+                                <button @click="groupNumber = 1" :disabled="isSessionActive"
                                     class="py-2 rounded-lg text-sm font-bold border transition-all"
-                                    :class="groupNumber === 1 ? 'bg-green-50 border-green-500 text-green-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                                    :class="groupNumber === 1 ? (isSessionActive ? 'bg-green-100 border-green-400 text-green-600 cursor-not-allowed' : 'bg-green-50 border-green-500 text-green-700') : (isSessionActive ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50')">
                                     第1组 (Day 1)
                                 </button>
-                                <button @click="groupNumber = 2" 
+                                <button @click="groupNumber = 2" :disabled="isSessionActive"
                                     class="py-2 rounded-lg text-sm font-bold border transition-all"
-                                    :class="groupNumber === 2 ? 'bg-green-50 border-green-500 text-green-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                                    :class="groupNumber === 2 ? (isSessionActive ? 'bg-green-100 border-green-400 text-green-600 cursor-not-allowed' : 'bg-green-50 border-green-500 text-green-700') : (isSessionActive ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50')">
                                     第2组 (Day 2)
                                 </button>
-                                <button @click="groupNumber = 3" 
+                                <button @click="groupNumber = 3" :disabled="isSessionActive"
                                     class="py-2 rounded-lg text-sm font-bold border transition-all"
-                                    :class="groupNumber === 3 ? 'bg-green-50 border-green-500 text-green-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                                    :class="groupNumber === 3 ? (isSessionActive ? 'bg-green-100 border-green-400 text-green-600 cursor-not-allowed' : 'bg-green-50 border-green-500 text-green-700') : (isSessionActive ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50')">
                                     第3组 (Day 3)
                                 </button>
                             </div>
@@ -454,6 +459,24 @@
                         const data = await res.json();
                         sessionStatus.value = data.status;
                         
+                        // Restore Dashboard config from backend (for page refresh)
+                        if (data.config && Object.keys(data.config).length > 0) {
+                            console.log('[Dashboard] 🔄 Restoring config from backend:', data.config);
+                            
+                            if (data.config.language) {
+                                sessionLang.value = data.config.language;
+                            }
+                            if (data.config.group_number) {
+                                groupNumber.value = data.config.group_number;
+                            }
+                            if (data.config.map_id) {
+                                selectedMap.value = data.config.map_id;
+                            }
+                            if (data.config.participant_id) {
+                                participantId.value = data.config.participant_id;
+                            }
+                        }
+                        
                         // Update current position from game_state
                         if (data.game_state && data.game_state.playerPos !== undefined) {
                             currentPosition.value = data.game_state.playerPos;
@@ -614,10 +637,17 @@
                     console.log('[Dashboard] 🚀 WebSocket initialized and ready');
                     
                     lucide.createIcons();
-                    fetchMaps();
+                    await fetchMaps();  // Wait for maps to load first
                     checkRobotStatus();
-                    // Start the polling loop
-                    fetchState(); 
+                    
+                    // Fetch state to restore config (IMPORTANT: do this after maps are loaded)
+                    await fetchState();
+                    console.log('[Dashboard] 📋 Config restored from backend:', {
+                        language: sessionLang.value,
+                        group: groupNumber.value,
+                        map: selectedMap.value,
+                        participant: participantId.value
+                    });
                 });
 
                 onUnmounted(() => {
