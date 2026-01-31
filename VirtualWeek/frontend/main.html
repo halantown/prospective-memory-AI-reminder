@@ -295,7 +295,9 @@
                 </div>
 
                 <!-- Status Text (Adjusted position) -->
-                <div class="w-full text-center mt-24 mb-4 z-10 relative" :class="{'opacity-20': phase === 'waiting_confirm' || phase === 'idle'}">
+                <div class="w-full text-center mt-24 mb-4 z-10 relative" 
+                     :class="{'opacity-20': phase === 'waiting_confirm' || phase === 'idle'}"
+                     role="status" aria-live="polite">
                     <h2 class="text-3xl font-bold text-slate-800 mb-2 transition-all">{{ statusMessage }}</h2>
                     <p class="text-lg text-slate-400 font-medium">{{ subMessage }}</p>
                 </div>
@@ -978,6 +980,11 @@
                     timerInterval = setInterval(() => { realTimeSeconds.value++; }, 1000);
                     logAction('timer_start');
                 };
+                
+                const stopAllTimers = () => {
+                    if (timerInterval) clearInterval(timerInterval);
+                    if (activePollHandle) clearInterval(activePollHandle);
+                };
 
                 const dismissStartCard = () => {
                     showStartCard.value = false;
@@ -1119,7 +1126,7 @@
                     statusMessage.value = "今日结束";
                     subMessage.value = "通知实验员";
                     phase.value = 'finished';
-                    clearInterval(timerInterval);
+                    stopAllTimers();
                     logAction('day_end');
                 };
 
