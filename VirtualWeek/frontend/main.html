@@ -720,6 +720,17 @@
                 const diceSequence = ref([]);
                 const diceSequenceIndex = ref(0);
                 const isTrialMode = ref(false);
+                
+                // High-precision timing: Record session start time
+                const sessionStartTime = ref(0);
+                const sessionStartISO = ref('');
+                
+                // Initialize timing references when session starts
+                const initSessionTiming = () => {
+                    sessionStartTime.value = performance.now();
+                    sessionStartISO.value = new Date().toISOString();
+                    console.log('[Timing] Session start:', sessionStartISO.value, 'at', sessionStartTime.value.toFixed(3), 'ms');
+                };
 
                 // Tutorial
                 let tutorial = null;
@@ -887,10 +898,34 @@
                                     currentLang.value = data.config.language;
                                 }
                             }
+                            
+                            // Handle admin commands
+                            if (data.admin_command) {
+                                console.log('[Admin] Received command:', data.admin_command);
+                                executeAdminCommand(data.admin_command);
+                            }
                         } catch(e) { 
                             // Ignore network errors during active play to prevent accidental resets
                         }
                     }, 5000); // Changed from 2000ms to 5000ms for less frequent polling
+                };
+
+                const executeAdminCommand = (cmd) => {
+                    if (!cmd || !cmd.type) return;
+                    
+                    console.log('[Admin] Executing command:', cmd.type, cmd);
+                    
+                    switch (cmd.type) {
+                        case 'SET_POSITION':
+                            if (typeof cmd.position === 'number') {
+                                playerPos.value = Math.max(0, Math.min(boardCells.value.length - 1, cmd.position));
+                                logAction('admin_position_change', { position: playerPos.value });
+                                console.log(`[Admin] Player position set to ${playerPos.value}`);
+                            }
+                            break;
+                        default:
+                            console.warn('[Admin] Unknown command type:', cmd.type);
+                    }
                 };
 
                 const restoreGameSession = async (mapId, savedState) => {
@@ -1023,19 +1058,25 @@
                     });
 
                     // Start Game
+                    initSessionTiming();  // Initialize high-precision timing
                     showStartCard.value = true;
                     phase.value = 'start_card';
                     statusMessage.value = "阅读早安卡";
                     subMessage.value = "";
                     
-                    logAction('game_start', { map_id: config.map_id });
+                    logAction('game_start', { map_id: config.map_id, session_start: sessionStartISO.value });
                 };
 
                 const logAction = (type, details = {}) => {
                     if (!logFileName.value) return;
+                    
+                    // High-precision timestamp: milliseconds since session start
+                    const preciseTime = performance.now();
+                    
                     apiCall('/log', 'POST', {
                         log_file: logFileName.value,
-                        client_timestamp: new Date().toISOString(),
+                        client_timestamp: new Date().toISOString(), // Human-readable absolute time
+                        client_time_ms: preciseTime.toFixed(3),     // High-precision relative time (microsecond precision)
                         event_type: type,
                         details: typeof details === 'string' ? details : JSON.stringify(details),
                         metadata: details

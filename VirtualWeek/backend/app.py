@@ -96,7 +96,7 @@ def init_session():
     # Write header
     with open(file_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(['server_timestamp', 'client_timestamp', 'event_type', 'details', 'metadata'])
+        writer.writerow(['server_timestamp', 'client_timestamp', 'client_time_ms', 'event_type', 'details', 'metadata'])
         
     return jsonify({
         "status": "created", 
@@ -124,6 +124,7 @@ def log_event():
     
     server_time = datetime.now().isoformat()
     client_time = data.get('client_timestamp', '')
+    client_time_ms = data.get('client_time_ms', '')  # High-precision performance.now()
     event_type = data.get('event_type', 'info')
     details = data.get('details', '')
     metadata = json.dumps(data.get('metadata', {}), ensure_ascii=False)
@@ -142,7 +143,7 @@ def log_event():
     try:
         with open(file_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow([server_time, client_time, event_type, details, metadata])
+            writer.writerow([server_time, client_time, client_time_ms, event_type, details, metadata])
         return jsonify({"status": "logged"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
