@@ -492,7 +492,7 @@
     </div>
 
     <script>
-        const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+        const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
 
         const API_BASE_URL = '/api';
         const API_BASE = '/api'; // Added for compatibility with dashboard poller
@@ -779,27 +779,33 @@
                 };
 
                 // --- State Persistence ---
+                let saveStateTimeout = null;
                 const saveState = () => {
                     if (phase.value === 'loading' || phase.value === 'finished') return;
                     
-                    const state = {
-                        playerPos: playerPos.value,
-                        phase: phase.value,
-                        diceSequenceIndex: diceSequenceIndex.value,
-                        logFileName: logFileName.value,
-                        realTimeSeconds: realTimeSeconds.value,
-                        statusMessage: statusMessage.value,
-                        subMessage: subMessage.value,
-                        showStartCard: showStartCard.value,
-                        showEventCard: showEventCard.value,
-                        showMinigame: showMinigame.value,
-                        // Persist current event details if needed
-                        currentEvent: currentEvent.value,
-                        requiredRollText: requiredRollText.value
-                    };
+                    // Debounce to reduce API calls
+                    if (saveStateTimeout) clearTimeout(saveStateTimeout);
                     
-                    // Fire and forget sync
-                    apiCall('/client/sync', 'POST', state);
+                    saveStateTimeout = setTimeout(() => {
+                        const state = {
+                            playerPos: playerPos.value,
+                            phase: phase.value,
+                            diceSequenceIndex: diceSequenceIndex.value,
+                            logFileName: logFileName.value,
+                            realTimeSeconds: realTimeSeconds.value,
+                            statusMessage: statusMessage.value,
+                            subMessage: subMessage.value,
+                            showStartCard: showStartCard.value,
+                            showEventCard: showEventCard.value,
+                            showMinigame: showMinigame.value,
+                            // Persist current event details if needed
+                            currentEvent: currentEvent.value,
+                            requiredRollText: requiredRollText.value
+                        };
+                        
+                        // Fire and forget sync
+                        apiCall('/client/sync', 'POST', state);
+                    }, 300); // Debounce by 300ms
                 };
 
                 // Watch critical state changes to trigger save
@@ -823,7 +829,7 @@
                         } catch(e) { 
                             // Ignore network errors during active play to prevent accidental resets
                         }
-                    }, 2000);
+                    }, 5000); // Changed from 2000ms to 5000ms for less frequent polling
                 };
 
                 const restoreGameSession = async (mapId, savedState) => {
@@ -1023,25 +1029,37 @@
                     rollingProgress.value = 0;
                     logAction('dice_roll_start');
 
-                    const flashInterval = setInterval(() => {
-                        rollingDisplayValue.value = Math.floor(Math.random() * 6) + 1;
-                        rollingProgress.value += 10; 
-                    }, 80);
+                    // Use requestAnimationFrame for smoother 60fps animation
+                    const animationDuration = 800;
+                    const startTime = performance.now();
+                    let animationFrame;
 
-                    setTimeout(() => {
-                        clearInterval(flashInterval);
-                        const finalResult = getNextDiceValue();
-                        rollingDisplayValue.value = finalResult;
-                        diceResult.value = finalResult;
-                        rollingProgress.value = 100;
+                    const animate = (currentTime) => {
+                        const elapsed = currentTime - startTime;
+                        const progress = Math.min(elapsed / animationDuration, 1);
                         
-                        logAction('dice_roll_result', { result: finalResult });
+                        rollingDisplayValue.value = Math.floor(Math.random() * 6) + 1;
+                        rollingProgress.value = progress * 100;
+                        
+                        if (progress < 1) {
+                            animationFrame = requestAnimationFrame(animate);
+                        } else {
+                            // Animation complete
+                            const finalResult = getNextDiceValue();
+                            rollingDisplayValue.value = finalResult;
+                            diceResult.value = finalResult;
+                            rollingProgress.value = 100;
+                            
+                            logAction('dice_roll_result', { result: finalResult });
 
-                        setTimeout(() => {
-                            isRolling.value = false;
-                            moveTokenWithPassCheck(finalResult);
-                        }, 500);
-                    }, 800);
+                            setTimeout(() => {
+                                isRolling.value = false;
+                                moveTokenWithPassCheck(finalResult);
+                            }, 500);
+                        }
+                    };
+                    
+                    animationFrame = requestAnimationFrame(animate);
                 };
 
                 const moveTokenWithPassCheck = async (steps) => {
@@ -1109,8 +1127,8 @@
                     minigameBackground.value = gameConfig.background;
                     
                     showMinigame.value = true;
-                    // Ensure Lucide icons re-render inside the new component
-                    setTimeout(() => lucide.createIcons(), 100);
+                    // Ensure Lucide icons re-render inside the new component - use nextTick for better performance
+                    Vue.nextTick(() => lucide.createIcons());
                     logAction('minigame_start', { category });
                 };
 
@@ -1187,6 +1205,18 @@
                     gridColumnStart: cell.x + 1,
                     gridRowStart: cell.y + 1
                 });
+                
+                // Optimize cell class computation with memoization
+                const getCellClasses = (cell, index) => {
+                    const classes = ['cell'];
+                    if (cell.type === 'E') classes.push('event');
+                    else if (cell.type === 'Start') classes.push('start');
+                    else if (cell.type === 'End') classes.push('end');
+                    else if (cell.type === 'Hour') classes.push('hour');
+                    if (playerPos.value === index) classes.push('active-cell');
+                    if (cell.hourMarker) classes.push('has-marker');
+                    return classes.join(' ');
+                };
                 
                 const formattedVirtualTime = computed(() => {
                     const startMin = 7 * 60;
