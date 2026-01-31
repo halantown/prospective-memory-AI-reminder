@@ -1,0 +1,93 @@
+{
+  "condition_id": "C",
+  "condition_name": "High Focality, Low Detail",
+  "focality": "high",
+  "detail": "low",
+  "generated_at": "2026-01-31T23:31:38.420880",
+  "reminders": {
+    "pm_medication": {
+      "action": "Take morning blood pressure medication",
+      "ongoing_task_used": "PillBox",
+      "texts": {
+        "zh": "你正在查看药盒，记得吃药。",
+        "en": "You are looking at the pill box. Remember to take your medication.",
+        "nl": "Je kijkt naar de pillendoos. Vergeet niet je medicijnen te nemen."
+      },
+      "metadata": {
+        "importance": "critical",
+        "target_type": "event_based",
+        "target_value": "PillBox"
+      }
+    },
+    "pm_bring_medical_book": {
+      "action": "Bring blue medical record book to doctor appointment",
+      "ongoing_task_used": "Schedule",
+      "texts": {
+        "zh": "你正在查看日程，记得带上蓝色病历本。",
+        "en": "You are checking your schedule. Remember to bring your blue medical record book.",
+        "nl": "Je bekijkt je agenda. Vergeet niet je blauwe medische boek mee te nemen."
+      },
+      "metadata": {
+        "importance": "high",
+        "target_type": "event_based",
+        "target_value": "Schedule"
+      }
+    },
+    "pm_return_book": {
+      "action": "Return borrowed book to Maria",
+      "ongoing_task_used": "Social",
+      "texts": {
+        "zh": "你正在与人交谈，记得还书给Maria。",
+        "en": "You are having a conversation. Remember to return the book to Maria.",
+        "nl": "Je bent in gesprek. Vergeet niet het boek aan Maria terug te geven."
+      },
+      "metadata": {
+        "importance": "medium",
+        "target_type": "event_based",
+        "target_value": "Social"
+      }
+    },
+    "pm_call_sarah": {
+      "action": "Call Sarah to confirm Wednesday dinner",
+      "ongoing_task_used": "Schedule",
+      "texts": {
+        "zh": "你正在查看日程，记得给Sarah打电话确认晚餐。",
+        "en": "You are checking your schedule. Remember to call Sarah about dinner.",
+        "nl": "Je bekijkt je agenda. Vergeet niet Sarah te bellen over het diner."
+      },
+      "metadata": {
+        "importance": "medium",
+        "target_type": "time_based",
+        "target_value": "17:00"
+      }
+    },
+    "pm_water_plants": {
+      "action": "Water the garden plants",
+      "ongoing_task_used": "PhotoSpot",
+      "texts": {
+        "zh": "你正在观察周围环境，记得给植物浇水。",
+        "en": "You are observing your surroundings. Remember to water the plants.",
+        "nl": "Je observeert je omgeving. Vergeet niet de planten water te geven."
+      },
+      "metadata": {
+        "importance": "low",
+        "target_type": "time_based",
+        "target_value": "09:00"
+      }
+    },
+    "pm_pay_bill": {
+      "action": "Pay electricity bill before deadline",
+      "ongoing_task_used": "Priority",
+      "texts": {
+        "zh": "你正在决定优先级，记得付电费账单。",
+        "en": "You are deciding priorities. Remember to pay the electricity bill.",
+        "nl": "Je bepaalt prioriteiten. Vergeet niet de elektriciteitsrekening te betalen."
+      },
+      "metadata": {
+        "importance": "high",
+        "target_type": "event_based",
+        "target_value": "Priority"
+      }
+    }
+  }
+}

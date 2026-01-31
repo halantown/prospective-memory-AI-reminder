@@ -1,0 +1,295 @@
+{
+  "description": "Semantic bridges define the relationship between ongoing tasks (minigames) and PM tasks (reminders). High focality = strong semantic alignment between the current activity and the reminder cue.",
+  
+  "bridges": [
+    {
+      "bridge_id": "bridge_001",
+      "pm_task": {
+        "id": "pm_medication",
+        "action": "Take morning blood pressure medication",
+        "target_time": "08:00",
+        "importance": "critical"
+      },
+      "high_focal_triggers": [
+        {
+          "ongoing_task": "PillBox",
+          "semantic_link": "direct_object",
+          "explanation": "Looking at a pill box directly relates to taking medication",
+          "cue_strength": 1.0
+        },
+        {
+          "ongoing_task": "Shopping_pharmacy",
+          "semantic_link": "location_association", 
+          "explanation": "Being at pharmacy reminds of medication needs",
+          "cue_strength": 0.8
+        }
+      ],
+      "low_focal_triggers": [
+        {
+          "trigger_type": "time_based",
+          "time": "08:00",
+          "explanation": "Pure time trigger with no semantic link to current activity",
+          "cue_strength": 0.2
+        }
+      ],
+      "detail_elements": {
+        "motivation": "王医生说早饭后吃可以减少头晕，对控制血压很重要",
+        "social_entity": "Dr. Wang",
+        "consequence": "Missing doses can cause blood pressure spikes like on December 15th",
+        "location_hint": "The pill organizer is on the kitchen counter"
+      }
+    },
+    
+    {
+      "bridge_id": "bridge_002", 
+      "pm_task": {
+        "id": "pm_bring_medical_book",
+        "action": "Bring blue medical record book to doctor appointment",
+        "target_event": "doctor_appointment",
+        "importance": "high"
+      },
+      "high_focal_triggers": [
+        {
+          "ongoing_task": "Schedule",
+          "semantic_link": "appointment_preparation",
+          "explanation": "Reviewing schedule reminds of appointment preparation needs",
+          "cue_strength": 0.9
+        },
+        {
+          "ongoing_task": "PillBox",
+          "semantic_link": "medical_context",
+          "explanation": "Medical items remind of doctor visit preparation",
+          "cue_strength": 0.7
+        }
+      ],
+      "low_focal_triggers": [
+        {
+          "trigger_type": "time_based",
+          "time": "13:00",
+          "explanation": "One hour before appointment",
+          "cue_strength": 0.2
+        }
+      ],
+      "detail_elements": {
+        "motivation": "王医生需要对比12月的血压数据来调整治疗方案",
+        "social_entity": "Dr. Wang",
+        "consequence": "Without the readings, the appointment will be less productive",
+        "location_hint": "The blue book is in the bedroom drawer"
+      }
+    },
+
+    {
+      "bridge_id": "bridge_003",
+      "pm_task": {
+        "id": "pm_return_book",
+        "action": "Return borrowed book to Maria",
+        "target_event": "social_coffee",
+        "importance": "medium"
+      },
+      "high_focal_triggers": [
+        {
+          "ongoing_task": "PhotoSpot",
+          "semantic_link": "visual_reminder",
+          "explanation": "Seeing living room scene where book is placed",
+          "cue_strength": 0.6
+        },
+        {
+          "ongoing_task": "Social",
+          "semantic_link": "social_context",
+          "explanation": "Social activity reminds of social obligations",
+          "cue_strength": 0.9
+        }
+      ],
+      "low_focal_triggers": [
+        {
+          "trigger_type": "time_based",
+          "time": "09:45",
+          "explanation": "Before coffee time with Maria",
+          "cue_strength": 0.2
+        }
+      ],
+      "detail_elements": {
+        "motivation": "Maria想在周末前读完这本书",
+        "social_entity": "Maria (neighbor)",
+        "consequence": "Maria mentioned she wants to read it before the weekend",
+        "location_hint": "The book is on the coffee table"
+      }
+    },
+
+    {
+      "bridge_id": "bridge_004",
+      "pm_task": {
+        "id": "pm_call_sarah",
+        "action": "Call Sarah to confirm Wednesday dinner",
+        "target_time": "17:00",
+        "importance": "medium"
+      },
+      "high_focal_triggers": [
+        {
+          "ongoing_task": "Schedule",
+          "semantic_link": "planning_context",
+          "explanation": "Looking at schedule reminds of dinner planning",
+          "cue_strength": 0.85
+        },
+        {
+          "ongoing_task": "Shopping",
+          "semantic_link": "meal_preparation",
+          "explanation": "Shopping for groceries relates to dinner planning",
+          "cue_strength": 0.7
+        }
+      ],
+      "low_focal_triggers": [
+        {
+          "trigger_type": "time_based",
+          "time": "17:00",
+          "cue_strength": 0.2
+        }
+      ],
+      "detail_elements": {
+        "motivation": "确认Sarah是否带外卖来，还是需要自己准备",
+        "social_entity": "Sarah (daughter)",
+        "consequence": "Need to know whether to prepare dinner or not",
+        "location_hint": "Phone is usually in the living room"
+      }
+    },
+
+    {
+      "bridge_id": "bridge_005",
+      "pm_task": {
+        "id": "pm_water_plants",
+        "action": "Water the garden plants",
+        "target_time": "09:00",
+        "importance": "low"
+      },
+      "high_focal_triggers": [
+        {
+          "ongoing_task": "PhotoSpot",
+          "semantic_link": "visual_environment",
+          "explanation": "Seeing outdoor/garden scene triggers gardening task",
+          "cue_strength": 0.8
+        },
+        {
+          "ongoing_task": "RouteChoice",
+          "semantic_link": "outdoor_activity",
+          "explanation": "Planning outdoor route reminds of outdoor tasks",
+          "cue_strength": 0.5
+        }
+      ],
+      "low_focal_triggers": [
+        {
+          "trigger_type": "time_based",
+          "time": "09:00",
+          "cue_strength": 0.2
+        }
+      ],
+      "detail_elements": {
+        "motivation": "天气预报说今天很热，植物需要水分",
+        "social_entity": null,
+        "consequence": "The roses might wilt in the heat",
+        "location_hint": "Watering can is in the garden shed"
+      }
+    },
+
+    {
+      "bridge_id": "bridge_006",
+      "pm_task": {
+        "id": "pm_pay_bill",
+        "action": "Pay electricity bill before deadline",
+        "target_time": "11:00",
+        "importance": "high"
+      },
+      "high_focal_triggers": [
+        {
+          "ongoing_task": "Priority",
+          "semantic_link": "urgency_assessment",
+          "explanation": "Prioritizing tasks reminds of deadlines",
+          "cue_strength": 0.9
+        },
+        {
+          "ongoing_task": "Schedule",
+          "semantic_link": "deadline_awareness",
+          "explanation": "Checking schedule reveals deadline",
+          "cue_strength": 0.85
+        }
+      ],
+      "low_focal_triggers": [
+        {
+          "trigger_type": "time_based",
+          "time": "11:00",
+          "cue_strength": 0.2
+        }
+      ],
+      "detail_elements": {
+        "motivation": "账单截止日期是今天，逾期会有滞纳金",
+        "social_entity": null,
+        "consequence": "Late payment fee of €15 will be charged",
+        "location_hint": "Bill is on the desk, login details in the blue notebook"
+      }
+    }
+  ],
+
+  "ongoing_task_definitions": {
+    "PillBox": {
+      "description": "Checking pill organizer for medication",
+      "semantic_domain": ["health", "medication", "daily_routine", "medical"],
+      "visual_elements": ["pills", "pill_box", "medicine"],
+      "associated_pm_tasks": ["pm_medication", "pm_bring_medical_book"]
+    },
+    "Shopping": {
+      "description": "Grocery or pharmacy shopping task",
+      "semantic_domain": ["errands", "supplies", "food", "pharmacy"],
+      "visual_elements": ["cart", "shelves", "products"],
+      "associated_pm_tasks": ["pm_call_sarah", "pm_medication"]
+    },
+    "Schedule": {
+      "description": "Reviewing or checking daily schedule",
+      "semantic_domain": ["planning", "appointments", "time", "deadlines"],
+      "visual_elements": ["calendar", "clock", "events"],
+      "associated_pm_tasks": ["pm_bring_medical_book", "pm_call_sarah", "pm_pay_bill"]
+    },
+    "RouteChoice": {
+      "description": "Choosing a route or planning travel",
+      "semantic_domain": ["travel", "outdoor", "navigation", "weather"],
+      "visual_elements": ["map", "paths", "weather"],
+      "associated_pm_tasks": ["pm_water_plants"]
+    },
+    "Priority": {
+      "description": "Deciding task priority and urgency",
+      "semantic_domain": ["urgency", "importance", "deadlines", "decisions"],
+      "visual_elements": ["tasks", "time_pressure"],
+      "associated_pm_tasks": ["pm_pay_bill"]
+    },
+    "PhotoSpot": {
+      "description": "Observing a scene for anomalies",
+      "semantic_domain": ["environment", "home", "visual", "observation"],
+      "visual_elements": ["room", "objects", "home_items"],
+      "associated_pm_tasks": ["pm_return_book", "pm_water_plants"]
+    },
+    "Social": {
+      "description": "Social interaction event",
+      "semantic_domain": ["friends", "family", "conversation", "obligations"],
+      "visual_elements": ["people", "conversation"],
+      "associated_pm_tasks": ["pm_return_book", "pm_call_sarah"]
+    }
+  },
+
+  "focality_scoring": {
+    "description": "How to calculate focality score",
+    "high_focal": {
+      "score_range": [0.7, 1.0],
+      "characteristics": [
+        "Direct semantic overlap between ongoing task and PM task",
+        "Visual or contextual cue present in ongoing task",
+        "Triggers spontaneous retrieval (PAM theory)"
+      ]
+    },
+    "low_focal": {
+      "score_range": [0.0, 0.3],
+      "characteristics": [
+        "No semantic relationship",
+        "Pure time-based trigger",
+        "Requires active monitoring (PAM theory)"
+      ]
+    }
+  }
+}

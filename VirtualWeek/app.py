@@ -32,7 +32,7 @@ def create_socketio(app):
     socketio = SocketIO(
         app,
         cors_allowed_origins="*",
-        async_mode='eventlet',
+        async_mode='threading',  # Changed from 'eventlet' to 'threading'
         logger=True,
         engineio_logger=False
     )

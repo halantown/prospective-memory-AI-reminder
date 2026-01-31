@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-01-31T23:31:38.422553",
+  "conditions": {
+    "A": {
+      "name": "Low Focality, Low Detail (Baseline)",
+      "focality": "low",
+      "detail": "low",
+      "file": "condition_A_LF_LD.json"
+    },
+    "B": {
+      "name": "Low Focality, High Detail",
+      "focality": "low",
+      "detail": "high",
+      "file": "condition_B_LF_HD.json"
+    },
+    "C": {
+      "name": "High Focality, Low Detail",
+      "focality": "high",
+      "detail": "low",
+      "file": "condition_C_HF_LD.json"
+    },
+    "D": {
+      "name": "High Focality, High Detail",
+      "focality": "high",
+      "detail": "high",
+      "file": "condition_D_HF_HD.json"
+    }
+  },
+  "pm_tasks": [
+    "pm_medication",
+    "pm_bring_medical_book",
+    "pm_return_book",
+    "pm_call_sarah",
+    "pm_water_plants",
+    "pm_pay_bill"
+  ],
+  "languages": [
+    "zh",
+    "en",
+    "nl"
+  ]
+}
