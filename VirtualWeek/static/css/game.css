@@ -181,6 +181,13 @@ body {
     z-index: 100;
 }
 
+/* Tutorial mode: reduce modal overlay opacity to let tutorial highlight show through */
+body.tutorial-active .modal-overlay {
+    background: rgba(15, 23, 42, 0.1);
+    backdrop-filter: blur(0px);
+    z-index: 50;
+}
+
 .card {
     background: white;
     padding: 40px;

@@ -74,11 +74,13 @@ window.TutorialSystem = class TutorialSystem {
     start() {
         this.active = true;
         this.container.style.display = 'block';
+        document.body.classList.add('tutorial-active');
     }
 
     stop() {
         this.active = false;
         this.container.style.display = 'none';
+        document.body.classList.remove('tutorial-active');
     }
 
     /**

@@ -513,7 +513,11 @@
                 
                 const initSocket = () => {
                     return new Promise((resolve) => {
-                        socket = io('http://localhost:5001', {
+                        // Use dynamic server address based on current location
+                        const socketUrl = `${window.location.protocol}//${window.location.hostname}:5001`;
+                        console.log('[WebSocket] Connecting to:', socketUrl);
+                        
+                        socket = io(socketUrl, {
                             transports: ['websocket', 'polling'],
                             reconnection: true,
                             reconnectionDelay: 1000,
@@ -862,6 +866,14 @@
                                 playerPos.value = Math.max(0, Math.min(boardCells.value.length - 1, cmd.position));
                                 logAction('admin_position_change', { position: playerPos.value });
                                 console.log(`[Admin] Player position set to ${playerPos.value}`);
+                            }
+                            break;
+                        case 'MOVE_STEPS':
+                            if (typeof cmd.steps === 'number') {
+                                const newPos = Math.max(0, Math.min(boardCells.value.length - 1, playerPos.value + cmd.steps));
+                                playerPos.value = newPos;
+                                logAction('admin_move_steps', { steps: cmd.steps, new_position: newPos });
+                                console.log(`[Admin] Player moved ${cmd.steps} steps to position ${newPos}`);
                             }
                             break;
                         default:

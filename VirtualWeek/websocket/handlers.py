@@ -64,7 +64,8 @@ def register_handlers(socketio):
     @socketio.on('admin:command')
     def handle_admin_command(data):
         """Admin sends command to game board."""
-        command = data.get('command')
+        # Support both formats: direct command or wrapped in 'command' key
+        command = data.get('command', data)
         print(f"[WebSocket] Admin command received: {command}")
         
         if connection_manager.has_game():

@@ -6,431 +6,353 @@
     <title>Virtual Week Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- Socket.IO Client (v4 compatible with Flask-SocketIO 5.x) -->
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { overflow: hidden; }
+        .card { 
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+        }
+        .btn { 
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            transition: all 0.15s;
+            cursor: pointer;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #2563eb; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover:not(:disabled) { background: #dc2626; }
+        .btn-ghost { background: #f1f5f9; color: #475569; }
+        .btn-ghost:hover:not(:disabled) { background: #e2e8f0; }
+        .label { font-size: 10px; font-weight: 700; color: #64748b; margin-bottom: 4px; display: block; }
+        .input { 
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .input:focus { border-color: #3b82f6; }
+        .input:disabled { background: #f1f5f9; color: #94a3b8; }
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-box {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 360px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+    </style>
 </head>
-<body class="bg-slate-100 p-6">
-    <div id="app" class="max-w-7xl mx-auto">
-        <header class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-black text-slate-800">🔬 实验控制台</h1>
-            <div class="flex items-center gap-4">
-                <span class="px-3 py-1 rounded-full text-sm font-bold" 
-                    :class="statusColor">
-                    {{ sessionStatus }}
-                </span>
-                <button @click="resetSession" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg font-bold transition-colors">
-                    重置会话
-                </button>
+<body class="bg-gradient-to-br from-slate-100 to-slate-200 p-4 h-screen">
+    <div id="app" class="h-full flex flex-col max-w-[1600px] mx-auto">
+        
+        <!-- Reset Confirmation Modal -->
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-4 shrink-0">
+            <div class="flex items-center gap-3">
+                <h1 class="text-xl font-black text-slate-800">🔬 Virtual Week 控制台</h1>
+                <span class="px-3 py-1 rounded-full text-xs font-bold" :class="statusColor">{{ sessionStatus }}</span>
             </div>
+            <button @click="resetSession" class="btn btn-danger">
+                <span class="flex items-center gap-1">🔄 重置会话</span>
+            </button>
         </header>
 
-        <!-- Main Layout: 3 Columns -->
-        <div class="grid grid-cols-12 gap-6 items-start">
+        <!-- Main Grid - Fixed Height -->
+        <div class="flex-1 grid grid-cols-12 gap-4 min-h-0">
             
-            <!-- Left Column: Config (3 cols) -->
-            <div class="col-span-12 lg:col-span-3 space-y-6">
+            <!-- Left: Config + Robot (3 cols) -->
+            <div class="col-span-3 flex flex-col gap-4 overflow-y-auto pr-1">
                 <!-- Experiment Config -->
-                <div class="card bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <i data-lucide="settings-2" class="w-5 h-5"></i> 实验配置
-                    </h2>
-                    
-                    <div class="space-y-4">
+                <div class="card p-4">
+                    <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                        <i data-lucide="settings-2" class="w-4 h-4 text-blue-500"></i> 实验配置
+                    </h3>
+                    <div class="space-y-3">
                         <div>
-                            <label class="block text-sm font-bold text-slate-500 mb-1">受试者 ID</label>
-                            <input v-model="participantId" :disabled="isSessionActive" type="text" 
-                                class="w-full border border-slate-300 rounded-lg px-3 py-2 font-mono text-sm outline-none transition-all"
-                                :class="isSessionActive ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'"
-                                placeholder="例如: sub_001">
+                            <label class="label">受试者 ID</label>
+                            <input v-model="participantId" :disabled="isSessionActive" type="text" class="input" placeholder="例如: sub_001">
                         </div>
-
+                        
                         <div>
-                            <label class="block text-sm font-bold text-slate-500 mb-1">语言 / Language</label>
+                            <label class="label">界面语言</label>
                             <div class="grid grid-cols-3 gap-2">
-                                <button @click="updateLanguage('zh')"
-                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
-                                    :class="sessionLang === 'zh' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
-                                    中文
-                                </button>
-                                <button @click="updateLanguage('en')"
-                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
-                                    :class="sessionLang === 'en' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
-                                    English
-                                </button>
-                                <button @click="updateLanguage('nl')"
-                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
-                                    :class="sessionLang === 'nl' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
-                                    Dutch
+                                <button v-for="lang in [{k:'zh',l:'中文'}, {k:'en',l:'English'}, {k:'nl',l:'Dutch'}]" :key="lang.k"
+                                    @click="updateLanguage(lang.k)"
+                                    class="btn" :class="sessionLang === lang.k ? 'btn-primary' : 'btn-ghost'">
+                                    {{ lang.l }}
                                 </button>
                             </div>
                         </div>
-
+                        
                         <div>
-                            <label class="block text-sm font-bold text-slate-500 mb-1">选择地图</label>
-                            <select v-model="selectedMap" :disabled="isSessionActive"
-                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm transition-all"
-                                :class="isSessionActive ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'">
+                            <label class="label">选择地图</label>
+                            <select v-model="selectedMap" :disabled="isSessionActive" class="input">
                                 <option v-for="map in maps" :key="map" :value="map">{{ map }}</option>
                             </select>
                         </div>
-
-                        <div>
-                            <label class="block text-sm font-bold text-slate-500 mb-1">组数 / Group Number</label>
+                        
+                        <div v-if="!isTrialMap">
+                            <label class="label">该受试者实验组数（天数）</label>
                             <div class="grid grid-cols-3 gap-2">
-                                <button @click="groupNumber = 1" :disabled="isSessionActive"
-                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
-                                    :class="groupNumber === 1 ? (isSessionActive ? 'bg-green-100 border-green-400 text-green-600 cursor-not-allowed' : 'bg-green-50 border-green-500 text-green-700') : (isSessionActive ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50')">
-                                    第1组 (Day 1)
-                                </button>
-                                <button @click="groupNumber = 2" :disabled="isSessionActive"
-                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
-                                    :class="groupNumber === 2 ? (isSessionActive ? 'bg-green-100 border-green-400 text-green-600 cursor-not-allowed' : 'bg-green-50 border-green-500 text-green-700') : (isSessionActive ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50')">
-                                    第2组 (Day 2)
-                                </button>
-                                <button @click="groupNumber = 3" :disabled="isSessionActive"
-                                    class="py-2 rounded-lg text-sm font-bold border transition-all"
-                                    :class="groupNumber === 3 ? (isSessionActive ? 'bg-green-100 border-green-400 text-green-600 cursor-not-allowed' : 'bg-green-50 border-green-500 text-green-700') : (isSessionActive ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50')">
-                                    第3组 (Day 3)
+                                <button v-for="n in 3" :key="n" @click="groupNumber = n" :disabled="isSessionActive"
+                                    class="btn" :class="groupNumber === n ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'btn-ghost'">
+                                    第 {{ n }} 组（天）
                                 </button>
                             </div>
                         </div>
-
+                        <div v-else class="p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                            <span class="text-xs text-purple-700 font-medium">🧪 练习模式 (星期日)</span>
+                        </div>
+                        
                         <button @click="startExperiment" :disabled="isSessionActive" 
-                            class="w-full py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2"
-                            :class="isSessionActive ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200'">
-                            <i data-lucide="play" class="w-5 h-5 fill-current"></i>
-                            启动实验
+                            class="btn btn-primary w-full py-3 text-sm">
+                            <span class="flex items-center justify-center gap-2">
+                                <i data-lucide="play" class="w-4 h-4"></i> 启动实验
+                            </span>
                         </button>
                     </div>
                 </div>
 
                 <!-- Robot Control -->
-                <div class="card bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="card p-4">
                     <div class="flex items-center justify-between mb-3">
-                        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                            <i data-lucide="bot" class="w-4 h-4"></i> 机器人控制
-                        </h2>
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold" 
-                            :class="robotConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="bot" class="w-4 h-4 text-indigo-500"></i> 机器人控制
+                        </h3>
+                        <span class="flex items-center gap-1 text-xs" :class="robotConnected ? 'text-green-600' : 'text-red-500'">
+                            <span class="w-2 h-2 rounded-full" :class="robotConnected ? 'bg-green-500' : 'bg-red-500'"></span>
                             {{ robotConnected ? '已连接' : '未连接' }}
                         </span>
                     </div>
                     
-                    <!-- Status Info -->
-                    <div v-if="robotStatus.tts_language" class="mb-3 p-2 bg-slate-50 rounded-lg text-[10px] text-slate-500 grid grid-cols-2 gap-1">
-                        <span>语言: <strong>{{ robotStatus.tts_language }}</strong></span>
-                        <span>音量: <strong>{{ Math.round((robotStatus.tts_volume || 0) * 100) }}%</strong></span>
-                        <span>姿态: <strong>{{ robotStatus.posture || '-' }}</strong></span>
-                        <span>自主: <strong>{{ robotStatus.autonomous_state || '-' }}</strong></span>
-                    </div>
-                    
                     <!-- Emergency Controls -->
-                    <div class="mb-3 grid grid-cols-2 gap-2">
-                        <button @click="robotAction('stop_speaking')" 
-                            class="py-2 rounded-lg text-xs font-bold bg-red-100 hover:bg-red-200 text-red-700 transition-colors flex items-center justify-center gap-1">
-                            <i data-lucide="mic-off" class="w-3 h-3"></i> 停止说话
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <button @click="robotAction('stop_speaking')" class="btn bg-red-100 text-red-700 hover:bg-red-200">
+                            🔇 停止说话
                         </button>
-                        <button @click="robotAction('rest')" 
-                            class="py-2 rounded-lg text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-700 transition-colors flex items-center justify-center gap-1">
-                            <i data-lucide="moon" class="w-3 h-3"></i> 休息复位
+                        <button @click="robotAction('rest')" class="btn bg-amber-100 text-amber-700 hover:bg-amber-200">
+                            💤 休息复位
                         </button>
                     </div>
                     
-                    <!-- Posture Controls -->
+                    <!-- Posture -->
                     <div class="mb-3">
-                        <label class="block text-[10px] font-bold text-slate-400 mb-1">姿势控制</label>
+                        <label class="label">姿势控制</label>
                         <div class="grid grid-cols-4 gap-1">
-                            <button @click="robotAction('wake_up')" 
-                                class="px-2 py-1.5 rounded text-[10px] font-bold bg-green-100 hover:bg-green-200 text-green-700 transition-colors">
-                                唤醒
-                            </button>
-                            <button @click="robotAction('go_to_posture', {posture: 'Stand'})" 
-                                class="px-2 py-1.5 rounded text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
-                                站立
-                            </button>
-                            <button @click="robotAction('go_to_posture', {posture: 'StandInit'})" 
-                                class="px-2 py-1.5 rounded text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
-                                初始
-                            </button>
-                            <button @click="robotAction('go_to_posture', {posture: 'Crouch'})" 
-                                class="px-2 py-1.5 rounded text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
-                                蹲下
-                            </button>
+                            <button @click="robotAction('wake_up')" class="btn bg-green-100 text-green-700 hover:bg-green-200 text-[10px]">唤醒</button>
+                            <button @click="robotAction('go_to_posture', {posture: 'Stand'})" class="btn btn-ghost text-[10px]">站立</button>
+                            <button @click="robotAction('go_to_posture', {posture: 'StandInit'})" class="btn btn-ghost text-[10px]">初始</button>
+                            <button @click="robotAction('go_to_posture', {posture: 'Crouch'})" class="btn btn-ghost text-[10px]">蹲下</button>
                         </div>
                     </div>
                     
                     <!-- Autonomous Life -->
                     <div class="mb-3">
-                        <label class="block text-[10px] font-bold text-slate-400 mb-1">自主行为</label>
+                        <label class="label">自主行为模式</label>
                         <div class="grid grid-cols-3 gap-1">
                             <button @click="robotAction('set_autonomous_life', {state: 'interactive'})" 
-                                class="px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
-                                :class="robotStatus.autonomous_state === 'interactive' ? 'bg-blue-500 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'">
-                                交互
-                            </button>
+                                class="btn text-[10px]" :class="robotStatus.autonomous_state === 'interactive' ? 'btn-primary' : 'btn-ghost'">交互</button>
                             <button @click="robotAction('set_autonomous_life', {state: 'solitary'})" 
-                                class="px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
-                                :class="robotStatus.autonomous_state === 'solitary' ? 'bg-blue-500 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'">
-                                安静
-                            </button>
+                                class="btn text-[10px]" :class="robotStatus.autonomous_state === 'solitary' ? 'btn-primary' : 'btn-ghost'">安静</button>
                             <button @click="robotAction('set_autonomous_life', {state: 'disabled'})" 
-                                class="px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
-                                :class="robotStatus.autonomous_state === 'disabled' ? 'bg-red-500 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'">
-                                关闭
-                            </button>
+                                class="btn text-[10px]" :class="robotStatus.autonomous_state === 'disabled' ? 'btn-danger' : 'btn-ghost'">关闭</button>
                         </div>
                     </div>
                     
-                    <!-- Volume Control -->
+                    <!-- Volume -->
                     <div class="mb-3">
-                        <label class="block text-[10px] font-bold text-slate-400 mb-1">音量: {{ Math.round(robotVolume * 100) }}%</label>
+                        <label class="label">音量: {{ Math.round(robotVolume * 100) }}%</label>
                         <input type="range" v-model="robotVolume" min="0" max="1" step="0.1" 
                             @change="robotAction('set_volume', {volume: robotVolume})"
-                            class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                            class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500">
                     </div>
                     
-                    <!-- Language Selector -->
+                    <!-- TTS Language -->
                     <div class="mb-3">
-                        <label class="block text-[10px] font-bold text-slate-400 mb-1">语音语言</label>
+                        <label class="label">语音语言</label>
                         <div class="grid grid-cols-3 gap-1">
                             <button @click="robotLang = 'zh'; robotAction('set_language', {language: 'Chinese'})" 
-                                class="px-2 py-1.5 rounded text-xs font-bold transition-colors"
-                                :class="robotLang === 'zh' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
-                                中文
-                            </button>
+                                class="btn text-[10px]" :class="robotLang === 'zh' ? 'btn-primary' : 'btn-ghost'">中文</button>
                             <button @click="robotLang = 'en'; robotAction('set_language', {language: 'English'})" 
-                                class="px-2 py-1.5 rounded text-xs font-bold transition-colors"
-                                :class="robotLang === 'en' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
-                                English
-                            </button>
+                                class="btn text-[10px]" :class="robotLang === 'en' ? 'btn-primary' : 'btn-ghost'">English</button>
                             <button @click="robotLang = 'nl'; robotAction('set_language', {language: 'Dutch'})" 
-                                class="px-2 py-1.5 rounded text-xs font-bold transition-colors"
-                                :class="robotLang === 'nl' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
-                                Nederlands
-                            </button>
+                                class="btn text-[10px]" :class="robotLang === 'nl' ? 'btn-primary' : 'btn-ghost'">Dutch</button>
                         </div>
                     </div>
-
+                    
                     <!-- Quick Phrases -->
                     <div class="mb-3">
-                        <label class="block text-[10px] font-bold text-slate-400 mb-1">快捷短语</label>
+                        <label class="label">快捷短语</label>
                         <div class="flex flex-wrap gap-1">
                             <button v-for="(phrase, key) in quickPhrases" :key="key"
                                 @click="robotSay(phrase[robotLang])"
-                                class="px-2 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded text-[10px] font-medium transition-colors">
+                                class="btn btn-ghost text-[10px] border border-slate-200">
                                 {{ key }}
                             </button>
                         </div>
                     </div>
-
-                    <!-- Custom Text Input -->
-                    <div class="space-y-2">
-                        <textarea v-model="robotText" rows="2" 
-                            class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs resize-none focus:ring-2 focus:ring-blue-500 outline-none"
-                            :placeholder="robotLang === 'zh' ? '输入要说的内容...' : robotLang === 'en' ? 'Enter text to speak...' : 'Voer tekst in...'">
-                        </textarea>
+                    
+                    <!-- Custom Speech -->
+                    <div class="flex gap-2">
+                        <input v-model="robotText" type="text" class="input flex-1" placeholder="输入要说的内容...">
                         <button @click="robotSay(robotText)" :disabled="!robotText.trim()"
-                            class="w-full py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
-                            :class="robotText.trim() ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'">
-                            <i data-lucide="volume-2" class="w-3 h-3"></i> 发送语音
+                            class="btn" :class="robotText.trim() ? 'bg-green-500 text-white hover:bg-green-600' : 'btn-ghost opacity-50'">
+                            发送
                         </button>
                     </div>
                     
                     <!-- Tablet Control -->
                     <div class="mt-3 pt-3 border-t border-slate-100">
-                        <label class="block text-[10px] font-bold text-slate-400 mb-1">平板控制</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button @click="robotAction('show_view', {url: tabletUrl})" 
-                                class="py-1.5 rounded text-[10px] font-bold bg-indigo-100 hover:bg-indigo-200 text-indigo-700 transition-colors">
-                                显示网页
-                            </button>
-                            <button @click="robotAction('hide_view')" 
-                                class="py-1.5 rounded text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
-                                隐藏网页
-                            </button>
+                        <label class="label">平板显示</label>
+                        <div class="flex gap-2">
+                            <button @click="robotAction('show_view', {url: tabletUrl})" class="btn bg-indigo-100 text-indigo-700 hover:bg-indigo-200 flex-1">显示网页</button>
+                            <button @click="robotAction('hide_view')" class="btn btn-ghost flex-1">隐藏</button>
                         </div>
-                        <input v-model="tabletUrl" type="text" 
-                            class="mt-2 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="http://...">
                     </div>
                 </div>
 
-                <!-- Admin Toggle -->
-                <div v-if="isSessionActive" class="card bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                    <button @click="showAdmin = !showAdmin" class="w-full flex items-center justify-between font-bold text-slate-600 hover:text-blue-600 transition-colors">
-                        <span class="flex items-center gap-2"><i data-lucide="shield" class="w-4 h-4"></i> 超级管理员</span>
+                <!-- Admin Controls -->
+                <div v-if="isSessionActive" class="card p-4">
+                    <button @click="showAdmin = !showAdmin" class="w-full flex items-center justify-between text-sm font-bold text-slate-700">
+                        <span class="flex items-center gap-2">
+                            <i data-lucide="shield" class="w-4 h-4 text-amber-500"></i> 管理员控制
+                        </span>
                         <i :data-lucide="showAdmin ? 'chevron-up' : 'chevron-down'" class="w-4 h-4"></i>
                     </button>
-                    
-                    <div v-if="showAdmin" class="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                         <!-- Row 1: Display & Input -->
+                    <div v-if="showAdmin" class="mt-3 pt-3 border-t border-slate-100 space-y-3">
                         <div class="flex items-center gap-2">
-                             <div class="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 shrink-0">
-                                <span class="text-[10px] text-slate-400 font-bold block leading-none mb-0.5">位置</span>
-                                <span class="text-lg font-black text-slate-800 leading-none">{{ currentPosition }}</span>
+                            <div class="bg-slate-100 px-3 py-2 rounded-lg text-center">
+                                <div class="text-[10px] text-slate-500 font-bold">当前位置</div>
+                                <div class="text-xl font-black text-slate-800">{{ currentPosition }}</div>
                             </div>
-                            <div class="flex flex-1 gap-1">
-                                <input v-model.number="targetPosition" type="number" min="0" max="119" 
-                                    class="w-full min-w-0 border border-slate-300 rounded px-2 py-1 text-xs font-mono" 
-                                    placeholder="0-119">
-                                <button @click="setPosition" 
-                                    class="bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-xs font-bold whitespace-nowrap">
-                                    跳转
-                                </button>
+                            <div class="flex-1 flex gap-1">
+                                <input v-model.number="targetPosition" type="number" min="0" max="119" class="input" placeholder="0-119">
+                                <button @click="setPosition" class="btn bg-amber-500 text-white hover:bg-amber-600">跳转</button>
                             </div>
                         </div>
-
-                        <!-- Row 2: Steps -->
-                        <div class="grid grid-cols-4 gap-1">
-                             <button @click="moveSteps(-10)" class="bg-slate-100 hover:bg-slate-200 text-slate-500 px-1 py-1.5 rounded text-[10px] font-bold">
-                                -10
-                            </button>
-                            <button @click="moveSteps(-1)" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-1 py-1.5 rounded text-[10px] font-bold">
-                                -1
-                            </button>
-                            <button @click="moveSteps(1)" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-1 py-1.5 rounded text-[10px] font-bold">
-                                +1
-                            </button>
-                            <button @click="moveSteps(10)" class="bg-slate-100 hover:bg-slate-200 text-slate-500 px-1 py-1.5 rounded text-[10px] font-bold">
-                                +10
-                            </button>
+                        <div class="grid grid-cols-5 gap-1">
+                            <button @click="moveSteps(-10)" class="btn btn-ghost">-10</button>
+                            <button @click="moveSteps(-1)" class="btn btn-ghost">-1</button>
+                            <button @click="jumpToEnd" class="btn btn-danger">跳到结尾</button>
+                            <button @click="moveSteps(1)" class="btn btn-ghost">+1</button>
+                            <button @click="moveSteps(10)" class="btn btn-ghost">+10</button>
                         </div>
-
-                        <!-- Row 3: End -->
-                        <button @click="jumpToEnd" class="w-full bg-red-50 hover:bg-red-100 text-red-600 px-2 py-1.5 rounded text-[10px] font-bold border border-red-100 flex items-center justify-center gap-1">
-                            ⚠ 跳到结尾
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Minigame Test Panel -->
-                <div class="card bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-                    <h2 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                        <i data-lucide="gamepad-2" class="w-4 h-4"></i> 小游戏测试
-                    </h2>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button v-for="game in minigames" :key="game.id"
-                            @click="triggerMinigame(game.id)"
-                            class="p-2 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-lg text-left transition-colors">
-                            <div class="text-base mb-0.5">{{ game.icon }}</div>
-                            <div class="text-[10px] font-bold text-slate-700 leading-tight">{{ game.name }}</div>
-                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Middle Column: Monitor (2 cols) -->
-            <div v-if="isSessionActive" class="col-span-12 lg:col-span-2 space-y-6">
-                 <div class="card bg-white p-4 rounded-2xl shadow-sm border border-slate-200 h-[400px] overflow-y-auto">
-                    <h2 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                        <i data-lucide="monitor" class="w-4 h-4"></i> 状态监视
-                    </h2>
-                    
-                    <div class="flex flex-col gap-3">
-                        <!-- Current Position -->
-                        <div class="bg-blue-200 p-3 rounded-lg border border-blue-400">
-                            <div class="text-[10px] text-blue-800 font-bold uppercase mb-0.5">当前位置</div>
-                            <div class="text-xl font-black text-blue-950 leading-none">{{ monitor.current_position }} <span class="text-[10px] font-medium opacity-70">/ 119</span></div>
+            <!-- Middle: Monitor + Reminders (3 cols) -->
+            <div v-if="isSessionActive" class="col-span-3 flex flex-col gap-3 overflow-hidden">
+                <!-- Monitor -->
+                <div class="card p-3 shrink-0">
+                    <h3 class="text-xs font-bold text-slate-700 mb-2">📊 状态监视</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-blue-100 p-2 rounded text-center">
+                            <div class="text-[10px] text-blue-600 font-bold">位置</div>
+                            <div class="text-lg font-black text-blue-800">{{ monitor.current_position }}<span class="text-[10px] opacity-60">/119</span></div>
                         </div>
-
-                        <!-- Next Dice -->
-                        <div class="bg-amber-200 p-3 rounded-lg border border-amber-400">
-                            <div class="text-[10px] text-amber-800 font-bold uppercase mb-0.5">下一骰子</div>
-                            <div class="text-xl font-black text-amber-950 leading-none">🎲 {{ monitor.next_dice || '-' }}</div>
-                            <div class="text-[10px] text-amber-900 mt-0.5">余 {{ monitor.dice_remaining || 0 }} 次</div>
+                        <div class="bg-amber-100 p-2 rounded text-center">
+                            <div class="text-[10px] text-amber-600 font-bold">骰子</div>
+                            <div class="text-lg font-black text-amber-800">🎲 {{ monitor.next_dice || '-' }}</div>
                         </div>
-
-                         <!-- Next Position -->
-                        <div class="bg-green-200 p-3 rounded-lg border border-green-400">
-                            <div class="text-[10px] text-green-800 font-bold uppercase mb-0.5">下一位置</div>
-                            <div class="text-xl font-black text-green-950 leading-none">→ {{ monitor.next_position ?? '-' }}</div>
+                        <div class="bg-green-100 p-2 rounded text-center">
+                            <div class="text-[10px] text-green-600 font-bold">下一位</div>
+                            <div class="text-lg font-black text-green-800">→ {{ monitor.next_position ?? '-' }}</div>
                         </div>
-
-                        <!-- Real Time -->
-                        <div class="bg-red-200 p-3 rounded-lg border border-red-400">
-                            <div class="text-[10px] text-red-800 font-bold uppercase mb-0.5">真实计时</div>
-                            <div class="text-lg font-mono font-bold text-red-950 leading-none">{{ formatRealTime(monitor.real_time_seconds) }}</div>
-                        </div>
-
-                        <!-- Current Phase -->
-                        <div class="bg-purple-200 p-3 rounded-lg border border-purple-400">
-                            <div class="text-[10px] text-purple-800 font-bold uppercase mb-0.5">当前阶段</div>
-                            <div class="text-sm font-bold text-purple-950 truncate">{{ monitor.current_phase }}</div>
-                            <div class="text-[10px] text-purple-900 mt-0.5 truncate">{{ monitor.status_message }}</div>
-                        </div>
-                        
-                         <!-- UI State -->
-                        <div class="bg-slate-200 p-3 rounded-lg border border-slate-400">
-                            <div class="text-[10px] text-slate-700 font-bold uppercase mb-1">UI 状态</div>
-                            <div class="flex flex-wrap gap-1">
-                                <span v-if="monitor.show_start_card" class="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px] font-bold shadow-sm">开始卡</span>
-                                <span v-if="monitor.show_event_card" class="px-1.5 py-0.5 bg-amber-600 text-white rounded text-[10px] font-bold shadow-sm">事件卡</span>
-                                <span v-if="monitor.show_minigame" class="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px] font-bold shadow-sm">小游戏</span>
-                                <span v-if="!monitor.show_start_card && !monitor.show_event_card && !monitor.show_minigame" class="text-[10px] text-slate-500 font-bold">常规</span>
-                            </div>
+                        <div class="bg-red-100 p-2 rounded text-center">
+                            <div class="text-[10px] text-red-600 font-bold">计时</div>
+                            <div class="text-lg font-mono font-bold text-red-800">{{ formatRealTime(monitor.real_time_seconds) }}</div>
                         </div>
                     </div>
+                    <div class="mt-2 p-2 bg-purple-50 rounded">
+                        <div class="text-[10px] text-purple-600 font-bold">阶段: {{ monitor.current_phase }}</div>
+                        <div class="text-[10px] text-purple-500 truncate">{{ monitor.status_message }}</div>
+                    </div>
+                    <div class="mt-1 flex gap-1">
+                        <span v-if="monitor.show_start_card" class="px-1 py-0.5 bg-green-500 text-white rounded text-[9px] font-bold">开始卡</span>
+                        <span v-if="monitor.show_event_card" class="px-1 py-0.5 bg-amber-500 text-white rounded text-[9px] font-bold">事件卡</span>
+                        <span v-if="monitor.show_minigame" class="px-1 py-0.5 bg-blue-500 text-white rounded text-[9px] font-bold">小游戏</span>
+                    </div>
                 </div>
-
-                <!-- Reminders Control -->
-                <div class="card bg-white p-4 rounded-2xl shadow-sm border border-slate-200 h-[calc(100%-424px)] overflow-hidden flex flex-col">
-                    <h2 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 shrink-0">
-                        <i data-lucide="bell" class="w-4 h-4"></i> 消息控制
-                    </h2>
-                    <div class="overflow-y-auto space-y-2 pr-1 flex-1">
+                
+                <!-- Reminders -->
+                <div class="card p-3 flex-1 overflow-hidden flex flex-col min-h-0">
+                    <h3 class="text-xs font-bold text-slate-700 mb-2 shrink-0">🔔 消息 ({{ reminders.filter(r => r.status === 'PENDING').length }})</h3>
+                    <div class="overflow-y-auto space-y-1 flex-1">
                         <div v-for="rem in reminders" :key="rem.id" 
-                            class="p-2 rounded-lg border text-xs relative group transition-all"
-                            :class="rem.status === 'PENDING' ? 'bg-slate-50 border-slate-200' : 'bg-green-50 border-green-200 opacity-60'">
-                            
-                            <div class="flex justify-between items-start mb-1">
-                                <span class="font-bold uppercase text-[10px] px-1.5 py-0.5 rounded"
+                            class="p-1.5 rounded border text-[10px] flex justify-between items-start gap-1 group"
+                            :class="rem.status === 'PENDING' ? 'bg-slate-50 border-slate-200' : 'bg-green-50 border-green-200 opacity-50'">
+                            <div class="flex-1 min-w-0">
+                                <span class="font-bold uppercase px-1 py-0.5 rounded text-[9px]"
                                     :class="rem.status === 'PENDING' ? 'bg-slate-200 text-slate-600' : 'bg-green-200 text-green-700'">
                                     {{ rem.condition }}
                                 </span>
-                                <div v-if="rem.status === 'PENDING'" class="opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-2">
-                                     <button @click="triggerReminder(rem.id)" title="立即发送"
-                                        class="bg-blue-600 text-white p-1 rounded hover:bg-blue-700 shadow-sm">
-                                        <i data-lucide="send" class="w-3 h-3"></i>
-                                     </button>
-                                </div>
-                                <i v-else data-lucide="check" class="w-3 h-3 text-green-600"></i>
+                                <div class="text-slate-600 truncate mt-0.5">{{ rem.text }}</div>
                             </div>
-                            
-                            <div class="text-slate-700 font-medium leading-tight">
-                                {{ rem.text }}
-                            </div>
+                            <button v-if="rem.status === 'PENDING'" @click="triggerReminder(rem.id)"
+                                class="opacity-0 group-hover:opacity-100 bg-blue-500 text-white p-1 rounded text-[9px]">
+                                ➤
+                            </button>
                         </div>
-                        <div v-if="reminders.length === 0" class="text-center text-slate-400 italic py-4">无预设消息</div>
+                        <div v-if="reminders.length === 0" class="text-center text-slate-400 italic py-2 text-[10px]">无消息</div>
+                    </div>
+                </div>
+                
+                <!-- Minigame Test -->
+                <div class="card p-3 shrink-0">
+                    <h3 class="text-xs font-bold text-slate-700 mb-2">🎮 小游戏</h3>
+                    <div class="grid grid-cols-3 gap-1">
+                        <button v-for="game in minigames" :key="game.id" @click="triggerMinigame(game.id)"
+                            class="p-1 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded text-center">
+                            <div class="text-sm">{{ game.icon }}</div>
+                            <div class="text-[9px] font-bold text-slate-600 truncate">{{ game.name }}</div>
+                        </button>
                     </div>
                 </div>
             </div>
-
-            <!-- Right Column: Logs (7 cols) -->
-            <div class="col-span-12 lg:col-span-7 h-full min-h-[500px]">
-                 <div class="card bg-slate-900 text-slate-200 p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-col h-full max-h-[85vh]">
-                    <div class="flex justify-between items-center mb-4 shrink-0">
-                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                            <i data-lucide="activity" class="w-5 h-5 text-green-400"></i> 实时日志
-                        </h2>
-                        <span class="text-xs font-mono text-slate-500">Auto-refreshing</span>
+            
+            <!-- Right: Logs (6 cols when active, full width when idle) -->
+            <div :class="isSessionActive ? 'col-span-6' : 'col-span-9'" class="h-full overflow-hidden">
+                <div class="card bg-slate-900 text-slate-200 p-3 h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-2 shrink-0">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-1">
+                            <i data-lucide="activity" class="w-4 h-4 text-green-400"></i> 日志
+                        </h3>
+                        <span class="text-[10px] font-mono text-slate-500">{{ logs.length }} 条</span>
                     </div>
-                    
-                    <div class="flex-grow overflow-y-auto font-mono text-xs space-y-2 pr-2" ref="logContainer">
-                        <div v-if="logs.length === 0" class="text-slate-600 text-center mt-20 italic">等待数据...</div>
-                        <div v-for="(log, idx) in logs" :key="idx" class="border-l-2 pl-3 py-1" :class="getLogColor(log.event_type)">
-                            <div class="flex gap-3 opacity-60 text-[10px] mb-0.5">
+                    <div class="flex-1 overflow-y-auto font-mono text-[10px] space-y-1 pr-1" ref="logContainer">
+                        <div v-if="logs.length === 0" class="text-slate-600 text-center mt-10 italic">等待数据...</div>
+                        <div v-for="(log, idx) in logs" :key="idx" class="border-l-2 pl-2 py-0.5" :class="getLogColor(log.event_type)">
+                            <div class="flex gap-2 opacity-60 text-[9px]">
                                 <span>{{ formatTime(log.server_timestamp) }}</span>
-                                <span class="uppercase tracking-wider">{{ log.event_type }}</span>
+                                <span class="uppercase">{{ log.event_type }}</span>
                             </div>
-                            <div class="font-medium text-slate-100 break-words">
-                                {{ log.details }}
-                            </div>
+                            <div class="text-slate-200 break-words">{{ log.details }}</div>
                         </div>
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 
@@ -444,9 +366,20 @@
                 let socket = null;
                 const isSocketReady = ref(false);
                 
+                const scrollToBottom = () => {
+                    nextTick(() => {
+                        const container = logContainer.value;
+                        if (container) container.scrollTop = container.scrollHeight;
+                    });
+                };
+                
                 const initSocket = () => {
                     return new Promise((resolve) => {
-                        socket = io('http://localhost:5001', {
+                        // Use dynamic server address based on current location
+                        const socketUrl = `${window.location.protocol}//${window.location.hostname}:5001`;
+                        console.log('[Dashboard WebSocket] Connecting to:', socketUrl);
+                        
+                        socket = io(socketUrl, {
                             transports: ['websocket', 'polling'],
                             reconnection: true,
                             reconnectionDelay: 1000
@@ -455,8 +388,6 @@
                         socket.on('connect', () => {
                             console.log('[Dashboard WebSocket] ✅ Connected:', socket.id);
                             isSocketReady.value = true;
-                            
-                            // Join dashboard room immediately after connection
                             socket.emit('dashboard:join');
                             resolve(socket);
                         });
@@ -466,53 +397,42 @@
                             isSocketReady.value = false;
                         });
                         
-                        socket.on('dashboard:joined', () => {
-                            console.log('[Dashboard WebSocket] 🎯 Joined dashboard room');
+                        socket.on('dashboard:monitor', (data) => {
+                            Object.assign(monitor.value, data);
+                            currentPosition.value = data.current_position || 0;
                         });
                         
-                        socket.on('dashboard:session_state', (data) => {
-                            console.log('[Dashboard WebSocket] 📊 Session state:', data);
-                            sessionStatus.value = data.status;
-                            if (data.game_state) {
-                                currentPosition.value = data.game_state.playerPos || 0;
-                            }
+                        socket.on('dashboard:reminders', (data) => {
+                            reminders.value = data || [];
                         });
                         
                         socket.on('dashboard:game_state', (data) => {
-                            console.log('[Dashboard WebSocket] ⚡ Real-time game state:', data);
                             currentPosition.value = data.playerPos || 0;
                             monitor.value.current_position = data.playerPos || 0;
                             monitor.value.current_phase = data.phase || 'unknown';
                         });
                         
                         socket.on('dashboard:log', (logEntry) => {
-                            // Real-time log update
                             logs.value.push(logEntry);
                             if (logs.value.length > 100) logs.value.shift();
                             scrollToBottom();
                         });
-                        
-                        socket.on('error', (error) => {
-                            console.error('[Dashboard WebSocket] ❌ Error:', error);
-                        });
                     });
                 };
                 
-                const sessionStatus = ref('IDLE'); // IDLE, RUNNING
+                const sessionStatus = ref('IDLE');
                 const maps = ref([]);
                 const selectedMap = ref('');
                 const participantId = ref('sub_' + Math.floor(Math.random() * 1000));
-                const sessionLang = ref('zh'); // New: Session Language
-                const groupNumber = ref(1); // New: Group Number (1, 2, or 3)
+                const sessionLang = ref('zh');
+                const groupNumber = ref(1);
                 const logs = ref([]);
                 const logContainer = ref(null);
                 
-                // Admin Control State
                 const currentPosition = ref(0);
                 const targetPosition = ref(0);
                 const showAdmin = ref(false);
                 
-                // Monitor State
                 const monitor = ref({
                     current_position: 0,
                     current_phase: 'unknown',
@@ -526,35 +446,31 @@
                     show_minigame: false
                 });
 
-                // Reminder State
                 const reminders = ref([]);
 
                 // Robot Control State
                 const robotConnected = ref(false);
-                const robotStatus = ref({});  // Full robot status
+                const robotStatus = ref({});
                 const robotLang = ref('zh');
                 const robotText = ref('');
                 const robotVolume = ref(0.8);
-                const tabletUrl = ref('http://localhost:5000/');
+                // Use dynamic server address for tablet display
+                const tabletUrl = ref(`${window.location.protocol}//${window.location.hostname}:5000/`);
                 const quickPhrases = ref({
-                    '你好': { zh: '你好，欢迎参加实验', en: 'Hello, welcome to the experiment', nl: 'Hallo, welkom bij het experiment' },
-                    '掷骰子': { zh: '请点击骰子', en: 'Please click the dice', nl: 'Klik alstublieft op de dobbelsteen' },
-                    '做得好': { zh: '做得很好，继续加油', en: 'Well done, keep going', nl: 'Goed gedaan, ga zo door' },
-                    '休息': { zh: '现在可以休息一下', en: 'You can take a break now', nl: 'Je kunt nu even pauze nemen' },
-                    '结束': { zh: '实验结束了，谢谢参与', en: 'The experiment is over, thank you', nl: 'Het experiment is afgelopen, bedankt' }
+                    '你好': { zh: '你好，欢迎参加实验', en: 'Hello, welcome', nl: 'Hallo, welkom' },
+                    '掷骰子': { zh: '请点击骰子', en: 'Please click the dice', nl: 'Klik op de dobbelsteen' },
+                    '做得好': { zh: '做得很好', en: 'Well done', nl: 'Goed gedaan' },
+                    '结束': { zh: '实验结束了', en: 'Experiment over', nl: 'Experiment voorbij' }
                 });
                 
-                // Minigame Test List
                 const minigames = ref([
-                    { id: 'Shopping', icon: '🛒', name: '超市采购' },
-                    { id: 'PillBox', icon: '💊', name: '药盒检查' },
-                    { id: 'RouteChoice', icon: '🗺️', name: '路线选择' },
-                    { id: 'Schedule', icon: '📅', name: '日程冲突' },
+                    { id: 'Shopping', icon: '🛒', name: '超市' },
+                    { id: 'PillBox', icon: '💊', name: '药盒' },
+                    { id: 'RouteChoice', icon: '🗺️', name: '路线' },
+                    { id: 'Schedule', icon: '📅', name: '日程' },
                     { id: 'Priority', icon: '📋', name: '优先级' },
-                    { id: 'PhotoSpot', icon: '🔍', name: '场景检查' }
+                    { id: 'PhotoSpot', icon: '🔍', name: '场景' }
                 ]);
-                
-                let pollInterval = null;
 
                 const isSessionActive = computed(() => sessionStatus.value === 'RUNNING');
                 const isTrialMap = computed(() => selectedMap.value && selectedMap.value.toLowerCase() === 'trial');
@@ -579,58 +495,26 @@
                         const data = await res.json();
                         sessionStatus.value = data.status;
                         
-                        // Restore Dashboard config from backend (for page refresh)
                         if (data.config && Object.keys(data.config).length > 0) {
-                            console.log('[Dashboard] 🔄 Restoring config from backend:', data.config);
-                            
-                            if (data.config.language) {
-                                sessionLang.value = data.config.language;
-                            }
-                            if (data.config.group_number) {
-                                groupNumber.value = data.config.group_number;
-                            }
-                            if (data.config.map_id) {
-                                selectedMap.value = data.config.map_id;
-                            }
-                            if (data.config.participant_id) {
-                                participantId.value = data.config.participant_id;
-                            }
+                            if (data.config.language) sessionLang.value = data.config.language;
+                            if (data.config.group_number) groupNumber.value = data.config.group_number;
+                            if (data.config.map_id) selectedMap.value = data.config.map_id;
+                            if (data.config.participant_id) participantId.value = data.config.participant_id;
                         }
                         
-                        // Update current position from game_state
-                        if (data.game_state && data.game_state.playerPos !== undefined) {
-                            currentPosition.value = data.game_state.playerPos;
+                        if (data.logs) {
+                            logs.value = data.logs;
+                            scrollToBottom();
                         }
                         
-                        // Update monitor data
-                        if (data.monitor) {
-                            monitor.value = data.monitor;
-                        }
+                        if (data.monitor) Object.assign(monitor.value, data.monitor);
+                        if (data.reminders) reminders.value = data.reminders;
                         
-                        // Update reminders
-                        if (data.reminders) {
-                            reminders.value = data.reminders;
-                        }
-                        
-                        // Merge logs
-                        if (data.recent_logs && data.recent_logs.length > 0) {
-                            logs.value = data.recent_logs; // Keep chronological order (oldest -> newest)
-                            
-                            // Auto scroll to bottom if we were already near bottom or it's a fresh load
-                            nextTick(() => {
-                                if (logContainer.value) {
-                                    logContainer.value.scrollTop = logContainer.value.scrollHeight;
-                                }
-                            });
-                        }
                     } catch (e) {
-                        console.error("Poll error", e);
-                    } finally {
-                        if (pollInterval !== 'STOPPED') {
-                             // Reduced polling frequency since WebSocket handles real-time updates
-                             pollInterval = setTimeout(fetchState, 5000); // Changed from 1500ms
-                        }
+                        console.error('Failed to fetch state:', e);
                     }
+                    
+                    setTimeout(fetchState, 2000);
                 };
 
                 const startExperiment = async () => {
@@ -641,62 +525,52 @@
                         body: JSON.stringify({
                             map_id: selectedMap.value,
                             participant_id: participantId.value,
-                            language: sessionLang.value, // Pass language to backend
-                            group_number: groupNumber.value // Pass group number to backend
+                            language: sessionLang.value,
+                            group_number: groupNumber.value
                         })
                     });
-                    // fetchState loop is already running
                 };
                 
                 const updateLanguage = async (lang) => {
-                    console.log(`[Dashboard] 🌐 updateLanguage called with: ${lang}`);
-                    console.log(`[Dashboard] Socket exists: ${!!socket}`);
-                    console.log(`[Dashboard] Socket connected: ${socket?.connected}`);
-                    
                     sessionLang.value = lang;
-                    
-                    // Send via WebSocket if connected
                     if (socket && socket.connected) {
-                        console.log(`[Dashboard] ✅ Sending language change via WebSocket to: ${lang}`);
                         socket.emit('admin:language_change', { language: lang });
-                    } else {
-                        console.warn('[Dashboard] ⚠️ WebSocket not connected, language will be set on next session start');
                     }
                 };
 
                 const resetSession = async () => {
-                    if(!confirm('确定要强制重置当前会话吗？受试者页面将重新等待。')) return;
-                    await fetch(`${API_BASE}/admin/reset`, { method: 'POST' });
-                    logs.value = [];
-                    currentPosition.value = 0;
-                    // fetchState loop is already running
+                    if (!confirm('⚠️ 确认重置会话？\n\n此操作将清除当前实验数据，日志已保存到文件。')) {
+                        return;
+                    }
+                    try {
+                        await fetch(`${API_BASE}/admin/reset`, { method: 'POST' });
+                        logs.value = [];
+                        alert('✅ 会话已重置');
+                    } catch (e) {
+                        alert('❌ 重置失败: ' + e.message);
+                    }
                 };
 
-                // --- Admin Control Functions ---
-                const sendCommand = (command) => {
+                const sendCommand = (cmd) => {
                     if (socket && socket.connected) {
-                        console.log('[Dashboard WebSocket] Sending command:', command);
-                        socket.emit('admin:command', { command });
+                        console.log('[Dashboard] Sending admin command:', cmd);
+                        socket.emit('admin:command', cmd);
                     } else {
-                        console.error('[Dashboard] WebSocket not connected');
+                        console.error('[Dashboard] Cannot send command: WebSocket not connected');
+                        alert('⚠️ WebSocket 未连接，无法发送命令');
                     }
                 };
 
                 const setPosition = () => {
-                    const pos = Math.max(0, Math.min(119, targetPosition.value));
-                    sendCommand({ type: 'SET_POSITION', position: pos });
+                    if (typeof targetPosition.value !== 'number' || targetPosition.value < 0 || targetPosition.value > 119) {
+                        alert('❌ 请输入 0-119 之间的数字');
+                        return;
+                    }
+                    sendCommand({ type: 'SET_POSITION', position: targetPosition.value });
                 };
+                const moveSteps = (steps) => sendCommand({ type: 'MOVE_STEPS', steps });
+                const jumpToEnd = () => sendCommand({ type: 'SET_POSITION', position: 119 });
 
-                const moveSteps = (delta) => {
-                    const newPos = Math.max(0, Math.min(119, currentPosition.value + delta));
-                    sendCommand({ type: 'SET_POSITION', position: newPos });
-                };
-
-                const jumpToEnd = () => {
-                    sendCommand({ type: 'SET_POSITION', position: 119 });
-                };
-
-                // --- Reminder Control ---
                 const triggerReminder = async (id) => {
                     await fetch(`${API_BASE}/admin/trigger_reminder`, {
                         method: 'POST',
@@ -705,15 +579,11 @@
                     });
                 };
 
-                // --- Minigame Test ---
                 const triggerMinigame = (gameId) => {
-                    if (socket) {
-                        socket.emit('admin:trigger_minigame', { category: gameId });
-                        console.log(`[Dashboard] Triggered minigame: ${gameId}`);
-                    }
+                    if (socket) socket.emit('admin:trigger_minigame', { category: gameId });
                 };
 
-                // --- Robot Control Functions ---
+                // Robot Control
                 const ROBOT_API = 'http://localhost:8001';
                 
                 const checkRobotStatus = async () => {
@@ -722,9 +592,7 @@
                         const data = await res.json();
                         robotConnected.value = data.status === 'ok' && data.connected;
                         robotStatus.value = data;
-                        if (data.tts_volume !== undefined) {
-                            robotVolume.value = data.tts_volume;
-                        }
+                        if (data.tts_volume !== undefined) robotVolume.value = data.tts_volume;
                     } catch (e) {
                         robotConnected.value = false;
                         robotStatus.value = {};
@@ -733,31 +601,23 @@
 
                 const robotAction = async (action, payload = {}) => {
                     try {
-                        const res = await fetch(ROBOT_API, {
+                        await fetch(ROBOT_API, {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ action, payload })
                         });
-                        const data = await res.json();
-                        console.log(`[Robot] ${action}:`, data);
-                        // Refresh status after actions that change state
                         if (['wake_up', 'rest', 'go_to_posture', 'set_autonomous_life', 'set_volume', 'set_language'].includes(action)) {
                             setTimeout(checkRobotStatus, 500);
                         }
-                        return data;
                     } catch (e) {
-                        console.error(`[Robot] ${action} error:`, e);
+                        console.error(`Robot ${action} error:`, e);
                     }
                 };
 
                 const robotSay = async (text) => {
                     if (!text || !text.trim()) return;
-                    try {
-                        await robotAction('say', { text: text.trim() });
-                        robotText.value = ''; // Clear after sending
-                    } catch (e) {
-                        console.error('Robot say error:', e);
-                    }
+                    await robotAction('say', { text: text.trim() });
+                    robotText.value = '';
                 };
 
                 const getLogColor = (type) => {
@@ -782,28 +642,12 @@
                 };
 
                 onMounted(async () => {
-                    // Initialize WebSocket and wait for connection
                     socket = await initSocket();
-                    console.log('[Dashboard] 🚀 WebSocket initialized and ready');
-                    
                     lucide.createIcons();
-                    await fetchMaps();  // Wait for maps to load first
+                    await fetchMaps();
                     checkRobotStatus();
-                    // Poll robot status periodically
                     setInterval(checkRobotStatus, 5000);
-                    
-                    // Fetch state to restore config (IMPORTANT: do this after maps are loaded)
                     await fetchState();
-                    console.log('[Dashboard] 📋 Config restored from backend:', {
-                        language: sessionLang.value,
-                        group: groupNumber.value,
-                        map: selectedMap.value,
-                        participant: participantId.value
-                    });
-                });
-
-                onUnmounted(() => {
-                    pollInterval = 'STOPPED'; // Signal to stop recursion
                 });
 
                 return {
