@@ -108,6 +108,13 @@ def register_handlers(socketio):
         print("[WebSocket] Admin stopped minigame")
         socketio.emit('game:stop_minigame', room='game')
     
+    @socketio.on('game:minigame_cleared')
+    def handle_minigame_cleared(data):
+        """Game client cleared minigame (e.g. page refresh)."""
+        reason = data.get('reason', 'unknown')
+        print(f"[WebSocket] Minigame cleared on client: {reason}")
+        socketio.emit('admin:minigame_cleared', {'reason': reason}, room='admin')
+    
     @socketio.on('game:action')
     def handle_game_action(data):
         """Game board sends action log."""

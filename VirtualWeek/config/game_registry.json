@@ -5,6 +5,7 @@
         "defaultScenario": {
             "nLevel": 2,
             "totalTrials": 20,
+            "totalRounds": 1,
             "matchRatio": 0.3,
             "stimulusDuration": 2500,
             "interStimulusInterval": 500
@@ -50,7 +51,8 @@
             "nLevel": 2,
             "stimulusDuration": 2500,
             "stimulusType": "letter",
-            "totalTrials": 20
+            "totalTrials": 20,
+            "totalRounds": 1
         },
         "icon": "brain",
         "subtitle": {
@@ -378,6 +380,7 @@
         "defaultScenario": {
             "nLevel": 2,
             "totalTrials": 20,
+            "totalRounds": 1,
             "matchRatio": 0.3,
             "stimulusDuration": 2500,
             "interStimulusInterval": 500
@@ -400,9 +403,79 @@
         "defaultScenario": {
             "nLevel": 2,
             "totalTrials": 20,
+            "totalRounds": 1,
             "matchRatio": 0.3,
             "stimulusDuration": 2500,
             "interStimulusInterval": 500
+        }
+    },
+    "KitchenSort": {
+        "component": "KitchenSortGame",
+        "icon": "utensils-crossed",
+        "title": {
+            "zh": "厨房分类",
+            "en": "Kitchen Sort",
+            "nl": "Keuken Sorteren"
+        },
+        "subtitle": {
+            "zh": "快速分类食材到冰箱或橱柜",
+            "en": "Sort food into fridge or pantry",
+            "nl": "Sorteer voedsel in koelkast of voorraadkast"
+        },
+        "background": "",
+        "defaultScenario": {
+            "totalItems": 30,
+            "initialFallSpeed": 2.5,
+            "speedIncrement": 0.03,
+            "maxFallSpeed": 6,
+            "spawnInterval": 1800,
+            "minSpawnInterval": 800
+        }
+    },
+    "OfficeSort": {
+        "component": "OfficeSortGame",
+        "icon": "mail",
+        "title": {
+            "zh": "邮件分拣",
+            "en": "Mail Sort",
+            "nl": "Post Sorteren"
+        },
+        "subtitle": {
+            "zh": "快速分类紧急和普通邮件",
+            "en": "Sort urgent vs normal mail",
+            "nl": "Sorteer dringende en normale post"
+        },
+        "background": "",
+        "defaultScenario": {
+            "totalItems": 30,
+            "initialFallSpeed": 2.5,
+            "speedIncrement": 0.03,
+            "maxFallSpeed": 6,
+            "spawnInterval": 1800,
+            "minSpawnInterval": 800
+        }
+    },
+    "GardenSort": {
+        "component": "GardenSortGame",
+        "icon": "sprout",
+        "title": {
+            "zh": "花园整理",
+            "en": "Garden Sort",
+            "nl": "Tuin Sorteren"
+        },
+        "subtitle": {
+            "zh": "分类物品到花园或室内",
+            "en": "Sort items: garden or indoor",
+            "nl": "Sorteer items: tuin of binnen"
+        },
+        "background": "",
+        "defaultScenario": {
+            "totalItems": 30,
+            "initialFallSpeed": 2.5,
+            "speedIncrement": 0.03,
+            "maxFallSpeed": 6,
+            "spawnInterval": 1800,
+            "minSpawnInterval": 800
         }
     }
 }

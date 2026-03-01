@@ -34,6 +34,9 @@
     <script src="js/components/ParkMOTGame.js"></script>
     <script src="js/components/LibraryNBackGame.js"></script>
     <script src="js/components/GardenNBackGame.js"></script>
+    <script src="js/components/KitchenSortGame.js"></script>
+    <script src="js/components/OfficeSortGame.js"></script>
+    <script src="js/components/GardenSortGame.js"></script>
 </head>
 <body>
 
@@ -929,6 +932,11 @@
                     // so close it on refresh and let user re-trigger from dashboard
                     showMinigame.value = false;
                     activeGameComponent.value = null;
+                    
+                    // Notify server that minigame was cleared due to refresh
+                    if (savedState.showMinigame && socket) {
+                        socket.emit('game:minigame_cleared', { reason: 'page_refresh' });
+                    }
                     
                     phase.value = savedState.phase;
                     statusMessage.value = savedState.statusMessage;
