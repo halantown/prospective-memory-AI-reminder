@@ -310,11 +310,15 @@ const TaskSwitchGame = {
             });
         };
 
+        const colorHintHtml = computed(() => {
+            return t('colorHint') + ' <span class="text-blue-600 font-bold">' + t('blueNumber') + '</span> / <span class="text-green-600 font-bold">' + t('greenLetter') + '</span>';
+        });
+
         onMounted(() => { if (window.lucide) window.lucide.createIcons(); });
         onUnmounted(() => { isDestroyed = true; clearTimeout(trialTimer); clearTimeout(blankTimer); });
 
         return {
-            config, TASKS, phase, t,
+            config, TASKS, phase, t, colorHintHtml,
             currentTrialIndex, currentTask, currentStimulus, showingBlank, responded,
             lastFeedback, taskConfig, leftLabel, rightLabel,
             accuracy, avgRT, switchAcc, repeatAcc, switchRT, repeatRT, switchCost, progressPercent,
@@ -366,7 +370,7 @@ const TaskSwitchGame = {
                             <p class="text-xs text-slate-600" v-html="t('letterTaskDesc')"></p>
                         </div>
                     </div>
-                    <p class="text-slate-600 text-sm" v-html="t('colorHint') + ' <span class=\'text-blue-600 font-bold\'>' + t('blueNumber') + '</span> / <span class=\'text-green-600 font-bold\'>' + t('greenLetter') + '</span>'"></p>
+                    <p class="text-slate-600 text-sm" v-html="colorHintHtml"></p>
                     <p class="text-slate-500 text-sm">{{ t('stayFocused') }}</p>
                 </div>
                 <button @click="startGame"
