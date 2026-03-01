@@ -3,23 +3,22 @@
         "background": "",
         "component": "CookingGame",
         "defaultScenario": {
-            "conveyorInterval": 1200,
-            "conveyorSpeed": 2800,
-            "difficulty": "medium",
-            "stepTimeLimit": 20,
-            "timePerRound": 30,
-            "totalRounds": 3
+            "nLevel": 2,
+            "totalTrials": 20,
+            "matchRatio": 0.3,
+            "stimulusDuration": 2500,
+            "interStimulusInterval": 500
         },
         "icon": "chef-hat",
         "subtitle": {
-            "zh": "传送带选食材 + 排列烹饪步骤",
-            "en": "Pick ingredients & arrange cooking steps",
-            "nl": "Ingrediënten kiezen & kookstappen ordenen"
+            "zh": "厨房主题工作记忆测试",
+            "en": "Kitchen-themed working memory test",
+            "nl": "Keukenthema werkgeheugentest"
         },
         "title": {
-            "zh": "大厨模拟器",
-            "en": "Chef Simulator",
-            "nl": "Chef Simulator"
+            "zh": "厨房记忆",
+            "en": "Kitchen Memory",
+            "nl": "Keukengeheugen"
         }
     },
     "MentalArithmetic": {
@@ -337,6 +336,73 @@
             "flashDuration": 2500,
             "objectRadius": 24,
             "speed": 2.2
+        }
+    },
+    "ParkMOT": {
+        "component": "ParkMOTGame",
+        "icon": "fish",
+        "title": {
+            "zh": "池塘锦鲤",
+            "en": "Pond Koi",
+            "nl": "Vijver Koi"
+        },
+        "subtitle": {
+            "zh": "在池塘中追踪金色锦鲤",
+            "en": "Track golden koi in the pond",
+            "nl": "Volg gouden koi in de vijver"
+        },
+        "background": "",
+        "defaultScenario": {
+            "totalObjects": 10,
+            "targetCount": 4,
+            "moveDuration": 8000,
+            "flashDuration": 2000,
+            "objectRadius": 20,
+            "speed": 2.0
+        }
+    },
+    "LibraryNBack": {
+        "component": "LibraryNBackGame",
+        "icon": "book-open",
+        "title": {
+            "zh": "图书馆记忆",
+            "en": "Library Memory",
+            "nl": "Bibliotheek Geheugen"
+        },
+        "subtitle": {
+            "zh": "图书馆主题工作记忆测试",
+            "en": "Library-themed working memory test",
+            "nl": "Bibliotheekthema werkgeheugentest"
+        },
+        "background": "",
+        "defaultScenario": {
+            "nLevel": 2,
+            "totalTrials": 20,
+            "matchRatio": 0.3,
+            "stimulusDuration": 2500,
+            "interStimulusInterval": 500
+        }
+    },
+    "GardenNBack": {
+        "component": "GardenNBackGame",
+        "icon": "flower-2",
+        "title": {
+            "zh": "花园记忆",
+            "en": "Garden Memory",
+            "nl": "Tuingeheugen"
+        },
+        "subtitle": {
+            "zh": "花园主题工作记忆测试",
+            "en": "Garden-themed working memory test",
+            "nl": "Tuinthema werkgeheugentest"
+        },
+        "background": "",
+        "defaultScenario": {
+            "nLevel": 2,
+            "totalTrials": 20,
+            "matchRatio": 0.3,
+            "stimulusDuration": 2500,
+            "interStimulusInterval": 500
         }
     }
 }
