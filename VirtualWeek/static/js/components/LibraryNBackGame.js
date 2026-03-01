@@ -1,17 +1,15 @@
 /**
- * 厨房记忆 N-Back 任务 (Kitchen Memory N-Back)
- * 高认知负荷小游戏：判断当前食材是否与 N 步之前的食材相同
- *
- * 默认 2-back，可通过 scenario.nLevel 配置
- * 刺激类型：食物 emoji
+ * 图书馆 N-Back 工作记忆任务
+ * Library-themed N-back game: judge if current book/stationery item
+ * matches the one from N steps ago on the reading desk.
  */
-const CookingGame = {
-    name: 'CookingGame',
+const LibraryNBackGame = {
+    name: 'LibraryNBackGame',
     props: ['scenario'],
     emits: ['complete'],
 
     setup(props, { emit }) {
-        const { ref, computed, onMounted, onUnmounted } = Vue;
+        const { ref, computed, onMounted, onUnmounted, watch } = Vue;
 
         // ============================================================
         // 配置
@@ -22,8 +20,7 @@ const CookingGame = {
             matchRatio: 0.3,
             stimulusDuration: 2500,
             interStimulusInterval: 500,
-            stimulusType: 'emoji',
-            stimuli: ['🥕','🍅','🧅','🥩','🍳','🧈','🌶️','🍆','🥦','🫑','🧄','🍗'],
+            stimuli: ['📕','📗','📘','📙','📓','📒','📔','🔖','📝','📎','📐','✏️'],
             lang: 'zh'
         };
 
@@ -33,33 +30,33 @@ const CookingGame = {
         // i18n
         // ============================================================
         const TEXTS = {
-            header_subtitle: { zh: '厨房记忆', en: 'Kitchen Memory', nl: 'Keukengeheugen' },
-            header_title: { zh: '-Back 任务', en: '-Back Task', nl: '-Back Taak' },
+            header_subtitle: { zh: '工作记忆测试', en: 'Working Memory Test', nl: 'Werkgeheugentest' },
+            header_title: { zh: '图书馆记忆', en: 'Library Memory', nl: 'Bibliotheek Geheugen' },
             trial_progress: { zh: '第 {current} / {total} 个', en: 'Trial {current} / {total}', nl: 'Trial {current} / {total}' },
             accuracy_label: { zh: '正确率: {value}%', en: 'Accuracy: {value}%', nl: 'Nauwkeurigheid: {value}%' },
-            intro_title: { zh: '厨房记忆挑战', en: 'Kitchen Memory Challenge', nl: 'Keukengeheugen Uitdaging' },
+            intro_title: { zh: '📚 图书馆记忆挑战', en: '📚 Library Memory Challenge', nl: '📚 Bibliotheek Geheugenuitdaging' },
             intro_desc: {
-                zh: '屏幕上会依次出现<strong class="text-orange-700">食材</strong>。请判断当前食材是否与<strong class="text-orange-700"> {n} 个之前</strong>的食材<strong class="text-orange-700">相同</strong>。',
-                en: '<strong class="text-orange-700">Food items</strong> will appear one at a time. Determine if the current item is <strong class="text-orange-700">the same</strong> as the one <strong class="text-orange-700">{n} steps ago</strong>.',
-                nl: 'Er verschijnen <strong class="text-orange-700">voedselitems</strong> één voor één. Bepaal of het huidige item <strong class="text-orange-700">hetzelfde</strong> is als dat van <strong class="text-orange-700">{n} stappen geleden</strong>.'
+                zh: '阅读桌上会依次出现<strong class="text-emerald-700">书本和文具</strong>。请判断当前物品是否与<strong class="text-emerald-700"> {n} 个之前</strong>的物品<strong class="text-emerald-700">相同</strong>。',
+                en: '<strong class="text-emerald-700">Books and stationery</strong> will appear one at a time on the reading desk. Determine if the current item is <strong class="text-emerald-700">the same</strong> as the one <strong class="text-emerald-700">{n} steps ago</strong>.',
+                nl: '<strong class="text-emerald-700">Boeken en schrijfwaren</strong> verschijnen één voor één op de leesafel. Bepaal of het huidige item <strong class="text-emerald-700">hetzelfde</strong> is als dat van <strong class="text-emerald-700">{n} stappen geleden</strong>.'
             },
             example_label: { zh: '示例 ({n}-back):', en: 'Example ({n}-back):', nl: 'Voorbeeld ({n}-back):' },
             match_indicator: { zh: '← 匹配！', en: '← Match!', nl: '← Match!' },
-            timing_hint: { zh: '⏱ 每个食材展示 {duration} 秒，请尽快作答。', en: '⏱ Each item is shown for {duration} seconds. Respond quickly.', nl: '⏱ Elk item wordt {duration} seconden getoond. Reageer zo snel mogelijk.' },
+            timing_hint: { zh: '⏱ 每个物品展示 {duration} 秒，请尽快作答。', en: '⏱ Each item is shown for {duration} seconds. Respond quickly.', nl: '⏱ Elk item wordt {duration} seconden getoond. Reageer zo snel mogelijk.' },
             start_button: { zh: '开始挑战', en: 'Start Challenge', nl: 'Start Uitdaging' },
-            remember_hint: { zh: '请记住这个食材（前 {n} 个无需判断）', en: 'Remember this item (no response needed for first {n})', nl: 'Onthoud dit item (geen reactie nodig voor de eerste {n})' },
+            remember_hint: { zh: '请记住这个物品（前 {n} 个无需判断）', en: 'Remember this item (no response needed for first {n})', nl: 'Onthoud dit item (geen reactie nodig voor de eerste {n})' },
             match_question: { zh: '与 {n} 个前的相同吗？', en: 'Same as {n} back?', nl: 'Hetzelfde als {n} terug?' },
             match_button: { zh: '匹配', en: 'Match', nl: 'Match' },
             no_match_button: { zh: '不匹配', en: 'No Match', nl: 'Geen Match' },
-            perf_excellent: { zh: '大厨水平！', en: 'Master Chef!', nl: 'Meesterkok!' },
-            perf_good: { zh: '不错的厨艺！', en: 'Great Cooking!', nl: 'Goed Gekookt!' },
-            perf_practice: { zh: '继续练习！', en: 'Keep Practicing!', nl: 'Blijf Oefenen!' },
-            task_complete: { zh: '-Back 任务完成', en: '-Back Task Complete', nl: '-Back Taak Voltooid' },
+            perf_excellent: { zh: '书虫达人！', en: 'Bookworm Master!', nl: 'Boekenwurm Meester!' },
+            perf_good: { zh: '阅读能手！', en: 'Skilled Reader!', nl: 'Vaardige Lezer!' },
+            perf_practice: { zh: '继续翻阅！', en: 'Keep Reading!', nl: 'Blijf Lezen!' },
+            task_complete: { zh: '图书馆记忆任务完成', en: 'Library Memory Task Complete', nl: 'Bibliotheek Geheugentaak Voltooid' },
             total_accuracy: { zh: '总正确率', en: 'Total Accuracy', nl: 'Totale Nauwkeurigheid' },
             avg_rt: { zh: '平均反应时', en: 'Avg Response Time', nl: 'Gem. Reactietijd' },
             hits_label: { zh: '命中 (Hits)', en: 'Hits', nl: 'Hits' },
             false_alarms_label: { zh: '虚报 (FA)', en: 'False Alarms', nl: 'Vals Alarm' },
-            remember_first_n: { zh: '请先记住前 {n} 个食材', en: 'Remember the first {n} items', nl: 'Onthoud de eerste {n} items' },
+            remember_first_n: { zh: '请先记住前 {n} 个物品', en: 'Remember the first {n} items', nl: 'Onthoud de eerste {n} items' },
             answer_instruction: { zh: '按"匹配"或"不匹配"作答', en: 'Press "Match" or "No Match" to respond', nl: 'Druk op "Match" of "Geen Match" om te reageren' },
             finish_button: { zh: '完成', en: 'Finish', nl: 'Voltooien' }
         };
@@ -94,6 +91,7 @@ const CookingGame = {
         let trialTimer = null;
         let blankTimer = null;
         let gameStartTime = 0;
+        let isDestroyed = false;
 
         // ============================================================
         // 序列生成
@@ -160,6 +158,8 @@ const CookingGame = {
         };
 
         const nextTrial = () => {
+            if (isDestroyed) return;
+
             const nextIdx = currentTrialIndex.value + 1;
             if (nextIdx >= sequence.value.length) {
                 endGame();
@@ -178,8 +178,10 @@ const CookingGame = {
             trialStartTime.value = performance.now();
 
             trialTimer = setTimeout(() => {
+                if (isDestroyed) return;
                 showingBlank.value = true;
                 blankTimer = setTimeout(() => {
+                    if (isDestroyed) return;
                     nextTrial();
                 }, config.value.interStimulusInterval);
             }, config.value.stimulusDuration);
@@ -270,7 +272,7 @@ const CookingGame = {
             clearTimeout(trialTimer);
             clearTimeout(blankTimer);
             emit('complete', {
-                game: 'CookingGame',
+                game: 'LibraryNBackGame',
                 success: accuracy.value >= 60,
                 nLevel: N.value,
                 totalTrials: config.value.totalTrials,
@@ -293,6 +295,7 @@ const CookingGame = {
         });
 
         onUnmounted(() => {
+            isDestroyed = true;
             clearTimeout(trialTimer);
             clearTimeout(blankTimer);
         });
@@ -311,27 +314,27 @@ const CookingGame = {
     // 模板
     // ============================================================
     template: `
-    <div class="h-full flex flex-col bg-gradient-to-b from-orange-50 to-amber-50">
+    <div class="h-full flex flex-col bg-gradient-to-b from-emerald-50 to-stone-50">
 
         <!-- 顶部标题栏 -->
-        <div class="bg-white/90 backdrop-blur p-5 border-b border-orange-200 shrink-0">
+        <div class="bg-white/90 backdrop-blur p-5 border-b border-emerald-100 shrink-0">
             <div class="flex items-center gap-4">
-                <div class="bg-orange-100 p-3 rounded-xl">
-                    <i data-lucide="chef-hat" class="w-8 h-8 text-orange-600"></i>
+                <div class="bg-emerald-100 p-3 rounded-xl">
+                    <i data-lucide="book-open" class="w-8 h-8 text-emerald-600"></i>
                 </div>
                 <div>
-                    <span class="text-orange-600 font-bold text-sm uppercase tracking-wider">{{ t('header_subtitle') }}</span>
-                    <h2 class="text-xl font-black text-slate-800">{{ N }}{{ t('header_title') }}</h2>
+                    <span class="text-emerald-600 font-bold text-sm uppercase tracking-wider">{{ t('header_subtitle') }}</span>
+                    <h2 class="text-xl font-black text-amber-800">{{ t('header_title') }}</h2>
                 </div>
             </div>
 
             <!-- 进度条 (playing 阶段) -->
             <div v-if="phase === 'playing'" class="mt-3">
-                <div class="h-2 bg-orange-100 rounded-full overflow-hidden">
-                    <div class="h-full bg-orange-500 transition-all duration-300"
+                <div class="h-2 bg-stone-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-emerald-500 transition-all duration-300"
                          :style="{ width: progressPercent + '%' }"></div>
                 </div>
-                <div class="flex justify-between text-xs text-slate-500 mt-1">
+                <div class="flex justify-between text-xs text-stone-500 mt-1">
                     <span>{{ t('trial_progress', { current: currentTrialIndex + 1, total: config.totalTrials }) }}</span>
                     <span>{{ t('accuracy_label', { value: accuracy }) }}</span>
                 </div>
@@ -343,61 +346,60 @@ const CookingGame = {
 
             <!-- =============== INTRO 阶段 =============== -->
             <div v-if="phase === 'intro'" class="text-center max-w-md">
-                <div class="text-6xl mb-4">🍳</div>
-                <h3 class="text-2xl font-black text-slate-800 mb-3">{{ t('intro_title') }}</h3>
-                <div class="bg-white rounded-2xl p-5 border border-orange-200 shadow-sm text-left mb-6 space-y-3">
-                    <p class="text-slate-600 leading-relaxed" v-html="t('intro_desc', { n: N })"></p>
-                    <div class="bg-orange-50 rounded-xl p-4 space-y-2">
-                        <p class="text-sm font-bold text-orange-700">{{ t('example_label', { n: N }) }}</p>
+                <div class="text-6xl mb-4">📚</div>
+                <h3 class="text-2xl font-black text-amber-800 mb-3">{{ t('intro_title') }}</h3>
+                <div class="bg-white rounded-2xl p-5 border border-emerald-200 shadow-sm text-left mb-6 space-y-3">
+                    <p class="text-stone-600 leading-relaxed" v-html="t('intro_desc', { n: N })"></p>
+                    <div class="bg-emerald-50 rounded-xl p-4 space-y-2">
+                        <p class="text-sm font-bold text-emerald-700">{{ t('example_label', { n: N }) }}</p>
                         <div class="flex items-center gap-2 text-2xl">
                             <template v-if="N === 2">
-                                <span class="bg-white px-3 py-1 rounded border">🥕</span>
-                                <span class="bg-white px-3 py-1 rounded border">🍅</span>
-                                <span class="bg-green-100 px-3 py-1 rounded border-2 border-green-500 font-bold">🥕</span>
+                                <span class="bg-white px-3 py-1 rounded-lg border border-stone-200">📕</span>
+                                <span class="bg-white px-3 py-1 rounded-lg border border-stone-200">📗</span>
+                                <span class="bg-green-100 px-3 py-1 rounded-lg border-2 border-green-500 font-bold">📕</span>
                                 <span class="text-green-600 text-sm font-bold">{{ t('match_indicator') }}</span>
                             </template>
                             <template v-else>
-                                <span class="bg-white px-3 py-1 rounded border">🥕</span>
-                                <span class="bg-green-100 px-3 py-1 rounded border-2 border-green-500 font-bold">🥕</span>
+                                <span class="bg-white px-3 py-1 rounded-lg border border-stone-200">📕</span>
+                                <span class="bg-green-100 px-3 py-1 rounded-lg border-2 border-green-500 font-bold">📕</span>
                                 <span class="text-green-600 text-sm font-bold">{{ t('match_indicator') }}</span>
                             </template>
                         </div>
                     </div>
-                    <p class="text-slate-500 text-sm">
+                    <p class="text-stone-500 text-sm">
                         {{ t('timing_hint', { duration: (config.stimulusDuration / 1000).toFixed(1) }) }}
                     </p>
                 </div>
                 <button @click="startGame"
-                    class="bg-orange-500 hover:bg-orange-600 text-white px-10 py-4 rounded-xl font-bold text-lg
-                           shadow-[0_4px_0_#c2410c] active:shadow-none active:translate-y-[4px] transition-all">
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-4 rounded-xl font-bold text-lg
+                           shadow-[0_4px_0_#065f46] active:shadow-none active:translate-y-[4px] transition-all">
                     {{ t('start_button') }}
                 </button>
             </div>
 
             <!-- =============== PLAYING 阶段 =============== -->
             <div v-if="phase === 'playing'" class="text-center w-full max-w-md">
+
+                <!-- 书架/阅读桌刺激展示 -->
                 <div class="relative">
-                    <!-- 盘子造型刺激显示区 -->
-                    <div class="w-48 h-48 mx-auto rounded-full flex items-center justify-center mb-6 transition-all duration-200"
+                    <div class="w-44 h-44 mx-auto rounded-3xl flex items-center justify-center mb-6 transition-all duration-200"
                          :class="showingBlank
-                            ? 'bg-orange-50 border-4 border-dashed border-orange-200'
-                            : 'bg-white border-[6px] border-orange-300 shadow-lg shadow-orange-200'">
+                            ? 'bg-stone-100 border-2 border-dashed border-stone-300'
+                            : 'bg-amber-50 border-4 border-amber-700/30 shadow-lg shadow-amber-200/50'">
                         <span v-if="!showingBlank"
-                              class="text-8xl select-none leading-none"
-                              style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">
+                              class="text-8xl select-none drop-shadow-sm">
                             {{ currentStimulus }}
                         </span>
-                        <span v-else class="text-orange-300 text-lg">...</span>
+                        <span v-else class="text-stone-400 text-lg">📖...</span>
                     </div>
 
-                    <!-- 已响应指示 -->
                     <div v-if="responded" class="absolute top-2 right-2">
                         <span class="text-2xl">✓</span>
                     </div>
                 </div>
 
                 <!-- 提示文字 -->
-                <p class="text-slate-500 text-sm mb-4">
+                <p class="text-stone-500 text-sm mb-4">
                     <template v-if="currentTrialIndex < N">
                         {{ t('remember_hint', { n: N }) }}
                     </template>
@@ -410,13 +412,13 @@ const CookingGame = {
                 <div class="flex gap-4 justify-center"
                      :class="{ 'opacity-30 pointer-events-none': currentTrialIndex < N || responded || showingBlank }">
                     <button @click="handleResponse(true)"
-                        class="flex-1 max-w-[180px] bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-black text-xl py-5
-                               shadow-[0_4px_0_#c2410c] active:shadow-none active:translate-y-[4px] transition-all
+                        class="flex-1 max-w-[180px] bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xl py-5
+                               shadow-[0_4px_0_#065f46] active:shadow-none active:translate-y-[4px] transition-all
                                flex items-center justify-center gap-2">
                         <i data-lucide="check" class="w-6 h-6"></i> {{ t('match_button') }}
                     </button>
                     <button @click="handleResponse(false)"
-                        class="flex-1 max-w-[180px] bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-xl py-5
+                        class="flex-1 max-w-[180px] bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-xl py-5
                                shadow-[0_4px_0_#b91c1c] active:shadow-none active:translate-y-[4px] transition-all
                                flex items-center justify-center gap-2">
                         <i data-lucide="x" class="w-6 h-6"></i> {{ t('no_match_button') }}
@@ -427,34 +429,34 @@ const CookingGame = {
             <!-- =============== FEEDBACK 阶段 =============== -->
             <div v-if="phase === 'feedback'" class="text-center max-w-md w-full">
                 <div class="text-6xl mb-3">
-                    {{ performanceLevel === 'excellent' ? '👨‍🍳' : performanceLevel === 'good' ? '🍽️' : '🔪' }}
+                    {{ performanceLevel === 'excellent' ? '🏆📚' : performanceLevel === 'good' ? '👍📚' : '💪📚' }}
                 </div>
                 <h3 class="text-2xl font-black mb-1"
-                    :class="performanceLevel === 'excellent' ? 'text-green-600'
-                          : performanceLevel === 'good' ? 'text-orange-600' : 'text-amber-600'">
+                    :class="performanceLevel === 'excellent' ? 'text-emerald-600'
+                          : performanceLevel === 'good' ? 'text-amber-700' : 'text-stone-600'">
                     {{ performanceLevel === 'excellent' ? t('perf_excellent')
                      : performanceLevel === 'good' ? t('perf_good') : t('perf_practice') }}
                 </h3>
-                <p class="text-slate-500 mb-5">{{ N }}{{ t('task_complete') }}</p>
+                <p class="text-stone-500 mb-5">{{ t('task_complete') }}</p>
 
                 <!-- 结果卡片 -->
-                <div class="bg-white rounded-2xl border border-orange-200 shadow-sm p-5 mb-5">
+                <div class="bg-white rounded-2xl border border-stone-200 shadow-sm p-5 mb-5">
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-orange-50 rounded-xl p-3">
-                            <div class="text-3xl font-black text-orange-700">{{ accuracy }}%</div>
-                            <div class="text-xs text-orange-500 font-bold">{{ t('total_accuracy') }}</div>
+                        <div class="bg-emerald-50 rounded-xl p-3">
+                            <div class="text-3xl font-black text-emerald-700">{{ accuracy }}%</div>
+                            <div class="text-xs text-emerald-600 font-bold">{{ t('total_accuracy') }}</div>
                         </div>
                         <div class="bg-amber-50 rounded-xl p-3">
-                            <div class="text-3xl font-black text-amber-700">{{ avgResponseTime }}ms</div>
-                            <div class="text-xs text-amber-500 font-bold">{{ t('avg_rt') }}</div>
+                            <div class="text-3xl font-black text-amber-800">{{ avgResponseTime }}ms</div>
+                            <div class="text-xs text-amber-600 font-bold">{{ t('avg_rt') }}</div>
                         </div>
                         <div class="bg-green-50 rounded-xl p-3">
                             <div class="text-2xl font-black text-green-700">{{ hits }}</div>
-                            <div class="text-xs text-green-500 font-bold">{{ t('hits_label') }}</div>
+                            <div class="text-xs text-green-600 font-bold">{{ t('hits_label') }}</div>
                         </div>
                         <div class="bg-red-50 rounded-xl p-3">
                             <div class="text-2xl font-black text-red-700">{{ falseAlarms }}</div>
-                            <div class="text-xs text-red-500 font-bold">{{ t('false_alarms_label') }}</div>
+                            <div class="text-xs text-red-600 font-bold">{{ t('false_alarms_label') }}</div>
                         </div>
                     </div>
                 </div>
@@ -463,9 +465,9 @@ const CookingGame = {
         </div>
 
         <!-- 底部操作栏 -->
-        <div class="bg-white/95 backdrop-blur p-4 border-t border-orange-100 shrink-0 rounded-b-xl">
+        <div class="bg-white/95 backdrop-blur p-4 border-t border-stone-100 shrink-0 rounded-b-xl">
             <!-- playing 阶段提示 -->
-            <div v-if="phase === 'playing'" class="text-center text-slate-400 text-sm">
+            <div v-if="phase === 'playing'" class="text-center text-stone-400 text-sm">
                 <template v-if="currentTrialIndex < N">
                     {{ t('remember_first_n', { n: N }) }}
                 </template>
@@ -477,7 +479,7 @@ const CookingGame = {
             <!-- feedback 阶段按钮 -->
             <div v-if="phase === 'feedback'">
                 <button @click="finishGame"
-                    class="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-xl font-bold text-lg transition-colors">
+                    class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold text-lg transition-colors">
                     {{ t('finish_button') }}
                 </button>
             </div>
@@ -486,4 +488,4 @@ const CookingGame = {
     `
 };
 
-window.CookingGame = CookingGame;
+window.LibraryNBackGame = LibraryNBackGame;
