@@ -179,57 +179,89 @@ const DumplingMOTGame = {
         }
 
         // ── physics ─────────────────────────────────────────────
+        let physicsTime = 0;
         function updatePhysics() {
+            physicsTime += 0.016;
             const R = config.value.objectRadius;
             const objs = objects.value;
             const cx = canvasW / 2, cy = canvasH * 0.55;
             const rx = canvasW * 0.36 - R, ry = canvasH * 0.28 - R;
+            const baseSpeed = config.value.speed;
 
             for (const obj of objs) {
-                // slight turbulence to feel like boiling
-                obj.vx += (Math.random() - 0.5) * 0.35;
-                obj.vy += (Math.random() - 0.5) * 0.35;
-                // speed cap
+                // Boiling convection: circular current + buoyancy
+                const offX = (obj.x - cx) / rx, offY = (obj.y - cy) / ry;
+                // Gentle circular flow (like convection in boiling water)
+                const flowStrength = 0.08;
+                obj.vx += -offY * flowStrength * baseSpeed;
+                obj.vy += offX * flowStrength * baseSpeed;
+                // Buoyancy: slight upward drift
+                obj.vy -= 0.03 * baseSpeed;
+
+                // Smooth turbulence using per-object phase offset
+                const turbPhase = physicsTime * 2.5 + obj.id * 1.7;
+                obj.vx += Math.sin(turbPhase) * 0.12;
+                obj.vy += Math.cos(turbPhase * 0.7 + 1.3) * 0.12;
+
+                // Damping to prevent runaway speed
+                obj.vx *= 0.985;
+                obj.vy *= 0.985;
+
+                // Speed limits
                 const spd = Math.sqrt(obj.vx * obj.vx + obj.vy * obj.vy);
-                const maxSpd = config.value.speed * 1.6;
+                const maxSpd = baseSpeed * 1.8;
+                const minSpd = baseSpeed * 0.3;
                 if (spd > maxSpd) { obj.vx *= maxSpd / spd; obj.vy *= maxSpd / spd; }
+                if (spd < minSpd && spd > 0) { obj.vx *= minSpd / spd; obj.vy *= minSpd / spd; }
 
                 obj.x += obj.vx;
                 obj.y += obj.vy;
 
-                // elliptical boundary (pot)
+                // Soft elliptical boundary (spring force, not hard reflect)
                 const dx = (obj.x - cx) / rx, dy = (obj.y - cy) / ry;
-                const dist = dx * dx + dy * dy;
-                if (dist > 1) {
-                    const norm = Math.sqrt(dist);
-                    const nx = dx / (rx * norm), ny = dy / (ry * norm);
-                    // reflect velocity
-                    const dot = obj.vx * nx + obj.vy * ny;
-                    obj.vx -= 2 * dot * nx;
-                    obj.vy -= 2 * dot * ny;
-                    // push inside
-                    obj.x = cx + (dx / norm) * rx * 0.98;
-                    obj.y = cy + (dy / norm) * ry * 0.98;
+                const dist2 = dx * dx + dy * dy;
+                if (dist2 > 0.7) {
+                    const dist = Math.sqrt(dist2);
+                    const penetration = dist - 0.85;
+                    if (penetration > 0) {
+                        // Push inward with spring force
+                        const pushStrength = penetration * 0.6;
+                        obj.vx -= (dx / dist) * pushStrength * baseSpeed;
+                        obj.vy -= (dy / dist) * pushStrength * baseSpeed;
+                    }
+                    // Hard clamp if way outside
+                    if (dist > 1) {
+                        obj.x = cx + (dx / dist) * rx * 0.95;
+                        obj.y = cy + (dy / dist) * ry * 0.95;
+                        // Deflect velocity tangentially instead of hard reflect
+                        const nx = dx / dist, ny = dy / dist;
+                        const dot = obj.vx * nx / rx + obj.vy * ny / ry;
+                        if (dot > 0) {
+                            obj.vx -= 1.5 * dot * nx * rx;
+                            obj.vy -= 1.5 * dot * ny * ry;
+                        }
+                    }
                 }
             }
 
-            // dumpling-to-dumpling collisions
+            // Dumpling-to-dumpling soft collisions
             for (let i = 0; i < objs.length; i++) {
                 for (let j = i + 1; j < objs.length; j++) {
                     const a = objs[i], b = objs[j];
                     const ddx = b.x - a.x, ddy = b.y - a.y;
                     const d = Math.sqrt(ddx * ddx + ddy * ddy);
                     const minD = R * 2;
-                    if (d < minD && d > 0) {
+                    if (d < minD && d > 0.1) {
                         const nx = ddx / d, ny = ddy / d;
-                        const dvn = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
-                        if (dvn > 0) {
-                            a.vx -= dvn * nx; a.vy -= dvn * ny;
-                            b.vx += dvn * nx; b.vy += dvn * ny;
-                        }
-                        const overlap = (minD - d) / 2;
-                        a.x -= overlap * nx; a.y -= overlap * ny;
-                        b.x += overlap * nx; b.y += overlap * ny;
+                        // Soft repulsion
+                        const overlap = (minD - d) / minD;
+                        const pushForce = overlap * 0.8;
+                        a.vx -= pushForce * nx; a.vy -= pushForce * ny;
+                        b.vx += pushForce * nx; b.vy += pushForce * ny;
+                        // Gentle separation
+                        const sep = (minD - d) * 0.3;
+                        a.x -= sep * nx; a.y -= sep * ny;
+                        b.x += sep * nx; b.y += sep * ny;
                     }
                 }
             }
@@ -614,37 +646,39 @@ const DumplingMOTGame = {
                 <div v-if="phase === 'move'" class="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.07]">
                     <div class="absolute w-full h-1 bg-orange-300 animate-boil-line"></div>
                 </div>
-            </div>
 
-            <!-- result panel -->
-            <div v-if="phase === 'result'" class="shrink-0 mx-4 mb-3 bg-stone-900/70 backdrop-blur rounded-xl border border-amber-900/30 p-4">
-                <div class="text-center mb-2">
-                    <h3 class="text-white font-bold text-lg">{{ t('phase_result') }}</h3>
-                    <p class="text-lg mt-1">{{ perfMessage }}</p>
-                </div>
-                <div class="grid grid-cols-4 gap-3 mb-3">
-                    <div class="text-center">
-                        <div class="text-2xl font-black text-green-400">{{ results.hits }}</div>
-                        <div class="text-xs text-stone-400">{{ t('correct_label') }}</div>
+                <!-- result overlay (inside canvas container to avoid squeezing) -->
+                <div v-if="phase === 'result'" class="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div class="bg-stone-900/95 rounded-2xl border border-amber-800/50 p-6 max-w-sm w-full mx-4 shadow-2xl">
+                        <div class="text-center mb-3">
+                            <h3 class="text-white font-bold text-xl">{{ t('phase_result') }}</h3>
+                            <p class="text-lg mt-1 font-bold" :class="results.accuracy >= 90 ? 'text-green-400' : results.accuracy >= 60 ? 'text-amber-400' : 'text-orange-400'">{{ perfMessage }}</p>
+                        </div>
+                        <div class="grid grid-cols-4 gap-3 mb-4">
+                            <div class="text-center bg-green-900/30 rounded-lg p-2">
+                                <div class="text-2xl font-black text-green-400">{{ results.hits }}</div>
+                                <div class="text-xs text-green-300/70 font-medium">{{ t('correct_label') }}</div>
+                            </div>
+                            <div class="text-center bg-yellow-900/30 rounded-lg p-2">
+                                <div class="text-2xl font-black text-yellow-400">{{ results.misses }}</div>
+                                <div class="text-xs text-yellow-300/70 font-medium">{{ t('missed_label') }}</div>
+                            </div>
+                            <div class="text-center bg-red-900/30 rounded-lg p-2">
+                                <div class="text-2xl font-black text-red-400">{{ results.falseAlarms }}</div>
+                                <div class="text-xs text-red-300/70 font-medium">{{ t('false_alarm_label') }}</div>
+                            </div>
+                            <div class="text-center bg-amber-900/30 rounded-lg p-2">
+                                <div class="text-2xl font-black text-amber-400">{{ results.accuracy }}%</div>
+                                <div class="text-xs text-amber-300/70 font-medium">{{ t('accuracy_label') }}</div>
+                            </div>
+                        </div>
+                        <div class="flex justify-center">
+                            <button @click="finishGame"
+                                class="px-8 py-2.5 bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95">
+                                {{ t('finish_button') }}
+                            </button>
+                        </div>
                     </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-black text-yellow-400">{{ results.misses }}</div>
-                        <div class="text-xs text-stone-400">{{ t('missed_label') }}</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-black text-red-400">{{ results.falseAlarms }}</div>
-                        <div class="text-xs text-stone-400">{{ t('false_alarm_label') }}</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-black text-amber-400">{{ results.accuracy }}%</div>
-                        <div class="text-xs text-stone-400">{{ t('accuracy_label') }}</div>
-                    </div>
-                </div>
-                <div class="flex justify-center">
-                    <button @click="finishGame"
-                        class="px-8 py-2.5 bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95">
-                        {{ t('finish_button') }}
-                    </button>
                 </div>
             </div>
 

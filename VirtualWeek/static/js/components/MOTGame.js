@@ -561,37 +561,39 @@ const MOTGame = {
                 <div v-if="phase === 'move'" class="absolute inset-0 pointer-events-none overflow-hidden opacity-10">
                     <div class="absolute w-full h-0.5 bg-cyan-400 animate-scan-line"></div>
                 </div>
-            </div>
 
-            <!-- 结果面板 -->
-            <div v-if="phase === 'result'" class="shrink-0 mx-4 mb-3 bg-slate-900/70 backdrop-blur rounded-xl border border-cyan-900/30 p-4">
-                <div class="text-center mb-2">
-                    <h3 class="text-white font-bold text-lg">{{ t('phase_result') }}</h3>
-                    <p class="text-lg mt-1">{{ perfMessage }}</p>
-                </div>
-                <div class="grid grid-cols-4 gap-3 mb-3">
-                    <div class="text-center">
-                        <div class="text-2xl font-black text-green-400">{{ results.hits }}</div>
-                        <div class="text-xs text-slate-400">{{ t('correct_label') }}</div>
+                <!-- 结果覆盖层 (inside canvas to avoid squeezing) -->
+                <div v-if="phase === 'result'" class="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div class="bg-slate-900/95 rounded-2xl border border-cyan-800/50 p-6 max-w-sm w-full mx-4 shadow-2xl">
+                        <div class="text-center mb-3">
+                            <h3 class="text-white font-bold text-xl">{{ t('phase_result') }}</h3>
+                            <p class="text-lg mt-1 font-bold" :class="results.accuracy >= 90 ? 'text-green-400' : results.accuracy >= 60 ? 'text-cyan-400' : 'text-yellow-400'">{{ perfMessage }}</p>
+                        </div>
+                        <div class="grid grid-cols-4 gap-3 mb-4">
+                            <div class="text-center bg-green-900/30 rounded-lg p-2">
+                                <div class="text-2xl font-black text-green-400">{{ results.hits }}</div>
+                                <div class="text-xs text-green-300/70 font-medium">{{ t('correct_label') }}</div>
+                            </div>
+                            <div class="text-center bg-yellow-900/30 rounded-lg p-2">
+                                <div class="text-2xl font-black text-yellow-400">{{ results.misses }}</div>
+                                <div class="text-xs text-yellow-300/70 font-medium">{{ t('missed_label') }}</div>
+                            </div>
+                            <div class="text-center bg-red-900/30 rounded-lg p-2">
+                                <div class="text-2xl font-black text-red-400">{{ results.falseAlarms }}</div>
+                                <div class="text-xs text-red-300/70 font-medium">{{ t('false_alarm_label') }}</div>
+                            </div>
+                            <div class="text-center bg-cyan-900/30 rounded-lg p-2">
+                                <div class="text-2xl font-black text-cyan-400">{{ results.accuracy }}%</div>
+                                <div class="text-xs text-cyan-300/70 font-medium">{{ t('accuracy_label') }}</div>
+                            </div>
+                        </div>
+                        <div class="flex justify-center">
+                            <button @click="finishGame"
+                                class="px-8 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95">
+                                {{ t('finish_button') }}
+                            </button>
+                        </div>
                     </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-black text-yellow-400">{{ results.misses }}</div>
-                        <div class="text-xs text-slate-400">{{ t('missed_label') }}</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-black text-red-400">{{ results.falseAlarms }}</div>
-                        <div class="text-xs text-slate-400">{{ t('false_alarm_label') }}</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-black text-cyan-400">{{ results.accuracy }}%</div>
-                        <div class="text-xs text-slate-400">{{ t('accuracy_label') }}</div>
-                    </div>
-                </div>
-                <div class="flex justify-center">
-                    <button @click="finishGame"
-                        class="px-8 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95">
-                        {{ t('finish_button') }}
-                    </button>
                 </div>
             </div>
 
