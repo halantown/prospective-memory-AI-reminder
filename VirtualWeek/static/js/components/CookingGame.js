@@ -24,6 +24,7 @@ const CookingGame = {
             interStimulusInterval: 500,
             stimulusType: 'emoji',
             stimuli: ['🥕','🍅','🧅','🥩','🍳','🧈','🌶️','🍆','🥦','🫑','🧄','🍗'],
+            totalRounds: 1,
             lang: 'zh'
         };
 
@@ -61,7 +62,11 @@ const CookingGame = {
             false_alarms_label: { zh: '虚报 (FA)', en: 'False Alarms', nl: 'Vals Alarm' },
             remember_first_n: { zh: '请先记住前 {n} 个食材', en: 'Remember the first {n} items', nl: 'Onthoud de eerste {n} items' },
             answer_instruction: { zh: '按"匹配"或"不匹配"作答', en: 'Press "Match" or "No Match" to respond', nl: 'Druk op "Match" of "Geen Match" om te reageren' },
-            finish_button: { zh: '完成', en: 'Finish', nl: 'Voltooien' }
+            finish_button: { zh: '完成', en: 'Finish', nl: 'Voltooien' },
+            round_label: { zh: '第 {current} / {total} 轮', en: 'Round {current} / {total}', nl: 'Ronde {current} / {total}' },
+            round_complete: { zh: '本轮完成！', en: 'Round Complete!', nl: 'Ronde Voltooid!' },
+            round_accuracy: { zh: '本轮正确率: {value}%', en: 'This round accuracy: {value}%', nl: 'Nauwkeurigheid deze ronde: {value}%' },
+            next_round: { zh: '开始下一轮', en: 'Next Round', nl: 'Volgende Ronde' }
         };
         const lang = computed(() => config.value.lang || 'zh');
         const t = (key, params = {}) => {
@@ -77,13 +82,17 @@ const CookingGame = {
         // ============================================================
         // 状态
         // ============================================================
-        const phase = ref('intro');
+        const phase = ref('intro');         // 'intro' | 'playing' | 'round_break' | 'feedback'
         const sequence = ref([]);
         const currentTrialIndex = ref(-1);
         const currentStimulus = ref(null);
         const showingBlank = ref(false);
         const responded = ref(false);
         const trialStartTime = ref(0);
+
+        // Multi-round tracking
+        const currentRound = ref(1);
+        const allRoundResults = ref([]);
 
         const results = ref([]);
         const hits = ref(0);
@@ -147,6 +156,12 @@ const CookingGame = {
         // 游戏控制
         // ============================================================
         const startGame = () => {
+            currentRound.value = 1;
+            allRoundResults.value = [];
+            startRound();
+        };
+
+        const startRound = () => {
             sequence.value = generateSequence();
             results.value = [];
             hits.value = 0;
@@ -237,7 +252,31 @@ const CookingGame = {
             }
             clearTimeout(trialTimer);
             clearTimeout(blankTimer);
-            phase.value = 'feedback';
+
+            // Save this round's results
+            allRoundResults.value.push({
+                round: currentRound.value,
+                accuracy: accuracy.value,
+                hits: hits.value,
+                misses: misses.value,
+                falseAlarms: falseAlarms.value,
+                correctRejections: correctRejections.value,
+                avgResponseTime: avgResponseTime.value,
+                totalTime: Math.round(performance.now() - gameStartTime),
+                trials: [...results.value]
+            });
+
+            const maxRounds = config.value.totalRounds || 1;
+            if (currentRound.value < maxRounds) {
+                phase.value = 'round_break';
+            } else {
+                phase.value = 'feedback';
+            }
+        };
+
+        const startNextRound = () => {
+            currentRound.value++;
+            startRound();
         };
 
         // ============================================================
@@ -266,22 +305,33 @@ const CookingGame = {
         // ============================================================
         // 完成
         // ============================================================
+        const overallAccuracy = computed(() => {
+            const rounds = allRoundResults.value;
+            if (rounds.length === 0) return accuracy.value;
+            const total = rounds.reduce((s, r) => s + r.trials.length, 0);
+            if (total === 0) return 0;
+            const correct = rounds.reduce((s, r) => s + r.trials.filter(t => t.correct).length, 0);
+            return Math.round((correct / total) * 100);
+        });
+
         const finishGame = () => {
             clearTimeout(trialTimer);
             clearTimeout(blankTimer);
+            const rounds = allRoundResults.value;
             emit('complete', {
                 game: 'CookingGame',
-                success: accuracy.value >= 60,
+                success: overallAccuracy.value >= 60,
                 nLevel: N.value,
                 totalTrials: config.value.totalTrials,
-                accuracy: accuracy.value,
-                hits: hits.value,
-                misses: misses.value,
-                falseAlarms: falseAlarms.value,
-                correctRejections: correctRejections.value,
-                avgResponseTime: avgResponseTime.value,
-                totalTime: Math.round(performance.now() - gameStartTime),
-                trials: results.value
+                totalRounds: rounds.length,
+                accuracy: overallAccuracy.value,
+                hits: rounds.reduce((s, r) => s + r.hits, 0),
+                misses: rounds.reduce((s, r) => s + r.misses, 0),
+                falseAlarms: rounds.reduce((s, r) => s + r.falseAlarms, 0),
+                correctRejections: rounds.reduce((s, r) => s + r.correctRejections, 0),
+                avgResponseTime: Math.round(rounds.reduce((s, r) => s + r.avgResponseTime, 0) / rounds.length),
+                totalTime: rounds.reduce((s, r) => s + r.totalTime, 0),
+                rounds: rounds
             });
         };
 
@@ -298,11 +348,11 @@ const CookingGame = {
         });
 
         return {
-            config, N, phase,
+            config, N, phase, currentRound, allRoundResults, overallAccuracy,
             sequence, currentTrialIndex, currentStimulus, showingBlank, responded,
             results, hits, misses, falseAlarms, correctRejections,
             totalResponded, accuracy, avgResponseTime, progressPercent, performanceLevel,
-            startGame, handleResponse, finishGame,
+            startGame, startNextRound, handleResponse, finishGame,
             t
         };
     },
@@ -332,7 +382,9 @@ const CookingGame = {
                          :style="{ width: progressPercent + '%' }"></div>
                 </div>
                 <div class="flex justify-between text-xs text-slate-500 mt-1">
-                    <span>{{ t('trial_progress', { current: currentTrialIndex + 1, total: config.totalTrials }) }}</span>
+                    <span>{{ t('trial_progress', { current: currentTrialIndex + 1, total: config.totalTrials }) }}
+                        <template v-if="config.totalRounds > 1"> · {{ t('round_label', { current: currentRound, total: config.totalRounds }) }}</template>
+                    </span>
                     <span>{{ t('accuracy_label', { value: accuracy }) }}</span>
                 </div>
             </div>
@@ -422,6 +474,19 @@ const CookingGame = {
                         <i data-lucide="x" class="w-6 h-6"></i> {{ t('no_match_button') }}
                     </button>
                 </div>
+            </div>
+
+            <!-- =============== ROUND BREAK 阶段 =============== -->
+            <div v-if="phase === 'round_break'" class="text-center max-w-md w-full">
+                <div class="text-6xl mb-3">✅</div>
+                <h3 class="text-2xl font-black text-slate-800 mb-2">{{ t('round_complete') }}</h3>
+                <p class="text-slate-600 mb-2">{{ t('round_accuracy', { value: accuracy }) }}</p>
+                <p class="text-slate-500 text-sm mb-6">{{ t('round_label', { current: currentRound, total: config.totalRounds }) }}</p>
+                <button @click="startNextRound"
+                    class="bg-orange-600 hover:bg-orange-700 text-white px-10 py-4 rounded-xl font-bold text-lg
+                           shadow-[0_4px_0_#c2410c] active:shadow-none active:translate-y-[4px] transition-all">
+                    {{ t('next_round') }}
+                </button>
             </div>
 
             <!-- =============== FEEDBACK 阶段 =============== -->

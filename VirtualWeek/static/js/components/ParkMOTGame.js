@@ -82,7 +82,7 @@ const ParkMOTGame = {
         function initLilyPads() {
             lilyPads = [];
             const cx = canvasW / 2, cy = canvasH * 0.52;
-            const rx = canvasW * 0.36, ry = canvasH * 0.30;
+            const rx = canvasW * 0.42, ry = canvasH * 0.36;
             const count = 5 + Math.floor(Math.random() * 4); // 5-8
             for (let i = 0; i < count; i++) {
                 const angle = Math.random() * Math.PI * 2;
@@ -107,7 +107,7 @@ const ParkMOTGame = {
         }
         function newRipple() {
             const cx = canvasW / 2, cy = canvasH * 0.52;
-            const rx = canvasW * 0.32, ry = canvasH * 0.26;
+            const rx = canvasW * 0.38, ry = canvasH * 0.32;
             const angle = Math.random() * Math.PI * 2;
             const rFrac = Math.sqrt(Math.random()) * 0.8;
             return {
@@ -136,9 +136,8 @@ const ParkMOTGame = {
             const total = config.value.totalObjects;
             const targets = config.value.targetCount;
             const cx = canvasW / 2, cy = canvasH * 0.52;
-            const rx = canvasW * 0.36, ry = canvasH * 0.30;
+            const rx = canvasW * 0.42, ry = canvasH * 0.36;
             const arr = [];
-
             const targetIndices = new Set();
             while (targetIndices.size < targets) targetIndices.add(Math.floor(Math.random() * total));
 
@@ -173,22 +172,37 @@ const ParkMOTGame = {
         }
 
         // ── physics ─────────────────────────────────────────────
+        let physicsTime = 0;
         function updatePhysics() {
+            physicsTime += 0.016;
             const R = config.value.objectRadius;
             const objs = objects.value;
             const cx = canvasW / 2, cy = canvasH * 0.52;
-            const rx = canvasW * 0.36 - R, ry = canvasH * 0.30 - R;
+            const rx = canvasW * 0.42 - R, ry = canvasH * 0.36 - R;
+            const baseSpeed = config.value.speed;
 
             for (const obj of objs) {
-                // slight random direction changes to simulate swimming
-                obj.vx += (Math.random() - 0.5) * 0.2;
-                obj.vy += (Math.random() - 0.5) * 0.2;
-                // speed cap
+                // Gentle circular swimming pattern (like fish in a pond)
+                const offX = (obj.x - cx) / rx, offY = (obj.y - cy) / ry;
+                const flowStrength = 0.06;
+                obj.vx += -offY * flowStrength * baseSpeed;
+                obj.vy += offX * flowStrength * baseSpeed;
+
+                // Per-fish smooth direction changes (sinusoidal, not random)
+                const swimPhase = physicsTime * 1.8 + obj.id * 2.1;
+                obj.vx += Math.sin(swimPhase) * 0.08;
+                obj.vy += Math.cos(swimPhase * 0.6 + 0.9) * 0.08;
+
+                // Damping
+                obj.vx *= 0.988;
+                obj.vy *= 0.988;
+
+                // Speed limits
                 const spd = Math.sqrt(obj.vx * obj.vx + obj.vy * obj.vy);
-                const maxSpd = config.value.speed * 1.5;
-                const minSpd = config.value.speed * 0.5;
+                const maxSpd = baseSpeed * 1.6;
+                const minSpd = baseSpeed * 0.4;
                 if (spd > maxSpd) { obj.vx *= maxSpd / spd; obj.vy *= maxSpd / spd; }
-                else if (spd < minSpd && spd > 0) { obj.vx *= minSpd / spd; obj.vy *= minSpd / spd; }
+                if (spd < minSpd && spd > 0) { obj.vx *= minSpd / spd; obj.vy *= minSpd / spd; }
 
                 obj.x += obj.vx;
                 obj.y += obj.vy;
@@ -196,40 +210,47 @@ const ParkMOTGame = {
                 // tail wag
                 obj.tailPhase += 0.15;
 
-                // elliptical pond boundary
+                // Soft elliptical pond boundary (spring force)
                 const dx = (obj.x - cx) / rx, dy = (obj.y - cy) / ry;
-                const dist = dx * dx + dy * dy;
-                if (dist > 1) {
-                    const norm = Math.sqrt(dist);
-                    const nx = dx / (rx * norm), ny = dy / (ry * norm);
-                    const dot = obj.vx * nx + obj.vy * ny;
-                    obj.vx -= 2 * dot * nx;
-                    obj.vy -= 2 * dot * ny;
-                    // smooth turning: add slight curve instead of instant flip
-                    obj.vx += (Math.random() - 0.5) * 0.5;
-                    obj.vy += (Math.random() - 0.5) * 0.5;
-                    obj.x = cx + (dx / norm) * rx * 0.97;
-                    obj.y = cy + (dy / norm) * ry * 0.97;
+                const dist2 = dx * dx + dy * dy;
+                if (dist2 > 0.65) {
+                    const dist = Math.sqrt(dist2);
+                    const penetration = dist - 0.8;
+                    if (penetration > 0) {
+                        const pushStrength = penetration * 0.5;
+                        obj.vx -= (dx / dist) * pushStrength * baseSpeed;
+                        obj.vy -= (dy / dist) * pushStrength * baseSpeed;
+                    }
+                    // Hard clamp if way outside
+                    if (dist > 1) {
+                        obj.x = cx + (dx / dist) * rx * 0.95;
+                        obj.y = cy + (dy / dist) * ry * 0.95;
+                        const nx = dx / dist, ny = dy / dist;
+                        const dot = obj.vx * nx / rx + obj.vy * ny / ry;
+                        if (dot > 0) {
+                            obj.vx -= 1.5 * dot * nx * rx;
+                            obj.vy -= 1.5 * dot * ny * ry;
+                        }
+                    }
                 }
             }
 
-            // fish-to-fish collision avoidance
+            // fish-to-fish soft collision
             for (let i = 0; i < objs.length; i++) {
                 for (let j = i + 1; j < objs.length; j++) {
                     const a = objs[i], b = objs[j];
                     const ddx = b.x - a.x, ddy = b.y - a.y;
                     const d = Math.sqrt(ddx * ddx + ddy * ddy);
                     const minD = R * 2;
-                    if (d < minD && d > 0) {
+                    if (d < minD && d > 0.1) {
                         const nx = ddx / d, ny = ddy / d;
-                        const dvn = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
-                        if (dvn > 0) {
-                            a.vx -= dvn * nx; a.vy -= dvn * ny;
-                            b.vx += dvn * nx; b.vy += dvn * ny;
-                        }
-                        const overlap = (minD - d) / 2;
-                        a.x -= overlap * nx; a.y -= overlap * ny;
-                        b.x += overlap * nx; b.y += overlap * ny;
+                        const overlap = (minD - d) / minD;
+                        const pushForce = overlap * 0.6;
+                        a.vx -= pushForce * nx; a.vy -= pushForce * ny;
+                        b.vx += pushForce * nx; b.vy += pushForce * ny;
+                        const sep = (minD - d) * 0.25;
+                        a.x -= sep * nx; a.y -= sep * ny;
+                        b.x += sep * nx; b.y += sep * ny;
                     }
                 }
             }
@@ -254,7 +275,7 @@ const ParkMOTGame = {
             }
 
             // stone border (outer ring of pond)
-            const stoneRx = canvasW * 0.40, stoneRy = canvasH * 0.34;
+            const stoneRx = canvasW * 0.46, stoneRy = canvasH * 0.40;
             ctx.save();
             ctx.beginPath();
             ctx.ellipse(cx, cy, stoneRx, stoneRy, 0, 0, Math.PI * 2);
@@ -279,7 +300,7 @@ const ParkMOTGame = {
             }
 
             // pond water
-            const waterRx = canvasW * 0.37, waterRy = canvasH * 0.31;
+            const waterRx = canvasW * 0.44, waterRy = canvasH * 0.38;
             ctx.save();
             ctx.beginPath();
             ctx.ellipse(cx, cy, waterRx, waterRy, 0, 0, Math.PI * 2);

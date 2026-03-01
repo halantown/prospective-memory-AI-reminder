@@ -143,7 +143,7 @@ const DumplingMOTGame = {
             const targets = config.value.targetCount;
             // keep dumplings within the pot area (elliptical)
             const cx = canvasW / 2, cy = canvasH * 0.55;
-            const rx = canvasW * 0.36, ry = canvasH * 0.28;
+            const rx = canvasW * 0.40, ry = canvasH * 0.33;
             const arr = [];
 
             const targetIndices = new Set();
@@ -185,7 +185,7 @@ const DumplingMOTGame = {
             const R = config.value.objectRadius;
             const objs = objects.value;
             const cx = canvasW / 2, cy = canvasH * 0.55;
-            const rx = canvasW * 0.36 - R, ry = canvasH * 0.28 - R;
+            const rx = canvasW * 0.40 - R, ry = canvasH * 0.33 - R;
             const baseSpeed = config.value.speed;
 
             for (const obj of objs) {
@@ -282,7 +282,7 @@ const DumplingMOTGame = {
 
             // -- pot body (dark ellipse)
             const cx = canvasW / 2, cy = canvasH * 0.55;
-            const potRx = canvasW * 0.42, potRy = canvasH * 0.36;
+            const potRx = canvasW * 0.46, potRy = canvasH * 0.40;
             ctx.save();
             ctx.beginPath();
             ctx.ellipse(cx, cy, potRx, potRy, 0, 0, Math.PI * 2);
@@ -309,7 +309,7 @@ const DumplingMOTGame = {
             ctx.restore();
 
             // -- water surface
-            const waterRx = canvasW * 0.38, waterRy = canvasH * 0.30;
+            const waterRx = canvasW * 0.43, waterRy = canvasH * 0.36;
             ctx.save();
             ctx.beginPath();
             ctx.ellipse(cx, cy, waterRx, waterRy, 0, 0, Math.PI * 2);
