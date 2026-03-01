@@ -23,6 +23,14 @@
     <script src="js/components/ScheduleConflictGame.js"></script>
     <script src="js/components/PriorityGame.js"></script>
     <script src="js/components/PhotoSpotGame.js"></script>
+    <script src="js/components/NBackGame.js"></script>
+    <script src="js/components/MentalArithmeticGame.js"></script>
+    <script src="js/components/StroopGame.js"></script>
+    <script src="js/components/TaskSwitchGame.js"></script>
+    <script src="js/components/CookingGame.js"></script>
+    <script src="js/components/LibrarySortGame.js"></script>
+    <script src="js/components/MOTGame.js"></script>
+    <script src="js/components/DumplingMOTGame.js"></script>
 </head>
 <body>
 
@@ -248,12 +256,16 @@
                             <p class="text-blue-100 font-medium text-sm opacity-90">{{ minigameSubtitle }}</p>
                         </div>
                     </div>
+                    <button @click="stopMinigame" class="bg-white/20 hover:bg-white/30 p-2 rounded-xl transition-colors" title="关闭小游戏">
+                        <i data-lucide="x" class="w-6 h-6 text-white"></i>
+                    </button>
                 </div>
 
                 <!-- Dynamic Component Loader -->
                 <div class="flex-grow relative z-10 overflow-hidden">
                     <component 
                         :is="activeGameComponent" 
+                        :key="activeGameKey"
                         :scenario="activeGameScenario" 
                         @complete="handleMinigameComplete">
                     </component>
@@ -306,8 +318,9 @@
         const START_HOUR = 7;
         const START_MINUTES = START_HOUR * 60;
         const DAY_MINUTES = HOURS_PER_DAY * 60;
-        const TOTAL_STEPS = 120;
-        const MINUTES_PER_STEP = DAY_MINUTES / TOTAL_STEPS;
+        // Path-dependent values (recalculated via rebuildPath when map config specifies total_steps)
+        let TOTAL_STEPS = 120;
+        let MINUTES_PER_STEP = DAY_MINUTES / TOTAL_STEPS;
 
         // 动画时长 (毫秒)
         const DICE_ANIMATION_MS = 800;
@@ -340,86 +353,113 @@
         // ============================================================
         // 棋盘路径生成
         // ============================================================
-        function generatePath() {
-            // 棋盘 22x14，路径 120 步
-            // Path target: 8 steps per hour * 15 hours = 120 steps.
-            // Bumps extend towards center up to 3 units.
-            
-            let p = [];
-            let x = 21; 
-            let y = 13;
-            p.push({x, y}); // Start point
+        /**
+         * 生成棋盘路径
+         * @param {number} totalSteps - 目标格子数 (68~168, 默认120)
+         * 棋盘 22x14, 路径沿外圈螺旋, 通过调节向内凸起(bump)的数量和深度控制总步数
+         * totalSteps = 68 (基础周长) + 2 × Σ(所有bump深度)
+         */
+        function generatePath(totalSteps) {
+            totalSteps = (typeof totalSteps === 'number') ? Math.max(68, Math.min(152, totalSteps)) : 120;
 
-            const move = (dx, dy) => {
-                x += dx;
-                y += dy;
-                p.push({x, y});
-            };
+            let p = [];
+            let x = 21, y = 13;
+            p.push({x, y});
+
+            const move = (dx, dy) => { x += dx; y += dy; p.push({x, y}); };
 
             // Bump functions (Inward/Center-ward)
-            const bumpUp = (depth) => { // From Bottom
-                for(let i=0; i<depth; i++) move(0, -1);
-                move(-1, 0);
-                for(let i=0; i<depth; i++) move(0, 1);
-            };
-            const bumpRight = (depth) => { // From Left
-                for(let i=0; i<depth; i++) move(1, 0);
-                move(0, -1);
-                for(let i=0; i<depth; i++) move(-1, 0);
-            };
-            const bumpDown = (depth) => { // From Top
-                for(let i=0; i<depth; i++) move(0, 1);
-                move(1, 0);
-                for(let i=0; i<depth; i++) move(0, -1);
-            };
-            const bumpLeft = (depth) => { // From Right
-                for(let i=0; i<depth; i++) move(-1, 0);
-                move(0, 1);
-                for(let i=0; i<depth; i++) move(1, 0);
-            };
+            const bumpUp    = (d) => { for(let i=0;i<d;i++) move(0,-1); move(-1,0); for(let i=0;i<d;i++) move(0,1); };
+            const bumpRight = (d) => { for(let i=0;i<d;i++) move(1,0);  move(0,-1); for(let i=0;i<d;i++) move(-1,0); };
+            const bumpDown  = (d) => { for(let i=0;i<d;i++) move(0,1);  move(1,0);  for(let i=0;i<d;i++) move(0,-1); };
+            const bumpLeft  = (d) => { for(let i=0;i<d;i++) move(-1,0); move(0,1);  for(let i=0;i<d;i++) move(1,0); };
 
-            // 1. Bottom Edge (Right to Left)
-            // Sequence: 4 - B(3) - 5 - B(3) - 5 - B(3) - 4
-            for(let i=0; i<4; i++) move(-1, 0);
-            bumpUp(3);
-            for(let i=0; i<5; i++) move(-1, 0);
-            bumpUp(3);
-            for(let i=0; i<5; i++) move(-1, 0);
-            bumpUp(3);
-            for(let i=0; i<4; i++) move(-1, 0);
-
-            // 2. Left Edge (Bottom to Top)
-            // Sequence: 4 - B(3) - 4 - B(1) - 3
-            for(let i=0; i<4; i++) move(0, -1);
-            bumpRight(3);
-            for(let i=0; i<4; i++) move(0, -1);
-            bumpRight(1);
-            for(let i=0; i<3; i++) move(0, -1);
-
-            // 3. Top Edge (Left to Right)
-            // Sequence: 4 - B(3) - 5 - B(3) - 5 - B(3) - 4
-            for(let i=0; i<4; i++) move(1, 0);
-            bumpDown(3);
-            for(let i=0; i<5; i++) move(1, 0);
-            bumpDown(3);
-            for(let i=0; i<5; i++) move(1, 0);
-            bumpDown(3);
-            for(let i=0; i<4; i++) move(1, 0);
-
-            // 4. Right Edge (Top to Bottom)
-            // Sequence: 4 - B(3) - 4 - B(1) - 3
-            for(let i=0; i<4; i++) move(0, 1);
-            bumpLeft(3);
-            for(let i=0; i<4; i++) move(0, 1);
-            bumpLeft(1);
-            for(let i=0; i<3; i++) move(0, 1);
-
-            // Start point duplication check
-            if (p.length > 1 && p[p.length-1].x === 21 && p[p.length-1].y === 13) {
-                p.pop();
+            // 原始120步路径 — 保持向后兼容
+            if (totalSteps === 120) {
+                // Bottom Edge (R→L): 4 - B(3) - 5 - B(3) - 5 - B(3) - 4
+                for(let i=0;i<4;i++) move(-1,0); bumpUp(3);
+                for(let i=0;i<5;i++) move(-1,0); bumpUp(3);
+                for(let i=0;i<5;i++) move(-1,0); bumpUp(3);
+                for(let i=0;i<4;i++) move(-1,0);
+                // Left Edge (B→T): 4 - B(3) - 4 - B(1) - 3
+                for(let i=0;i<4;i++) move(0,-1); bumpRight(3);
+                for(let i=0;i<4;i++) move(0,-1); bumpRight(1);
+                for(let i=0;i<3;i++) move(0,-1);
+                // Top Edge (L→R): 4 - B(3) - 5 - B(3) - 5 - B(3) - 4
+                for(let i=0;i<4;i++) move(1,0); bumpDown(3);
+                for(let i=0;i<5;i++) move(1,0); bumpDown(3);
+                for(let i=0;i<5;i++) move(1,0); bumpDown(3);
+                for(let i=0;i<4;i++) move(1,0);
+                // Right Edge (T→B): 4 - B(3) - 4 - B(1) - 3
+                for(let i=0;i<4;i++) move(0,1); bumpLeft(3);
+                for(let i=0;i<4;i++) move(0,1); bumpLeft(1);
+                for(let i=0;i<3;i++) move(0,1);
+            } else {
+                // 参数化路径生成
+                const recipe = _computePathRecipe(totalSteps);
+                const runEdge = (segs, goStraight, goBump) => {
+                    for (const seg of segs) {
+                        if (seg.t === 's') { for(let i=0;i<seg.n;i++) goStraight(); }
+                        else goBump(seg.n);
+                    }
+                };
+                runEdge(recipe.bottom, () => move(-1,0), bumpUp);
+                runEdge(recipe.left,   () => move(0,-1), bumpRight);
+                runEdge(recipe.top,    () => move(1,0),  bumpDown);
+                runEdge(recipe.right,  () => move(0,1),  bumpLeft);
             }
 
+            if (p.length > 1 && p[p.length-1].x === 21 && p[p.length-1].y === 13) p.pop();
             return p;
+        }
+
+        /**
+         * 根据目标步数计算每条边的 bump 配方
+         * totalSteps = 68 + 2 × totalBumpDepth
+         */
+        function _computePathRecipe(totalSteps) {
+            const totalBumpDepth = Math.max(0, Math.round((totalSteps - 68) / 2));
+            if (totalBumpDepth === 0) {
+                const s = (n) => [{ t: 's', n }];
+                return { bottom: s(21), left: s(13), top: s(21), right: s(13) };
+            }
+            // 水平边(长21)分配 ~35%，垂直边分配剩余
+            let hDepth = Math.round(totalBumpDepth * 0.35);
+            let vDepth = Math.max(0, Math.round((totalBumpDepth - 2 * hDepth) / 2));
+            return {
+                bottom: _edgeSegments(hDepth, 21, 4),
+                left:   _edgeSegments(vDepth, 13, 3),
+                top:    _edgeSegments(hDepth, 21, 4),
+                right:  _edgeSegments(vDepth, 13, 3)
+            };
+        }
+
+        /** 将一条边的总bump深度转换为 [直线, bump, 直线, ...] 段序列 */
+        function _edgeSegments(bumpDepthTotal, netLen, maxBumps) {
+            if (bumpDepthTotal <= 0) return [{ t: 's', n: netLen }];
+            // 找最佳 (numBumps, depth) 使 numBumps×depth ≈ bumpDepthTotal
+            let bestN = 1, bestD = Math.min(5, bumpDepthTotal), bestDiff = Infinity;
+            for (let n = 1; n <= maxBumps; n++) {
+                for (const d of [Math.floor(bumpDepthTotal / n), Math.ceil(bumpDepthTotal / n)]) {
+                    if (d < 1 || d > 5) continue;
+                    const diff = Math.abs(n * d - bumpDepthTotal);
+                    if (diff < bestDiff || (diff === bestDiff && n < bestN)) {
+                        bestDiff = diff; bestN = n; bestD = d;
+                    }
+                }
+            }
+            // 交替排列直线段和 bump
+            const straightTotal = netLen - bestN;
+            const segs = [];
+            const base = Math.floor(straightTotal / (bestN + 1));
+            let rem = straightTotal % (bestN + 1);
+            for (let i = 0; i <= bestN; i++) {
+                const len = base + (rem > 0 ? 1 : 0);
+                if (rem > 0) rem--;
+                if (len > 0) segs.push({ t: 's', n: len });
+                if (i < bestN) segs.push({ t: 'b', n: bestD });
+            }
+            return segs;
         }
 
         // Calculate Rotation for each cell to point to next
@@ -437,73 +477,39 @@
             });
         }
 
-        const rawPath = calculateRotations(generatePath());
-        const STEPS_PER_HOUR = rawPath.length / 15;
+        let rawPath = calculateRotations(generatePath());
+        let STEPS_PER_HOUR = rawPath.length / HOURS_PER_DAY;
+
+        /** 按新步数重建路径，同步更新所有依赖变量 */
+        function rebuildPath(totalSteps) {
+            rawPath = calculateRotations(generatePath(totalSteps));
+            TOTAL_STEPS = rawPath.length;
+            MINUTES_PER_STEP = DAY_MINUTES / TOTAL_STEPS;
+            STEPS_PER_HOUR = rawPath.length / HOURS_PER_DAY;
+        }
         
         // Game Registry: Maps event category to game components details
         // ============================================================
-        // 小游戏注册表
+        // 小游戏注册表 (从外部 JSON 加载)
         // ============================================================
-        const GAME_REGISTRY = {
-            'Shopping': {
-                component: window.SupermarketGame,
-                title: '超市大采购',
-                subtitle: '请帮忙检查购物篮',
-                icon: 'shopping-cart',
-                background: 'pics/ah.png',
-                defaultScenario: {
-                    context: "准备做一份水果沙拉招待朋友",
-                    items: [
-                        { id: 101, name: "红苹果", emoji: "🍎", isReasonable: true },
-                        { id: 102, name: "甜香蕉", emoji: "🍌", isReasonable: true },
-                        { id: 103, name: "酸奶", emoji: "🥛", isReasonable: true },
-                        { id: 104, name: "大蒜头", emoji: "🧄", isReasonable: false },
-                        { id: 105, name: "大碗", emoji: "🥣", isReasonable: true },
-                        { id: 106, name: "葡萄", emoji: "🍇", isReasonable: true },
-                    ]
+        let GAME_REGISTRY = {};
+
+        async function loadGameRegistry() {
+            try {
+                const data = await apiCall('/config/game_registry');
+                if (!data) throw new Error('Empty response');
+                GAME_REGISTRY = {};
+                for (const [key, cfg] of Object.entries(data)) {
+                    GAME_REGISTRY[key] = {
+                        ...cfg,
+                        component: window[cfg.component] || null
+                    };
                 }
-            },
-            'PillBox': {
-                component: window.PillBoxGame,
-                title: '药盒检查',
-                subtitle: '判断药盒配置是否正确',
-                icon: 'pill',
-                background: '',
-                defaultScenario: null  // 使用组件内置默认值
-            },
-            'RouteChoice': {
-                component: window.RouteChoiceGame,
-                title: '路线选择',
-                subtitle: '选择更合适的路线',
-                icon: 'map',
-                background: '',
-                defaultScenario: null
-            },
-            'Schedule': {
-                component: window.ScheduleConflictGame,
-                title: '日程检查',
-                subtitle: '判断时间安排是否有冲突',
-                icon: 'calendar-clock',
-                background: '',
-                defaultScenario: null
-            },
-            'Priority': {
-                component: window.PriorityGame,
-                title: '优先级判断',
-                subtitle: '选择最应该先做的事',
-                icon: 'list-ordered',
-                background: '',
-                defaultScenario: null
-            },
-            'PhotoSpot': {
-                component: window.PhotoSpotGame,
-                title: '场景检查',
-                subtitle: '找出不对劲的地方',
-                icon: 'scan-search',
-                background: '',
-                defaultScenario: null
+                console.log(`Game registry loaded: ${Object.keys(GAME_REGISTRY).length} games`);
+            } catch (e) {
+                console.error('Failed to load game registry, using empty registry:', e);
             }
-        };
+        }
 
         createApp({
             setup() {
@@ -617,6 +623,8 @@
                 const showMinigame = ref(false);
                 const activeGameComponent = ref(null);
                 const activeGameScenario = ref({}); 
+                const activeGameKey = ref(0);
+                const mapGameSettings = ref({});  // 地图级小游戏配置 (game_settings)
                 const minigameTitle = ref('');
                 const minigameSubtitle = ref('');
                 const minigameIcon = ref('');
@@ -656,6 +664,8 @@
                 onMounted(async () => {
                     // Preload all locales first
                     await loadAllLocales();
+                    // Load game registry from external config
+                    await loadGameRegistry();
                     
                     lucide.createIcons();
                     // Initialize Tutorial System
@@ -766,6 +776,12 @@
                         } else {
                             console.warn(`[Minigame] Unknown category: ${category}`);
                         }
+                    });
+
+                    // 管理员停止小游戏
+                    socket.on('game:stop_minigame', () => {
+                        console.log('[WebSocket] Admin stopped minigame');
+                        stopMinigame();
                     });
                     
                     // Check session status ONCE (no more polling loop!)
@@ -961,6 +977,12 @@
                 // 5.8 棋盘设置
                 // --------------------------------------------------
                 const setupBoard = (config) => {
+                    // 如果地图配置指定了 total_steps，重建路径
+                    if (config.total_steps && config.total_steps !== rawPath.length) {
+                        rebuildPath(config.total_steps);
+                        console.log(`Path rebuilt: ${rawPath.length} cells (requested ${config.total_steps})`);
+                    }
+
                     // 解析事件配置
                     const eventLocations = {};
                     const eventsMap = {};
@@ -976,6 +998,7 @@
                         irregularTasks: config.irregular_tasks || [],
                         events: eventsMap
                     };
+                    mapGameSettings.value = config.game_settings || {};
                     
                     // 骰子序列
                     if (Array.isArray(config.dice_sequence)) {
@@ -1142,7 +1165,7 @@
                 const triggerEvent = (eventData) => {
                     // Check if this event category maps to a minigame
                     if (GAME_REGISTRY[eventData.category]) {
-                        startMinigame(eventData.category);
+                        startMinigame(eventData.category, eventData.scenario);
                         return;
                     }
                     currentEvent.value = {
@@ -1153,20 +1176,42 @@
                     showEventCard.value = true;
                 };
 
-                const startMinigame = (category) => {
+                const startMinigame = (category, eventScenario) => {
                     const gameConfig = GAME_REGISTRY[category];
-                    if (!gameConfig) return;
+                    if (!gameConfig || !gameConfig.component) {
+                        console.warn(`[Minigame] Invalid game config for: ${category}`);
+                        return;
+                    }
 
+                    // 三层合并: 代码默认值 → 地图级配置 → 事件级配置
+                    const merged = {
+                        ...(gameConfig.defaultScenario || {}),
+                        ...(mapGameSettings.value[category] || {}),
+                        ...(eventScenario || {}),
+                        lang: currentLang.value
+                    };
+
+                    // Increment key to force Vue to fully re-create the component
+                    activeGameKey.value++;
                     activeGameComponent.value = gameConfig.component;
-                    activeGameScenario.value = gameConfig.defaultScenario; 
-                    minigameTitle.value = gameConfig.title;
-                    minigameSubtitle.value = gameConfig.subtitle;
+                    activeGameScenario.value = Object.keys(merged).length > 0 ? merged : null;
+                    // i18n: title/subtitle support {zh, en, nl} objects or plain strings
+                    const lang = currentLang.value;
+                    minigameTitle.value = typeof gameConfig.title === 'object' ? (gameConfig.title[lang] || gameConfig.title.en || '') : (gameConfig.title || '');
+                    minigameSubtitle.value = typeof gameConfig.subtitle === 'object' ? (gameConfig.subtitle[lang] || gameConfig.subtitle.en || '') : (gameConfig.subtitle || '');
                     minigameIcon.value = gameConfig.icon;
                     minigameBackground.value = gameConfig.background;
                     
                     showMinigame.value = true;
                     Vue.nextTick(() => lucide.createIcons());
-                    logAction('minigame_start', { category });
+                    logAction('minigame_start', { category, scenario: merged });
+                };
+
+                const stopMinigame = () => {
+                    showMinigame.value = false;
+                    activeGameComponent.value = null;
+                    activeGameScenario.value = {};
+                    logAction('minigame_stopped');
                 };
 
                 // --------------------------------------------------
@@ -1174,6 +1219,7 @@
                 // --------------------------------------------------
                 const handleMinigameComplete = (result) => {
                     showMinigame.value = false;
+                    activeGameComponent.value = null;
                     phase.value = 'waiting_confirm';
                     statusMessage.value = i18n.taskComplete.value;
                     logAction('minigame_complete', result);
@@ -1383,11 +1429,11 @@
                     // 状态
                     boardCells, playerPos, currentDay, phase, statusMessage, subMessage,
                     showStartCard, showEventCard, showTaskMenu, showMinigame,
-                    activeGameComponent, activeGameScenario, minigameTitle, minigameSubtitle, minigameIcon, minigameBackground,
+                    activeGameComponent, activeGameScenario, activeGameKey, minigameTitle, minigameSubtitle, minigameIcon, minigameBackground,
                     currentEvent, isRolling, rollingDisplayValue, rollingProgress, diceResult,
                     formattedVirtualTime, formattedRealTime, dayScenario, requiredRollText, isGameActive,
                     // 动作
-                    dismissStartCard, rollDice, confirmContinue, handleMinigameComplete,
+                    dismissStartCard, rollDice, confirmContinue, handleMinigameComplete, stopMinigame,
                     openTaskMenu, closeEventCard, selectEventChoice, getCellStyle, performTask, rollForEvent,
                     // 国际化
                     currentLang, i18n

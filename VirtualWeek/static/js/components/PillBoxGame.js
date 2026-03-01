@@ -30,7 +30,27 @@ const PillBoxGame = {
             errorExplanation: "晚上的降压药剂量应该是1片，不是2片"
         };
         
-        const gameData = ref(props.scenario || defaultScenario);
+        const gameData = ref({ ...defaultScenario, ...(props.scenario || {}) });
+
+        const TEXTS = {
+            pillBoxCheck: { zh: '药盒检查', en: 'Pill Box Check', nl: 'Pillendoos Controle' },
+            morning: { zh: '早上', en: 'Morning', nl: 'Ochtend' },
+            noon: { zh: '中午', en: 'Noon', nl: 'Middag' },
+            evening: { zh: '晚上', en: 'Evening', nl: 'Avond' },
+            none: { zh: '无', en: 'None', nl: 'Geen' },
+            questionPrompt: { zh: '这个药盒配置有问题吗？', en: 'Is there a problem with this pill box?', nl: 'Is er een probleem met deze pillendoos?' },
+            noProblem: { zh: '没问题', en: 'No Problem', nl: 'Geen Probleem' },
+            hasProblem: { zh: '有问题', en: 'Has Problem', nl: 'Heeft Probleem' },
+            correct: { zh: '判断正确！', en: 'Correct!', nl: 'Correct!' },
+            incorrect: { zh: '判断错误', en: 'Incorrect', nl: 'Onjuist' },
+            responseTime: { zh: '反应时间', en: 'Response time', nl: 'Reactietijd' },
+            seconds: { zh: '秒', en: 's', nl: 's' },
+            done: { zh: '完成', en: 'Done', nl: 'Klaar' }
+        };
+        const lang = computed(() => (props.scenario?.lang) || 'zh');
+        const t = (key) => TEXTS[key]?.[lang.value] || TEXTS[key]?.en || key;
+        const tr = (obj) => typeof obj === 'string' ? obj : (obj?.[lang.value] || obj?.en || '');
+
         const phase = ref('playing');
         const selectedAnswer = ref(null);
         const isCorrect = ref(null);
@@ -60,7 +80,7 @@ const PillBoxGame = {
         
         return {
             gameData, phase, selectedAnswer, isCorrect, responseTime,
-            submitAnswer, finishGame
+            submitAnswer, finishGame, t, tr
         };
     },
     
@@ -73,8 +93,8 @@ const PillBoxGame = {
                     <i data-lucide="pill" class="w-8 h-8 text-teal-600"></i>
                 </div>
                 <div>
-                    <span class="text-teal-600 font-bold text-sm uppercase tracking-wider">药盒检查</span>
-                    <h2 class="text-xl font-black text-slate-800">{{ gameData.instruction }}</h2>
+                    <span class="text-teal-600 font-bold text-sm uppercase tracking-wider">{{ t('pillBoxCheck') }}</span>
+                    <h2 class="text-xl font-black text-slate-800">{{ tr(gameData.instruction) }}</h2>
                 </div>
             </div>
         </div>
@@ -88,17 +108,17 @@ const PillBoxGame = {
                     <div class="flex items-center gap-3 mb-3">
                         <span class="text-2xl">{{ time === 'morning' ? '🌅' : time === 'noon' ? '☀️' : '🌙' }}</span>
                         <span class="font-black text-lg text-slate-700">
-                            {{ time === 'morning' ? '早上' : time === 'noon' ? '中午' : '晚上' }}
+                            {{ t(time) }}
                         </span>
                     </div>
                     <div class="flex flex-wrap gap-3">
                         <div v-for="(pill, idx) in pills" :key="idx"
                              class="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
                             <div :class="[pill.color, 'w-4 h-4 rounded-full']"></div>
-                            <span class="font-bold text-slate-700">{{ pill.name }}</span>
-                            <span class="text-slate-500 font-medium">{{ pill.dose }}</span>
+                            <span class="font-bold text-slate-700">{{ tr(pill.name) }}</span>
+                            <span class="text-slate-500 font-medium">{{ tr(pill.dose) }}</span>
                         </div>
-                        <div v-if="pills.length === 0" class="text-slate-400 italic">无</div>
+                        <div v-if="pills.length === 0" class="text-slate-400 italic">{{ t('none') }}</div>
                     </div>
                 </div>
             </div>
@@ -108,19 +128,19 @@ const PillBoxGame = {
         <div class="bg-white/95 backdrop-blur p-5 border-t border-slate-100 shrink-0">
             <!-- 选择阶段 -->
             <div v-if="phase === 'playing'" class="space-y-3">
-                <p class="text-center text-slate-600 font-bold text-lg mb-4">这个药盒配置有问题吗？</p>
+                <p class="text-center text-slate-600 font-bold text-lg mb-4">{{ t('questionPrompt') }}</p>
                 <div class="flex gap-4">
                     <button @click="submitAnswer(false)" 
                         class="flex-1 bg-green-500 hover:bg-green-600 text-white rounded-xl font-black text-xl py-4 
                                shadow-[0_4px_0_#15803d] active:shadow-none active:translate-y-[4px] transition-all
                                flex items-center justify-center gap-2">
-                        <i data-lucide="check" class="w-6 h-6"></i> 没问题
+                        <i data-lucide="check" class="w-6 h-6"></i> {{ t('noProblem') }}
                     </button>
                     <button @click="submitAnswer(true)" 
                         class="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-xl py-4 
                                shadow-[0_4px_0_#b91c1c] active:shadow-none active:translate-y-[4px] transition-all
                                flex items-center justify-center gap-2">
-                        <i data-lucide="x" class="w-6 h-6"></i> 有问题
+                        <i data-lucide="x" class="w-6 h-6"></i> {{ t('hasProblem') }}
                     </button>
                 </div>
             </div>
@@ -131,14 +151,14 @@ const PillBoxGame = {
                     <span v-if="isCorrect" class="text-3xl">✅</span>
                     <span v-else class="text-3xl">❌</span>
                     <h3 class="text-xl font-black mt-2" :class="isCorrect ? 'text-green-600' : 'text-red-600'">
-                        {{ isCorrect ? '判断正确！' : '判断错误' }}
+                        {{ isCorrect ? t('correct') : t('incorrect') }}
                     </h3>
-                    <p class="text-slate-500 mt-2">{{ gameData.errorExplanation }}</p>
-                    <p class="text-slate-400 text-sm mt-1">反应时间: {{ (responseTime / 1000).toFixed(1) }}秒</p>
+                    <p class="text-slate-500 mt-2">{{ tr(gameData.errorExplanation) }}</p>
+                    <p class="text-slate-400 text-sm mt-1">{{ t('responseTime') }}: {{ (responseTime / 1000).toFixed(1) }}{{ t('seconds') }}</p>
                 </div>
                 <button @click="finishGame" 
                     class="w-full bg-teal-600 hover:bg-teal-700 text-white py-4 rounded-xl font-bold text-lg transition-colors">
-                    完成
+                    {{ t('done') }}
                 </button>
             </div>
         </div>

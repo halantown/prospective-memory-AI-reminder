@@ -8,21 +8,46 @@ const ScheduleConflictGame = {
     emits: ['complete'],
     
     setup(props, { emit }) {
-        const { ref, onMounted } = Vue;
-        
+        const { ref, computed, onMounted } = Vue;
+
+        const TEXTS = {
+            headerTag:        { zh: '日程检查',               en: 'Schedule Check',                          nl: 'Roostercontrole' },
+            timelineLabel:    { zh: '📅 时间轴',              en: '📅 Timeline',                              nl: '📅 Tijdlijn' },
+            questionPrompt:   { zh: '这些安排有时间冲突吗？',  en: 'Do these appointments have time conflicts?', nl: 'Hebben deze afspraken tijdconflicten?' },
+            noConflict:       { zh: '没有冲突',               en: 'No Conflict',                              nl: 'Geen Conflict' },
+            hasConflictBtn:   { zh: '有冲突',                 en: 'Has Conflict',                             nl: 'Heeft Conflict' },
+            correctFeedback:  { zh: '判断正确！',             en: 'Correct!',                                 nl: 'Juist!' },
+            incorrectFeedback:{ zh: '判断错误',               en: 'Incorrect',                                nl: 'Onjuist' },
+            responseTime:     { zh: '反应时间:',              en: 'Response time:',                           nl: 'Reactietijd:' },
+            seconds:          { zh: '秒',                     en: 's',                                        nl: 's' },
+            finishBtn:        { zh: '完成',                   en: 'Done',                                     nl: 'Klaar' },
+        };
+
+        const lang = computed(() => (props.scenario?.lang) || 'zh');
+        const t  = (key) => TEXTS[key]?.[lang.value] || TEXTS[key]?.en || key;
+        const tr = (obj) => typeof obj === 'string' ? obj : (obj?.[lang.value] || obj?.en || '');
+
         const defaultScenario = {
-            instruction: "这是今天的安排，是否有时间冲突？",
+            instruction: {
+                zh: '这是今天的安排，是否有时间冲突？',
+                en: "Here is today's schedule. Are there any time conflicts?",
+                nl: 'Dit is het rooster van vandaag. Zijn er tijdconflicten?'
+            },
             events: [
-                { time: "09:00 - 10:30", title: "去银行办事", icon: "building-2", color: "bg-blue-100 text-blue-600" },
-                { time: "10:00 - 11:00", title: "医院复查", icon: "heart-pulse", color: "bg-red-100 text-red-600" },
-                { time: "14:00 - 15:00", title: "接孙子放学", icon: "baby", color: "bg-green-100 text-green-600" },
-                { time: "16:00 - 17:00", title: "公园散步", icon: "trees", color: "bg-emerald-100 text-emerald-600" }
+                { time: "09:00 - 10:30", title: { zh: '去银行办事', en: 'Bank errand', nl: 'Bankbezoek' }, icon: "building-2", color: "bg-blue-100 text-blue-600" },
+                { time: "10:00 - 11:00", title: { zh: '医院复查', en: 'Hospital check-up', nl: 'Ziekenhuiscontrole' }, icon: "heart-pulse", color: "bg-red-100 text-red-600" },
+                { time: "14:00 - 15:00", title: { zh: '接孙子放学', en: 'Pick up grandchild from school', nl: 'Kleinkind ophalen van school' }, icon: "baby", color: "bg-green-100 text-green-600" },
+                { time: "16:00 - 17:00", title: { zh: '公园散步', en: 'Walk in the park', nl: 'Wandeling in het park' }, icon: "trees", color: "bg-emerald-100 text-emerald-600" }
             ],
             hasConflict: true,
-            conflictExplanation: "银行办事（09:00-10:30）和医院复查（10:00-11:00）时间重叠了"
+            conflictExplanation: {
+                zh: '银行办事（09:00-10:30）和医院复查（10:00-11:00）时间重叠了',
+                en: 'Bank errand (09:00-10:30) and Hospital check-up (10:00-11:00) overlap',
+                nl: 'Bankbezoek (09:00-10:30) en Ziekenhuiscontrole (10:00-11:00) overlappen'
+            }
         };
         
-        const gameData = ref(props.scenario || defaultScenario);
+        const gameData = ref({ ...defaultScenario, ...(props.scenario || {}) });
         const phase = ref('playing');
         const selectedAnswer = ref(null);
         const isCorrect = ref(null);
@@ -52,7 +77,7 @@ const ScheduleConflictGame = {
         
         return {
             gameData, phase, selectedAnswer, isCorrect, responseTime,
-            submitAnswer, finishGame
+            submitAnswer, finishGame, t, tr
         };
     },
     
@@ -65,8 +90,8 @@ const ScheduleConflictGame = {
                     <i data-lucide="calendar-clock" class="w-8 h-8 text-violet-600"></i>
                 </div>
                 <div>
-                    <span class="text-violet-600 font-bold text-sm uppercase tracking-wider">日程检查</span>
-                    <h2 class="text-xl font-black text-slate-800">{{ gameData.instruction }}</h2>
+                    <span class="text-violet-600 font-bold text-sm uppercase tracking-wider">{{ t('headerTag') }}</span>
+                    <h2 class="text-xl font-black text-slate-800">{{ tr(gameData.instruction) }}</h2>
                 </div>
             </div>
         </div>
@@ -80,7 +105,7 @@ const ScheduleConflictGame = {
                         <i :data-lucide="event.icon" class="w-7 h-7"></i>
                     </div>
                     <div class="flex-grow">
-                        <p class="font-black text-lg text-slate-800">{{ event.title }}</p>
+                        <p class="font-black text-lg text-slate-800">{{ tr(event.title) }}</p>
                         <p class="text-slate-500 font-bold">{{ event.time }}</p>
                     </div>
                 </div>
@@ -88,7 +113,7 @@ const ScheduleConflictGame = {
             
             <!-- 时间轴可视化 -->
             <div class="max-w-lg mx-auto mt-6 bg-slate-50 rounded-xl p-4 border border-slate-200">
-                <p class="text-sm font-bold text-slate-500 mb-3">📅 时间轴</p>
+                <p class="text-sm font-bold text-slate-500 mb-3">{{ t('timelineLabel') }}</p>
                 <div class="relative h-16">
                     <!-- 时间刻度 -->
                     <div class="absolute inset-x-0 top-1/2 h-1 bg-slate-200 rounded"></div>
@@ -117,19 +142,19 @@ const ScheduleConflictGame = {
         <!-- 底部按钮 -->
         <div class="bg-white/95 backdrop-blur p-5 border-t border-slate-100 shrink-0">
             <div v-if="phase === 'playing'" class="space-y-3">
-                <p class="text-center text-slate-600 font-bold text-lg mb-4">这些安排有时间冲突吗？</p>
+                <p class="text-center text-slate-600 font-bold text-lg mb-4">{{ t('questionPrompt') }}</p>
                 <div class="flex gap-4">
                     <button @click="submitAnswer(false)" 
                         class="flex-1 bg-green-500 hover:bg-green-600 text-white rounded-xl font-black text-xl py-4 
                                shadow-[0_4px_0_#15803d] active:shadow-none active:translate-y-[4px] transition-all
                                flex items-center justify-center gap-2">
-                        <i data-lucide="check" class="w-6 h-6"></i> 没有冲突
+                        <i data-lucide="check" class="w-6 h-6"></i> {{ t('noConflict') }}
                     </button>
                     <button @click="submitAnswer(true)" 
                         class="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-xl py-4 
                                shadow-[0_4px_0_#b91c1c] active:shadow-none active:translate-y-[4px] transition-all
                                flex items-center justify-center gap-2">
-                        <i data-lucide="x" class="w-6 h-6"></i> 有冲突
+                        <i data-lucide="x" class="w-6 h-6"></i> {{ t('hasConflictBtn') }}
                     </button>
                 </div>
             </div>
@@ -138,14 +163,14 @@ const ScheduleConflictGame = {
                 <div class="mb-4">
                     <span class="text-3xl">{{ isCorrect ? '✅' : '❌' }}</span>
                     <h3 class="text-xl font-black mt-2" :class="isCorrect ? 'text-green-600' : 'text-red-600'">
-                        {{ isCorrect ? '判断正确！' : '判断错误' }}
+                        {{ isCorrect ? t('correctFeedback') : t('incorrectFeedback') }}
                     </h3>
-                    <p class="text-slate-500 mt-2">{{ gameData.conflictExplanation }}</p>
-                    <p class="text-slate-400 text-sm mt-1">反应时间: {{ (responseTime / 1000).toFixed(1) }}秒</p>
+                    <p class="text-slate-500 mt-2">{{ tr(gameData.conflictExplanation) }}</p>
+                    <p class="text-slate-400 text-sm mt-1">{{ t('responseTime') }} {{ (responseTime / 1000).toFixed(1) }}{{ t('seconds') }}</p>
                 </div>
                 <button @click="finishGame" 
                     class="w-full bg-violet-600 hover:bg-violet-700 text-white py-4 rounded-xl font-bold text-lg transition-colors">
-                    完成
+                    {{ t('finishBtn') }}
                 </button>
             </div>
         </div>

@@ -13,7 +13,7 @@ const BOARD_ROWS = 14;
 const TOTAL_HOURS = 15;  // 7:00 to 22:00
 const START_HOUR = 7;    // 7:00 AM
 const END_HOUR = 22;     // 10:00 PM
-const BOARD_END_INDEX = 119;  // Last cell index (0-indexed)
+let BOARD_END_INDEX = 119;  // Last cell index (0-indexed), updated by rebuildPath
 
 // Game Phase Constants
 const PHASE = {

@@ -1,0 +1,342 @@
+{
+    "Cooking": {
+        "background": "",
+        "component": "CookingGame",
+        "defaultScenario": {
+            "conveyorInterval": 1200,
+            "conveyorSpeed": 2800,
+            "difficulty": "medium",
+            "stepTimeLimit": 20,
+            "timePerRound": 30,
+            "totalRounds": 3
+        },
+        "icon": "chef-hat",
+        "subtitle": {
+            "zh": "传送带选食材 + 排列烹饪步骤",
+            "en": "Pick ingredients & arrange cooking steps",
+            "nl": "Ingrediënten kiezen & kookstappen ordenen"
+        },
+        "title": {
+            "zh": "大厨模拟器",
+            "en": "Chef Simulator",
+            "nl": "Chef Simulator"
+        }
+    },
+    "MentalArithmetic": {
+        "background": "",
+        "component": "MentalArithmeticGame",
+        "defaultScenario": {
+            "difficulty": "medium",
+            "timePerRound": 15,
+            "totalRounds": 5
+        },
+        "icon": "calculator",
+        "subtitle": {
+            "zh": "连续心算运算挑战",
+            "en": "Chain mental arithmetic challenge",
+            "nl": "Kettinghoofdrekenen uitdaging"
+        },
+        "title": {
+            "zh": "心算连锁",
+            "en": "Mental Arithmetic",
+            "nl": "Hoofdrekenen"
+        }
+    },
+    "NBack": {
+        "background": "",
+        "component": "NBackGame",
+        "defaultScenario": {
+            "interStimulusInterval": 500,
+            "matchRatio": 0.3,
+            "nLevel": 2,
+            "stimulusDuration": 2500,
+            "stimulusType": "letter",
+            "totalTrials": 20
+        },
+        "icon": "brain",
+        "subtitle": {
+            "zh": "高负荷工作记忆测试",
+            "en": "High-load working memory test",
+            "nl": "Hoge-belasting werkgeheugentest"
+        },
+        "title": {
+            "zh": "N-Back 记忆挑战",
+            "en": "N-Back Memory Challenge",
+            "nl": "N-Back Geheugenuitdaging"
+        }
+    },
+    "PhotoSpot": {
+        "background": "",
+        "component": "PhotoSpotGame",
+        "defaultScenario": null,
+        "icon": "scan-search",
+        "subtitle": {
+            "zh": "找出不对劲的地方",
+            "en": "Find what's wrong",
+            "nl": "Vind wat er mis is"
+        },
+        "title": {
+            "zh": "场景检查",
+            "en": "Scene Check",
+            "nl": "Scènecontrole"
+        }
+    },
+    "PillBox": {
+        "background": "",
+        "component": "PillBoxGame",
+        "defaultScenario": null,
+        "icon": "pill",
+        "subtitle": {
+            "zh": "判断药盒配置是否正确",
+            "en": "Check pill box configuration",
+            "nl": "Controleer de pillendoosverdeling"
+        },
+        "title": {
+            "zh": "药盒检查",
+            "en": "Pill Box Check",
+            "nl": "Pillendoos Controle"
+        }
+    },
+    "Priority": {
+        "background": "",
+        "component": "PriorityGame",
+        "defaultScenario": null,
+        "icon": "list-ordered",
+        "subtitle": {
+            "zh": "选择最应该先做的事",
+            "en": "Choose what to do first",
+            "nl": "Kies wat je eerst moet doen"
+        },
+        "title": {
+            "zh": "优先级判断",
+            "en": "Priority Judgment",
+            "nl": "Prioriteitsbeoordeling"
+        }
+    },
+    "RouteChoice": {
+        "background": "",
+        "component": "RouteChoiceGame",
+        "defaultScenario": null,
+        "icon": "map",
+        "subtitle": {
+            "zh": "选择更合适的路线",
+            "en": "Choose a better route",
+            "nl": "Kies een betere route"
+        },
+        "title": {
+            "zh": "路线选择",
+            "en": "Route Choice",
+            "nl": "Routekeuze"
+        }
+    },
+    "Schedule": {
+        "background": "",
+        "component": "ScheduleConflictGame",
+        "defaultScenario": null,
+        "icon": "calendar-clock",
+        "subtitle": {
+            "zh": "判断时间安排是否有冲突",
+            "en": "Check for schedule conflicts",
+            "nl": "Controleer op planningsconflicten"
+        },
+        "title": {
+            "zh": "日程检查",
+            "en": "Schedule Check",
+            "nl": "Agendacontrole"
+        }
+    },
+    "Shopping": {
+        "background": "pics/ah.png",
+        "component": "SupermarketGame",
+        "defaultScenario": {
+            "context": {
+                "zh": "准备做一份水果沙拉招待朋友",
+                "en": "Preparing a fruit salad for friends",
+                "nl": "Een fruitsalade maken voor vrienden"
+            },
+            "items": [
+                {
+                    "emoji": "🍎",
+                    "id": 101,
+                    "isReasonable": true,
+                    "name": {
+                        "zh": "红苹果",
+                        "en": "Red Apple",
+                        "nl": "Rode Appel"
+                    }
+                },
+                {
+                    "emoji": "🍌",
+                    "id": 102,
+                    "isReasonable": true,
+                    "name": {
+                        "zh": "甜香蕉",
+                        "en": "Banana",
+                        "nl": "Banaan"
+                    }
+                },
+                {
+                    "emoji": "🥛",
+                    "id": 103,
+                    "isReasonable": true,
+                    "name": {
+                        "zh": "酸奶",
+                        "en": "Yoghurt",
+                        "nl": "Yoghurt"
+                    }
+                },
+                {
+                    "emoji": "🧄",
+                    "id": 104,
+                    "isReasonable": false,
+                    "name": {
+                        "zh": "大蒜头",
+                        "en": "Garlic",
+                        "nl": "Knoflook"
+                    }
+                },
+                {
+                    "emoji": "🥣",
+                    "id": 105,
+                    "isReasonable": true,
+                    "name": {
+                        "zh": "大碗",
+                        "en": "Bowl",
+                        "nl": "Kom"
+                    }
+                },
+                {
+                    "emoji": "🍇",
+                    "id": 106,
+                    "isReasonable": true,
+                    "name": {
+                        "zh": "葡萄",
+                        "en": "Grapes",
+                        "nl": "Druiven"
+                    }
+                }
+            ]
+        },
+        "icon": "shopping-cart",
+        "subtitle": {
+            "zh": "请帮忙检查购物篮",
+            "en": "Please check the shopping basket",
+            "nl": "Controleer het winkelmandje"
+        },
+        "title": {
+            "zh": "超市大采购",
+            "en": "Supermarket Shopping",
+            "nl": "Supermarkt Boodschappen"
+        }
+    },
+    "Stroop": {
+        "background": "",
+        "component": "StroopGame",
+        "defaultScenario": {
+            "congruentRatio": 0.3,
+            "interTrialInterval": 500,
+            "stimulusDuration": 3000,
+            "totalTrials": 15
+        },
+        "icon": "palette",
+        "subtitle": {
+            "zh": "注意力与抑制控制测试",
+            "en": "Attention & inhibition control test",
+            "nl": "Aandacht- en remmingscontroletest"
+        },
+        "title": {
+            "zh": "Stroop 色词任务",
+            "en": "Stroop Color-Word Task",
+            "nl": "Stroop Kleur-Woord Taak"
+        }
+    },
+    "TaskSwitch": {
+        "background": "",
+        "component": "TaskSwitchGame",
+        "defaultScenario": {
+            "interTrialInterval": 600,
+            "stimulusDuration": 3500,
+            "switchRatio": 0.5,
+            "totalTrials": 20
+        },
+        "icon": "shuffle",
+        "subtitle": {
+            "zh": "认知灵活性测试",
+            "en": "Cognitive flexibility test",
+            "nl": "Cognitieve flexibiliteitstest"
+        },
+        "title": {
+            "zh": "任务切换",
+            "en": "Task Switching",
+            "nl": "Taakwisseling"
+        }
+    },
+    "LibrarySort": {
+        "background": "",
+        "component": "LibrarySortGame",
+        "defaultScenario": {
+            "totalRounds": 4,
+            "booksPerRound": 6,
+            "timePerRound": 30,
+            "enableRuleSwitch": true,
+            "difficulty": "medium"
+        },
+        "icon": "library",
+        "subtitle": {
+            "zh": "按规则整理书籍上架",
+            "en": "Sort books by rules onto shelves",
+            "nl": "Sorteer boeken op regels in de kast"
+        },
+        "title": {
+            "zh": "图书整理",
+            "en": "Library Sorting",
+            "nl": "Bibliotheek Sorteren"
+        }
+    },
+    "MOT": {
+        "background": "",
+        "component": "MOTGame",
+        "defaultScenario": {
+            "totalObjects": 10,
+            "targetCount": 4,
+            "moveDuration": 8000,
+            "flashDuration": 2000,
+            "objectRadius": 22,
+            "speed": 2.5
+        },
+        "icon": "radar",
+        "subtitle": {
+            "zh": "在陨石群中追踪隐形飞船",
+            "en": "Track stealth ships among asteroids",
+            "nl": "Volg stealthschepen tussen asteroïden"
+        },
+        "title": {
+            "zh": "星际雷达",
+            "en": "Star Radar",
+            "nl": "Sterrenradar"
+        }
+    },
+    "DumplingMOT": {
+        "component": "DumplingMOTGame",
+        "icon": "soup",
+        "title": {
+            "zh": "滚水煮饺子",
+            "en": "Boiling Dumplings",
+            "nl": "Kokende Knoedels"
+        },
+        "subtitle": {
+            "zh": "在沸水中追踪素馅饺子",
+            "en": "Track veggie dumplings in boiling water",
+            "nl": "Volg groenteknoedels in kokend water"
+        },
+        "background": "",
+        "defaultScenario": {
+            "totalObjects": 10,
+            "targetCount": 3,
+            "moveDuration": 6000,
+            "flashDuration": 2500,
+            "objectRadius": 24,
+            "speed": 2.2
+        }
+    }
+}

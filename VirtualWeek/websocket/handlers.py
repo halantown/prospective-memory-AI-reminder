@@ -102,6 +102,12 @@ def register_handlers(socketio):
         }, room='game')
         print(f"[WebSocket] Minigame trigger sent to game room")
     
+    @socketio.on('admin:stop_minigame')
+    def handle_stop_minigame():
+        """Admin stops the current minigame on the game client."""
+        print("[WebSocket] Admin stopped minigame")
+        socketio.emit('game:stop_minigame', room='game')
+    
     @socketio.on('game:action')
     def handle_game_action(data):
         """Game board sends action log."""

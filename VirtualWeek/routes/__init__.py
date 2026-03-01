@@ -7,6 +7,7 @@ from .log_routes import log_bp
 from .admin_routes import admin_bp
 from .client_routes import client_bp
 from .robot_routes import robot_bp
+from .config_routes import config_bp
 
 
 def register_routes(app):
@@ -17,3 +18,4 @@ def register_routes(app):
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(client_bp, url_prefix='/api/client')
     app.register_blueprint(robot_bp, url_prefix='/api/robot')
+    app.register_blueprint(config_bp, url_prefix='/api/config')
