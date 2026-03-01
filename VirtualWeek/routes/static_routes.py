@@ -21,6 +21,12 @@ def serve_dashboard():
     return send_from_directory(BASE_DIR, 'dashboard.html')
 
 
+@static_bp.route('/dashboard/config')
+def serve_config_editor():
+    """Serve the configuration editor page."""
+    return send_from_directory(BASE_DIR, 'config_editor.html')
+
+
 @static_bp.route('/<path:path>')
 def serve_static(path):
     """Serve static files from /static directory."""

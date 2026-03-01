@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Week — 配置编辑器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background: #f1f5f9; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+        .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #2563eb; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-success:hover:not(:disabled) { background: #16a34a; }
+        .btn-ghost { background: #f1f5f9; color: #475569; }
+        .btn-ghost:hover:not(:disabled) { background: #e2e8f0; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover:not(:disabled) { background: #dc2626; }
+        .input {
+            width: 100%; border: 1px solid #cbd5e1; border-radius: 8px;
+            padding: 8px 12px; font-size: 13px; outline: none; transition: border-color 0.15s;
+        }
+        .input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        .label { font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 4px; display: block; text-transform: uppercase; letter-spacing: 0.05em; }
+        .tab { padding: 10px 20px; font-weight: 600; font-size: 13px; border-bottom: 2px solid transparent; cursor: pointer; color: #64748b; transition: all 0.15s; }
+        .tab:hover { color: #334155; }
+        .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+        .toast {
+            position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+            border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 9999;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .json-editor { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.6; tab-size: 4; }
+    </style>
+</head>
+<body class="p-6">
+    <div id="app" class="max-w-6xl mx-auto">
+
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-3">
+                <a href="/dashboard" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </a>
+                <h1 class="text-xl font-black text-slate-800">⚙️ 配置编辑器</h1>
+            </div>
+            <div class="flex items-center gap-2">
+                <span v-if="dirty" class="text-amber-500 text-xs font-bold">● 未保存的更改</span>
+                <button @click="saveCurrentTab" :disabled="saving || !dirty" class="btn btn-success flex items-center gap-2">
+                    <span v-if="saving">保存中…</span>
+                    <span v-else>💾 保存</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-slate-200 mb-6">
+            <div class="tab" :class="{ active: activeTab === 'games' }" @click="switchTab('games')">🎮 小游戏注册表</div>
+            <div class="tab" :class="{ active: activeTab === 'maps' }" @click="switchTab('maps')">🗺️ 地图配置</div>
+            <div class="tab" :class="{ active: activeTab === 'json' }" @click="switchTab('json')">📝 JSON 编辑器</div>
+        </div>
+
+        <!-- Toast -->
+        <div v-if="toast.show" class="toast" :class="toast.type === 'ok' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'">
+            {{ toast.message }}
+        </div>
+
+        <!-- ==================== TAB 1: Game Registry ==================== -->
+        <div v-show="activeTab === 'games'">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div v-for="(game, gameId) in gameRegistry" :key="gameId" class="card p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">{{ iconEmoji(game.icon) }}</span>
+                            <h3 class="font-bold text-slate-800">{{ gameId }}</h3>
+                        </div>
+                        <span class="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded-full font-mono">{{ game.component }}</span>
+                    </div>
+
+                    <!-- Meta -->
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div>
+                            <label class="label">标题 (title)</label>
+                            <input v-model="game.title" class="input" @input="markDirty">
+                        </div>
+                        <div>
+                            <label class="label">副标题 (subtitle)</label>
+                            <input v-model="game.subtitle" class="input" @input="markDirty">
+                        </div>
+                        <div>
+                            <label class="label">图标 (icon)</label>
+                            <input v-model="game.icon" class="input" @input="markDirty">
+                        </div>
+                        <div>
+                            <label class="label">背景图 (background)</label>
+                            <input v-model="game.background" class="input" placeholder="留空无背景" @input="markDirty">
+                        </div>
+                    </div>
+
+                    <!-- defaultScenario -->
+                    <div>
+                        <label class="label">默认场景参数 (defaultScenario)</label>
+                        <div v-if="game.defaultScenario && typeof game.defaultScenario === 'object'" class="space-y-2">
+                            <div v-for="(val, key) in flatScenario(game.defaultScenario)" :key="key"
+                                 class="flex items-center gap-2">
+                                <span class="text-xs font-mono text-slate-500 w-40 shrink-0 text-right">{{ key }}</span>
+                                <input v-if="typeof val === 'number'"
+                                       type="number" :step="Number.isInteger(val) ? 1 : 0.1"
+                                       :value="val"
+                                       @input="setScenarioField(game, key, parseNum($event.target.value)); markDirty()"
+                                       class="input flex-1">
+                                <input v-else-if="typeof val === 'boolean'"
+                                       type="checkbox" :checked="val"
+                                       @change="setScenarioField(game, key, $event.target.checked); markDirty()"
+                                       class="w-4 h-4">
+                                <input v-else
+                                       type="text" :value="val"
+                                       @input="setScenarioField(game, key, $event.target.value); markDirty()"
+                                       class="input flex-1">
+                            </div>
+                        </div>
+                        <div v-else class="text-xs text-slate-400 italic mt-1">null — 使用组件内置默认值</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 2: Map Config ==================== -->
+        <div v-show="activeTab === 'maps'">
+            <!-- Map selector -->
+            <div class="flex items-center gap-3 mb-4">
+                <label class="label mb-0">选择地图</label>
+                <select v-model="selectedMap" @change="loadMap" class="input" style="width: auto; min-width: 280px;">
+                    <option v-for="m in mapList" :key="m" :value="m">{{ m }}</option>
+                </select>
+            </div>
+
+            <div v-if="mapData" class="space-y-4">
+                <!-- Basic info -->
+                <div class="card p-5">
+                    <h3 class="font-bold text-slate-800 mb-4">📋 基本信息</h3>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="label">地图 ID</label>
+                            <input v-model="mapData.map_id" class="input" @input="markDirty">
+                        </div>
+                        <div>
+                            <label class="label">描述</label>
+                            <input v-model="mapData.description" class="input" @input="markDirty">
+                        </div>
+                        <div>
+                            <label class="label">总步数 (total_steps)</label>
+                            <input v-model.number="mapData.total_steps" type="number" min="68" max="152" class="input" @input="markDirty">
+                        </div>
+                        <div>
+                            <label class="label">每小时步数 (steps_per_hour)</label>
+                            <input v-model.number="mapData.steps_per_hour" type="number" class="input" @input="markDirty">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Settings -->
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-slate-800">🎮 地图级小游戏覆盖 (game_settings)</h3>
+                        <button @click="addGameSetting" class="btn btn-ghost text-xs">+ 添加游戏覆盖</button>
+                    </div>
+                    <div v-if="!mapData.game_settings || Object.keys(mapData.game_settings).length === 0"
+                         class="text-xs text-slate-400 italic">无覆盖 — 使用 game_registry.json 的默认值</div>
+                    <div v-else class="space-y-3">
+                        <div v-for="(settings, gameId) in mapData.game_settings" :key="gameId"
+                             class="bg-slate-50 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold text-sm text-slate-700">{{ gameId }}</span>
+                                <button @click="removeGameSetting(gameId)" class="text-red-400 hover:text-red-600 text-xs">删除</button>
+                            </div>
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                                <div v-for="(val, key) in settings" :key="key">
+                                    <label class="label">{{ key }}</label>
+                                    <input v-if="typeof val === 'number'"
+                                           type="number" :step="Number.isInteger(val) ? 1 : 0.1"
+                                           :value="val"
+                                           @input="settings[key] = parseNum($event.target.value); markDirty()"
+                                           class="input">
+                                    <input v-else type="text" :value="val"
+                                           @input="settings[key] = $event.target.value; markDirty()"
+                                           class="input">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Events overview -->
+                <div class="card p-5">
+                    <h3 class="font-bold text-slate-800 mb-4">📍 事件列表 (events)</h3>
+                    <div v-if="!mapData.events || Object.keys(mapData.events).length === 0"
+                         class="text-xs text-slate-400 italic">无事件</div>
+                    <div v-else class="overflow-auto max-h-80">
+                        <table class="w-full text-xs">
+                            <thead class="bg-slate-50 sticky top-0">
+                                <tr>
+                                    <th class="text-left p-2 font-bold text-slate-500">位置</th>
+                                    <th class="text-left p-2 font-bold text-slate-500">类别</th>
+                                    <th class="text-left p-2 font-bold text-slate-500">时间</th>
+                                    <th class="text-left p-2 font-bold text-slate-500">描述</th>
+                                    <th class="text-left p-2 font-bold text-slate-500">scenario 覆盖</th>
+                                    <th class="p-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(evt, pos) in sortedEvents" :key="pos" class="border-t border-slate-100 hover:bg-blue-50/30">
+                                    <td class="p-2 font-mono font-bold">{{ pos }}</td>
+                                    <td class="p-2">
+                                        <span class="px-2 py-0.5 rounded-full text-xs font-bold"
+                                              :class="isMinigame(evt.category) ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'">
+                                            {{ evt.category }}
+                                        </span>
+                                    </td>
+                                    <td class="p-2 text-slate-500">{{ eventTime(evt) }}</td>
+                                    <td class="p-2 text-slate-600 max-w-xs truncate">{{ eventDesc(evt) }}</td>
+                                    <td class="p-2">
+                                        <span v-if="evt.scenario" class="text-green-600 font-mono text-xs">{{ JSON.stringify(evt.scenario) }}</span>
+                                        <span v-else class="text-slate-300">—</span>
+                                    </td>
+                                    <td class="p-2">
+                                        <button @click="editEvent(pos)" class="text-blue-500 hover:text-blue-700 text-xs font-bold">编辑</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Dice Sequence -->
+                <div class="card p-5">
+                    <h3 class="font-bold text-slate-800 mb-2">🎲 骰子序列 (dice_sequence)</h3>
+                    <p class="text-xs text-slate-400 mb-3">共 {{ (mapData.dice_sequence || []).length }} 次投掷</p>
+                    <div class="flex flex-wrap gap-1 max-h-32 overflow-auto">
+                        <span v-for="(d, i) in (mapData.dice_sequence || [])" :key="i"
+                              class="inline-flex items-center justify-center w-7 h-7 rounded bg-slate-100 text-xs font-mono font-bold"
+                              :class="d >= 4 ? 'text-blue-600' : 'text-slate-500'">
+                            {{ d }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 3: Raw JSON Editor ==================== -->
+        <div v-show="activeTab === 'json'">
+            <div class="flex items-center gap-3 mb-4">
+                <label class="label mb-0">编辑目标</label>
+                <select v-model="jsonTarget" @change="loadJsonTarget" class="input" style="width:auto; min-width: 280px;">
+                    <option value="game_registry">game_registry.json</option>
+                    <option v-for="m in mapList" :key="m" :value="'map:' + m">地图: {{ m }}</option>
+                </select>
+            </div>
+            <div class="card p-4">
+                <textarea v-model="jsonRaw" class="input json-editor" rows="28" spellcheck="false" @input="markDirty"></textarea>
+                <div v-if="jsonError" class="text-red-500 text-xs font-bold mt-2">❌ JSON 解析错误: {{ jsonError }}</div>
+            </div>
+        </div>
+
+        <!-- ==================== Event Edit Modal ==================== -->
+        <div v-if="editingEvent" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="editingEvent = null">
+            <div class="bg-white rounded-2xl p-6 w-[500px] max-h-[80vh] overflow-auto shadow-2xl">
+                <h3 class="font-bold text-lg mb-4">编辑事件 — 位置 {{ editingEventPos }}</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="label">类别 (category)</label>
+                        <input v-model="editingEvent.category" class="input">
+                    </div>
+                    <div>
+                        <label class="label">时间 (time)</label>
+                        <input v-model="editingEvent.time" class="input" placeholder="例如 9:00">
+                    </div>
+                    <div>
+                        <label class="label">scenario 覆盖 (JSON)</label>
+                        <textarea v-model="editingEventScenarioStr" class="input json-editor" rows="6" spellcheck="false"></textarea>
+                        <div v-if="editingEventScenarioError" class="text-red-500 text-xs mt-1">{{ editingEventScenarioError }}</div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button @click="editingEvent = null" class="btn btn-ghost">取消</button>
+                    <button @click="saveEventEdit" class="btn btn-primary">确定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== Add Game Setting Modal ==================== -->
+        <div v-if="showAddGameSetting" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showAddGameSetting = false">
+            <div class="bg-white rounded-2xl p-6 w-[400px] shadow-2xl">
+                <h3 class="font-bold text-lg mb-4">添加游戏覆盖</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="label">选择游戏</label>
+                        <select v-model="newGameSettingId" class="input">
+                            <option v-for="(g, gid) in gameRegistry" :key="gid" :value="gid">{{ gid }} — {{ g.title }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button @click="showAddGameSetting = false" class="btn btn-ghost">取消</button>
+                    <button @click="confirmAddGameSetting" class="btn btn-primary">添加</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, watch } = Vue;
+        const API = '/api/config';
+
+        const ICON_EMOJI = {
+            'shopping-cart': '🛒', 'pill': '💊', 'map': '🗺️', 'calendar-clock': '📅',
+            'list-ordered': '📋', 'scan-search': '🔍', 'brain': '🧠', 'calculator': '🧮',
+            'palette': '🎨', 'shuffle': '🔀'
+        };
+
+        createApp({
+            setup() {
+                const activeTab = ref('games');
+                const dirty = ref(false);
+                const saving = ref(false);
+                const toast = ref({ show: false, message: '', type: 'ok' });
+
+                // Game Registry
+                const gameRegistry = ref({});
+
+                // Maps
+                const mapList = ref([]);
+                const selectedMap = ref('');
+                const mapData = ref(null);
+
+                // JSON Editor
+                const jsonTarget = ref('game_registry');
+                const jsonRaw = ref('');
+                const jsonError = ref('');
+
+                // Event editing
+                const editingEvent = ref(null);
+                const editingEventPos = ref('');
+                const editingEventScenarioStr = ref('');
+                const editingEventScenarioError = ref('');
+
+                // Add game setting
+                const showAddGameSetting = ref(false);
+                const newGameSettingId = ref('');
+
+                // ── Helpers ──
+
+                const showToast = (message, type = 'ok') => {
+                    toast.value = { show: true, message, type };
+                    setTimeout(() => { toast.value.show = false; }, 2500);
+                };
+
+                const markDirty = () => { dirty.value = true; };
+
+                const iconEmoji = (icon) => ICON_EMOJI[icon] || '🎮';
+
+                const parseNum = (v) => {
+                    const n = Number(v);
+                    return isNaN(n) ? v : n;
+                };
+
+                const flatScenario = (scenario) => {
+                    if (!scenario || typeof scenario !== 'object') return {};
+                    const result = {};
+                    for (const [k, v] of Object.entries(scenario)) {
+                        if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+                            // Skip nested objects (like items array in Shopping) in flat view
+                            continue;
+                        }
+                        result[k] = v;
+                    }
+                    return result;
+                };
+
+                const setScenarioField = (game, key, value) => {
+                    if (!game.defaultScenario) game.defaultScenario = {};
+                    game.defaultScenario[key] = value;
+                };
+
+                const isMinigame = (category) => {
+                    return !!gameRegistry.value[category];
+                };
+
+                const eventTime = (evt) => {
+                    if (evt.time) return evt.time;
+                    if (evt.name && typeof evt.name === 'object') return '';
+                    return '';
+                };
+
+                const eventDesc = (evt) => {
+                    if (typeof evt.description === 'string') return evt.description;
+                    if (typeof evt.description === 'object' && evt.description) {
+                        return evt.description.zh || evt.description.en || '';
+                    }
+                    if (typeof evt.name === 'string') return evt.name;
+                    if (typeof evt.name === 'object' && evt.name) {
+                        return evt.name.zh || evt.name.en || '';
+                    }
+                    return '';
+                };
+
+                const sortedEvents = computed(() => {
+                    if (!mapData.value || !mapData.value.events) return {};
+                    const entries = Object.entries(mapData.value.events);
+                    entries.sort((a, b) => Number(a[0]) - Number(b[0]));
+                    return Object.fromEntries(entries);
+                });
+
+                // ── API ──
+
+                const apiFetch = async (url, method = 'GET', body = null) => {
+                    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+                    if (body !== null) opts.body = JSON.stringify(body);
+                    const res = await fetch(`${API}${url}`, opts);
+                    return res.json();
+                };
+
+                const loadGameRegistry = async () => {
+                    const data = await apiFetch('/game_registry');
+                    if (data && !data.error) gameRegistry.value = data;
+                };
+
+                const loadMapList = async () => {
+                    const data = await apiFetch('/maps');
+                    if (data && data.maps) {
+                        mapList.value = data.maps;
+                        if (!selectedMap.value && data.maps.length > 0) {
+                            selectedMap.value = data.maps[0];
+                            await loadMap();
+                        }
+                    }
+                };
+
+                const loadMap = async () => {
+                    if (!selectedMap.value) return;
+                    const data = await apiFetch(`/maps/${encodeURIComponent(selectedMap.value)}`);
+                    if (data && !data.error) mapData.value = data;
+                    dirty.value = false;
+                };
+
+                const loadJsonTarget = async () => {
+                    jsonError.value = '';
+                    if (jsonTarget.value === 'game_registry') {
+                        const data = await apiFetch('/game_registry');
+                        jsonRaw.value = JSON.stringify(data, null, 4);
+                    } else if (jsonTarget.value.startsWith('map:')) {
+                        const mapId = jsonTarget.value.slice(4);
+                        const data = await apiFetch(`/maps/${encodeURIComponent(mapId)}`);
+                        jsonRaw.value = JSON.stringify(data, null, 4);
+                    }
+                    dirty.value = false;
+                };
+
+                // ── Save ──
+
+                const saveCurrentTab = async () => {
+                    saving.value = true;
+                    try {
+                        if (activeTab.value === 'games') {
+                            await apiFetch('/game_registry', 'PUT', gameRegistry.value);
+                            showToast('小游戏注册表已保存');
+                        } else if (activeTab.value === 'maps') {
+                            if (!selectedMap.value || !mapData.value) return;
+                            await apiFetch(`/maps/${encodeURIComponent(selectedMap.value)}`, 'PUT', mapData.value);
+                            showToast(`地图 "${selectedMap.value}" 已保存`);
+                        } else if (activeTab.value === 'json') {
+                            jsonError.value = '';
+                            let parsed;
+                            try {
+                                parsed = JSON.parse(jsonRaw.value);
+                            } catch (e) {
+                                jsonError.value = e.message;
+                                showToast('JSON 格式错误', 'error');
+                                return;
+                            }
+                            if (jsonTarget.value === 'game_registry') {
+                                await apiFetch('/game_registry', 'PUT', parsed);
+                                gameRegistry.value = parsed;
+                                showToast('game_registry.json 已保存');
+                            } else if (jsonTarget.value.startsWith('map:')) {
+                                const mapId = jsonTarget.value.slice(4);
+                                await apiFetch(`/maps/${encodeURIComponent(mapId)}`, 'PUT', parsed);
+                                if (mapId === selectedMap.value) mapData.value = parsed;
+                                showToast(`地图 "${mapId}" 已保存`);
+                            }
+                        }
+                        dirty.value = false;
+                    } catch (e) {
+                        showToast('保存失败: ' + e.message, 'error');
+                    } finally {
+                        saving.value = false;
+                    }
+                };
+
+                // ── Tab switch ──
+
+                const switchTab = (tab) => {
+                    if (dirty.value && !confirm('有未保存的更改，确定要切换吗？')) return;
+                    activeTab.value = tab;
+                    dirty.value = false;
+                    if (tab === 'json') loadJsonTarget();
+                };
+
+                // ── Event editing ──
+
+                const editEvent = (pos) => {
+                    editingEventPos.value = pos;
+                    const evt = JSON.parse(JSON.stringify(mapData.value.events[pos]));
+                    editingEvent.value = evt;
+                    editingEventScenarioStr.value = evt.scenario ? JSON.stringify(evt.scenario, null, 2) : '';
+                    editingEventScenarioError.value = '';
+                };
+
+                const saveEventEdit = () => {
+                    editingEventScenarioError.value = '';
+                    let scenario = null;
+                    const str = editingEventScenarioStr.value.trim();
+                    if (str) {
+                        try {
+                            scenario = JSON.parse(str);
+                        } catch (e) {
+                            editingEventScenarioError.value = 'JSON 格式错误: ' + e.message;
+                            return;
+                        }
+                    }
+                    const evt = editingEvent.value;
+                    if (scenario) {
+                        evt.scenario = scenario;
+                    } else {
+                        delete evt.scenario;
+                    }
+                    mapData.value.events[editingEventPos.value] = evt;
+                    editingEvent.value = null;
+                    markDirty();
+                };
+
+                // ── Game Setting add/remove ──
+
+                const addGameSetting = () => {
+                    if (!mapData.value.game_settings) mapData.value.game_settings = {};
+                    newGameSettingId.value = Object.keys(gameRegistry.value)[0] || '';
+                    showAddGameSetting.value = true;
+                };
+
+                const confirmAddGameSetting = () => {
+                    if (!newGameSettingId.value) return;
+                    if (!mapData.value.game_settings) mapData.value.game_settings = {};
+                    // Pre-fill from registry defaults
+                    const reg = gameRegistry.value[newGameSettingId.value];
+                    const defaults = reg && reg.defaultScenario ? { ...reg.defaultScenario } : {};
+                    // Remove non-scalar values for clean override
+                    for (const k of Object.keys(defaults)) {
+                        if (typeof defaults[k] === 'object' && defaults[k] !== null) delete defaults[k];
+                    }
+                    mapData.value.game_settings[newGameSettingId.value] = defaults;
+                    showAddGameSetting.value = false;
+                    markDirty();
+                };
+
+                const removeGameSetting = (gameId) => {
+                    delete mapData.value.game_settings[gameId];
+                    // Force reactivity
+                    mapData.value.game_settings = { ...mapData.value.game_settings };
+                    markDirty();
+                };
+
+                // ── Init ──
+
+                onMounted(async () => {
+                    await Promise.all([loadGameRegistry(), loadMapList()]);
+                    lucide.createIcons();
+                });
+
+                // Warn before leaving with unsaved changes
+                window.addEventListener('beforeunload', (e) => {
+                    if (dirty.value) { e.preventDefault(); e.returnValue = ''; }
+                });
+
+                return {
+                    activeTab, dirty, saving, toast,
+                    gameRegistry, mapList, selectedMap, mapData,
+                    jsonTarget, jsonRaw, jsonError,
+                    editingEvent, editingEventPos, editingEventScenarioStr, editingEventScenarioError,
+                    showAddGameSetting, newGameSettingId,
+                    switchTab, saveCurrentTab, loadMap, loadJsonTarget,
+                    markDirty, iconEmoji, parseNum, flatScenario, setScenarioField,
+                    isMinigame, eventTime, eventDesc, sortedEvents,
+                    editEvent, saveEventEdit,
+                    addGameSetting, confirmAddGameSetting, removeGameSetting
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
