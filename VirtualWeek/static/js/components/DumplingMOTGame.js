@@ -443,6 +443,9 @@ const DumplingMOTGame = {
             startTime.value = Date.now();
             selectedCount.value = 0;
 
+            // Show canvas first so container has dimensions (v-show depends on phase)
+            phase.value = 'flash';
+
             nextTick(() => {
                 const canvas = canvasRef.value;
                 if (canvas) {
@@ -455,8 +458,6 @@ const DumplingMOTGame = {
                 initBubbles();
                 initSteam();
                 initObjects();
-
-                phase.value = 'flash';
                 animationLoop();
 
                 setTimeout(() => {
@@ -562,12 +563,11 @@ const DumplingMOTGame = {
     },
 
     template: `
-    <div class="fixed inset-0 z-50 flex items-center justify-center" style="background: linear-gradient(135deg, #2a1a0a 0%, #3b2210 40%, #1a0e05 100%);">
-        <div class="relative w-full max-w-2xl mx-4 flex flex-col items-center" style="max-height: 90vh;">
+    <div class="h-full flex flex-col overflow-hidden" style="background: linear-gradient(135deg, #2a1a0a 0%, #3b2210 40%, #1a0e05 100%);">
 
             <!-- status bar -->
-            <div v-if="phase !== 'intro'" class="w-full mb-3 px-2">
-                <div class="flex items-center justify-between bg-stone-900/70 backdrop-blur rounded-xl px-4 py-2 border border-amber-900/30">
+            <div class="shrink-0 px-4 pt-3 pb-1">
+                <div v-if="phase !== 'intro'" class="flex items-center justify-between bg-stone-900/70 backdrop-blur rounded-xl px-4 py-2 border border-amber-900/30">
                     <div class="flex items-center gap-2">
                         <span class="text-amber-400 text-xs font-bold tracking-wider uppercase">{{ t('header_subtitle') }}</span>
                         <span class="text-stone-500 mx-1">|</span>
@@ -577,7 +577,7 @@ const DumplingMOTGame = {
                         {{ t('selected_indicator', { n: selectedCount, total: config.targetCount }) }}
                     </div>
                 </div>
-                <div class="mt-2 text-center">
+                <div v-if="phase !== 'intro'" class="mt-2 text-center">
                     <div v-if="phase === 'flash'" class="text-green-400 text-sm font-bold animate-pulse">
                         {{ t('phase_flash') }}
                     </div>
@@ -591,18 +591,20 @@ const DumplingMOTGame = {
             </div>
 
             <!-- intro -->
-            <div v-if="phase === 'intro'" class="text-center px-6 py-10 bg-stone-900/60 backdrop-blur-lg rounded-2xl border border-amber-900/30 max-w-lg">
-                <div class="text-5xl mb-4">🥟</div>
-                <h2 class="text-2xl font-black text-white mb-4">{{ t('intro_title') }}</h2>
-                <p class="text-stone-300 text-sm leading-relaxed mb-8" v-html="t('intro_desc', { total: config.totalObjects, targets: config.targetCount })"></p>
-                <button @click="startGame"
-                    class="px-8 py-3 bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 text-white font-bold rounded-xl shadow-lg shadow-amber-900/40 transition-all transform hover:scale-105 active:scale-95">
-                    {{ t('start_button') }}
-                </button>
+            <div v-if="phase === 'intro'" class="flex-grow flex items-center justify-center p-6">
+                <div class="text-center px-6 py-8 bg-stone-900/60 backdrop-blur-lg rounded-2xl border border-amber-900/30 max-w-lg">
+                    <div class="text-5xl mb-4">🥟</div>
+                    <h2 class="text-2xl font-black text-white mb-4">{{ t('intro_title') }}</h2>
+                    <p class="text-stone-300 text-sm leading-relaxed mb-8" v-html="t('intro_desc', { total: config.totalObjects, targets: config.targetCount })"></p>
+                    <button @click="startGame"
+                        class="px-8 py-3 bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 text-white font-bold rounded-xl shadow-lg shadow-amber-900/40 transition-all transform hover:scale-105 active:scale-95">
+                        {{ t('start_button') }}
+                    </button>
+                </div>
             </div>
 
             <!-- canvas -->
-            <div v-show="phase !== 'intro'" class="w-full relative rounded-xl overflow-hidden border border-amber-900/40 shadow-2xl shadow-black/50" style="aspect-ratio: 6/5.6;">
+            <div v-show="phase !== 'intro'" class="flex-grow relative mx-4 mb-2 rounded-xl overflow-hidden border border-amber-900/40 shadow-2xl shadow-black/50">
                 <canvas ref="canvasRef" @click="handleCanvasClick"
                     class="w-full h-full cursor-crosshair"
                     style="background: #3b2a1a;">
@@ -615,12 +617,12 @@ const DumplingMOTGame = {
             </div>
 
             <!-- result panel -->
-            <div v-if="phase === 'result'" class="w-full mt-4 bg-stone-900/70 backdrop-blur rounded-xl border border-amber-900/30 p-5">
-                <div class="text-center mb-3">
+            <div v-if="phase === 'result'" class="shrink-0 mx-4 mb-3 bg-stone-900/70 backdrop-blur rounded-xl border border-amber-900/30 p-4">
+                <div class="text-center mb-2">
                     <h3 class="text-white font-bold text-lg">{{ t('phase_result') }}</h3>
                     <p class="text-lg mt-1">{{ perfMessage }}</p>
                 </div>
-                <div class="grid grid-cols-4 gap-3 mb-4">
+                <div class="grid grid-cols-4 gap-3 mb-3">
                     <div class="text-center">
                         <div class="text-2xl font-black text-green-400">{{ results.hits }}</div>
                         <div class="text-xs text-stone-400">{{ t('correct_label') }}</div>
@@ -645,8 +647,6 @@ const DumplingMOTGame = {
                     </button>
                 </div>
             </div>
-
-        </div>
 
         <style>
             @keyframes boil-line {

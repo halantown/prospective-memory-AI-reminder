@@ -133,6 +133,7 @@ const TaskSwitchGame = {
         let trialTimer = null;
         let blankTimer = null;
         let gameStartTime = 0;
+        let isDestroyed = false;
 
         // ============================================================
         // 生成试次
@@ -184,6 +185,7 @@ const TaskSwitchGame = {
         };
 
         const nextTrial = () => {
+            if (isDestroyed) return;
             const nextIdx = currentTrialIndex.value + 1;
 
             if (currentTrialIndex.value >= 0 && !responded.value) {
@@ -206,8 +208,12 @@ const TaskSwitchGame = {
             trialStartTime.value = performance.now();
 
             trialTimer = setTimeout(() => {
+                if (isDestroyed) return;
                 showingBlank.value = true;
-                blankTimer = setTimeout(nextTrial, config.value.interTrialInterval);
+                blankTimer = setTimeout(() => {
+                    if (isDestroyed) return;
+                    nextTrial();
+                }, config.value.interTrialInterval);
             }, config.value.stimulusDuration);
         };
 
@@ -305,7 +311,7 @@ const TaskSwitchGame = {
         };
 
         onMounted(() => { if (window.lucide) window.lucide.createIcons(); });
-        onUnmounted(() => { clearTimeout(trialTimer); clearTimeout(blankTimer); });
+        onUnmounted(() => { isDestroyed = true; clearTimeout(trialTimer); clearTimeout(blankTimer); });
 
         return {
             config, TASKS, phase, t,

@@ -922,11 +922,19 @@
                     // Restore UI State
                     showStartCard.value = savedState.showStartCard;
                     showEventCard.value = savedState.showEventCard;
-                    showMinigame.value = savedState.showMinigame;
+                    // Minigame state cannot be fully restored (timers, canvas, etc.)
+                    // so close it on refresh and let user re-trigger from dashboard
+                    showMinigame.value = false;
+                    activeGameComponent.value = null;
                     
                     phase.value = savedState.phase;
                     statusMessage.value = savedState.statusMessage;
                     subMessage.value = savedState.subMessage;
+                    // If we were in a minigame, reset phase to waiting
+                    if (savedState.showMinigame) {
+                        phase.value = 'waiting_confirm';
+                        statusMessage.value = i18n.taskComplete?.value || '任务完成';
+                    }
 
                     // Restart timer if needed
                     startTimer();
