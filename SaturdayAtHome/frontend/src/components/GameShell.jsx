@@ -7,7 +7,6 @@ import Sidebar from './ui/Sidebar'
 import RoomOverview from './rooms/RoomOverview'
 import RoomExpanded from './rooms/RoomExpanded'
 import RobotAvatar from './ui/RobotAvatar'
-import MessageLog from './ui/MessageLog'
 import ReportTaskButton from './ui/ReportTaskButton'
 import PmExecuteOverlay from './ui/PmExecuteOverlay'
 import EncodingScreen from './screens/EncodingScreen'
@@ -112,7 +111,6 @@ export default function GameShell() {
           <ReportTaskButton />
           <PmExecuteOverlay />
           <RobotAvatar />
-          <MessageLog />
         </div>
       </div>
     </div>

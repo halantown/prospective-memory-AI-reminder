@@ -1,17 +1,19 @@
 /**
  * Shared API helper for backend communication.
  * All game HTTP requests go through this module.
+ * Every request includes client_ts (ms since epoch) for precise experiment timing.
  */
 
 const BASE = '/api'
 
 export async function apiPost(path, body = {}) {
   const url = `${BASE}${path}`
-  console.log(`[API] POST ${url}`, body)
+  const payload = { ...body, client_ts: Date.now() }
+  console.log(`[API] POST ${url}`, payload)
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   })
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)

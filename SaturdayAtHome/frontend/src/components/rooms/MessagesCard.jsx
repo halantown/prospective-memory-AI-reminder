@@ -9,6 +9,11 @@ const AVATAR_COLORS = {
   default: 'bg-slate-500',
 }
 
+const fmtTime = (ts) => {
+  if (!ts) return ''
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
 function EmailListItem({ email, isSelected, onSelect }) {
   const color = AVATAR_COLORS[email.avatar] || AVATAR_COLORS.default
   return (
@@ -26,7 +31,7 @@ function EmailListItem({ email, isSelected, onSelect }) {
           <span className={`text-sm truncate ${!email.read ? 'font-bold text-slate-900' : 'font-medium text-slate-600'}`}>
             {email.from}
           </span>
-          <span className="text-[10px] text-slate-400 shrink-0 ml-auto">{email.receivedAt}</span>
+          <span className="text-[10px] text-slate-400 shrink-0 ml-auto">{fmtTime(email.receivedAt)}</span>
         </div>
         <p className={`text-xs truncate ${!email.read ? 'font-semibold text-slate-700' : 'text-slate-500'}`}>
           {email.subject}
@@ -51,7 +56,7 @@ function EmailDetail({ email, onReply }) {
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-700">{email.from}</p>
-            <p className="text-xs text-slate-400">{email.receivedAt}</p>
+            <p className="text-xs text-slate-400">{fmtTime(email.receivedAt)}</p>
           </div>
         </div>
       </div>

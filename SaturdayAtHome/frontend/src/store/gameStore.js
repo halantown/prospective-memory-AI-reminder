@@ -22,6 +22,9 @@ const makeHob = (id) => ({
 
 const initialHobs = [makeHob(0), makeHob(1), makeHob(2)]
 
+// Timestamp helper — all internal timestamps use Date.now() (ms since epoch)
+const ts = () => Date.now()
+
 export { HOB_STATUS, DIFFICULTY }
 
 export const useGameStore = create((set, get) => ({
@@ -65,7 +68,6 @@ export const useGameStore = create((set, get) => ({
 
   getDifficultyParams: () => DIFFICULTY[get().difficulty],
 
-  // Spawn a steak on a hob (called by SSE steak_spawn or demo scheduler)
   spawnSteak: (hobId, duration) => set((state) => {
     const diff = DIFFICULTY[state.difficulty]
     const cookingMs = duration?.cooking ?? diff.cookingMs
@@ -73,51 +75,36 @@ export const useGameStore = create((set, get) => ({
     return {
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.EMPTY
-          ? { ...h, status: HOB_STATUS.COOKING, startedAt: Date.now(), cookingMs, readyMs }
+          ? { ...h, status: HOB_STATUS.COOKING, startedAt: ts(), cookingMs, readyMs }
           : h
       ),
     }
   }),
 
-  // Called by GameShell timer when cooking/ready duration expires
   transitionHob: (hobId, newStatus) => set((state) => {
-    const msgs = []
     const newHobs = state.hobs.map(h => {
       if (h.id !== hobId) return h
       if (newStatus === HOB_STATUS.READY && h.status === HOB_STATUS.COOKING) {
-        msgs.push({ text: `⚠️ Hob ${h.id + 1}: steak is ready!`, type: 'warning' })
-        return { ...h, status: HOB_STATUS.READY, startedAt: Date.now() }
+        return { ...h, status: HOB_STATUS.READY, startedAt: ts() }
       }
       if (newStatus === HOB_STATUS.BURNING && h.status === HOB_STATUS.READY) {
-        msgs.push({ text: `🔥 Hob ${h.id + 1}: steak burnt!`, type: 'error' })
         return { ...h, status: HOB_STATUS.BURNING, startedAt: null }
       }
       return h
     })
-    return {
-      hobs: newHobs,
-      messages: [
-        ...state.messages,
-        ...msgs.map(m => ({ ...m, time: new Date().toLocaleTimeString() })),
-      ].slice(-50),
-    }
+    return { hobs: newHobs }
   }),
 
   // Player actions on hobs — update local state + POST to backend
   flipSteak: (hobId) => {
     const { sessionId, blockNumber } = get()
-    console.log('[Steak] flip', { hobId, sessionId })
     set((state) => ({
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.READY
-          ? { ...h, status: HOB_STATUS.COOKING, startedAt: Date.now() }
+          ? { ...h, status: HOB_STATUS.COOKING, startedAt: ts() }
           : h
       ),
       score: state.score + 5,
-      messages: [...state.messages, {
-        text: `🥩 Flipped steak on hob ${hobId + 1}! +5`, type: 'success',
-        time: new Date().toLocaleTimeString(),
-      }].slice(-50),
     }))
     if (sessionId) {
       reportSteakAction(sessionId, blockNumber, hobId, 'flip').catch(err =>
@@ -128,7 +115,6 @@ export const useGameStore = create((set, get) => ({
 
   serveSteak: (hobId) => {
     const { sessionId, blockNumber, sseConnected } = get()
-    console.log('[Steak] serve', { hobId, sessionId })
     set((state) => ({
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.READY
@@ -136,18 +122,12 @@ export const useGameStore = create((set, get) => ({
           : h
       ),
       score: state.score + 5,
-      messages: [...state.messages, {
-        text: `🍽️ Served steak from hob ${hobId + 1}! +5`, type: 'success',
-        time: new Date().toLocaleTimeString(),
-      }].slice(-50),
     }))
     if (sessionId) {
-      // Backend handles respawn via SSE after 15-25s
       reportSteakAction(sessionId, blockNumber, hobId, 'serve').catch(err =>
         console.error('[Steak] serve report failed:', err)
       )
     } else if (!sseConnected) {
-      // Demo mode fallback — local respawn
       const delay = 15000 + Math.random() * 10000
       setTimeout(() => {
         const s = get()
@@ -160,7 +140,6 @@ export const useGameStore = create((set, get) => ({
 
   cleanSteak: (hobId) => {
     const { sessionId, blockNumber, sseConnected } = get()
-    console.log('[Steak] clean', { hobId, sessionId })
     set((state) => ({
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.BURNING
@@ -168,10 +147,6 @@ export const useGameStore = create((set, get) => ({
           : h
       ),
       score: state.score - 10,
-      messages: [...state.messages, {
-        text: `🧽 Cleaned burnt steak on hob ${hobId + 1}. −10`, type: 'error',
-        time: new Date().toLocaleTimeString(),
-      }].slice(-50),
     }))
     if (sessionId) {
       reportSteakAction(sessionId, blockNumber, hobId, 'clean').catch(err =>
@@ -188,17 +163,12 @@ export const useGameStore = create((set, get) => ({
     }
   },
 
-  // Force a hob into READY state regardless of current state
   forceYellowSteak: (hobId) => set((state) => ({
     hobs: state.hobs.map(h =>
       h.id === hobId
-        ? { ...h, status: HOB_STATUS.READY, startedAt: Date.now() }
+        ? { ...h, status: HOB_STATUS.READY, startedAt: ts() }
         : h
     ),
-    messages: [...state.messages, {
-      text: `⚠️ Hob ${hobId + 1}: steak forced ready!`, type: 'warning',
-      time: new Date().toLocaleTimeString(),
-    }].slice(-50),
   })),
 
   // ── Washing Machine ────────────────────────────────────
@@ -209,61 +179,35 @@ export const useGameStore = create((set, get) => ({
     if (state.machine.status !== 'washing') return {}
     const next = state.machine.progress + 1
     if (next >= state.washTime) {
-      return {
-        machine: { status: 'done', progress: 0 },
-        messages: [...state.messages, {
-          text: '🧺 Washing machine is done!', type: 'info',
-          time: new Date().toLocaleTimeString(),
-        }].slice(-50),
-      }
+      return { machine: { status: 'done', progress: 0 } }
     }
     return { machine: { ...state.machine, progress: next } }
   }),
 
   handleMachineAction: () => set((state) => {
     if (state.machine.status === 'empty') {
-      return {
-        machine: { status: 'washing', progress: 0 },
-        messages: [...state.messages, {
-          text: '💦 Started the washing machine.', type: 'info',
-          time: new Date().toLocaleTimeString(),
-        }].slice(-50),
-      }
+      return { machine: { status: 'washing', progress: 0 } }
     }
     if (state.machine.status === 'done') {
-      return {
-        machine: { status: 'empty', progress: 0 },
-        messages: [...state.messages, {
-          text: '👕 Collected clean laundry!', type: 'success',
-          time: new Date().toLocaleTimeString(),
-        }].slice(-50),
-      }
+      return { machine: { status: 'empty', progress: 0 } }
     }
     return {}
   }),
 
   // ── Messages (Email Inbox) ──────────────────────────────
-  messages: [
-    { text: 'Welcome home! Click rooms to explore.', type: 'info', time: new Date().toLocaleTimeString() },
-  ],
   messageBubbles: [],
   unreadCount: 0,
   selectedEmailId: null,
-
-  addMessage: (text, type = 'info') => set((state) => ({
-    messages: [...state.messages, { text, type, time: new Date().toLocaleTimeString() }].slice(-50),
-  })),
 
   addMessageBubble: (bubble) => {
     if (get().pmExecution.active) return // T13-5: pause new bubbles during PM execution
     set((state) => ({
       messageBubbles: [...state.messageBubbles, {
         ...bubble,
-        id: Date.now(),
+        id: ts(),
         replied: false,
         read: false,
-        receivedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        // Ensure email fields have defaults
+        receivedAt: ts(),
         from: bubble.from || 'Unknown',
         subject: bubble.subject || bubble.text?.slice(0, 40) || 'New message',
         body: bubble.body || bubble.text || '',
@@ -278,9 +222,7 @@ export const useGameStore = create((set, get) => ({
   selectEmail: (emailId) => set((state) => ({
     selectedEmailId: emailId,
     messageBubbles: state.messageBubbles.map((b) =>
-      b.id === emailId && !b.read
-        ? { ...b, read: true }
-        : b
+      b.id === emailId && !b.read ? { ...b, read: true } : b
     ),
     unreadCount: state.messageBubbles.reduce((count, b) => {
       if (b.id === emailId && !b.read) return count
@@ -291,13 +233,9 @@ export const useGameStore = create((set, get) => ({
 
   replyToBubble: (bubbleId, choice) => set((state) => ({
     messageBubbles: state.messageBubbles.map((b) =>
-      b.id === bubbleId ? { ...b, replied: true, replyChoice: choice } : b
+      b.id === bubbleId ? { ...b, replied: true, replyChoice: choice, repliedAt: ts() } : b
     ),
     score: state.score + 2,
-    messages: [...state.messages, {
-      text: '📧 Replied to email! +2', type: 'success',
-      time: new Date().toLocaleTimeString(),
-    }].slice(-50),
   })),
 
   // ── PM Execution ───────────────────────────────────────
@@ -310,69 +248,49 @@ export const useGameStore = create((set, get) => ({
   },
   reportTaskVisible: false,
 
-  // SSE: trigger_appear → Report Task button appears
   triggerAppear: (taskId) => {
-    console.log('[PM] trigger_appear', { taskId })
     set((s) => ({
       reportTaskVisible: true,
       pmExecution: { ...s.pmExecution, taskId, submitted: false, active: false, windowOpenAt: null },
     }))
   },
 
-  // SSE: window_close → button disappears, miss if not submitted
   windowClose: (taskId) => {
     const { pmExecution } = get()
     if (pmExecution.taskId !== taskId) return
-    console.log('[PM] window_close', { taskId, submitted: pmExecution.submitted })
     if (pmExecution.submitted) {
       set({ reportTaskVisible: false })
     } else {
       set({
         reportTaskVisible: false,
         pmExecution: { active: false, taskId: null, windowOpenAt: null, timeLimit: 30000, submitted: false },
-        messages: [...get().messages, {
-          text: `⏰ Missed task window!`, type: 'error',
-          time: new Date().toLocaleTimeString(),
-        }].slice(-50),
       })
     }
   },
 
-  // User clicks Report Task button → overlay opens with 30s countdown
   openPmOverlay: () => {
-    console.log('[PM] overlay_open', { taskId: get().pmExecution.taskId })
     set((s) => ({
-      pmExecution: { ...s.pmExecution, active: true, windowOpenAt: Date.now(), submitted: false },
+      pmExecution: { ...s.pmExecution, active: true, windowOpenAt: ts(), submitted: false },
     }))
   },
 
-  // User confirms PM action
   submitPmAction: (actionData = {}) => {
-    console.log('[PM] submit', { taskId: get().pmExecution.taskId, ...actionData })
     set((s) => ({
       pmExecution: { ...s.pmExecution, submitted: true, active: false },
       reportTaskVisible: false,
     }))
   },
 
-  // Close overlay without submitting (not sure)
   closePmOverlay: () => {
-    console.log('[PM] overlay_close_unsure', { taskId: get().pmExecution.taskId })
     set((s) => ({
       pmExecution: { ...s.pmExecution, active: false },
     }))
   },
 
-  // Timeout auto-close — called from GameShell when 30s expires
   pmTimeout: () => {
-    console.log('[PM] timeout', { taskId: get().pmExecution.taskId })
     set((s) => ({
       pmExecution: { ...s.pmExecution, active: false },
       reportTaskVisible: false,
-      messages: [...s.messages, {
-        text: `⏰ Task execution timed out!`, type: 'error',
-        time: new Date().toLocaleTimeString(),
-      }].slice(-50),
     }))
   },
 
@@ -412,11 +330,19 @@ export const useGameStore = create((set, get) => ({
     blockTimer: 0,
     score: 0,
     hobs: initialHobs.map(h => ({ ...h })),
+    messageBubbles: [],
+    unreadCount: 0,
+    selectedEmailId: null,
     reportTaskVisible: false,
     pmExecution: { active: false, taskId: null, windowOpenAt: null, timeLimit: 30000, submitted: false },
     encodingConfirmed: false,
     encodingQuizAttempts: 0,
-    messages: [{ text: 'New round starting — read your tasks carefully.', type: 'info', time: new Date().toLocaleTimeString() }],
+    machine: { status: 'empty', progress: 0 },
+    fakeTriggered: false,
+    fakeType: null,
+    robotSpeaking: false,
+    robotText: '',
+    activeRoom: 'overview',
   }),
 
   confirmEncoding: (quizAttempts = 1) => set({
@@ -440,18 +366,22 @@ export const useGameStore = create((set, get) => ({
     blockTimer: 0,
     score: 0,
     hobs: initialHobs.map(h => ({ ...h })),
+    messageBubbles: [],
+    unreadCount: 0,
+    selectedEmailId: null,
     reportTaskVisible: false,
     pmExecution: { active: false, taskId: null, windowOpenAt: null, timeLimit: 30000, submitted: false },
+    machine: { status: 'empty', progress: 0 },
+    fakeTriggered: false,
+    fakeType: null,
+    robotSpeaking: false,
+    robotText: '',
+    activeRoom: 'overview',
   }),
 
   endBlock: () => set((s) => ({
     blockRunning: false,
     phase: 'block_end',
-    messages: [...s.messages, {
-      text: `✅ Block ${s.blockNumber} complete! Final score: ${s.score}`,
-      type: 'success',
-      time: new Date().toLocaleTimeString(),
-    }].slice(-50),
   })),
 
   tickBlockTimer: () => set((s) => ({ blockTimer: s.blockTimer + 1 })),

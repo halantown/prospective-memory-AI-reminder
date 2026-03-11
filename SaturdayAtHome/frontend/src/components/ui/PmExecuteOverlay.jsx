@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { Clock, Check, HelpCircle } from 'lucide-react'
+import MedicineTask from '../tasks/MedicineTask'
 
 const TASK_PROMPTS = {
   medicine_a: { text: 'You had a medicine to take after dinner. Which one and how?', icon: '💊' },
@@ -14,6 +15,21 @@ const TASK_PROMPTS = {
   chores_h:   { text: 'The rubbish truck arrived. Which bag should you take out?', icon: '🗑️' },
 }
 
+function TaskUI({ taskId, onSelectionChange }) {
+  if (taskId?.startsWith('medicine_')) {
+    return <MedicineTask taskId={taskId} onSelectionChange={onSelectionChange} />
+  }
+  // Placeholder for other task types (T15, T16, T17)
+  return (
+    <div className="bg-slate-50 rounded-xl p-8 min-h-[200px] flex items-center justify-center border-2 border-dashed border-slate-200">
+      <p className="text-slate-400 text-center text-sm">
+        Task-specific UI not yet implemented<br />
+        <span className="text-xs text-slate-300">({taskId})</span>
+      </p>
+    </div>
+  )
+}
+
 export default function PmExecuteOverlay() {
   const pmExecution = useGameStore((s) => s.pmExecution)
   const submitPmAction = useGameStore((s) => s.submitPmAction)
@@ -24,19 +40,19 @@ export default function PmExecuteOverlay() {
   const [countdownStarted, setCountdownStarted] = useState(false)
   const [remainingMs, setRemainingMs] = useState(30000)
   const [submitting, setSubmitting] = useState(false)
+  const [selection, setSelection] = useState(null)
   const intervalRef = useRef(null)
 
   const { active, taskId, windowOpenAt, timeLimit } = pmExecution
   const prompt = TASK_PROMPTS[taskId] || { text: 'Complete the task.', icon: '📋' }
 
-  // Start countdown animation when overlay opens
+  // Reset selection when overlay opens
   useEffect(() => {
     if (active && windowOpenAt) {
+      setSelection(null)
       setCountdownStarted(false)
       setRemainingMs(timeLimit)
-      // Trigger CSS transition on next frame
       requestAnimationFrame(() => setCountdownStarted(true))
-      // Update remaining text every 500ms
       intervalRef.current = setInterval(() => {
         const elapsed = Date.now() - windowOpenAt
         const remaining = Math.max(0, timeLimit - elapsed)
@@ -57,20 +73,27 @@ export default function PmExecuteOverlay() {
       await fetch(`/api/session/${sessionId}/block/${blockNumber}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task_id: taskId, ...actionData }),
+        body: JSON.stringify({
+          task_id: taskId,
+          client_ts: Date.now(),
+          ...actionData,
+        }),
         signal: controller.signal,
       })
       clearTimeout(timeout)
     } catch (err) {
-      console.error('[PM] POST action failed (network timeout or error)', err)
+      console.error('[PM] POST action failed:', err)
     } finally {
       setSubmitting(false)
     }
   }, [sessionId, blockNumber, taskId])
 
   const handleConfirm = async () => {
-    // TODO T14: collect actual selection from task-specific UI
-    await postAction({ action: 'confirm' })
+    const payload = { action: 'confirm' }
+    if (selection) {
+      payload.choice = selection
+    }
+    await postAction(payload)
     submitPmAction()
   }
 
@@ -79,6 +102,11 @@ export default function PmExecuteOverlay() {
     closePmOverlay()
   }
 
+  const handleSelectionChange = (sel) => {
+    setSelection(sel)
+  }
+
+  const isComplete = selection?.complete ?? false
   const remainingSec = Math.ceil(remainingMs / 1000)
 
   return (
@@ -94,9 +122,9 @@ export default function PmExecuteOverlay() {
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
-            className="bg-white rounded-2xl shadow-2xl w-[520px] overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl w-[560px] max-h-[90vh] overflow-y-auto"
           >
-            {/* Header with task prompt */}
+            {/* Header */}
             <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">{prompt.icon}</span>
@@ -107,19 +135,13 @@ export default function PmExecuteOverlay() {
               </div>
             </div>
 
-            {/* Task interaction area (placeholder for T14) */}
-            <div className="px-6 py-6">
-              <div className="bg-slate-50 rounded-xl p-8 min-h-[200px] flex items-center justify-center border-2 border-dashed border-slate-200">
-                <p className="text-slate-400 text-center text-sm">
-                  Task-specific UI will be loaded here<br />
-                  <span className="text-xs text-slate-300">(Task: {taskId})</span>
-                </p>
-              </div>
+            {/* Task-specific interaction area */}
+            <div className="px-6 py-5">
+              <TaskUI taskId={taskId} onSelectionChange={handleSelectionChange} />
             </div>
 
-            {/* Bottom: countdown bar + buttons */}
-            <div className="px-6 pb-6 space-y-4">
-              {/* Countdown progress bar (CSS transition) */}
+            {/* Countdown bar + buttons */}
+            <div className="px-6 pb-5 space-y-4">
               <div className="space-y-1">
                 <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
                   <div
@@ -139,12 +161,15 @@ export default function PmExecuteOverlay() {
                 </div>
               </div>
 
-              {/* Action buttons */}
               <div className="flex gap-3">
                 <button
                   onClick={handleConfirm}
-                  disabled={submitting}
-                  className="flex-1 py-3 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                  disabled={submitting || !isComplete}
+                  className={`flex-1 py-3 font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${
+                    isComplete
+                      ? 'bg-indigo-500 hover:bg-indigo-600 text-white'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  }`}
                 >
                   <Check size={18} />
                   Confirm

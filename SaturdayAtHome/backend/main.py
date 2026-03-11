@@ -153,6 +153,8 @@ class PmActionReport(BaseModel):
     action: Optional[str] = None
     selected_target: Optional[str] = None
     selected_detail: Optional[str] = None
+    choice: Optional[dict] = None  # For structured tasks like medicine: {bottle, amount}
+    client_ts: Optional[float] = None
 
 class OngoingScoreReport(BaseModel):
     ts: float
@@ -200,13 +202,33 @@ def assign_group() -> str:
 # ── Scoring logic ──────────────────────────────────────────
 
 def score_pm_action(task_id: str, action: PmActionReport) -> int:
-    """Score PM action: 0=miss, 1=wrong, 2=correct"""
-    if action.action is None and action.selected_target is None:
+    """Score PM action: 0=miss, 1=partial, 2=correct"""
+    if action.action == "not_sure":
+        return 0
+    if action.action is None and action.selected_target is None and action.choice is None:
+        return 0
+
+    # Correct answers (backend-only, never sent to frontend)
+    CORRECT = {
+        "medicine_a": {"bottle": "round_red",    "amount": "2 tablets"},
+        "medicine_b": {"bottle": "round_orange",  "amount": "1000mg × 1"},
+    }
+
+    def score_medicine(a):
+        correct = CORRECT.get(task_id)
+        if not correct or not a.choice:
+            return 0
+        bottle_ok = a.choice.get("bottle") == correct["bottle"]
+        amount_ok = a.choice.get("amount") == correct["amount"]
+        if bottle_ok and amount_ok:
+            return 2
+        if bottle_ok or amount_ok:
+            return 1
         return 0
 
     scoring = {
-        "medicine_a": lambda a: 2 if a.selected_target == "round_red" and a.selected_detail == "1_tablet" else (1 if a.selected_target else 0),
-        "medicine_b": lambda a: 2 if a.selected_target == "orange_round" and a.selected_detail == "1_tablet" else (1 if a.selected_target else 0),
+        "medicine_a": score_medicine,
+        "medicine_b": score_medicine,
         "laundry_c":  lambda a: 2 if a.action == "shirt_rack_jeans_dryer" else (1 if a.action else 0),
         "laundry_d":  lambda a: 2 if a.action == "shirt_only" else (1 if a.action else 0),
         "comm_e":     lambda a: 2 if a.selected_target == "li_wei" and a.selected_detail == "restaurant_b" else (1 if a.selected_target else 0),
@@ -407,6 +429,7 @@ async def report_pm_action(session_id: str, block_num: int, report: PmActionRepo
     log_action(session_id, block_num, "pm_action", {
         "task_id": report.task_id, "action": report.action,
         "selected_target": report.selected_target, "selected_detail": report.selected_detail,
+        "choice": report.choice, "client_ts": report.client_ts,
         "score": score,
     })
 
