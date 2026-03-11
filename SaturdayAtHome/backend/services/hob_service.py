@@ -1,32 +1,14 @@
-"""Hob (stove) state tracking — in-memory state for active cooking sessions."""
+"""Hob (stove) state management — in-memory state for active cooking sessions."""
 
 import asyncio
 import logging
 import random
 import time
-from dataclasses import dataclass
-from enum import Enum
 
-from config import DIFFICULTY_CONFIG
+from core.config import DIFFICULTY_CONFIG
+from models.entities import Hob, HobStatus
 
-logger = logging.getLogger("saturday.hobs")
-
-
-class HobStatus(str, Enum):
-    EMPTY = "empty"
-    COOKING = "cooking"
-    READY = "ready"
-    BURNING = "burning"
-
-
-@dataclass
-class Hob:
-    id: int
-    status: HobStatus = HobStatus.EMPTY
-    started_at: float = 0.0
-    cooking_ms: float = 18000
-    ready_ms: float = 6000
-
+logger = logging.getLogger("saturday.services.hob")
 
 # Per-session hob state (in-memory, not persisted)
 _session_hobs: dict[str, list[Hob]] = {}

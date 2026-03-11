@@ -1,6 +1,6 @@
 """PM action scoring — correct answers are defined here (backend-only)."""
 
-from models import PmActionReport
+from models.schemas import PmActionReport
 
 
 # Correct answers for medicine tasks — NEVER sent to frontend

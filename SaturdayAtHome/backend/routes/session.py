@@ -9,12 +9,12 @@ import uuid
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from config import DB_PATH, LATIN_SQUARE, TASK_PAIRS, REMINDER_TEXTS, assign_group
-from database import get_db
-from helpers import log_action
-from models import SessionStartRequest, SessionStartResponse
-from sse import send_sse, register_client, event_generator
-from timeline import BlockTimeline
+from core.config import DB_PATH, LATIN_SQUARE, TASK_PAIRS, REMINDER_TEXTS, assign_group
+from core.database import get_db
+from utils.helpers import log_action
+from models.schemas import SessionStartRequest, SessionStartResponse
+from core.sse import send_sse, register_client, event_generator
+from core.timeline import BlockTimeline
 
 logger = logging.getLogger("saturday.routes.session")
 

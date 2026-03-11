@@ -5,8 +5,9 @@ import json
 import logging
 import time
 
-from config import DIFFICULTY_CONFIG
-from hobs import HobStatus, get_session_hobs, reconcile_hob
+from core.config import DIFFICULTY_CONFIG
+from models.entities import HobStatus, Hob
+from services.hob_service import get_session_hobs, reconcile_hob
 
 logger = logging.getLogger("saturday.sse")
 

@@ -4,8 +4,8 @@ import json
 import logging
 import time
 
-from config import DB_PATH
-from database import get_db
+from core.config import DB_PATH
+from core.database import get_db
 
 logger = logging.getLogger("saturday.helpers")
 

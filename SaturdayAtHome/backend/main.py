@@ -6,8 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import DB_PATH
-from database import init_db
+from core.config import DB_PATH
+from core.database import init_db
 from routes.session import router as session_router, active_timelines
 from routes.experiment import router as experiment_router
 from routes.admin import router as admin_router
