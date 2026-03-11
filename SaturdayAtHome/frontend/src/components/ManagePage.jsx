@@ -14,6 +14,16 @@ function Panel({ title, children, className = '' }) {
   )
 }
 
+const fmtPrecise = (epochSec) => {
+  const d = new Date(epochSec * 1000)
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 })
+}
+
+const fmtDateTime = (isoOrEpoch) => {
+  const d = new Date(isoOrEpoch)
+  return d.toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
 export default function ManagePage() {
   const [sessions, setSessions] = useState([])
   const [selectedId, setSelectedId] = useState(null)
@@ -134,7 +144,7 @@ export default function ManagePage() {
                     <span>Group {s.latin_square_group || s.group}</span>
                   </div>
                   <div className="text-[10px] text-gray-600 mt-0.5">
-                    {s.created_at ? new Date(s.created_at).toLocaleString() : ''}
+                    {s.created_at ? fmtDateTime(s.created_at) : ''}
                   </div>
                 </div>
               ))}
@@ -162,7 +172,7 @@ export default function ManagePage() {
                   </div>
                   <div>
                     <div className="text-gray-500">Created</div>
-                    <div className="text-gray-200">{selected.created_at ? new Date(selected.created_at).toLocaleString() : '-'}</div>
+                    <div className="text-gray-200">{selected.created_at ? fmtDateTime(selected.created_at) : '-'}</div>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -196,7 +206,7 @@ export default function ManagePage() {
                     <tbody>
                       {logs.map((l, i) => (
                         <tr key={i} className="border-b border-gray-800/30 hover:bg-gray-800/50">
-                          <td className="py-1 pr-2 text-gray-500">{new Date(l.ts * 1000).toLocaleTimeString()}</td>
+                          <td className="py-1 pr-2 text-gray-500 font-mono whitespace-nowrap">{fmtPrecise(l.ts)}</td>
                           <td className="py-1 pr-2 text-gray-400">{l.block_num || '-'}</td>
                           <td className="py-1 pr-2 text-cyan-400 font-bold">{l.action_type}</td>
                           <td className="py-1 text-gray-500 break-all">{l.payload ? l.payload.slice(0, 120) : ''}</td>

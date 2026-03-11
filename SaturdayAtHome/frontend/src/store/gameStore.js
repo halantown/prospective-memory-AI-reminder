@@ -10,9 +10,9 @@ const HOB_STATUS = {
 }
 
 const DIFFICULTY = {
-  slow:   { cookingMs: 25000, readyMs: 15000, maxSteaks: 2 },
-  medium: { cookingMs: 18000, readyMs: 6000,  maxSteaks: 3 },
-  fast:   { cookingMs: 12000, readyMs: 6000,  maxSteaks: 3 },
+  slow:   { cookingMs: 20000, readyMs: 5000, maxSteaks: 2 },
+  medium: { cookingMs: 13000, readyMs: 4000, maxSteaks: 3 },
+  fast:   { cookingMs: 9000,  readyMs: 3000, maxSteaks: 3 },
 }
 
 const makeHob = (id) => ({
@@ -24,6 +24,8 @@ const initialHobs = [makeHob(0), makeHob(1), makeHob(2)]
 
 // Timestamp helper — all internal timestamps use Date.now() (ms since epoch)
 const ts = () => Date.now()
+
+const MESSAGE_TIMEOUT_MS = 15000  // 15s to reply before penalty
 
 export { HOB_STATUS, DIFFICULTY }
 
@@ -206,6 +208,7 @@ export const useGameStore = create((set, get) => ({
         ...bubble,
         id: ts(),
         replied: false,
+        expired: false,
         read: false,
         receivedAt: ts(),
         from: bubble.from || 'Unknown',
@@ -214,6 +217,8 @@ export const useGameStore = create((set, get) => ({
         avatar: bubble.avatar || (bubble.from ? bubble.from[0].toUpperCase() : '?'),
         option_a: bubble.option_a || 'OK',
         option_b: bubble.option_b || 'Skip',
+        correct: bubble.correct || null,  // "option_a" or "option_b" for scoring
+        timeoutMs: MESSAGE_TIMEOUT_MS,
       }],
       unreadCount: state.unreadCount + 1,
     }))
@@ -231,12 +236,50 @@ export const useGameStore = create((set, get) => ({
     }, 0),
   })),
 
-  replyToBubble: (bubbleId, choice) => set((state) => ({
-    messageBubbles: state.messageBubbles.map((b) =>
-      b.id === bubbleId ? { ...b, replied: true, replyChoice: choice, repliedAt: ts() } : b
-    ),
-    score: state.score + 2,
-  })),
+  replyToBubble: (bubbleId, choice) => {
+    const bubble = get().messageBubbles.find(b => b.id === bubbleId)
+    if (!bubble || bubble.replied || bubble.expired) return
+    // Score: +2 for correct reply, +1 for wrong reply (still engaged)
+    const isCorrect = bubble.correct && choice === bubble.correct
+    const pts = isCorrect ? 2 : 1
+    set((state) => ({
+      messageBubbles: state.messageBubbles.map((b) =>
+        b.id === bubbleId ? { ...b, replied: true, replyChoice: choice, repliedAt: ts(), replyCorrect: isCorrect } : b
+      ),
+      score: state.score + pts,
+    }))
+  },
+
+  expireMessage: (bubbleId) => {
+    const bubble = get().messageBubbles.find(b => b.id === bubbleId)
+    if (!bubble || bubble.replied || bubble.expired) return
+    set((state) => ({
+      messageBubbles: state.messageBubbles.map((b) =>
+        b.id === bubbleId ? { ...b, expired: true, expiredAt: ts() } : b
+      ),
+      score: state.score - 2,
+    }))
+  },
+
+  // ── Plant Watering (Living Room) ─────────────────────────
+  plantNeedsWater: false,
+  plantWilted: false,
+  plantLastWatered: null,
+  plantNeedsWaterSince: null,
+
+  showPlantNeedsWater: () => set({ plantNeedsWater: true, plantWilted: false, plantNeedsWaterSince: ts() }),
+  waterPlant: () => {
+    const { plantNeedsWater, plantWilted } = get()
+    if (!plantNeedsWater) return
+    set({
+      plantNeedsWater: false,
+      plantWilted: false,
+      plantLastWatered: ts(),
+      plantNeedsWaterSince: null,
+      score: get().score + (plantWilted ? 1 : 3),  // reduced points if wilted
+    })
+  },
+  wiltPlant: () => set({ plantWilted: true }),
 
   // ── PM Execution ───────────────────────────────────────
   pmExecution: {
@@ -343,6 +386,10 @@ export const useGameStore = create((set, get) => ({
     robotSpeaking: false,
     robotText: '',
     activeRoom: 'overview',
+    plantNeedsWater: false,
+    plantWilted: false,
+    plantLastWatered: null,
+    plantNeedsWaterSince: null,
   }),
 
   confirmEncoding: (quizAttempts = 1) => set({
@@ -377,6 +424,10 @@ export const useGameStore = create((set, get) => ({
     robotSpeaking: false,
     robotText: '',
     activeRoom: 'overview',
+    plantNeedsWater: false,
+    plantWilted: false,
+    plantLastWatered: null,
+    plantNeedsWaterSince: null,
   }),
 
   endBlock: () => set((s) => ({
@@ -401,13 +452,30 @@ export const useGameStore = create((set, get) => ({
   getKitchenStatus: () => {
     const hobs = get().hobs
     if (hobs.some(h => h.status === HOB_STATUS.BURNING)) return 'red'
-    if (hobs.some(h => h.status === HOB_STATUS.READY)) return 'yellow'
-    return 'green'
+    if (hobs.some(h => h.status === HOB_STATUS.READY)) return 'orange'
+    return null
   },
 
   getBalconyStatus: () => {
     const m = get().machine
     if (m.status === 'done') return 'blue'
-    return 'grey'
+    return null
+  },
+
+  getLivingStatus: () => {
+    const { plantNeedsWater, plantWilted } = get()
+    if (plantWilted) return 'red'
+    if (plantNeedsWater) return 'orange'
+    return null
+  },
+
+  getInboxStatus: () => {
+    const { messageBubbles } = get()
+    const now = ts()
+    const hasUrgent = messageBubbles.some(b => !b.replied && !b.expired && (now - b.receivedAt) > MESSAGE_TIMEOUT_MS * 0.7)
+    const hasUnreplied = messageBubbles.some(b => !b.replied && !b.expired)
+    if (hasUrgent) return 'red'
+    if (hasUnreplied) return 'orange'
+    return null
   },
 }))

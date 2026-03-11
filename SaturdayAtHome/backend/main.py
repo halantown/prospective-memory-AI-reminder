@@ -45,9 +45,9 @@ class HobStatus(str, Enum):
 
 
 DIFFICULTY_CONFIG = {
-    "slow":   {"cooking_ms": 25000, "ready_ms": 15000, "max_steaks": 2},
-    "medium": {"cooking_ms": 18000, "ready_ms": 6000,  "max_steaks": 3},
-    "fast":   {"cooking_ms": 12000, "ready_ms": 6000,  "max_steaks": 3},
+    "slow":   {"cooking_ms": 20000, "ready_ms": 5000, "max_steaks": 2},
+    "medium": {"cooking_ms": 13000, "ready_ms": 4000, "max_steaks": 3},
+    "fast":   {"cooking_ms": 9000,  "ready_ms": 3000, "max_steaks": 3},
 }
 
 

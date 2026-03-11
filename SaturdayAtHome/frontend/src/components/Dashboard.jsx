@@ -135,7 +135,7 @@ export default function Dashboard() {
     const ALL_EVENTS = [
       'steak_spawn', 'force_yellow_steak', 'trigger_appear', 'window_close',
       'reminder_fire', 'robot_neutral', 'fake_trigger_fire', 'message_bubble',
-      'block_start', 'block_end', 'keepalive',
+      'plant_needs_water', 'block_start', 'block_end', 'keepalive',
     ]
 
     ALL_EVENTS.forEach(type => {
@@ -302,13 +302,33 @@ export default function Dashboard() {
             <Panel title="📊 Action Logs (DB)" className="h-[calc(100vh-80px)] overflow-y-auto">
               {logs.length === 0 ? (
                 <p className="text-gray-600 text-xs">No logged actions yet</p>
-              ) : logs.map((l, i) => (
-                <div key={i} className="text-xs border-b border-gray-800/50 py-1">
-                  <span className="text-gray-600">{new Date(l.ts * 1000).toLocaleTimeString()}</span>
-                  <span className="ml-2 text-cyan-400 font-bold">{l.action_type}</span>
-                  {l.payload && <span className="text-gray-500 ml-1 break-all">{l.payload.slice(0, 80)}</span>}
-                </div>
-              ))}
+              ) : logs.map((l, i) => {
+                const isPm = l.action_type === 'pm_action'
+                const isSteak = l.action_type === 'steak_action'
+                let scoreInfo = null
+                if (l.payload) {
+                  try {
+                    const p = JSON.parse(l.payload)
+                    if (p.score !== undefined) scoreInfo = p.score
+                  } catch {}
+                }
+                return (
+                  <div key={i} className="text-xs border-b border-gray-800/50 py-1 font-mono">
+                    <span className="text-gray-600">{new Date(l.ts * 1000).toLocaleTimeString()}</span>
+                    <span className={`ml-2 font-bold ${
+                      isPm ? 'text-orange-400' : isSteak ? 'text-pink-400' : 'text-cyan-400'
+                    }`}>{l.action_type}</span>
+                    {scoreInfo !== null && (
+                      <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        scoreInfo === 2 ? 'bg-green-900 text-green-300' :
+                        scoreInfo === 1 ? 'bg-yellow-900 text-yellow-300' :
+                        'bg-red-900 text-red-300'
+                      }`}>score:{scoreInfo}</span>
+                    )}
+                    {l.payload && <span className="text-gray-500 ml-1 break-all">{l.payload.slice(0, 80)}</span>}
+                  </div>
+                )
+              })}
             </Panel>
           </div>
         </div>

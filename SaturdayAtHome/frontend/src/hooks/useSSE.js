@@ -44,6 +44,7 @@ export default function useSSE() {
       robot_neutral:      (d) => useGameStore.getState().triggerRobot(d.text),
       fake_trigger_fire:  (d) => useGameStore.getState().triggerFake(d.type),
       message_bubble:     (d) => useGameStore.getState().addMessageBubble(d),
+      plant_needs_water:  ()  => useGameStore.getState().showPlantNeedsWater(),
       block_start:        (d) => console.log('[SSE] block_start', d),
       block_end:          (d) => useGameStore.getState().endBlock(),
       keepalive:          ()  => {},

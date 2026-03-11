@@ -11,16 +11,25 @@ const rooms = [
 
 function StatusDot({ color }) {
   if (color === 'red') return (
-    <span className="absolute -top-1 -right-1 flex h-4 w-4">
+    <span className="absolute -top-1 -right-1 flex h-5 w-5">
       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-slate-900" />
+      <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 border-2 border-slate-900" />
+    </span>
+  )
+  if (color === 'orange') return (
+    <span className="absolute -top-1 -right-1 flex h-5 w-5">
+      <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60" />
+      <span className="relative inline-flex rounded-full h-5 w-5 bg-orange-500 border-2 border-slate-900" />
     </span>
   )
   if (color === 'yellow') return (
-    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-yellow-400 border-2 border-slate-900" />
+    <span className="absolute -top-1 -right-1 flex h-5 w-5">
+      <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-50" />
+      <span className="relative inline-flex rounded-full h-5 w-5 bg-yellow-400 border-2 border-slate-900" />
+    </span>
   )
   if (color === 'blue') return (
-    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-blue-400 border-2 border-slate-900 animate-pulse" />
+    <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-blue-400 border-2 border-slate-900 animate-pulse" />
   )
   return null
 }
@@ -30,14 +39,20 @@ export default function Sidebar() {
   const setActiveRoom = useGameStore((s) => s.setActiveRoom)
   const getKitchenStatus = useGameStore((s) => s.getKitchenStatus)
   const getBalconyStatus = useGameStore((s) => s.getBalconyStatus)
+  const getLivingStatus = useGameStore((s) => s.getLivingStatus)
+  const getInboxStatus = useGameStore((s) => s.getInboxStatus)
   const unreadCount = useGameStore((s) => s.unreadCount)
 
   const kitchenStatus = getKitchenStatus()
   const balconyStatus = getBalconyStatus()
+  const livingStatus = getLivingStatus()
+  const inboxStatus = getInboxStatus()
 
   const getStatusColor = (roomId) => {
     if (roomId === 'kitchen') return kitchenStatus
     if (roomId === 'balcony') return balconyStatus
+    if (roomId === 'living') return livingStatus
+    if (roomId === 'messages') return inboxStatus
     return null
   }
 

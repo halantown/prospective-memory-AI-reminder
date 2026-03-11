@@ -9,9 +9,9 @@ logger = logging.getLogger("saturday.timeline")
 
 # Difficulty presets (durations in milliseconds for frontend)
 DIFFICULTY_DURATIONS = {
-    "slow":   {"cooking": 25000, "ready": 15000},
-    "medium": {"cooking": 18000, "ready": 6000},
-    "fast":   {"cooking": 12000, "ready": 6000},
+    "slow":   {"cooking": 20000, "ready": 5000},
+    "medium": {"cooking": 13000, "ready": 4000},
+    "fast":   {"cooking": 9000,  "ready": 3000},
 }
 
 
@@ -62,50 +62,79 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
         (510,  "block_end",          {"block_number": block_num}),
     ]
 
-    # Steak spawns — every 20-35s on rotating hobs (GDD §12.2)
+    # Steak spawns — every 8-15s on rotating hobs for high concurrent load
     import random
     t = 3
     hob_cycle = 0
     while t < 490:
         timeline.append((t, "steak_spawn", {"hob_id": hob_cycle % 3, "duration": dur}))
         hob_cycle += 1
-        t += random.randint(20, 35)
+        t += random.randint(8, 15)
 
-    # Message bubbles as emails (avoid ±60s of reminders/triggers)
+    # Message bubbles — situational questions with meaningful choices
+    # correct_option field is for backend scoring only (not sent to frontend)
     timeline.extend([
         (55,   "message_bubble", {
             "from": "Sarah",
-            "subject": "Party tonight",
-            "body": "Hey! Are you still coming tonight? I've been looking forward to it all week!",
-            "option_a": "Yes, definitely!",
-            "option_b": "Maybe later",
+            "subject": "What time tonight?",
+            "body": "Hey! What time should I come over for dinner tonight? I need to know so I can plan my evening.",
+            "option_a": "7 o'clock",
+            "option_b": "8 o'clock",
+            "correct": "option_a",
             "avatar": "S",
         }),
-        (170,  "message_bubble", {
+        (130,  "message_bubble", {
             "from": "Mom",
-            "subject": "Bringing something?",
-            "body": "Should I bring anything for the party? I could make my famous apple pie if you want 😊",
-            "option_a": "Some drinks please!",
-            "option_b": "Nothing, just yourself",
+            "subject": "Grocery question",
+            "body": "I'm at the supermarket. Do you need whole milk or skimmed milk? I remember you mentioned something last week.",
+            "option_a": "Whole milk",
+            "option_b": "Skimmed milk",
+            "correct": "option_a",
             "avatar": "M",
         }),
-        (340,  "message_bubble", {
+        (220,  "message_bubble", {
             "from": "David",
-            "subject": "Arrival time?",
-            "body": "What time should everyone arrive? I want to make sure I'm not late. Should I bring some music too?",
-            "option_a": "Around 7pm",
-            "option_b": "Whenever works",
+            "subject": "Parking spot?",
+            "body": "I'm driving over. Which parking spot should I use — A12 near the entrance or B07 by the garden?",
+            "option_a": "A12",
+            "option_b": "B07",
+            "correct": "option_b",
             "avatar": "D",
         }),
-        (450,  "message_bubble", {
+        (310,  "message_bubble", {
+            "from": "Neighbor Jan",
+            "subject": "Package arrived",
+            "body": "Hi! A package came for you while you were out. Should I leave it at your door or keep it at mine until later?",
+            "option_a": "Leave at my door",
+            "option_b": "Keep it for now",
+            "correct": "option_a",
+            "avatar": "J",
+        }),
+        (400,  "message_bubble", {
             "from": "Sarah",
-            "subject": "Almost there!",
-            "body": "We're on our way! Traffic is a bit slow though. Save some food for us! 🚗",
-            "option_a": "Drive safe!",
-            "option_b": "No worries, plenty left",
+            "subject": "Dessert idea?",
+            "body": "Should I bring chocolate cake or apple pie for dessert tonight? I can stop by the bakery on the way.",
+            "option_a": "Chocolate cake",
+            "option_b": "Apple pie",
+            "correct": "option_b",
             "avatar": "S",
         }),
+        (460,  "message_bubble", {
+            "from": "Mom",
+            "subject": "Bus or car?",
+            "body": "I can't decide — should I take the bus or drive over? Parking is sometimes difficult in your area.",
+            "option_a": "Take the bus",
+            "option_b": "Just drive",
+            "correct": "option_a",
+            "avatar": "M",
+        }),
     ])
+
+    # Plant needs water — random intervals (60-90s) for living room engagement
+    plant_t = 60 + random.randint(0, 30)
+    while plant_t < 480:
+        timeline.append((plant_t, "plant_needs_water", {}))
+        plant_t += random.randint(60, 90)
 
     timeline.sort(key=lambda x: x[0])
     return timeline

@@ -1,50 +1,93 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
-import { Mail, Reply, Check } from 'lucide-react'
+import { Mail, Reply, Check, X, Clock } from 'lucide-react'
 
 const AVATAR_COLORS = {
   S: 'bg-violet-500',
   M: 'bg-rose-500',
   D: 'bg-sky-500',
+  J: 'bg-teal-500',
   default: 'bg-slate-500',
 }
+
+const MESSAGE_TIMEOUT_MS = 15000
 
 const fmtTime = (ts) => {
   if (!ts) return ''
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function EmailListItem({ email, isSelected, onSelect }) {
+function CountdownBar({ receivedAt, onExpire }) {
+  const [progress, setProgress] = useState(100)
+
+  useEffect(() => {
+    const tick = () => {
+      const elapsed = Date.now() - receivedAt
+      const pct = Math.max(0, 100 - (elapsed / MESSAGE_TIMEOUT_MS) * 100)
+      setProgress(pct)
+      if (pct <= 0) { onExpire(); return }
+      requestAnimationFrame(tick)
+    }
+    const raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [receivedAt, onExpire])
+
+  const color = progress > 50 ? 'bg-green-500' : progress > 25 ? 'bg-yellow-500' : 'bg-red-500'
+
+  return (
+    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+      <div className={`h-full rounded-full transition-colors ${color}`} style={{ width: `${progress}%` }} />
+    </div>
+  )
+}
+
+function EmailListItem({ email, isSelected, onSelect, onExpire }) {
   const color = AVATAR_COLORS[email.avatar] || AVATAR_COLORS.default
+  const isActive = !email.replied && !email.expired
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onSelect(email.id) }}
       className={`w-full text-left px-3 py-2.5 flex gap-3 items-start rounded-lg transition-colors ${
+        email.expired ? 'opacity-50 bg-red-50 border border-red-100' :
         isSelected ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50 border border-transparent'
       }`}
     >
-      <div className={`${color} w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 mt-0.5`}>
+      <div className={`${color} w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 mt-0.5 ${email.expired ? 'grayscale' : ''}`}>
         {email.avatar}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className={`text-sm truncate ${!email.read ? 'font-bold text-slate-900' : 'font-medium text-slate-600'}`}>
+          <span className={`text-sm truncate ${
+            email.expired ? 'text-red-400 line-through' :
+            !email.read ? 'font-bold text-slate-900' : 'font-medium text-slate-600'
+          }`}>
             {email.from}
           </span>
           <span className="text-[10px] text-slate-400 shrink-0 ml-auto">{fmtTime(email.receivedAt)}</span>
         </div>
-        <p className={`text-xs truncate ${!email.read ? 'font-semibold text-slate-700' : 'text-slate-500'}`}>
+        <p className={`text-xs truncate ${
+          email.expired ? 'text-red-300' :
+          !email.read ? 'font-semibold text-slate-700' : 'text-slate-500'
+        }`}>
           {email.subject}
         </p>
+        {isActive && (
+          <div className="mt-1.5">
+            <CountdownBar receivedAt={email.receivedAt} onExpire={() => onExpire(email.id)} />
+          </div>
+        )}
       </div>
-      {!email.read && <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-3" />}
-      {email.replied && <Check size={14} className="text-green-500 shrink-0 mt-3" />}
+      {email.expired && <X size={14} className="text-red-400 shrink-0 mt-3" />}
+      {!email.read && !email.expired && <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-3" />}
+      {email.replied && <Check size={14} className={email.replyCorrect ? 'text-green-500' : 'text-yellow-500'} />}
     </button>
   )
 }
 
-function EmailDetail({ email, onReply }) {
+function EmailDetail({ email, onReply, onExpire }) {
   const color = AVATAR_COLORS[email.avatar] || AVATAR_COLORS.default
+  const isActive = !email.replied && !email.expired
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -66,19 +109,35 @@ function EmailDetail({ email, onReply }) {
         <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{email.body}</p>
       </div>
 
+      {/* Countdown bar for active messages */}
+      {isActive && (
+        <div className="px-5 py-1">
+          <div className="flex items-center gap-2 mb-1">
+            <Clock size={12} className="text-slate-400" />
+            <span className="text-[10px] text-slate-400 font-medium">Reply before time runs out</span>
+          </div>
+          <CountdownBar receivedAt={email.receivedAt} onExpire={() => onExpire(email.id)} />
+        </div>
+      )}
+
       {/* Reply actions */}
       <div className="border-t border-slate-200 px-5 py-3">
-        {!email.replied ? (
+        {email.expired ? (
+          <div className="flex items-center gap-2 text-red-500 text-sm font-medium py-2">
+            <X size={16} />
+            Expired — no reply sent (−2 points)
+          </div>
+        ) : !email.replied ? (
           <div className="flex gap-2">
             <button
-              onClick={(e) => { e.stopPropagation(); onReply(email.id, 'A') }}
+              onClick={(e) => { e.stopPropagation(); onReply(email.id, 'option_a') }}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold rounded-lg transition-colors"
             >
               <Reply size={14} />
               {email.option_a}
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onReply(email.id, 'B') }}
+              onClick={(e) => { e.stopPropagation(); onReply(email.id, 'option_b') }}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold rounded-lg transition-colors"
             >
               <Reply size={14} />
@@ -86,9 +145,10 @@ function EmailDetail({ email, onReply }) {
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-green-600 text-sm font-medium py-2">
+          <div className={`flex items-center gap-2 text-sm font-medium py-2 ${email.replyCorrect ? 'text-green-600' : 'text-yellow-600'}`}>
             <Check size={16} />
-            Replied: "{email.replyChoice === 'A' ? email.option_a : email.option_b}"
+            Replied: "{email.replyChoice === 'option_a' ? email.option_a : email.option_b}"
+            {email.replyCorrect ? ' ✓' : ''}
           </div>
         )}
       </div>
@@ -99,10 +159,12 @@ function EmailDetail({ email, onReply }) {
 export default function MessagesCard({ isExpanded }) {
   const messageBubbles = useGameStore((s) => s.messageBubbles)
   const replyToBubble = useGameStore((s) => s.replyToBubble)
+  const expireMessage = useGameStore((s) => s.expireMessage)
   const selectEmail = useGameStore((s) => s.selectEmail)
   const selectedEmailId = useGameStore((s) => s.selectedEmailId)
   const unreadCount = useGameStore((s) => s.unreadCount)
 
+  const activeCount = messageBubbles.filter(b => !b.replied && !b.expired).length
   const selectedEmail = messageBubbles.find((e) => e.id === selectedEmailId) || messageBubbles[messageBubbles.length - 1]
 
   if (!isExpanded) {
@@ -118,7 +180,9 @@ export default function MessagesCard({ isExpanded }) {
         </div>
         <h3 className="text-base font-black tracking-wider text-slate-700">Inbox</h3>
         {messageBubbles.length > 0 && (
-          <p className="text-[11px] text-slate-400">{messageBubbles.length} emails</p>
+          <p className="text-[11px] text-slate-400">
+            {messageBubbles.length} emails{activeCount > 0 ? ` · ${activeCount} pending` : ''}
+          </p>
         )}
       </div>
     )
@@ -152,6 +216,7 @@ export default function MessagesCard({ isExpanded }) {
                 email={email}
                 isSelected={selectedEmail?.id === email.id}
                 onSelect={selectEmail}
+                onExpire={expireMessage}
               />
             ))}
           </div>
@@ -165,7 +230,7 @@ export default function MessagesCard({ isExpanded }) {
                 animate={{ opacity: 1 }}
                 className="h-full"
               >
-                <EmailDetail email={selectedEmail} onReply={replyToBubble} />
+                <EmailDetail email={selectedEmail} onReply={replyToBubble} onExpire={expireMessage} />
               </motion.div>
             ) : (
               <div className="h-full flex items-center justify-center text-slate-400 text-sm">

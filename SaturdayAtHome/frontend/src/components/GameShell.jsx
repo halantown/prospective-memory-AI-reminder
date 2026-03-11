@@ -62,6 +62,13 @@ export default function GameShell() {
           pmTimeout()
         }
       }
+
+      // Plant wilt — wilts 30s after needing water
+      if (state.plantNeedsWater && !state.plantWilted && state.plantNeedsWaterSince) {
+        if (now - state.plantNeedsWaterSince >= 30000) {
+          state.wiltPlant()
+        }
+      }
     }, HOB_CHECK_RATE)
     return () => clearInterval(timer)
   }, [blockRunning])

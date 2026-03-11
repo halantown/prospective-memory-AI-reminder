@@ -1,7 +1,12 @@
 import { motion } from 'framer-motion'
-import { Sofa, Tv } from 'lucide-react'
+import { useGameStore } from '../../store/gameStore'
+import { Sofa, Tv, Flower2 } from 'lucide-react'
 
 export default function LivingCard({ isExpanded }) {
+  const plantNeedsWater = useGameStore((s) => s.plantNeedsWater)
+  const plantWilted = useGameStore((s) => s.plantWilted)
+  const waterPlant = useGameStore((s) => s.waterPlant)
+
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-6 relative">
       <div className={`flex items-center gap-3 text-amber-800 ${isExpanded ? 'absolute top-6 left-6' : 'mb-4'}`}>
@@ -29,15 +34,40 @@ export default function LivingCard({ isExpanded }) {
         </div>
       </motion.div>
 
+      {/* Plant — needs attention indicator */}
       {isExpanded && (
-        <motion.button
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          whileTap={{ scale: 0.95 }}
-          className="mt-8 px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg transition-colors"
-        >
-          Watch TV
-        </motion.button>
+        <div className="absolute bottom-8 right-8">
+          <motion.button
+            onClick={(e) => { e.stopPropagation(); if (plantNeedsWater) waterPlant() }}
+            disabled={!plantNeedsWater}
+            whileTap={plantNeedsWater ? { scale: 0.9 } : {}}
+            className={`flex flex-col items-center gap-1 p-4 rounded-2xl border-2 transition-all ${
+              plantWilted
+                ? 'border-red-400 bg-red-50 shadow-lg animate-pulse cursor-pointer'
+                : plantNeedsWater
+                ? 'border-orange-400 bg-orange-50 shadow-lg cursor-pointer hover:shadow-xl'
+                : 'border-green-200 bg-green-50/50 cursor-default'
+            }`}
+          >
+            <Flower2 size={32} className={
+              plantWilted ? 'text-red-400' : plantNeedsWater ? 'text-orange-500' : 'text-green-400'
+            } />
+            <span className={`text-xs font-bold ${
+              plantWilted ? 'text-red-600' : plantNeedsWater ? 'text-orange-600' : 'text-green-600'
+            }`}>
+              {plantWilted ? '🥀 Wilting!' : plantNeedsWater ? '💧 Needs water' : '🌱 Happy'}
+            </span>
+          </motion.button>
+        </div>
+      )}
+
+      {/* Mini plant indicator in overview */}
+      {!isExpanded && plantNeedsWater && (
+        <div className={`absolute bottom-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+          plantWilted ? 'bg-red-500 animate-ping' : 'bg-orange-400 animate-pulse'
+        }`}>
+          🌿
+        </div>
       )}
     </div>
   )
