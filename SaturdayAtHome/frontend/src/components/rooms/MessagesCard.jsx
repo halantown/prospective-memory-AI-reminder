@@ -4,10 +4,11 @@ import { useGameStore } from '../../store/gameStore'
 import { Mail, Reply, Check, X, Clock } from 'lucide-react'
 
 const AVATAR_COLORS = {
-  S: 'bg-violet-500',
-  M: 'bg-rose-500',
-  D: 'bg-sky-500',
-  J: 'bg-teal-500',
+  '芳': 'bg-violet-500',
+  '明': 'bg-sky-500',
+  '王': 'bg-teal-500',
+  '🛵': 'bg-amber-500',
+  '📦': 'bg-emerald-500',
   default: 'bg-slate-500',
 }
 
@@ -147,7 +148,7 @@ function EmailDetail({ email, onReply, onExpire }) {
         ) : (
           <div className={`flex items-center gap-2 text-sm font-medium py-2 ${email.replyCorrect ? 'text-green-600' : 'text-yellow-600'}`}>
             <Check size={16} />
-            Replied: "{email.replyChoice === 'option_a' ? email.option_a : email.option_b}"
+            已回复: "{email.replyChoice === 'option_a' ? email.option_a : email.option_b}"
             {email.replyCorrect ? ' ✓' : ''}
           </div>
         )}
@@ -178,10 +179,10 @@ export default function MessagesCard({ isExpanded }) {
             </span>
           )}
         </div>
-        <h3 className="text-base font-black tracking-wider text-slate-700">Inbox</h3>
+        <h3 className="text-base font-black tracking-wider text-slate-700">收件箱</h3>
         {messageBubbles.length > 0 && (
           <p className="text-[11px] text-slate-400">
-            {messageBubbles.length} emails{activeCount > 0 ? ` · ${activeCount} pending` : ''}
+            {messageBubbles.length} 封邮件{activeCount > 0 ? ` · ${activeCount} 待回复` : ''}
           </p>
         )}
       </div>
@@ -193,10 +194,10 @@ export default function MessagesCard({ isExpanded }) {
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-200 bg-white/80">
         <Mail size={22} className="text-slate-600" />
-        <h2 className="text-lg font-black tracking-wider text-slate-700">Inbox</h2>
+        <h2 className="text-lg font-black tracking-wider text-slate-700">收件箱</h2>
         {unreadCount > 0 && (
           <span className="bg-blue-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
-            {unreadCount} new
+            {unreadCount} 新
           </span>
         )}
       </div>
@@ -204,7 +205,7 @@ export default function MessagesCard({ isExpanded }) {
       {messageBubbles.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-2">
           <Mail size={40} className="opacity-30" />
-          <p className="text-sm">No emails yet</p>
+          <p className="text-sm">暂无邮件</p>
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
@@ -234,7 +235,7 @@ export default function MessagesCard({ isExpanded }) {
               </motion.div>
             ) : (
               <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-                Select an email to read
+                选择一封邮件阅读
               </div>
             )}
           </div>

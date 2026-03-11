@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { useHobProgress } from '../../hooks/useHobProgress'
 import { Flame, AlertCircle } from 'lucide-react'
+import MedicineCabinet from '../tasks/MedicineCabinet'
 
 const steakColor = {
   empty: 'bg-gray-300',
@@ -148,6 +149,13 @@ export default function KitchenCard({ isExpanded }) {
           )
         })}
       </div>
+
+      {/* Medicine cabinet — bottom right of kitchen (GDD A1) */}
+      {isExpanded && (
+        <div className="absolute bottom-6 right-6">
+          <MedicineCabinet />
+        </div>
+      )}
     </div>
   )
 }

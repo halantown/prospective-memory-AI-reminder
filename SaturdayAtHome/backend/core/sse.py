@@ -18,10 +18,10 @@ sse_queues: dict[str, list[asyncio.Queue]] = {}
 async def send_sse(session_id: str, event: str, data: dict):
     """Push an SSE event to all connected clients for this session.
 
-    Special handling for steak_spawn:
-    - Reconciles hob state first
-    - Only spawns on empty hobs (skips if occupied)
-    - Sets hob state + durations from event data
+    Special handling:
+    - steak_spawn: reconciles hob state, only spawns on empty hobs
+    - trigger_appear: opens an execution window (GDD A1)
+    - window_close: closes the execution window, records miss if not submitted
     """
     if event == "steak_spawn":
         hobs = get_session_hobs(session_id)
@@ -39,6 +39,19 @@ async def send_sse(session_id: str, event: str, data: dict):
             hobs[hob_id].started_at = time.time()
             hobs[hob_id].cooking_ms = dur.get("cooking", DIFFICULTY_CONFIG["medium"]["cooking_ms"])
             hobs[hob_id].ready_ms = dur.get("ready", DIFFICULTY_CONFIG["medium"]["ready_ms"])
+
+    elif event == "trigger_appear":
+        from services.window_service import open_window
+        task_id = data.get("task_id")
+        window_ms = data.get("window_ms", 30000)
+        if task_id:
+            open_window(session_id, task_id, window_ms)
+
+    elif event == "window_close":
+        from services.window_service import close_window
+        task_id = data.get("task_id")
+        if task_id:
+            close_window(session_id, task_id, reason="missed")
 
     logger.info(f"SSE [{session_id}] → {event}: {data}")
 

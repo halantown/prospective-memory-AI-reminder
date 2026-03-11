@@ -7,8 +7,6 @@ import Sidebar from './ui/Sidebar'
 import RoomOverview from './rooms/RoomOverview'
 import RoomExpanded from './rooms/RoomExpanded'
 import RobotAvatar from './ui/RobotAvatar'
-import ReportTaskButton from './ui/ReportTaskButton'
-import PmExecuteOverlay from './ui/PmExecuteOverlay'
 import EncodingScreen from './screens/EncodingScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import BlockEndScreen from './screens/BlockEndScreen'
@@ -54,14 +52,6 @@ export default function GameShell() {
           state.transitionHob(hob.id, HOB_STATUS.BURNING)
         }
       })
-
-      // PM execution timeout (T13)
-      const { pmExecution, pmTimeout } = state
-      if (pmExecution.active && pmExecution.windowOpenAt) {
-        if (now - pmExecution.windowOpenAt >= pmExecution.timeLimit) {
-          pmTimeout()
-        }
-      }
 
       // Plant wilt — wilts 30s after needing water
       if (state.plantNeedsWater && !state.plantWilted && state.plantNeedsWaterSince) {
@@ -115,8 +105,6 @@ export default function GameShell() {
             {activeRoom !== 'overview' && <RoomExpanded />}
           </AnimatePresence>
 
-          <ReportTaskButton />
-          <PmExecuteOverlay />
           <RobotAvatar />
         </div>
       </div>

@@ -10,6 +10,7 @@ from core.database import get_db
 from utils.helpers import log_action
 from models.entities import HobStatus
 from services.hob_service import get_session_hobs, reconcile_hob, clear_session_hobs
+from services.window_service import clear_session_windows
 from models.schemas import FireEventRequest
 from core.sse import send_sse, sse_queues, clear_session_queues
 
@@ -112,6 +113,7 @@ async def admin_delete_session(session_id: str):
     # Clean up in-memory state
     clear_session_hobs(session_id)
     clear_session_queues(session_id)
+    clear_session_windows(session_id)
 
     for k in list(active_timelines.keys()):
         if k.startswith(session_id):

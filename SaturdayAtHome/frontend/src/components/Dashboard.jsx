@@ -352,7 +352,7 @@ function PMControls({ fireEvent, activeBlock }) {
         return (
           <div key={taskId} className="flex gap-1 items-center">
             <span className="text-[10px] text-gray-500 w-20 font-mono truncate">{taskId}</span>
-            <button onClick={() => fireEvent('trigger_appear', { task_id: taskId, slot })}
+            <button onClick={() => fireEvent('trigger_appear', { task_id: taskId, slot, window_ms: 30000 })}
               className={`${btnOrange} text-[10px]`}>👁</button>
             <button onClick={() => fireEvent('window_close', { task_id: taskId, slot })}
               className={`${btnRed} text-[10px]`}>✕</button>

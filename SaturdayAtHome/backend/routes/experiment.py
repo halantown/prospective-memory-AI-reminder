@@ -14,6 +14,7 @@ from core.database import get_db
 from utils.helpers import log_action
 from models.entities import HobStatus
 from services.hob_service import get_session_hobs, reconcile_hob, schedule_respawn
+from services.window_service import submit_to_window
 from models.schemas import (
     EncodingReport, PmActionReport, SteakActionReport,
     OngoingScoreReport, FakeTriggerReport, QuestionnaireReport,
@@ -47,11 +48,24 @@ async def report_encoding(session_id: str, block_num: int, report: EncodingRepor
 
 @router.post("/session/{session_id}/block/{block_num}/action")
 async def report_pm_action(session_id: str, block_num: int, report: PmActionReport):
+    """Accept a PM action. Per GDD A1.3: validates against execution window, does NOT return score."""
     score = score_pm_action(report.task_id, report)
     logger.info(
         f"PM action [{session_id}] block={block_num} task={report.task_id} "
         f"action={report.action} target={report.selected_target} detail={report.selected_detail} → score={score}"
     )
+
+    # Validate against execution window (GDD A1.3)
+    window_result = submit_to_window(session_id, report.task_id, score)
+    if "error" in window_result:
+        logger.info(f"PM window check [{session_id}] task={report.task_id}: {window_result['error']}")
+        # Still log the action even if window is closed/missing
+        if window_result["error"] == "no_active_window":
+            # Could be a fake trigger interaction — log but don't record as PM trial
+            log_action(session_id, block_num, "pm_action_no_window", {
+                "task_id": report.task_id, "action": report.action, "client_ts": report.client_ts,
+            })
+            return {"received": True}
 
     db = get_db(DB_PATH)
     existing = db.execute(
@@ -62,7 +76,7 @@ async def report_pm_action(session_id: str, block_num: int, report: PmActionRepo
     if existing:
         logger.warning(f"Duplicate PM action [{session_id}] task={report.task_id}")
         db.close()
-        return {"status": "duplicate", "score": score}
+        return {"received": True}
 
     db.execute(
         """INSERT INTO pm_trials (session_id, block_number, task_id, action, selected_target, selected_detail, pm_score, acted_at)
@@ -79,7 +93,8 @@ async def report_pm_action(session_id: str, block_num: int, report: PmActionRepo
         "score": score,
     })
 
-    return {"status": "ok", "score": score}
+    # Per GDD A1.3: don't return score to frontend — participant stays blind
+    return {"received": True}
 
 
 # ── Steak Action ───────────────────────────────────────────

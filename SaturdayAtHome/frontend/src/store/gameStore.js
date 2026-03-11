@@ -202,7 +202,6 @@ export const useGameStore = create((set, get) => ({
   selectedEmailId: null,
 
   addMessageBubble: (bubble) => {
-    if (get().pmExecution.active) return // T13-5: pause new bubbles during PM execution
     set((state) => ({
       messageBubbles: [...state.messageBubbles, {
         ...bubble,
@@ -281,60 +280,31 @@ export const useGameStore = create((set, get) => ({
   },
   wiltPlant: () => set({ plantWilted: true }),
 
-  // ── PM Execution ───────────────────────────────────────
-  pmExecution: {
-    active: false,
-    taskId: null,
-    windowOpenAt: null,
-    timeLimit: 30000,
-    submitted: false,
-  },
-  reportTaskVisible: false,
+  // ── PM Task Interactability (GDD A1) ────────────────────
+  // Per-task interactable state: trigger_appear adds, window_close removes.
+  // Participant never sees a timer or "Report Task" button.
+  interactableTasks: [],    // task IDs currently in their execution window
+  openCabinetTask: null,    // task ID whose cabinet is currently open (inline, not overlay)
 
   triggerAppear: (taskId) => {
     set((s) => ({
-      reportTaskVisible: true,
-      pmExecution: { ...s.pmExecution, taskId, submitted: false, active: false, windowOpenAt: null },
+      interactableTasks: [...s.interactableTasks.filter(t => t !== taskId), taskId],
     }))
   },
 
   windowClose: (taskId) => {
-    const { pmExecution } = get()
-    if (pmExecution.taskId !== taskId) return
-    if (pmExecution.submitted) {
-      set({ reportTaskVisible: false })
-    } else {
-      set({
-        reportTaskVisible: false,
-        pmExecution: { active: false, taskId: null, windowOpenAt: null, timeLimit: 30000, submitted: false },
-      })
-    }
-  },
-
-  openPmOverlay: () => {
     set((s) => ({
-      pmExecution: { ...s.pmExecution, active: true, windowOpenAt: ts(), submitted: false },
+      interactableTasks: s.interactableTasks.filter(t => t !== taskId),
+      openCabinetTask: s.openCabinetTask === taskId ? null : s.openCabinetTask,
     }))
   },
 
-  submitPmAction: (actionData = {}) => {
-    set((s) => ({
-      pmExecution: { ...s.pmExecution, submitted: true, active: false },
-      reportTaskVisible: false,
-    }))
-  },
+  openCabinet: (taskId) => set({ openCabinetTask: taskId }),
+  closeCabinet: () => set({ openCabinetTask: null }),
 
-  closePmOverlay: () => {
-    set((s) => ({
-      pmExecution: { ...s.pmExecution, active: false },
-    }))
-  },
-
-  pmTimeout: () => {
-    set((s) => ({
-      pmExecution: { ...s.pmExecution, active: false },
-      reportTaskVisible: false,
-    }))
+  submitCabinetAction: () => {
+    // Close the cabinet after submission — no score feedback to participant
+    set({ openCabinetTask: null })
   },
 
   // ── Robot ──────────────────────────────────────────────
@@ -342,7 +312,6 @@ export const useGameStore = create((set, get) => ({
   robotText: '',
 
   triggerRobot: (text) => {
-    if (get().pmExecution.active) return // T13-5: pause robot during PM execution
     set({ robotSpeaking: true, robotText: text })
     const words = text.split(' ').length
     const duration = Math.max(3000, words * 300 + 2000)
@@ -376,8 +345,8 @@ export const useGameStore = create((set, get) => ({
     messageBubbles: [],
     unreadCount: 0,
     selectedEmailId: null,
-    reportTaskVisible: false,
-    pmExecution: { active: false, taskId: null, windowOpenAt: null, timeLimit: 30000, submitted: false },
+    interactableTasks: [],
+    openCabinetTask: null,
     encodingConfirmed: false,
     encodingQuizAttempts: 0,
     machine: { status: 'empty', progress: 0 },
@@ -416,8 +385,8 @@ export const useGameStore = create((set, get) => ({
     messageBubbles: [],
     unreadCount: 0,
     selectedEmailId: null,
-    reportTaskVisible: false,
-    pmExecution: { active: false, taskId: null, windowOpenAt: null, timeLimit: 30000, submitted: false },
+    interactableTasks: [],
+    openCabinetTask: null,
     machine: { status: 'empty', progress: 0 },
     fakeTriggered: false,
     fakeType: null,

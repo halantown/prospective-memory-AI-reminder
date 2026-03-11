@@ -23,8 +23,8 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
     reminder_a_text = _get_reminder_text(condition, "A")
     reminder_b_text = _get_reminder_text(condition, "B")
 
-    neutral_1 = "Smells good in the kitchen!"
-    neutral_2 = "How's the party prep going?"
+    neutral_1 = "厨房好香啊！"
+    neutral_2 = "准备得怎么样了？"
 
     timeline = [
         (0,    "block_start",        {"block_number": block_num, "condition": condition}),
@@ -35,27 +35,27 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
         # Robot neutral #1
         (75,   "robot_neutral",      {"text": neutral_1}),
 
-        # Force yellow 10s before Reminder A
-        (110,  "force_yellow_steak", {"hob_id": 0}),
+        # Force yellow 25s before Reminder A (GDD A8: give more time to return to kitchen)
+        (95,   "force_yellow_steak", {"hob_id": 0}),
 
         # Reminder A
         (120,  "reminder_fire",      {"text": reminder_a_text, "slot": "A", "condition": condition}),
 
-        # Trigger A
-        (210,  "trigger_appear",     {"task_id": _get_task_a(block_num), "slot": "A"}),
+        # Trigger A (hidden 30s execution window — GDD A1)
+        (210,  "trigger_appear",     {"task_id": _get_task_a(block_num), "slot": "A", "window_ms": 30000}),
         (240,  "window_close",       {"task_id": _get_task_a(block_num), "slot": "A"}),
 
         # Robot neutral #2
         (270,  "robot_neutral",      {"text": neutral_2}),
 
-        # Force yellow before Reminder B
-        (290,  "force_yellow_steak", {"hob_id": 1}),
+        # Force yellow before Reminder B (25s lead time)
+        (275,  "force_yellow_steak", {"hob_id": 1}),
 
         # Reminder B
         (300,  "reminder_fire",      {"text": reminder_b_text, "slot": "B", "condition": condition}),
 
-        # Trigger B
-        (390,  "trigger_appear",     {"task_id": _get_task_b(block_num), "slot": "B"}),
+        # Trigger B (hidden 30s execution window — GDD A1)
+        (390,  "trigger_appear",     {"task_id": _get_task_b(block_num), "slot": "B", "window_ms": 30000}),
         (420,  "window_close",       {"task_id": _get_task_b(block_num), "slot": "B"}),
 
         # Block end
@@ -71,62 +71,62 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
         hob_cycle += 1
         t += random.randint(8, 15)
 
-    # Message bubbles — situational questions with meaningful choices
-    # correct_option field is for backend scoring only (not sent to frontend)
+    # Message bubbles — story-coherent NPCs per GDD A3
+    # correct field used for backend scoring only
     timeline.extend([
         (55,   "message_bubble", {
-            "from": "Sarah",
-            "subject": "What time tonight?",
-            "body": "Hey! What time should I come over for dinner tonight? I need to know so I can plan my evening.",
-            "option_a": "7 o'clock",
-            "option_b": "8 o'clock",
+            "from": "张芳",
+            "subject": "今晚聚会",
+            "body": "嘿！今晚聚会几点开始？我好安排一下时间。",
+            "option_a": "7点",
+            "option_b": "8点",
             "correct": "option_a",
-            "avatar": "S",
+            "avatar": "芳",
         }),
         (130,  "message_bubble", {
-            "from": "Mom",
-            "subject": "Grocery question",
-            "body": "I'm at the supermarket. Do you need whole milk or skimmed milk? I remember you mentioned something last week.",
-            "option_a": "Whole milk",
-            "option_b": "Skimmed milk",
+            "from": "外卖平台",
+            "subject": "配送确认",
+            "body": "您的订单即将送达，请问放在门口还是需要送上楼？",
+            "option_a": "放门口",
+            "option_b": "送上楼",
             "correct": "option_a",
-            "avatar": "M",
+            "avatar": "🛵",
         }),
         (220,  "message_bubble", {
-            "from": "David",
-            "subject": "Parking spot?",
-            "body": "I'm driving over. Which parking spot should I use — A12 near the entrance or B07 by the garden?",
+            "from": "李明",
+            "subject": "停车问题",
+            "body": "我开车过来，A12号车位靠入口那个还是B07号靠花园那个是你的？",
             "option_a": "A12",
             "option_b": "B07",
             "correct": "option_b",
-            "avatar": "D",
+            "avatar": "明",
         }),
         (310,  "message_bubble", {
-            "from": "Neighbor Jan",
-            "subject": "Package arrived",
-            "body": "Hi! A package came for you while you were out. Should I leave it at your door or keep it at mine until later?",
-            "option_a": "Leave at my door",
-            "option_b": "Keep it for now",
+            "from": "物业",
+            "subject": "快递通知",
+            "body": "您有一个包裹到了，请问放在门卫处还是送到家门口？",
+            "option_a": "门卫处",
+            "option_b": "家门口",
             "correct": "option_a",
-            "avatar": "J",
+            "avatar": "📦",
         }),
         (400,  "message_bubble", {
-            "from": "Sarah",
-            "subject": "Dessert idea?",
-            "body": "Should I bring chocolate cake or apple pie for dessert tonight? I can stop by the bakery on the way.",
-            "option_a": "Chocolate cake",
-            "option_b": "Apple pie",
+            "from": "张芳",
+            "subject": "甜点选择",
+            "body": "我顺路买个甜点过来，你觉得巧克力蛋糕好还是苹果派好？",
+            "option_a": "巧克力蛋糕",
+            "option_b": "苹果派",
             "correct": "option_b",
-            "avatar": "S",
+            "avatar": "芳",
         }),
         (460,  "message_bubble", {
-            "from": "Mom",
-            "subject": "Bus or car?",
-            "body": "I can't decide — should I take the bus or drive over? Parking is sometimes difficult in your area.",
-            "option_a": "Take the bus",
-            "option_b": "Just drive",
+            "from": "王阿姨",
+            "subject": "来串门",
+            "body": "我想过来坐坐，你在家吗？要不要我带点水果过来？",
+            "option_a": "好的，来吧",
+            "option_b": "今天不太方便",
             "correct": "option_a",
-            "avatar": "M",
+            "avatar": "王",
         }),
     ])
 
