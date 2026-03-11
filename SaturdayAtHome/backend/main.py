@@ -17,6 +17,16 @@ from pydantic import BaseModel
 from database import init_db, get_db
 from timeline import BlockTimeline
 
+import logging
+import random
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("saturday")
+
 DB_PATH = Path(__file__).parent / "experiment.db"
 
 # Active SSE connections: session_id -> list of asyncio.Queue
@@ -56,6 +66,35 @@ def get_session_hobs(session_id: str) -> list[Hob]:
     if session_id not in session_hobs:
         session_hobs[session_id] = [Hob(id=i) for i in range(3)]
     return session_hobs[session_id]
+
+
+def log_action(session_id: str, block_num: int, action_type: str, payload: dict = None):
+    """Persist an action log entry to the database."""
+    try:
+        db = get_db(DB_PATH)
+        db.execute(
+            "INSERT INTO action_logs (session_id, block_number, action_type, payload, ts) VALUES (?, ?, ?, ?, ?)",
+            (session_id, block_num, action_type, json.dumps(payload) if payload else None, time.time()),
+        )
+        db.commit()
+        db.close()
+    except Exception as e:
+        logger.error(f"Failed to log action: {e}")
+
+
+async def _schedule_respawn(session_id: str, block_num: int, hob_id: int):
+    """Wait 15-25s then send steak_spawn SSE if the hob is still empty."""
+    delay = 15 + random.random() * 10
+    logger.info(f"Respawn scheduled [{session_id}] hob={hob_id} in {delay:.1f}s")
+    await asyncio.sleep(delay)
+    hobs = get_session_hobs(session_id)
+    if hob_id < len(hobs) and hobs[hob_id].status == HobStatus.EMPTY:
+        cfg = DIFFICULTY_CONFIG.get("medium")
+        dur = {"cooking": cfg["cooking_ms"], "ready": cfg["ready_ms"]}
+        hobs[hob_id].status = HobStatus.COOKING
+        hobs[hob_id].started_at = time.time()
+        await send_sse(session_id, "steak_spawn", {"hob_id": hob_id, "duration": dur})
+        logger.info(f"Respawned steak [{session_id}] hob={hob_id}")
 
 
 @asynccontextmanager
@@ -164,6 +203,7 @@ def score_pm_action(task_id: str, action: PmActionReport) -> int:
 
 async def send_sse(session_id: str, event: str, data: dict):
     """Push an SSE event to all connected clients for this session."""
+    logger.info(f"SSE [{session_id}] → {event}: {data}")
     if session_id not in sse_queues:
         return
     payload = {"event": event, "data": data, "ts": time.time()}
@@ -187,6 +227,9 @@ async def start_session(req: SessionStartRequest):
     )
     db.commit()
     db.close()
+
+    logger.info(f"Session started: {session_id} (participant={req.participant_id}, group={group})")
+    log_action(session_id, 0, "session_start", {"participant_id": req.participant_id, "group": group})
 
     return SessionStartResponse(
         session_id=session_id,
@@ -278,6 +321,7 @@ async def block_stream(session_id: str, block_num: int):
 
 @app.post("/session/{session_id}/block/{block_num}/encoding")
 async def report_encoding(session_id: str, block_num: int, report: EncodingReport):
+    logger.info(f"Encoding [{session_id}] block={block_num} attempts={report.quiz_attempts}")
     db = get_db(DB_PATH)
     db.execute(
         """INSERT INTO encoding_logs (session_id, block_number, quiz_attempts, confirmed_at)
@@ -286,12 +330,17 @@ async def report_encoding(session_id: str, block_num: int, report: EncodingRepor
     )
     db.commit()
     db.close()
+    log_action(session_id, block_num, "encoding_confirm", {"quiz_attempts": report.quiz_attempts})
     return {"status": "ok"}
 
 
 @app.post("/session/{session_id}/block/{block_num}/action")
 async def report_pm_action(session_id: str, block_num: int, report: PmActionReport):
     score = score_pm_action(report.task_id, report)
+    logger.info(
+        f"PM action [{session_id}] block={block_num} task={report.task_id} "
+        f"action={report.action} target={report.selected_target} detail={report.selected_detail} → score={score}"
+    )
 
     db = get_db(DB_PATH)
     # Deduplicate
@@ -301,6 +350,7 @@ async def report_pm_action(session_id: str, block_num: int, report: PmActionRepo
     ).fetchone()
 
     if existing:
+        logger.warning(f"Duplicate PM action [{session_id}] task={report.task_id}")
         db.close()
         return {"status": "duplicate", "score": score}
 
@@ -311,6 +361,12 @@ async def report_pm_action(session_id: str, block_num: int, report: PmActionRepo
     )
     db.commit()
     db.close()
+
+    log_action(session_id, block_num, "pm_action", {
+        "task_id": report.task_id, "action": report.action,
+        "selected_target": report.selected_target, "selected_detail": report.selected_detail,
+        "score": score,
+    })
 
     return {"status": "ok", "score": score}
 
@@ -323,6 +379,7 @@ async def report_steak_action(session_id: str, block_num: int, report: SteakActi
         raise HTTPException(400, "Invalid hob_id")
 
     hob = hobs[report.hob_id]
+    prev_status = hob.status.value
     score = 0
 
     if report.action == "flip" and hob.status == HobStatus.READY:
@@ -343,6 +400,15 @@ async def report_steak_action(session_id: str, block_num: int, report: SteakActi
             f"Invalid action '{report.action}' for hob status '{hob.status.value}'",
         )
 
+    logger.info(
+        f"Steak [{session_id}] hob={report.hob_id} {report.action}: "
+        f"{prev_status} → {hob.status.value} (score={score})"
+    )
+    log_action(session_id, block_num, f"steak_{report.action}", {
+        "hob_id": report.hob_id, "prev_status": prev_status,
+        "new_status": hob.status.value, "score": score,
+    })
+
     # Log score delta
     db = get_db(DB_PATH)
     db.execute(
@@ -353,7 +419,14 @@ async def report_steak_action(session_id: str, block_num: int, report: SteakActi
     db.commit()
     db.close()
 
+    # Schedule respawn via SSE after serve/clean (15-25s delay)
+    if report.action in ("serve", "clean"):
+        asyncio.create_task(_schedule_respawn(session_id, block_num, report.hob_id))
+
     return {"status": "ok", "score": score, "hob_status": hob.status.value}
+
+
+@app.post("/session/{session_id}/block/{block_num}/ongoing")
 async def report_ongoing(session_id: str, block_num: int, report: OngoingScoreReport):
     db = get_db(DB_PATH)
     db.execute(
@@ -368,6 +441,10 @@ async def report_ongoing(session_id: str, block_num: int, report: OngoingScoreRe
 
 @app.post("/session/{session_id}/block/{block_num}/fake")
 async def report_fake_trigger(session_id: str, block_num: int, report: FakeTriggerReport):
+    logger.info(
+        f"Fake trigger [{session_id}] block={block_num} type={report.trigger_type} "
+        f"response={report.response} false_alarm={report.false_alarm}"
+    )
     db = get_db(DB_PATH)
     db.execute(
         """INSERT INTO fake_trigger_logs (session_id, block_number, trigger_type, response, false_alarm, ts)
@@ -376,6 +453,10 @@ async def report_fake_trigger(session_id: str, block_num: int, report: FakeTrigg
     )
     db.commit()
     db.close()
+    log_action(session_id, block_num, "fake_trigger", {
+        "trigger_type": report.trigger_type, "response": report.response,
+        "false_alarm": report.false_alarm,
+    })
     return {"status": "ok"}
 
 

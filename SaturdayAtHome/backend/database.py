@@ -90,6 +90,15 @@ def init_db(db_path: Path):
         open_feedback   TEXT,
         ts              REAL NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS action_logs (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id      TEXT NOT NULL REFERENCES sessions(session_id),
+        block_number    INTEGER,
+        action_type     TEXT NOT NULL,
+        payload         TEXT,
+        ts              REAL NOT NULL
+    );
     """)
 
     db.commit()

@@ -103,6 +103,7 @@ export const useGameStore = create((set, get) => ({
 
   // Player actions on hobs
   flipSteak: (hobId) => {
+    console.log('[Steak] flip', { hobId })
     set((state) => ({
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.READY
@@ -118,6 +119,7 @@ export const useGameStore = create((set, get) => ({
   },
 
   serveSteak: (hobId) => {
+    console.log('[Steak] serve', { hobId })
     set((state) => ({
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.READY
@@ -130,17 +132,11 @@ export const useGameStore = create((set, get) => ({
         time: new Date().toLocaleTimeString(),
       }].slice(-50),
     }))
-    // Auto-respawn after random delay
-    const delay = 15000 + Math.random() * 10000
-    setTimeout(() => {
-      const s = get()
-      if (s.blockRunning && s.hobs.find(h => h.id === hobId)?.status === HOB_STATUS.EMPTY) {
-        get().spawnSteak(hobId)
-      }
-    }, delay)
+    // Respawn is handled by backend SSE (steak_spawn event after 15-25s)
   },
 
   cleanSteak: (hobId) => {
+    console.log('[Steak] clean', { hobId })
     set((state) => ({
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.BURNING
@@ -153,14 +149,7 @@ export const useGameStore = create((set, get) => ({
         time: new Date().toLocaleTimeString(),
       }].slice(-50),
     }))
-    // Auto-respawn
-    const delay = 15000 + Math.random() * 10000
-    setTimeout(() => {
-      const s = get()
-      if (s.blockRunning && s.hobs.find(h => h.id === hobId)?.status === HOB_STATUS.EMPTY) {
-        get().spawnSteak(hobId)
-      }
-    }, delay)
+    // Respawn is handled by backend SSE (steak_spawn event after 15-25s)
   },
 
   // Force a hob into READY state regardless of current state
@@ -228,10 +217,13 @@ export const useGameStore = create((set, get) => ({
     messages: [...state.messages, { text, type, time: new Date().toLocaleTimeString() }].slice(-50),
   })),
 
-  addMessageBubble: (bubble) => set((state) => ({
-    messageBubbles: [...state.messageBubbles, { ...bubble, id: Date.now(), replied: false }],
-    unreadCount: state.unreadCount + 1,
-  })),
+  addMessageBubble: (bubble) => {
+    if (get().pmExecution.active) return // T13-5: pause new bubbles during PM execution
+    set((state) => ({
+      messageBubbles: [...state.messageBubbles, { ...bubble, id: Date.now(), replied: false }],
+      unreadCount: state.unreadCount + 1,
+    }))
+  },
 
   replyToBubble: (bubbleId, choice) => set((state) => ({
     messageBubbles: state.messageBubbles.map((b) =>
@@ -246,40 +238,87 @@ export const useGameStore = create((set, get) => ({
   })),
 
   // ── PM Execution ───────────────────────────────────────
-  pmOverlayOpen: false,
-  pmTaskId: null,
-  pmCountdown: 30,
+  pmExecution: {
+    active: false,
+    taskId: null,
+    windowOpenAt: null,
+    timeLimit: 30000,
+    submitted: false,
+  },
   reportTaskVisible: false,
 
-  showReportTask: (taskId) => set({
-    reportTaskVisible: true,
-    pmTaskId: taskId,
-  }),
+  // SSE: trigger_appear → Report Task button appears
+  triggerAppear: (taskId) => {
+    console.log('[PM] trigger_appear', { taskId })
+    set((s) => ({
+      reportTaskVisible: true,
+      pmExecution: { ...s.pmExecution, taskId, submitted: false, active: false, windowOpenAt: null },
+    }))
+  },
 
-  hideReportTask: () => set({
-    reportTaskVisible: false,
-    pmTaskId: null,
-    pmOverlayOpen: false,
-  }),
-
-  openPmOverlay: () => set({ pmOverlayOpen: true, pmCountdown: 30 }),
-
-  closePmOverlay: () => set({ pmOverlayOpen: false, pmCountdown: 30 }),
-
-  tickPmCountdown: () => set((state) => {
-    if (!state.pmOverlayOpen) return {}
-    const next = state.pmCountdown - 1
-    if (next <= 0) {
-      return { pmOverlayOpen: false, reportTaskVisible: false, pmCountdown: 30 }
+  // SSE: window_close → button disappears, miss if not submitted
+  windowClose: (taskId) => {
+    const { pmExecution } = get()
+    if (pmExecution.taskId !== taskId) return
+    console.log('[PM] window_close', { taskId, submitted: pmExecution.submitted })
+    if (pmExecution.submitted) {
+      set({ reportTaskVisible: false })
+    } else {
+      set({
+        reportTaskVisible: false,
+        pmExecution: { active: false, taskId: null, windowOpenAt: null, timeLimit: 30000, submitted: false },
+        messages: [...get().messages, {
+          text: `⏰ Missed task window!`, type: 'error',
+          time: new Date().toLocaleTimeString(),
+        }].slice(-50),
+      })
     }
-    return { pmCountdown: next }
-  }),
+  },
+
+  // User clicks Report Task button → overlay opens with 30s countdown
+  openPmOverlay: () => {
+    console.log('[PM] overlay_open', { taskId: get().pmExecution.taskId })
+    set((s) => ({
+      pmExecution: { ...s.pmExecution, active: true, windowOpenAt: Date.now(), submitted: false },
+    }))
+  },
+
+  // User confirms PM action
+  submitPmAction: (actionData = {}) => {
+    console.log('[PM] submit', { taskId: get().pmExecution.taskId, ...actionData })
+    set((s) => ({
+      pmExecution: { ...s.pmExecution, submitted: true, active: false },
+      reportTaskVisible: false,
+    }))
+  },
+
+  // Close overlay without submitting (not sure)
+  closePmOverlay: () => {
+    console.log('[PM] overlay_close_unsure', { taskId: get().pmExecution.taskId })
+    set((s) => ({
+      pmExecution: { ...s.pmExecution, active: false },
+    }))
+  },
+
+  // Timeout auto-close — called from GameShell when 30s expires
+  pmTimeout: () => {
+    console.log('[PM] timeout', { taskId: get().pmExecution.taskId })
+    set((s) => ({
+      pmExecution: { ...s.pmExecution, active: false },
+      reportTaskVisible: false,
+      messages: [...s.messages, {
+        text: `⏰ Task execution timed out!`, type: 'error',
+        time: new Date().toLocaleTimeString(),
+      }].slice(-50),
+    }))
+  },
 
   // ── Robot ──────────────────────────────────────────────
   robotSpeaking: false,
   robotText: '',
 
   triggerRobot: (text) => {
+    if (get().pmExecution.active) return // T13-5: pause robot during PM execution
     set({ robotSpeaking: true, robotText: text })
     const words = text.split(' ').length
     const duration = Math.max(3000, words * 300 + 2000)
@@ -311,7 +350,7 @@ export const useGameStore = create((set, get) => ({
     score: 0,
     hobs: initialHobs.map(h => ({ ...h })),
     reportTaskVisible: false,
-    pmOverlayOpen: false,
+    pmExecution: { active: false, taskId: null, windowOpenAt: null, timeLimit: 30000, submitted: false },
     encodingConfirmed: false,
     encodingQuizAttempts: 0,
     messages: [{ text: 'New round starting — read your tasks carefully.', type: 'info', time: new Date().toLocaleTimeString() }],
@@ -339,7 +378,7 @@ export const useGameStore = create((set, get) => ({
     score: 0,
     hobs: initialHobs.map(h => ({ ...h })),
     reportTaskVisible: false,
-    pmOverlayOpen: false,
+    pmExecution: { active: false, taskId: null, windowOpenAt: null, timeLimit: 30000, submitted: false },
   }),
 
   endBlock: () => set({

@@ -19,7 +19,6 @@ export default function GameShell() {
   const blockRunning = useGameStore((s) => s.blockRunning)
   const tickMachine = useGameStore((s) => s.tickMachine)
   const tickBlockTimer = useGameStore((s) => s.tickBlockTimer)
-  const tickPmCountdown = useGameStore((s) => s.tickPmCountdown)
   const startBlockEncoding = useGameStore((s) => s.startBlockEncoding)
   const spawnSteak = useGameStore((s) => s.spawnSteak)
   const activeRoom = useGameStore((s) => s.activeRoom)
@@ -30,26 +29,35 @@ export default function GameShell() {
     const timer = setInterval(() => {
       tickMachine()
       tickBlockTimer()
-      tickPmCountdown()
     }, TICK_RATE)
     return () => clearInterval(timer)
-  }, [blockRunning, tickMachine, tickBlockTimer, tickPmCountdown])
+  }, [blockRunning, tickMachine, tickBlockTimer])
 
-  // ── 500ms hob transition checker ───────────────────────
+  // ── 500ms hob transition + PM timeout checker ──────────
   useEffect(() => {
     if (!blockRunning) return
     const timer = setInterval(() => {
-      const { hobs, transitionHob } = useGameStore.getState()
+      const state = useGameStore.getState()
       const now = Date.now()
-      hobs.forEach((hob) => {
+
+      // Hob transitions
+      state.hobs.forEach((hob) => {
         if (!hob.startedAt) return
         if (hob.status === HOB_STATUS.COOKING && now - hob.startedAt >= hob.cookingMs) {
-          transitionHob(hob.id, HOB_STATUS.READY)
+          state.transitionHob(hob.id, HOB_STATUS.READY)
         }
         if (hob.status === HOB_STATUS.READY && now - hob.startedAt >= hob.readyMs) {
-          transitionHob(hob.id, HOB_STATUS.BURNING)
+          state.transitionHob(hob.id, HOB_STATUS.BURNING)
         }
       })
+
+      // PM execution timeout (T13)
+      const { pmExecution, pmTimeout } = state
+      if (pmExecution.active && pmExecution.windowOpenAt) {
+        if (now - pmExecution.windowOpenAt >= pmExecution.timeLimit) {
+          pmTimeout()
+        }
+      }
     }, HOB_CHECK_RATE)
     return () => clearInterval(timer)
   }, [blockRunning])

@@ -1,7 +1,10 @@
 """Block timeline engine — schedules SSE events per GDD §12.2."""
 
 import asyncio
+import logging
 from typing import Callable, Coroutine
+
+logger = logging.getLogger("saturday.timeline")
 
 
 # Difficulty presets (durations in milliseconds for frontend)
@@ -123,6 +126,7 @@ class BlockTimeline:
         try:
             await asyncio.sleep(delay)
             if not self._cancelled:
+                logger.info(f"Timeline [{self.session_id}] t={delay}s → {event}")
                 await self.send_fn(self.session_id, event, data)
         except asyncio.CancelledError:
             pass
