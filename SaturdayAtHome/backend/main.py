@@ -306,15 +306,19 @@ async def block_stream(session_id: str, block_num: int, auto_start: bool = True)
     async def event_generator():
         try:
             while True:
-                payload = await asyncio.wait_for(queue.get(), timeout=60)
-                yield f"event: {payload['event']}\ndata: {json.dumps(payload['data'])}\n\n"
-        except asyncio.TimeoutError:
-            yield f"event: keepalive\ndata: {{}}\n\n"
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=30)
+                    yield f"event: {payload['event']}\ndata: {json.dumps(payload['data'])}\n\n"
+                except asyncio.TimeoutError:
+                    yield f"event: keepalive\ndata: {{}}\n\n"
         except asyncio.CancelledError:
+            pass
+        except GeneratorExit:
             pass
         finally:
             if session_id in sse_queues and queue in sse_queues[session_id]:
                 sse_queues[session_id].remove(queue)
+            logger.info(f"SSE disconnect [{session_id}]")
 
     return StreamingResponse(
         event_generator(),

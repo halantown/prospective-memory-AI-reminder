@@ -22,6 +22,19 @@ function Panel({ title, children, className = '' }) {
   )
 }
 
+function Toast({ message, type = 'info' }) {
+  const colors = {
+    ok: 'bg-emerald-900/90 text-emerald-200 border-emerald-700',
+    error: 'bg-red-900/90 text-red-200 border-red-700',
+    info: 'bg-cyan-900/90 text-cyan-200 border-cyan-700',
+  }
+  return (
+    <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded border text-xs font-mono animate-pulse ${colors[type] || colors.info}`}>
+      {message}
+    </div>
+  )
+}
+
 // ── Main Dashboard ───────────────────────────────────────
 export default function Dashboard() {
   const [sessions, setSessions] = useState([])
@@ -31,112 +44,193 @@ export default function Dashboard() {
   const [sessionState, setSessionState] = useState(null)
   const [logs, setLogs] = useState([])
   const [sseStatus, setSseStatus] = useState('disconnected')
+  const [toast, setToast] = useState(null)
+  const [loading, setLoading] = useState({})
   const esRef = useRef(null)
+  const activeSessionRef = useRef(null)
 
-  // ── API helpers ────────────────────────────────────────
-  const api = useCallback(async (path, opts = {}) => {
-    try {
-      const res = await fetch(`/api${path}`, {
-        headers: { 'Content-Type': 'application/json' },
-        ...opts,
-      })
-      return await res.json()
-    } catch (err) {
-      console.error(`API ${path}`, err)
-      return null
-    }
+  // keep ref in sync for use in non-reactive callbacks
+  useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
+
+  const showToast = useCallback((message, type = 'info', duration = 2000) => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), duration)
   }, [])
 
-  const refreshSessions = useCallback(() => api('/admin/sessions').then(d => d && setSessions(d)), [api])
-  const refreshState = useCallback(() => {
-    if (!activeSession) return
-    api(`/admin/session/${activeSession.session_id}/state`).then(d => d && setSessionState(d))
-  }, [api, activeSession])
-  const refreshLogs = useCallback(() => {
-    if (!activeSession) return
-    api(`/admin/logs/${activeSession.session_id}`).then(d => d && setLogs(d))
-  }, [api, activeSession])
+  // ── API helper with proper error handling ──────────────
+  const api = useCallback(async (path, opts = {}) => {
+    try {
+      const { headers: extraHeaders, ...rest } = opts
+      const headers = { 'Content-Type': 'application/json', ...extraHeaders }
+      const res = await fetch(`/api${path}`, { headers, ...rest })
+      if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText)
+        console.error(`API ${res.status} ${path}: ${text}`)
+        showToast(`API error: ${res.status} ${path}`, 'error')
+        return null
+      }
+      const data = await res.json()
+      return data
+    } catch (err) {
+      console.error(`API ${path}:`, err)
+      showToast(`Network error: ${path}`, 'error')
+      return null
+    }
+  }, [showToast])
+
+  // ── Refresh helpers ────────────────────────────────────
+  const refreshSessions = useCallback(async () => {
+    const d = await api('/admin/sessions')
+    if (d) setSessions(d)
+  }, [api])
+
+  const refreshState = useCallback(async () => {
+    const sid = activeSessionRef.current?.session_id
+    if (!sid) return
+    const d = await api(`/admin/session/${sid}/state`)
+    if (d) setSessionState(d)
+  }, [api])
+
+  const refreshLogs = useCallback(async () => {
+    const sid = activeSessionRef.current?.session_id
+    if (!sid) return
+    const d = await api(`/admin/logs/${sid}`)
+    if (d) setLogs(d)
+  }, [api])
 
   // ── Create session ─────────────────────────────────────
   const createSession = async () => {
+    setLoading(l => ({ ...l, create: true }))
     const pid = `test_${Date.now().toString(36)}`
     const data = await api('/session/start', {
       method: 'POST',
       body: JSON.stringify({ participant_id: pid }),
     })
+    setLoading(l => ({ ...l, create: false }))
     if (data) {
       setActiveSession(data)
-      refreshSessions()
+      showToast(`Session ${data.session_id} created`, 'ok')
+      await refreshSessions()
     }
   }
 
   // ── Fire SSE event ─────────────────────────────────────
   const fireEvent = useCallback(async (event, data = {}) => {
-    if (!activeSession) return alert('Select a session first')
-    await api('/admin/fire-event', {
+    const session = activeSessionRef.current
+    if (!session) return showToast('Select a session first', 'error')
+    if (sseStatus !== 'connected') {
+      showToast('SSE not connected — event sent to backend only', 'info')
+    }
+    const result = await api('/admin/fire-event', {
       method: 'POST',
-      body: JSON.stringify({ session_id: activeSession.session_id, event, data }),
+      body: JSON.stringify({ session_id: session.session_id, event, data }),
     })
+    if (result) {
+      showToast(`✓ ${event}`, 'ok', 1200)
+    }
     refreshState()
-  }, [activeSession, api, refreshState])
+  }, [api, refreshState, showToast, sseStatus])
 
   // ── Connect/Disconnect SSE ─────────────────────────────
   const connectSSE = useCallback(() => {
-    if (!activeSession) return alert('Select a session first')
-    if (esRef.current) esRef.current.close()
+    const session = activeSessionRef.current
+    if (!session) return showToast('Select a session first', 'error')
 
-    const url = `/api/session/${activeSession.session_id}/block/${activeBlock}/stream?auto_start=false`
+    // close previous
+    if (esRef.current) {
+      esRef.current.close()
+      esRef.current = null
+    }
+
+    const url = `/api/session/${session.session_id}/block/${activeBlock}/stream?auto_start=false`
+    console.log('[Dashboard] Connecting SSE:', url)
+    setSseStatus('connecting')
+    setEvents([])
+
     const es = new EventSource(url)
     esRef.current = es
-    setSseStatus('connecting')
 
-    const eventTypes = [
+    const ALL_EVENTS = [
       'steak_spawn', 'force_yellow_steak', 'trigger_appear', 'window_close',
       'reminder_fire', 'robot_neutral', 'fake_trigger_fire', 'message_bubble',
       'block_start', 'block_end', 'keepalive',
     ]
 
-    eventTypes.forEach(type => {
+    ALL_EVENTS.forEach(type => {
       es.addEventListener(type, (e) => {
-        try {
-          const data = JSON.parse(e.data)
-          setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type, data }, ...prev].slice(0, 200))
-        } catch {}
+        let parsed = {}
+        try { parsed = JSON.parse(e.data) } catch { parsed = { raw: e.data } }
+        if (type === 'keepalive') return // don't clutter log
+        setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type, data: parsed }, ...prev].slice(0, 200))
       })
     })
 
+    // also listen for generic messages (fallback)
+    es.onmessage = (e) => {
+      let parsed = {}
+      try { parsed = JSON.parse(e.data) } catch { parsed = { raw: e.data } }
+      setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type: 'message', data: parsed }, ...prev].slice(0, 200))
+    }
+
     es.onopen = () => {
+      console.log('[Dashboard] SSE connected')
       setSseStatus('connected')
-      setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type: '🟢 CONNECTED', data: {} }, ...prev])
+      setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type: '🟢 CONNECTED', data: { url } }, ...prev])
+      showToast('SSE connected', 'ok')
     }
-    es.onerror = () => {
-      setSseStatus('error')
-      setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type: '🔴 ERROR', data: {} }, ...prev])
+
+    es.onerror = (err) => {
+      console.error('[Dashboard] SSE error:', err)
+      const readyState = es.readyState
+      if (readyState === EventSource.CLOSED) {
+        setSseStatus('disconnected')
+        setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type: '🔴 CLOSED', data: {} }, ...prev])
+      } else {
+        // CONNECTING state = auto-reconnecting
+        setSseStatus('reconnecting')
+        setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type: '🟡 RECONNECTING', data: {} }, ...prev])
+      }
     }
-  }, [activeSession, activeBlock])
+  }, [activeBlock, showToast])
 
   const disconnectSSE = () => {
     if (esRef.current) { esRef.current.close(); esRef.current = null }
     setSseStatus('disconnected')
+    showToast('SSE disconnected', 'info')
   }
 
   // ── Effects ────────────────────────────────────────────
   useEffect(() => { refreshSessions() }, [refreshSessions])
-  useEffect(() => { if (activeSession) { refreshState(); refreshLogs() } }, [activeSession])
+
+  useEffect(() => {
+    if (activeSession) {
+      refreshState()
+      refreshLogs()
+    }
+  }, [activeSession, refreshState, refreshLogs])
+
   useEffect(() => {
     if (!activeSession) return
-    const timer = setInterval(refreshState, 2000)
+    const timer = setInterval(() => {
+      refreshState()
+      refreshLogs()
+    }, 3000)
     return () => clearInterval(timer)
-  }, [activeSession, refreshState])
+  }, [activeSession, refreshState, refreshLogs])
+
+  // cleanup SSE on unmount
   useEffect(() => { return () => { if (esRef.current) esRef.current.close() } }, [])
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-mono text-sm p-4">
+      {toast && <Toast message={toast.message} type={toast.type} />}
+
       <div className="flex items-center gap-4 mb-4">
         <h1 className="text-xl font-bold text-cyan-400">🎛️ Saturday At Home — Dashboard</h1>
         <span className={`text-xs px-2 py-0.5 rounded ${
           sseStatus === 'connected' ? 'bg-green-900 text-green-300' :
-          sseStatus === 'connecting' ? 'bg-yellow-900 text-yellow-300' :
+          sseStatus === 'connecting' || sseStatus === 'reconnecting' ? 'bg-yellow-900 text-yellow-300' :
+          sseStatus === 'error' ? 'bg-red-900 text-red-300' :
           'bg-gray-800 text-gray-500'
         }`}>SSE: {sseStatus}</span>
         <a href="/" className="text-xs text-gray-500 hover:text-gray-300 ml-auto">← Back to Game</a>
@@ -147,19 +241,22 @@ export default function Dashboard() {
         <div className="col-span-3 space-y-3">
           <Panel title="📡 Session">
             <div className="flex gap-1 mb-2">
-              <button onClick={createSession} className={`${btnPrimary} flex-1`}>+ New</button>
+              <button onClick={createSession} disabled={loading.create}
+                className={`${btnPrimary} flex-1`}>
+                {loading.create ? '…' : '+ New'}
+              </button>
               <button onClick={refreshSessions} className={btnSecondary}>↻</button>
             </div>
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {sessions.map(s => (
                 <div key={s.session_id}
-                  onClick={() => setActiveSession(s)}
+                  onClick={() => { setActiveSession(s); showToast(`Selected ${s.session_id}`, 'ok', 1000) }}
                   className={`p-2 rounded cursor-pointer text-xs ${
                     activeSession?.session_id === s.session_id
                       ? 'bg-cyan-900/50 border border-cyan-600' : 'bg-gray-800/50 hover:bg-gray-700'
                   }`}>
                   <div className="font-bold text-cyan-300">{s.session_id}</div>
-                  <div className="text-gray-400">{s.participant_id} · G{s.latin_square_group}</div>
+                  <div className="text-gray-400">{s.participant_id} · G{s.latin_square_group || s.group}</div>
                 </div>
               ))}
               {sessions.length === 0 && <p className="text-gray-600 text-xs">No sessions yet</p>}
@@ -170,11 +267,11 @@ export default function Dashboard() {
             <Panel title="🔍 Live State">
               <div className="text-xs space-y-1">
                 <div>SSE clients: <b className="text-cyan-400">{sessionState.sse_clients}</b></div>
-                <div>Timelines: <b className="text-cyan-400">{sessionState.active_timelines.length}</b></div>
+                <div>Timelines: <b className="text-cyan-400">{sessionState.active_timelines?.length || 0}</b></div>
                 <div className="mt-2 font-bold text-gray-400">Hobs:</div>
-                {sessionState.hobs.map(h => (
+                {(sessionState.hobs || []).map(h => (
                   <div key={h.id} className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${HOB_COLORS[h.status]}`} />
+                    <span className={`w-2.5 h-2.5 rounded-full ${HOB_COLORS[h.status] || 'bg-gray-600'}`} />
                     <span>Hob {h.id}: <b>{h.status}</b></span>
                   </div>
                 ))}
@@ -188,7 +285,6 @@ export default function Dashboard() {
                 <div>ID: <span className="text-gray-200">{activeSession.session_id}</span></div>
                 <div>Participant: <span className="text-gray-200">{activeSession.participant_id}</span></div>
                 <div>Group: <span className="text-gray-200">{activeSession.latin_square_group || activeSession.group}</span></div>
-                <div>Conditions: <span className="text-gray-200">{JSON.stringify(activeSession.condition_order)}</span></div>
               </div>
             </Panel>
           )}
@@ -202,13 +298,18 @@ export default function Dashboard() {
                 className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs">
                 {[1,2,3,4].map(n => <option key={n} value={n}>Block {n}</option>)}
               </select>
-              <button onClick={connectSSE} className={btnPrimary}>📡 Connect SSE</button>
-              <button onClick={disconnectSSE} className={btnSecondary}>Disconnect</button>
+              <button onClick={connectSSE} className={btnPrimary}
+                disabled={!activeSession}>📡 Connect</button>
+              <button onClick={disconnectSSE} className={btnSecondary}
+                disabled={sseStatus === 'disconnected'}>Disconnect</button>
               <button onClick={() => fireEvent('block_start', { block_number: activeBlock, condition: 'HighAF_HighCB' })}
-                className={btnGreen}>▶ Start</button>
+                className={btnGreen} disabled={!activeSession}>▶ Start</button>
               <button onClick={() => fireEvent('block_end', { block_number: activeBlock })}
-                className={btnRed}>⏹ End</button>
+                className={btnRed} disabled={!activeSession}>⏹ End</button>
             </div>
+            {!activeSession && (
+              <p className="text-yellow-600 text-xs mt-1">⚠ Create or select a session first</p>
+            )}
           </Panel>
 
           <Panel title="🥩 Steak Controls">
@@ -217,45 +318,50 @@ export default function Dashboard() {
                 <div key={id} className="space-y-1">
                   <div className="text-xs text-center text-gray-500">Hob {id}</div>
                   <button onClick={() => fireEvent('steak_spawn', { hob_id: id, duration: { cooking: 18000, ready: 6000 } })}
-                    className={`${btnPrimary} w-full`}>Spawn</button>
+                    className={`${btnPrimary} w-full`} disabled={!activeSession}>Spawn</button>
                   <button onClick={() => fireEvent('force_yellow_steak', { hob_id: id })}
-                    className={`${btnYellow} w-full`}>Force Yellow</button>
+                    className={`${btnYellow} w-full`} disabled={!activeSession}>Force Yellow</button>
                 </div>
               ))}
             </div>
           </Panel>
 
           <Panel title="📋 PM Task Controls">
-            <PMControls fireEvent={fireEvent} activeBlock={activeBlock} />
+            <PMControls fireEvent={fireEvent} activeBlock={activeBlock} disabled={!activeSession} />
           </Panel>
 
           <Panel title="🤖 Robot & 💬 Messages">
-            <RobotMessageControls fireEvent={fireEvent} />
+            <RobotMessageControls fireEvent={fireEvent} disabled={!activeSession} />
           </Panel>
 
           <Panel title="🚪 Fake Trigger">
             <div className="flex gap-2">
               <button onClick={() => fireEvent('fake_trigger_fire', { type: 'delivery' })}
-                className={btnOrange}>🔔 Doorbell</button>
+                className={btnOrange} disabled={!activeSession}>🔔 Doorbell</button>
               <button onClick={() => fireEvent('fake_trigger_fire', { type: 'dishwasher' })}
-                className={btnOrange}>🫧 Dishwasher</button>
+                className={btnOrange} disabled={!activeSession}>🫧 Dishwasher</button>
               <button onClick={() => fireEvent('fake_trigger_fire', { type: 'friend_online' })}
-                className={btnOrange}>👤 Friend Online</button>
+                className={btnOrange} disabled={!activeSession}>👤 Friend Online</button>
             </div>
           </Panel>
         </div>
 
         {/* ── Right: Event Log ─────────────────────────── */}
         <div className="col-span-4 space-y-3">
-          <Panel title="📝 Live SSE Events" className="max-h-[45vh] overflow-y-auto">
+          <Panel title={`📝 Live SSE Events (${events.filter(e => !e.type.includes('CONNECT') && !e.type.includes('ERROR') && !e.type.includes('CLOSED') && !e.type.includes('RECONNECT')).length})`} className="max-h-[45vh] overflow-y-auto">
             {events.length === 0 ? (
-              <p className="text-gray-600 text-xs">Connect SSE then fire events to see them here…</p>
+              <p className="text-gray-600 text-xs">
+                {sseStatus === 'connected'
+                  ? 'Connected ✓ — fire events using the controls on the left'
+                  : 'Create a session → Connect SSE → fire events'}
+              </p>
             ) : events.map((e, i) => (
               <div key={i} className="text-xs border-b border-gray-800/50 py-0.5 font-mono">
                 <span className="text-gray-600">{e.ts}</span>
                 <span className={`ml-2 font-bold ${
                   e.type.includes('CONNECT') ? 'text-green-400' :
-                  e.type.includes('ERROR') ? 'text-red-400' :
+                  e.type.includes('ERROR') || e.type.includes('CLOSED') ? 'text-red-400' :
+                  e.type.includes('RECONNECT') ? 'text-yellow-400' :
                   e.type.includes('steak') || e.type.includes('yellow') ? 'text-pink-400' :
                   e.type.includes('trigger') || e.type.includes('window') ? 'text-orange-400' :
                   e.type.includes('robot') || e.type.includes('reminder') ? 'text-blue-400' :
@@ -269,7 +375,7 @@ export default function Dashboard() {
           </Panel>
 
           <Panel title="📊 Action Logs (DB)" className="max-h-[30vh] overflow-y-auto">
-            <button onClick={refreshLogs} className={`${btnSecondary} mb-2`}>↻ Refresh Logs</button>
+            <button onClick={refreshLogs} className={`${btnSecondary} mb-2`} disabled={!activeSession}>↻ Refresh</button>
             {logs.length === 0 ? (
               <p className="text-gray-600 text-xs">No logs yet</p>
             ) : logs.map((l, i) => (
@@ -288,7 +394,7 @@ export default function Dashboard() {
 
 // ── Sub-components ───────────────────────────────────────
 
-function PMControls({ fireEvent, activeBlock }) {
+function PMControls({ fireEvent, activeBlock, disabled }) {
   const taskMap = {
     1: ['medicine_a', 'medicine_b'],
     2: ['laundry_c', 'laundry_d'],
@@ -305,9 +411,9 @@ function PMControls({ fireEvent, activeBlock }) {
           <div key={taskId} className="flex gap-2 items-center">
             <span className="text-xs text-gray-400 w-24 font-mono">{taskId}</span>
             <button onClick={() => fireEvent('trigger_appear', { task_id: taskId, slot })}
-              className={btnOrange}>👁 Appear</button>
+              className={btnOrange} disabled={disabled}>👁 Appear</button>
             <button onClick={() => fireEvent('window_close', { task_id: taskId, slot })}
-              className={btnRed}>✕ Close</button>
+              className={btnRed} disabled={disabled}>✕ Close</button>
           </div>
         )
       })}
@@ -315,26 +421,26 @@ function PMControls({ fireEvent, activeBlock }) {
   )
 }
 
-function RobotMessageControls({ fireEvent }) {
+function RobotMessageControls({ fireEvent, disabled }) {
   const [robotText, setRobotText] = useState('')
 
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
         <input value={robotText} onChange={e => setRobotText(e.target.value)}
-          placeholder="Robot says…"
-          className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs"
-          onKeyDown={e => { if (e.key === 'Enter') { fireEvent('robot_neutral', { text: robotText || 'Hello!' }); setRobotText('') } }} />
+          placeholder="Robot says…" disabled={disabled}
+          className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs disabled:opacity-40"
+          onKeyDown={e => { if (e.key === 'Enter' && !disabled) { fireEvent('robot_neutral', { text: robotText || 'Hello!' }); setRobotText('') } }} />
         <button onClick={() => { fireEvent('robot_neutral', { text: robotText || 'Hello!' }); setRobotText('') }}
-          className={btnBlue}>🤖 Say</button>
+          className={btnBlue} disabled={disabled}>🤖 Say</button>
       </div>
       <div className="flex gap-2 flex-wrap">
         <button onClick={() => fireEvent('reminder_fire', { text: 'Remember your medicine after dinner!', slot: 'A', condition: 'HighAF_HighCB' })}
-          className={btnPurple}>💬 Reminder A</button>
+          className={btnPurple} disabled={disabled}>💬 Reminder A</button>
         <button onClick={() => fireEvent('reminder_fire', { text: "Don't forget your vitamin!", slot: 'B', condition: 'HighAF_HighCB' })}
-          className={btnPurple}>💬 Reminder B</button>
+          className={btnPurple} disabled={disabled}>💬 Reminder B</button>
         <button onClick={() => fireEvent('message_bubble', { text: 'Hey! Coming tonight?', option_a: 'Yes!', option_b: 'Maybe later' })}
-          className={btnGreen}>📬 Bubble</button>
+          className={btnGreen} disabled={disabled}>📬 Bubble</button>
       </div>
     </div>
   )
