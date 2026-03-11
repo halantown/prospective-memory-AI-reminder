@@ -1,0 +1,69 @@
+# Condition Field Map — Authoritative field whitelist per condition
+# Maps each AF × CB condition to the Task JSON fields permitted in the LLM prompt.
+# This file is the single source of truth for the operationalisation (TECH_DOC §3.2).
+
+LowAF_LowCB:
+  required_fields:
+    - "Element1.Action_Verb"
+    - "Element1.Target_Entity.Entity_Name"
+  conditional_fields: []
+  excluded_fields:
+    - "Element1.Target_Entity.Cues.Visual"
+    - "Element1.Target_Entity.Domain_Specific_Properties"
+    - "Element2.Origin.Task_Creator"
+    - "Element3.Current_Live_State.Detected_Activity"
+    - "Element2.Motivation_Hierarchy"
+    - "Element1.Execution_Protocol.Action_Rules"
+    - "Element1.Execution_Protocol.Post_Action_Requirements"
+    - "Element2.User_State_at_Creation"
+    - "Element1.Temporal_Window"
+
+HighAF_LowCB:
+  required_fields:
+    - "Element1.Action_Verb"
+    - "Element1.Target_Entity.Entity_Name"
+    - "Element1.Target_Entity.Cues.Visual"
+    - "Element1.Target_Entity.Domain_Specific_Properties"
+  conditional_fields:
+    - field: "Element2.Origin.Task_Creator"
+      condition: "Element2.Origin.Creator_Is_Authority == true"
+  excluded_fields:
+    - "Element3.Current_Live_State.Detected_Activity"
+    - "Element2.Motivation_Hierarchy"
+    - "Element1.Execution_Protocol.Action_Rules"
+    - "Element1.Execution_Protocol.Post_Action_Requirements"
+    - "Element2.User_State_at_Creation"
+    - "Element1.Temporal_Window"
+
+LowAF_HighCB:
+  required_fields:
+    - "Element1.Action_Verb"
+    - "Element1.Target_Entity.Entity_Name"
+    - "Element3.Current_Live_State.Detected_Activity"
+  conditional_fields: []
+  excluded_fields:
+    - "Element1.Target_Entity.Cues.Visual"
+    - "Element1.Target_Entity.Domain_Specific_Properties"
+    - "Element2.Origin.Task_Creator"
+    - "Element2.Motivation_Hierarchy"
+    - "Element1.Execution_Protocol.Action_Rules"
+    - "Element1.Execution_Protocol.Post_Action_Requirements"
+    - "Element2.User_State_at_Creation"
+    - "Element1.Temporal_Window"
+
+HighAF_HighCB:
+  required_fields:
+    - "Element1.Action_Verb"
+    - "Element1.Target_Entity.Entity_Name"
+    - "Element1.Target_Entity.Cues.Visual"
+    - "Element1.Target_Entity.Domain_Specific_Properties"
+    - "Element3.Current_Live_State.Detected_Activity"
+  conditional_fields:
+    - field: "Element2.Origin.Task_Creator"
+      condition: "Element2.Origin.Creator_Is_Authority == true"
+  excluded_fields:
+    - "Element2.Motivation_Hierarchy"
+    - "Element1.Execution_Protocol.Action_Rules"
+    - "Element1.Execution_Protocol.Post_Action_Requirements"
+    - "Element2.User_State_at_Creation"
+    - "Element1.Temporal_Window"

@@ -1,0 +1,8 @@
+# Model Configuration — LLM backend selection and parameters
+# Switch backends by changing 'backend' and 'model_name'. No code changes needed.
+
+backend: "together"                                    # options: together | ollama | openai | anthropic
+model_name: "meta-llama/Meta-Llama-3-70B-Instruct"    # model identifier for the selected backend
+temperature: 0.8
+max_tokens: 150
+api_key_env: "TOGETHER_API_KEY"                        # environment variable holding the API key
