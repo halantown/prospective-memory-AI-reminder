@@ -1,12 +1,12 @@
 import { useGameStore } from '../../store/gameStore'
-import { Home, Flame, Droplets, Sofa, DoorOpen, MessageSquare } from 'lucide-react'
+import { Home, Flame, Droplets, Sofa, DoorOpen, Mail } from 'lucide-react'
 
 const rooms = [
-  { id: 'kitchen',  label: 'Kitchen',  icon: Flame,         chars: ['K','i','t'] },
-  { id: 'balcony',  label: 'Balcony',  icon: Droplets,      chars: ['B','a','l'] },
-  { id: 'living',   label: 'Living',   icon: Sofa,          chars: ['L','i','v'] },
-  { id: 'entrance', label: 'Entry',    icon: DoorOpen,      chars: ['E','n','t'] },
-  { id: 'messages', label: 'Msgs',     icon: MessageSquare, chars: ['M','s','g'] },
+  { id: 'kitchen',  label: 'Kitchen',  icon: Flame,     chars: ['K','i','t'] },
+  { id: 'balcony',  label: 'Balcony',  icon: Droplets,  chars: ['B','a','l'] },
+  { id: 'living',   label: 'Living',   icon: Sofa,      chars: ['L','i','v'] },
+  { id: 'entrance', label: 'Entry',    icon: DoorOpen,  chars: ['E','n','t'] },
+  { id: 'messages', label: 'Inbox',    icon: Mail,      chars: ['I','n','b'] },
 ]
 
 function StatusDot({ color }) {

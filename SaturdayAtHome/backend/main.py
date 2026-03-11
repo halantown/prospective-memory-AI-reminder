@@ -56,6 +56,8 @@ class Hob:
     id: int
     status: HobStatus = HobStatus.EMPTY
     started_at: float = 0.0
+    cooking_ms: float = 18000
+    ready_ms: float = 6000
 
 
 # Per-session hob state (in-memory)
@@ -66,6 +68,24 @@ def get_session_hobs(session_id: str) -> list[Hob]:
     if session_id not in session_hobs:
         session_hobs[session_id] = [Hob(id=i) for i in range(3)]
     return session_hobs[session_id]
+
+
+def reconcile_hob(hob: Hob):
+    """Update hob status based on elapsed time — keeps backend in sync with frontend."""
+    if hob.status == HobStatus.EMPTY or hob.started_at <= 0:
+        return
+    elapsed_ms = (time.time() - hob.started_at) * 1000
+
+    if hob.status == HobStatus.COOKING and elapsed_ms >= hob.cooking_ms:
+        if elapsed_ms >= hob.cooking_ms + hob.ready_ms:
+            hob.status = HobStatus.BURNING
+            hob.started_at = 0.0
+        else:
+            hob.status = HobStatus.READY
+            hob.started_at = hob.started_at + hob.cooking_ms / 1000.0
+    elif hob.status == HobStatus.READY and elapsed_ms >= hob.ready_ms:
+        hob.status = HobStatus.BURNING
+        hob.started_at = 0.0
 
 
 def log_action(session_id: str, block_num: int, action_type: str, payload: dict = None):
@@ -91,8 +111,7 @@ async def _schedule_respawn(session_id: str, block_num: int, hob_id: int):
     if hob_id < len(hobs) and hobs[hob_id].status == HobStatus.EMPTY:
         cfg = DIFFICULTY_CONFIG.get("medium")
         dur = {"cooking": cfg["cooking_ms"], "ready": cfg["ready_ms"]}
-        hobs[hob_id].status = HobStatus.COOKING
-        hobs[hob_id].started_at = time.time()
+        # send_sse handles setting hob state + durations
         await send_sse(session_id, "steak_spawn", {"hob_id": hob_id, "duration": dur})
         logger.info(f"Respawned steak [{session_id}] hob={hob_id}")
 
@@ -203,6 +222,21 @@ def score_pm_action(task_id: str, action: PmActionReport) -> int:
 
 async def send_sse(session_id: str, event: str, data: dict):
     """Push an SSE event to all connected clients for this session."""
+    # For steak_spawn from timeline: only spawn on empty hobs, update backend state
+    if event == "steak_spawn":
+        hobs = get_session_hobs(session_id)
+        hob_id = data.get("hob_id", 0)
+        if 0 <= hob_id < len(hobs):
+            reconcile_hob(hobs[hob_id])
+            if hobs[hob_id].status != HobStatus.EMPTY:
+                logger.info(f"SSE [{session_id}] → steak_spawn hob={hob_id} SKIPPED (status={hobs[hob_id].status.value})")
+                return
+            dur = data.get("duration", {})
+            hobs[hob_id].status = HobStatus.COOKING
+            hobs[hob_id].started_at = time.time()
+            hobs[hob_id].cooking_ms = dur.get("cooking", DIFFICULTY_CONFIG["medium"]["cooking_ms"])
+            hobs[hob_id].ready_ms = dur.get("ready", DIFFICULTY_CONFIG["medium"]["ready_ms"])
+
     logger.info(f"SSE [{session_id}] → {event}: {data}")
     if session_id not in sse_queues:
         return
@@ -387,12 +421,15 @@ async def report_steak_action(session_id: str, block_num: int, report: SteakActi
         raise HTTPException(400, "Invalid hob_id")
 
     hob = hobs[report.hob_id]
+    # Reconcile time-based state before validating the action
+    reconcile_hob(hob)
     prev_status = hob.status.value
     score = 0
 
     if report.action == "flip" and hob.status == HobStatus.READY:
         hob.status = HobStatus.COOKING
         hob.started_at = time.time()
+        # Keep existing cooking_ms/ready_ms from this steak
         score = 5
     elif report.action == "serve" and hob.status == HobStatus.READY:
         hob.status = HobStatus.EMPTY
@@ -517,14 +554,8 @@ async def admin_fire_event(req: FireEventRequest):
     logger.info(f"Admin fire [{req.session_id}] → {req.event}: {req.data}")
     await send_sse(req.session_id, req.event, req.data)
 
-    # Update backend hob state for steak events
-    if req.event == "steak_spawn":
-        hobs = get_session_hobs(req.session_id)
-        hob_id = req.data.get("hob_id", 0)
-        if 0 <= hob_id < len(hobs) and hobs[hob_id].status == HobStatus.EMPTY:
-            hobs[hob_id].status = HobStatus.COOKING
-            hobs[hob_id].started_at = time.time()
-    elif req.event == "force_yellow_steak":
+    # Update backend hob state for force_yellow events (send_sse handles steak_spawn)
+    if req.event == "force_yellow_steak":
         hobs = get_session_hobs(req.session_id)
         hob_id = req.data.get("hob_id", 0)
         if 0 <= hob_id < len(hobs):
@@ -548,8 +579,10 @@ async def admin_list_sessions():
 async def admin_session_state(session_id: str):
     """Get live session state (hobs, SSE clients, timelines)."""
     hobs = get_session_hobs(session_id)
+    for h in hobs:
+        reconcile_hob(h)
     return {
-        "hobs": [{"id": h.id, "status": h.status.value, "started_at": h.started_at} for h in hobs],
+        "hobs": [{"id": h.id, "status": h.status.value, "started_at": h.started_at, "cooking_ms": h.cooking_ms, "ready_ms": h.ready_ms} for h in hobs],
         "active_timelines": [k for k in active_timelines.keys() if k.startswith(session_id)],
         "sse_clients": len(sse_queues.get(session_id, [])),
     }
@@ -565,6 +598,64 @@ async def admin_get_logs(session_id: str):
     ).fetchall()
     db.close()
     return [dict(r) for r in rows]
+
+
+@app.get("/admin/active-session")
+async def admin_active_session():
+    """Find the currently active session (has SSE clients connected)."""
+    for sid, queues in sse_queues.items():
+        if len(queues) > 0:
+            db = get_db(DB_PATH)
+            row = db.execute("SELECT * FROM sessions WHERE session_id = ?", (sid,)).fetchone()
+            db.close()
+            if row:
+                return dict(row)
+    # Fallback: return most recent session
+    db = get_db(DB_PATH)
+    row = db.execute("SELECT * FROM sessions ORDER BY created_at DESC LIMIT 1").fetchone()
+    db.close()
+    return dict(row) if row else None
+
+
+@app.delete("/admin/session/{session_id}")
+async def admin_delete_session(session_id: str):
+    """Delete a session and all its data."""
+    db = get_db(DB_PATH)
+    db.execute("DELETE FROM action_logs WHERE session_id = ?", (session_id,))
+    db.execute("DELETE FROM pm_trials WHERE session_id = ?", (session_id,))
+    db.execute("DELETE FROM encoding_logs WHERE session_id = ?", (session_id,))
+    db.execute("DELETE FROM ongoing_snapshots WHERE session_id = ?", (session_id,))
+    db.execute("DELETE FROM fake_trigger_logs WHERE session_id = ?", (session_id,))
+    db.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+    db.commit()
+    db.close()
+    # Clean up in-memory state
+    if session_id in session_hobs:
+        del session_hobs[session_id]
+    if session_id in sse_queues:
+        del sse_queues[session_id]
+    tl_key = f"{session_id}"
+    for k in list(active_timelines.keys()):
+        if k.startswith(tl_key):
+            active_timelines[k].cancel()
+            del active_timelines[k]
+    logger.info(f"Admin: deleted session {session_id}")
+    return {"status": "ok"}
+
+
+@app.get("/admin/export/{session_id}")
+async def admin_export_session(session_id: str):
+    """Export session data as JSON."""
+    db = get_db(DB_PATH)
+    session = db.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
+    actions = db.execute("SELECT * FROM action_logs WHERE session_id = ? ORDER BY ts", (session_id,)).fetchall()
+    pm_trials = db.execute("SELECT * FROM pm_trials WHERE session_id = ?", (session_id,)).fetchall()
+    db.close()
+    return {
+        "session": dict(session) if session else None,
+        "actions": [dict(r) for r in actions],
+        "pm_trials": [dict(r) for r in pm_trials],
+    }
 
 
 if __name__ == "__main__":

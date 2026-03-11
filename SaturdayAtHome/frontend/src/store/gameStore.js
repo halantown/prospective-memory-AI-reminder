@@ -242,12 +242,13 @@ export const useGameStore = create((set, get) => ({
     return {}
   }),
 
-  // ── Messages ───────────────────────────────────────────
+  // ── Messages (Email Inbox) ──────────────────────────────
   messages: [
     { text: 'Welcome home! Click rooms to explore.', type: 'info', time: new Date().toLocaleTimeString() },
   ],
   messageBubbles: [],
   unreadCount: 0,
+  selectedEmailId: null,
 
   addMessage: (text, type = 'info') => set((state) => ({
     messages: [...state.messages, { text, type, time: new Date().toLocaleTimeString() }].slice(-50),
@@ -256,19 +257,45 @@ export const useGameStore = create((set, get) => ({
   addMessageBubble: (bubble) => {
     if (get().pmExecution.active) return // T13-5: pause new bubbles during PM execution
     set((state) => ({
-      messageBubbles: [...state.messageBubbles, { ...bubble, id: Date.now(), replied: false }],
+      messageBubbles: [...state.messageBubbles, {
+        ...bubble,
+        id: Date.now(),
+        replied: false,
+        read: false,
+        receivedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        // Ensure email fields have defaults
+        from: bubble.from || 'Unknown',
+        subject: bubble.subject || bubble.text?.slice(0, 40) || 'New message',
+        body: bubble.body || bubble.text || '',
+        avatar: bubble.avatar || (bubble.from ? bubble.from[0].toUpperCase() : '?'),
+        option_a: bubble.option_a || 'OK',
+        option_b: bubble.option_b || 'Skip',
+      }],
       unreadCount: state.unreadCount + 1,
     }))
   },
+
+  selectEmail: (emailId) => set((state) => ({
+    selectedEmailId: emailId,
+    messageBubbles: state.messageBubbles.map((b) =>
+      b.id === emailId && !b.read
+        ? { ...b, read: true }
+        : b
+    ),
+    unreadCount: state.messageBubbles.reduce((count, b) => {
+      if (b.id === emailId && !b.read) return count
+      if (!b.read) return count + 1
+      return count
+    }, 0),
+  })),
 
   replyToBubble: (bubbleId, choice) => set((state) => ({
     messageBubbles: state.messageBubbles.map((b) =>
       b.id === bubbleId ? { ...b, replied: true, replyChoice: choice } : b
     ),
     score: state.score + 2,
-    unreadCount: Math.max(0, state.unreadCount - 1),
     messages: [...state.messages, {
-      text: '💬 Replied to message! +2', type: 'success',
+      text: '📧 Replied to email! +2', type: 'success',
       time: new Date().toLocaleTimeString(),
     }].slice(-50),
   })),
@@ -417,10 +444,15 @@ export const useGameStore = create((set, get) => ({
     pmExecution: { active: false, taskId: null, windowOpenAt: null, timeLimit: 30000, submitted: false },
   }),
 
-  endBlock: () => set({
+  endBlock: () => set((s) => ({
     blockRunning: false,
-    phase: 'block_questionnaire',
-  }),
+    phase: 'block_end',
+    messages: [...s.messages, {
+      text: `✅ Block ${s.blockNumber} complete! Final score: ${s.score}`,
+      type: 'success',
+      time: new Date().toLocaleTimeString(),
+    }].slice(-50),
+  })),
 
   tickBlockTimer: () => set((s) => ({ blockTimer: s.blockTimer + 1 })),
 

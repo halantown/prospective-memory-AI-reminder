@@ -12,6 +12,7 @@ import ReportTaskButton from './ui/ReportTaskButton'
 import PmExecuteOverlay from './ui/PmExecuteOverlay'
 import EncodingScreen from './screens/EncodingScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
+import BlockEndScreen from './screens/BlockEndScreen'
 
 const TICK_RATE = 1000
 const HOB_CHECK_RATE = 500
@@ -87,6 +88,11 @@ export default function GameShell() {
   // ── Encoding screen (blocks game UI until confirmed) ───
   if (phase === 'block_encoding') {
     return <EncodingScreen />
+  }
+
+  // ── Block end screen ───────────────────────────────────
+  if (phase === 'block_end') {
+    return <BlockEndScreen />
   }
 
   return (

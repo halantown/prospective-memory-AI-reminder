@@ -29,10 +29,6 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
     timeline = [
         (0,    "block_start",        {"block_number": block_num, "condition": condition}),
 
-        # Steak spawns (staggered)
-        (5,    "steak_spawn",        {"hob_id": 0, "duration": dur}),
-        (13,   "steak_spawn",        {"hob_id": 1, "duration": dur}),
-
         # Fake trigger
         (35,   "fake_trigger_fire",  {"type": "delivery"}),
 
@@ -49,9 +45,6 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
         (210,  "trigger_appear",     {"task_id": _get_task_a(block_num), "slot": "A"}),
         (240,  "window_close",       {"task_id": _get_task_a(block_num), "slot": "A"}),
 
-        # New batch after Task A
-        (260,  "steak_spawn",        {"hob_id": 2, "duration": dur}),
-
         # Robot neutral #2
         (270,  "robot_neutral",      {"text": neutral_2}),
 
@@ -65,18 +58,53 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
         (390,  "trigger_appear",     {"task_id": _get_task_b(block_num), "slot": "B"}),
         (420,  "window_close",       {"task_id": _get_task_b(block_num), "slot": "B"}),
 
-        # Final steak batch
-        (425,  "steak_spawn",        {"hob_id": 0, "duration": dur}),
-
         # Block end
         (510,  "block_end",          {"block_number": block_num}),
     ]
 
-    # Message bubbles (avoid ±60s of reminders/triggers)
+    # Steak spawns — every 20-35s on rotating hobs (GDD §12.2)
+    import random
+    t = 3
+    hob_cycle = 0
+    while t < 490:
+        timeline.append((t, "steak_spawn", {"hob_id": hob_cycle % 3, "duration": dur}))
+        hob_cycle += 1
+        t += random.randint(20, 35)
+
+    # Message bubbles as emails (avoid ±60s of reminders/triggers)
     timeline.extend([
-        (55,   "message_bubble", {"text": "Hey! Are you still coming tonight?", "option_a": "Yes, definitely!", "option_b": "Maybe later"}),
-        (170,  "message_bubble", {"text": "Should I bring anything for the party?", "option_a": "Some drinks!", "option_b": "Nothing, just yourself"}),
-        (340,  "message_bubble", {"text": "What time should everyone arrive?", "option_a": "Around 7pm", "option_b": "Whenever you want"}),
+        (55,   "message_bubble", {
+            "from": "Sarah",
+            "subject": "Party tonight",
+            "body": "Hey! Are you still coming tonight? I've been looking forward to it all week!",
+            "option_a": "Yes, definitely!",
+            "option_b": "Maybe later",
+            "avatar": "S",
+        }),
+        (170,  "message_bubble", {
+            "from": "Mom",
+            "subject": "Bringing something?",
+            "body": "Should I bring anything for the party? I could make my famous apple pie if you want 😊",
+            "option_a": "Some drinks please!",
+            "option_b": "Nothing, just yourself",
+            "avatar": "M",
+        }),
+        (340,  "message_bubble", {
+            "from": "David",
+            "subject": "Arrival time?",
+            "body": "What time should everyone arrive? I want to make sure I'm not late. Should I bring some music too?",
+            "option_a": "Around 7pm",
+            "option_b": "Whenever works",
+            "avatar": "D",
+        }),
+        (450,  "message_bubble", {
+            "from": "Sarah",
+            "subject": "Almost there!",
+            "body": "We're on our way! Traffic is a bit slow though. Save some food for us! 🚗",
+            "option_a": "Drive safe!",
+            "option_b": "No worries, plenty left",
+            "avatar": "S",
+        }),
     ])
 
     timeline.sort(key=lambda x: x[0])
