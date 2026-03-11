@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { reportSteakAction } from '../utils/api'
 
 // ── Hob states ────────────────────────────────────────────
 const HOB_STATUS = {
@@ -28,6 +29,7 @@ export const useGameStore = create((set, get) => ({
   sessionId: null,
   participantId: null,
   group: null,
+  conditionOrder: null,
 
   // ── Game Phase ──────────────────────────────────────────
   phase: 'welcome',
@@ -101,9 +103,10 @@ export const useGameStore = create((set, get) => ({
     }
   }),
 
-  // Player actions on hobs
+  // Player actions on hobs — update local state + POST to backend
   flipSteak: (hobId) => {
-    console.log('[Steak] flip', { hobId })
+    const { sessionId, blockNumber } = get()
+    console.log('[Steak] flip', { hobId, sessionId })
     set((state) => ({
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.READY
@@ -116,10 +119,16 @@ export const useGameStore = create((set, get) => ({
         time: new Date().toLocaleTimeString(),
       }].slice(-50),
     }))
+    if (sessionId) {
+      reportSteakAction(sessionId, blockNumber, hobId, 'flip').catch(err =>
+        console.error('[Steak] flip report failed:', err)
+      )
+    }
   },
 
   serveSteak: (hobId) => {
-    console.log('[Steak] serve', { hobId })
+    const { sessionId, blockNumber, sseConnected } = get()
+    console.log('[Steak] serve', { hobId, sessionId })
     set((state) => ({
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.READY
@@ -132,8 +141,13 @@ export const useGameStore = create((set, get) => ({
         time: new Date().toLocaleTimeString(),
       }].slice(-50),
     }))
-    // Backend SSE handles respawn when connected; local fallback for demo mode
-    if (!get().sseConnected) {
+    if (sessionId) {
+      // Backend handles respawn via SSE after 15-25s
+      reportSteakAction(sessionId, blockNumber, hobId, 'serve').catch(err =>
+        console.error('[Steak] serve report failed:', err)
+      )
+    } else if (!sseConnected) {
+      // Demo mode fallback — local respawn
       const delay = 15000 + Math.random() * 10000
       setTimeout(() => {
         const s = get()
@@ -145,7 +159,8 @@ export const useGameStore = create((set, get) => ({
   },
 
   cleanSteak: (hobId) => {
-    console.log('[Steak] clean', { hobId })
+    const { sessionId, blockNumber, sseConnected } = get()
+    console.log('[Steak] clean', { hobId, sessionId })
     set((state) => ({
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.BURNING
@@ -158,8 +173,11 @@ export const useGameStore = create((set, get) => ({
         time: new Date().toLocaleTimeString(),
       }].slice(-50),
     }))
-    // Backend SSE handles respawn when connected; local fallback for demo mode
-    if (!get().sseConnected) {
+    if (sessionId) {
+      reportSteakAction(sessionId, blockNumber, hobId, 'clean').catch(err =>
+        console.error('[Steak] clean report failed:', err)
+      )
+    } else if (!sseConnected) {
       const delay = 15000 + Math.random() * 10000
       setTimeout(() => {
         const s = get()
@@ -411,6 +429,7 @@ export const useGameStore = create((set, get) => ({
     sessionId: data.sessionId,
     participantId: data.participantId,
     group: data.group,
+    conditionOrder: data.conditionOrder || null,
   }),
 
   setPhase: (phase) => set({ phase }),

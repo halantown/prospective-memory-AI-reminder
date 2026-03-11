@@ -11,6 +11,7 @@ import MessageLog from './ui/MessageLog'
 import ReportTaskButton from './ui/ReportTaskButton'
 import PmExecuteOverlay from './ui/PmExecuteOverlay'
 import EncodingScreen from './screens/EncodingScreen'
+import WelcomeScreen from './screens/WelcomeScreen'
 
 const TICK_RATE = 1000
 const HOB_CHECK_RATE = 500
@@ -20,14 +21,13 @@ export default function GameShell() {
   const blockRunning = useGameStore((s) => s.blockRunning)
   const tickMachine = useGameStore((s) => s.tickMachine)
   const tickBlockTimer = useGameStore((s) => s.tickBlockTimer)
-  const startBlockEncoding = useGameStore((s) => s.startBlockEncoding)
   const spawnSteak = useGameStore((s) => s.spawnSteak)
   const activeRoom = useGameStore((s) => s.activeRoom)
 
-  // SSE client — connects when sessionId is set, no-op in demo mode
+  // SSE client — connects when sessionId + blockNumber + blockRunning are set
   useSSE()
 
-  // ── 1s game loop (machine, block timer, PM countdown) ──
+  // ── 1s game loop (machine, block timer) ──
   useEffect(() => {
     if (!blockRunning) return
     const timer = setInterval(() => {
@@ -66,21 +66,11 @@ export default function GameShell() {
     return () => clearInterval(timer)
   }, [blockRunning])
 
-  // ── Auto-start demo block with encoding phase ──────────
-  useEffect(() => {
-    if (phase === 'welcome') {
-      startBlockEncoding({
-        blockNumber: 1,
-        condition: 'HighAF_HighCB',
-        taskPairId: 1,
-      })
-    }
-  }, [])
-
-  // ── Demo steak spawning (only when SSE not connected) ───
+  // ── Demo steak spawning (only when SSE not connected = no backend) ───
   useEffect(() => {
     if (!blockRunning) return
     if (useGameStore.getState().sseConnected) return
+    if (useGameStore.getState().sessionId) return // has session → SSE will connect, wait for backend spawns
     const timeouts = [
       setTimeout(() => spawnSteak(0), 2000),
       setTimeout(() => spawnSteak(1), 8000),
@@ -88,6 +78,11 @@ export default function GameShell() {
     ]
     return () => timeouts.forEach(clearTimeout)
   }, [blockRunning, spawnSteak])
+
+  // ── Welcome screen (session creation) ──────────────────
+  if (phase === 'welcome') {
+    return <WelcomeScreen />
+  }
 
   // ── Encoding screen (blocks game UI until confirmed) ───
   if (phase === 'block_encoding') {
