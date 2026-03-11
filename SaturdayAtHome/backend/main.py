@@ -275,29 +275,33 @@ async def get_block_config(session_id: str, block_num: int):
 
 
 @app.get("/session/{session_id}/block/{block_num}/stream")
-async def block_stream(session_id: str, block_num: int):
-    """SSE endpoint — pushes block timeline events to the frontend."""
+async def block_stream(session_id: str, block_num: int, auto_start: bool = True):
+    """SSE endpoint — pushes block timeline events to the frontend.
+    
+    Use auto_start=false from dashboard to observe without triggering timeline.
+    """
+    logger.info(f"SSE connect [{session_id}] block={block_num} auto_start={auto_start}")
 
     queue: asyncio.Queue = asyncio.Queue()
     if session_id not in sse_queues:
         sse_queues[session_id] = []
     sse_queues[session_id].append(queue)
 
-    # Start block timeline if not already running
-    timeline_key = f"{session_id}_{block_num}"
-    if timeline_key not in active_timelines:
-        # Get block config
-        db = get_db(DB_PATH)
-        row = db.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
-        db.close()
+    # Start block timeline if not already running (skip when auto_start=false)
+    if auto_start:
+        timeline_key = f"{session_id}_{block_num}"
+        if timeline_key not in active_timelines:
+            db = get_db(DB_PATH)
+            row = db.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
+            db.close()
 
-        if row:
-            condition_order = json.loads(row["condition_order"])
-            condition = condition_order[block_num - 1] if block_num <= len(condition_order) else "HighAF_HighCB"
+            if row:
+                condition_order = json.loads(row["condition_order"])
+                condition = condition_order[block_num - 1] if block_num <= len(condition_order) else "HighAF_HighCB"
 
-            tl = BlockTimeline(session_id, block_num, condition, send_sse)
-            active_timelines[timeline_key] = tl
-            asyncio.create_task(tl.run())
+                tl = BlockTimeline(session_id, block_num, condition, send_sse)
+                active_timelines[timeline_key] = tl
+                asyncio.create_task(tl.run())
 
     async def event_generator():
         try:
@@ -309,7 +313,7 @@ async def block_stream(session_id: str, block_num: int):
         except asyncio.CancelledError:
             pass
         finally:
-            if session_id in sse_queues:
+            if session_id in sse_queues and queue in sse_queues[session_id]:
                 sse_queues[session_id].remove(queue)
 
     return StreamingResponse(
@@ -493,6 +497,70 @@ async def export_session(session_id: str):
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=session_{session_id}.csv"},
     )
+
+
+# ── Admin / Dashboard Endpoints ───────────────────────────
+
+class FireEventRequest(BaseModel):
+    session_id: str
+    event: str
+    data: dict = {}
+
+
+@app.post("/admin/fire-event")
+async def admin_fire_event(req: FireEventRequest):
+    """Manually fire an SSE event to a session (from dashboard)."""
+    logger.info(f"Admin fire [{req.session_id}] → {req.event}: {req.data}")
+    await send_sse(req.session_id, req.event, req.data)
+
+    # Update backend hob state for steak events
+    if req.event == "steak_spawn":
+        hobs = get_session_hobs(req.session_id)
+        hob_id = req.data.get("hob_id", 0)
+        if 0 <= hob_id < len(hobs) and hobs[hob_id].status == HobStatus.EMPTY:
+            hobs[hob_id].status = HobStatus.COOKING
+            hobs[hob_id].started_at = time.time()
+    elif req.event == "force_yellow_steak":
+        hobs = get_session_hobs(req.session_id)
+        hob_id = req.data.get("hob_id", 0)
+        if 0 <= hob_id < len(hobs):
+            hobs[hob_id].status = HobStatus.READY
+            hobs[hob_id].started_at = time.time()
+
+    log_action(req.session_id, 0, f"admin_{req.event}", req.data)
+    return {"status": "ok"}
+
+
+@app.get("/admin/sessions")
+async def admin_list_sessions():
+    """List all sessions."""
+    db = get_db(DB_PATH)
+    rows = db.execute("SELECT * FROM sessions ORDER BY created_at DESC").fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+@app.get("/admin/session/{session_id}/state")
+async def admin_session_state(session_id: str):
+    """Get live session state (hobs, SSE clients, timelines)."""
+    hobs = get_session_hobs(session_id)
+    return {
+        "hobs": [{"id": h.id, "status": h.status.value, "started_at": h.started_at} for h in hobs],
+        "active_timelines": [k for k in active_timelines.keys() if k.startswith(session_id)],
+        "sse_clients": len(sse_queues.get(session_id, [])),
+    }
+
+
+@app.get("/admin/logs/{session_id}")
+async def admin_get_logs(session_id: str):
+    """Get action logs for a session (most recent first)."""
+    db = get_db(DB_PATH)
+    rows = db.execute(
+        "SELECT * FROM action_logs WHERE session_id = ? ORDER BY ts DESC LIMIT 100",
+        (session_id,),
+    ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useGameStore, HOB_STATUS } from '../store/gameStore'
+import useSSE from '../hooks/useSSE'
 import TopBar from './ui/TopBar'
 import Sidebar from './ui/Sidebar'
 import RoomOverview from './rooms/RoomOverview'
@@ -22,6 +23,9 @@ export default function GameShell() {
   const startBlockEncoding = useGameStore((s) => s.startBlockEncoding)
   const spawnSteak = useGameStore((s) => s.spawnSteak)
   const activeRoom = useGameStore((s) => s.activeRoom)
+
+  // SSE client — connects when sessionId is set, no-op in demo mode
+  useSSE()
 
   // ── 1s game loop (machine, block timer, PM countdown) ──
   useEffect(() => {
@@ -73,9 +77,10 @@ export default function GameShell() {
     }
   }, [])
 
-  // ── Demo steak spawning (replaces SSE in demo mode) ────
+  // ── Demo steak spawning (only when SSE not connected) ───
   useEffect(() => {
     if (!blockRunning) return
+    if (useGameStore.getState().sseConnected) return
     const timeouts = [
       setTimeout(() => spawnSteak(0), 2000),
       setTimeout(() => spawnSteak(1), 8000),

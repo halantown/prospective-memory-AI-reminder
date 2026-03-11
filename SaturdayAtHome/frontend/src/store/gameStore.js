@@ -132,7 +132,16 @@ export const useGameStore = create((set, get) => ({
         time: new Date().toLocaleTimeString(),
       }].slice(-50),
     }))
-    // Respawn is handled by backend SSE (steak_spawn event after 15-25s)
+    // Backend SSE handles respawn when connected; local fallback for demo mode
+    if (!get().sseConnected) {
+      const delay = 15000 + Math.random() * 10000
+      setTimeout(() => {
+        const s = get()
+        if (s.blockRunning && !s.sseConnected && s.hobs.find(h => h.id === hobId)?.status === HOB_STATUS.EMPTY) {
+          s.spawnSteak(hobId)
+        }
+      }, delay)
+    }
   },
 
   cleanSteak: (hobId) => {
@@ -149,7 +158,16 @@ export const useGameStore = create((set, get) => ({
         time: new Date().toLocaleTimeString(),
       }].slice(-50),
     }))
-    // Respawn is handled by backend SSE (steak_spawn event after 15-25s)
+    // Backend SSE handles respawn when connected; local fallback for demo mode
+    if (!get().sseConnected) {
+      const delay = 15000 + Math.random() * 10000
+      setTimeout(() => {
+        const s = get()
+        if (s.blockRunning && !s.sseConnected && s.hobs.find(h => h.id === hobId)?.status === HOB_STATUS.EMPTY) {
+          s.spawnSteak(hobId)
+        }
+      }, delay)
+    }
   },
 
   // Force a hob into READY state regardless of current state
