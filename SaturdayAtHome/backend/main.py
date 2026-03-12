@@ -32,8 +32,11 @@ async def lifespan(app: FastAPI):
     load_config()
     init_db(DB_PATH)
     yield
+    # Shutdown: cancel timelines first, then signal SSE queues to close
+    from core.sse import shutdown_all_queues
     for tl in active_timelines.values():
         tl.cancel()
+    shutdown_all_queues()
 
 
 # ── App factory ────────────────────────────────────────────

@@ -129,33 +129,28 @@ export default function KitchenCard({ isExpanded }) {
       </div>
 
       {/* Kitchen table with medicine cabinet — bottom section */}
-      {isExpanded ? (
-        <div className="relative w-full mt-6">
-          {/* Table surface */}
-          <div className="relative bg-amber-800/20 border-2 border-amber-700/30 rounded-2xl px-6 py-4 shadow-inner">
-            {/* Table wood grain texture hint */}
-            <div className="absolute inset-0 rounded-2xl opacity-[0.04] pointer-events-none"
-              style={{ background: 'repeating-linear-gradient(90deg, #000 0px, transparent 1px, transparent 12px)' }}
-            />
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-amber-800/50 uppercase tracking-widest select-none">
-                Kitchen Table
-              </span>
-              <MedicineCabinet isExpanded={true} />
-            </div>
-          </div>
-          {/* Table legs */}
-          <div className="flex justify-between px-4 -mt-px">
-            <div className="w-3 h-4 bg-amber-900/30 rounded-b" />
-            <div className="w-3 h-4 bg-amber-900/30 rounded-b" />
-          </div>
+      <div className={`relative w-full ${isExpanded ? 'mt-6' : 'mt-auto'}`}>
+        {/* Table surface */}
+        <div className={`relative bg-amber-800/20 border-2 border-amber-700/30 shadow-inner flex items-center justify-between ${
+          isExpanded ? 'rounded-2xl px-6 py-4' : 'rounded-lg px-3 py-1.5'
+        }`}>
+          {/* Wood grain texture */}
+          <div className="absolute inset-0 rounded-[inherit] opacity-[0.04] pointer-events-none"
+            style={{ background: 'repeating-linear-gradient(90deg, #000 0px, transparent 1px, transparent 12px)' }}
+          />
+          <span className={`font-semibold text-amber-800/50 uppercase tracking-widest select-none ${
+            isExpanded ? 'text-xs' : 'text-[7px]'
+          }`}>
+            Kitchen Table
+          </span>
+          <MedicineCabinet isExpanded={isExpanded} />
         </div>
-      ) : (
-        /* Compact view: small table hint with medicine icon */
-        <div className="w-full mt-2 flex items-center justify-end">
-          <MedicineCabinet isExpanded={false} />
+        {/* Table legs */}
+        <div className={`flex justify-between -mt-px ${isExpanded ? 'px-4' : 'px-2'}`}>
+          <div className={`bg-amber-900/30 rounded-b ${isExpanded ? 'w-3 h-4' : 'w-1.5 h-2'}`} />
+          <div className={`bg-amber-900/30 rounded-b ${isExpanded ? 'w-3 h-4' : 'w-1.5 h-2'}`} />
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -2,7 +2,71 @@ import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { MEDICINE_TASKS, getMedicineConfig } from '../../config/taskConfigs'
-import { Pill } from 'lucide-react'
+
+/**
+ * CSS-drawn medicine cabinet icon.
+ * White box with a cross, hinged door look.
+ */
+function CabinetIcon({ size = 40, active = false }) {
+  const s = size
+  const cross = Math.round(s * 0.28)
+  const crossW = Math.max(2, Math.round(s * 0.08))
+  return (
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: s, height: s }}
+    >
+      {/* Outer box */}
+      <div
+        className={`absolute inset-0 rounded-md border-2 transition-colors duration-300 ${
+          active ? 'border-emerald-500 bg-white' : 'border-slate-300 bg-slate-50'
+        }`}
+        style={{ boxShadow: active ? '0 0 8px rgba(16,185,129,0.3)' : 'inset 0 1px 3px rgba(0,0,0,0.08)' }}
+      />
+      {/* Door line (hinged left) */}
+      <div
+        className={`absolute top-[15%] bottom-[15%] left-[12%] border-l transition-colors ${
+          active ? 'border-emerald-400' : 'border-slate-300'
+        }`}
+      />
+      {/* Cross (horizontal) */}
+      <div
+        className={`absolute transition-colors ${active ? 'bg-emerald-500' : 'bg-red-400'}`}
+        style={{
+          width: cross,
+          height: crossW,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          borderRadius: 1,
+        }}
+      />
+      {/* Cross (vertical) */}
+      <div
+        className={`absolute transition-colors ${active ? 'bg-emerald-500' : 'bg-red-400'}`}
+        style={{
+          width: crossW,
+          height: cross,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          borderRadius: 1,
+        }}
+      />
+      {/* Door knob */}
+      <div
+        className={`absolute rounded-full transition-colors ${active ? 'bg-emerald-400' : 'bg-slate-400'}`}
+        style={{
+          width: Math.max(2, Math.round(s * 0.08)),
+          height: Math.max(2, Math.round(s * 0.08)),
+          right: '14%',
+          top: '50%',
+          transform: 'translateY(-50%)',
+        }}
+      />
+    </div>
+  )
+}
 
 /**
  * Medicine cabinet — sits on the kitchen table, always visible.
@@ -39,7 +103,6 @@ export default function MedicineCabinet({ isExpanded = true }) {
     : medicineConfigs.medicine_a
 
   const handleCabinetClick = () => {
-    if (!isExpanded) return
     if (isActive && !isOpen) {
       setSelectedBottle(null)
       setSelectedAmount(null)
@@ -90,18 +153,11 @@ export default function MedicineCabinet({ isExpanded = true }) {
       <div className="flex flex-col items-center gap-1">
         <motion.button
           onClick={handleCabinetClick}
-          disabled={!isExpanded}
-          whileHover={isExpanded ? { scale: 1.08 } : {}}
-          whileTap={isExpanded ? { scale: 0.95 } : {}}
-          className={`relative rounded-xl flex items-center justify-center transition-all duration-300 ${
-            isExpanded ? 'w-14 h-14' : 'w-9 h-9'
-          } ${
-            isActive
-              ? 'bg-emerald-100 border-2 border-emerald-400 shadow-lg cursor-pointer'
-              : 'bg-slate-100 border-2 border-slate-200 cursor-pointer hover:bg-slate-50'
-          }`}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.95 }}
+          className="relative"
         >
-          <Pill size={isExpanded ? 24 : 16} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
+          <CabinetIcon size={isExpanded ? 48 : 28} active={isActive} />
           {isActive && (
             <motion.div
               animate={{ scale: [1, 1.3, 1] }}
@@ -131,7 +187,7 @@ export default function MedicineCabinet({ isExpanded = true }) {
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Pill size={18} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
+                <CabinetIcon size={20} active={isActive} />
                 <span className="text-sm font-bold text-slate-700">Medicine Cabinet</span>
               </div>
               <button

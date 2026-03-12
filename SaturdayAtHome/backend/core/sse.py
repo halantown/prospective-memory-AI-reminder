@@ -14,6 +14,10 @@ logger = logging.getLogger("saturday.sse")
 # Active SSE connections: session_id → list[asyncio.Queue]
 sse_queues: dict[str, list[asyncio.Queue]] = {}
 
+# Sentinel value — pushed to queues on shutdown to unblock generators
+_SHUTDOWN = object()
+_shutting_down = False
+
 
 async def send_sse(session_id: str, event: str, data: dict):
     """Push an SSE event to all connected clients for this session.
@@ -23,6 +27,9 @@ async def send_sse(session_id: str, event: str, data: dict):
     - trigger_appear: opens an execution window (GDD A1)
     - window_close: closes the execution window, records miss if not submitted
     """
+    if _shutting_down:
+        return
+
     if event == "steak_spawn":
         hobs = get_session_hobs(session_id)
         hob_id = data.get("hob_id", 0)
@@ -59,13 +66,16 @@ async def send_sse(session_id: str, event: str, data: dict):
         return
 
     payload = {"event": event, "data": data, "ts": time.time()}
-    for q in sse_queues[session_id]:
-        await q.put(payload)
+    for q in list(sse_queues.get(session_id, [])):
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            pass
 
 
 def register_client(session_id: str) -> asyncio.Queue:
     """Register a new SSE client and return its queue."""
-    queue: asyncio.Queue = asyncio.Queue()
+    queue: asyncio.Queue = asyncio.Queue(maxsize=256)
     if session_id not in sse_queues:
         sse_queues[session_id] = []
     sse_queues[session_id].append(queue)
@@ -83,11 +93,14 @@ async def event_generator(session_id: str, queue: asyncio.Queue):
     """Async generator that yields SSE-formatted strings from a queue.
 
     Sends a keepalive every 30s to prevent connection timeout.
+    Stops cleanly on shutdown sentinel or CancelledError.
     """
     try:
-        while True:
+        while not _shutting_down:
             try:
                 payload = await asyncio.wait_for(queue.get(), timeout=30)
+                if payload is _SHUTDOWN:
+                    break
                 yield f"event: {payload['event']}\ndata: {json.dumps(payload['data'])}\n\n"
             except asyncio.TimeoutError:
                 yield "event: keepalive\ndata: {}\n\n"
@@ -97,6 +110,19 @@ async def event_generator(session_id: str, queue: asyncio.Queue):
         pass
     finally:
         unregister_client(session_id, queue)
+
+
+def shutdown_all_queues():
+    """Signal every connected SSE client to stop. Called during server shutdown."""
+    global _shutting_down
+    _shutting_down = True
+    for sid, queues in sse_queues.items():
+        for q in queues:
+            try:
+                q.put_nowait(_SHUTDOWN)
+            except asyncio.QueueFull:
+                pass
+    logger.info("SSE: shutdown sentinel pushed to all queues")
 
 
 def clear_session_queues(session_id: str):
