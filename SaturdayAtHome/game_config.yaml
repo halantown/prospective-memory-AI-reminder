@@ -1,0 +1,204 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Saturday At Home — Game Configuration
+# ═══════════════════════════════════════════════════════════════════════
+# All tunable experiment parameters in one place.
+# Edit here or via the web UI at /config.
+# Backend reads this on startup; changes via /config API are saved back.
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── Difficulty Presets ─────────────────────────────────────────────────
+difficulty:
+  slow:
+    cooking_ms: 20000
+    ready_ms: 5000
+    max_steaks: 2
+  medium:
+    cooking_ms: 13000
+    ready_ms: 4000
+    max_steaks: 3
+  fast:
+    cooking_ms: 9000
+    ready_ms: 3000
+    max_steaks: 3
+  default: medium
+
+# ── Scoring ───────────────────────────────────────────────────────────
+scoring:
+  steak_flip: 5
+  steak_serve: 5
+  steak_clean_penalty: -10
+  message_correct: 2
+  message_wrong: 1
+  message_expire_penalty: -2
+  plant_water_fresh: 3
+  plant_water_wilted: 1
+
+# ── Timers (ms) ──────────────────────────────────────────────────────
+timers:
+  message_timeout_ms: 15000
+  plant_wilt_ms: 30000
+  game_tick_ms: 1000
+  hob_check_ms: 500
+
+# ── Timeline (seconds) ──────────────────────────────────────────────
+timeline:
+  block_duration_s: 510
+
+  steak_spawn:
+    start_s: 3
+    end_s: 490
+    interval_min_s: 8
+    interval_max_s: 15
+
+  plant_water:
+    start_s: 60
+    start_jitter_s: 30
+    interval_min_s: 60
+    interval_max_s: 90
+
+  events:
+    fake_trigger_s: 35
+    robot_neutral_1_s: 75
+    force_yellow_1_s: 95
+    force_yellow_1_hob: 0
+    reminder_a_s: 120
+    trigger_a_appear_s: 210
+    trigger_a_close_s: 240
+    robot_neutral_2_s: 270
+    force_yellow_2_s: 275
+    force_yellow_2_hob: 1
+    reminder_b_s: 300
+    trigger_b_appear_s: 390
+    trigger_b_close_s: 420
+
+  neutral_comments:
+    - "Smells great in the kitchen!"
+    - "How's everything coming along?"
+
+  messages:
+    - time_s: 55
+      from: "Sarah"
+      subject: "Tonight's party"
+      body: "Hey! What time does the party start tonight? I need to plan my evening."
+      option_a: "7 o'clock"
+      option_b: "8 o'clock"
+      correct: "option_a"
+      avatar: "S"
+    - time_s: 130
+      from: "FoodDash"
+      subject: "Delivery confirmation"
+      body: "Your order is almost there! Should we leave it at the door or bring it upstairs?"
+      option_a: "Leave at door"
+      option_b: "Bring upstairs"
+      correct: "option_a"
+      avatar: "🛵"
+    - time_s: 220
+      from: "David"
+      subject: "Parking question"
+      body: "I'm driving over — is your spot A12 near the entrance or B07 by the garden?"
+      option_a: "A12"
+      option_b: "B07"
+      correct: "option_b"
+      avatar: "D"
+    - time_s: 310
+      from: "Building Mgmt"
+      subject: "Package notice"
+      body: "A package arrived for you. Should we keep it at the front desk or deliver to your door?"
+      option_a: "Front desk"
+      option_b: "My door"
+      correct: "option_a"
+      avatar: "📦"
+    - time_s: 400
+      from: "Sarah"
+      subject: "Dessert pick"
+      body: "I'll grab dessert on my way — chocolate cake or apple pie? What sounds good?"
+      option_a: "Chocolate cake"
+      option_b: "Apple pie"
+      correct: "option_b"
+      avatar: "S"
+    - time_s: 460
+      from: "Neighbor Jan"
+      subject: "Stopping by"
+      body: "I was thinking of popping over for a bit. Are you home? Want me to bring some fruit?"
+      option_a: "Sure, come by!"
+      option_b: "Not a great time"
+      correct: "option_a"
+      avatar: "J"
+
+# ── Experiment Design ────────────────────────────────────────────────
+experiment:
+  latin_square:
+    A: ["LowAF_LowCB", "HighAF_LowCB", "LowAF_HighCB", "HighAF_HighCB"]
+    B: ["HighAF_LowCB", "LowAF_HighCB", "HighAF_HighCB", "LowAF_LowCB"]
+    C: ["LowAF_HighCB", "HighAF_HighCB", "LowAF_LowCB", "HighAF_LowCB"]
+    D: ["HighAF_HighCB", "LowAF_LowCB", "HighAF_LowCB", "LowAF_HighCB"]
+
+  task_pairs:
+    1: ["medicine_a", "medicine_b"]
+    2: ["laundry_c", "laundry_d"]
+    3: ["comm_e", "comm_f"]
+    4: ["chores_g", "chores_h"]
+
+  reminder_texts:
+    LowAF_LowCB: "By the way, remember — after dinner today, take your medicine."
+    HighAF_LowCB: "By the way, remember — after dinner today, take your Doxycycline from the red round bottle, the one your cardiologist prescribed."
+    LowAF_HighCB: "I can see you're keeping an eye on the stove. By the way — after dinner today, remember to take your medicine."
+    HighAF_HighCB: "I can see you're keeping an eye on the stove. By the way — after dinner today, take your Doxycycline from the red round bottle, the one your cardiologist prescribed."
+
+  fake_trigger_type: "delivery"
+  execution_window_ms: 30000
+
+# ── PM Tasks ─────────────────────────────────────────────────────────
+pm_tasks:
+  medicine_a:
+    prompt: "Take your prescribed medicine"
+    bottles:
+      - id: "round_red"
+        label: "Red round bottle"
+        shape: "round"
+        color: "#e57373"
+      - id: "square_red"
+        label: "Red square bottle"
+        shape: "square"
+        color: "#ef5350"
+    amounts: ["1 tablet", "2 tablets", "3 tablets"]
+    correct:
+      bottle: "round_red"
+      amount: "2 tablets"
+
+  medicine_b:
+    prompt: "Take your vitamin supplement"
+    bottles:
+      - id: "round_orange"
+        label: "Orange round bottle"
+        shape: "round"
+        color: "#ffb74d"
+      - id: "square_orange"
+        label: "Orange square bottle"
+        shape: "square"
+        color: "#ffa726"
+    amounts: ["500mg × 1", "500mg × 2", "1000mg × 1"]
+    correct:
+      bottle: "round_orange"
+      amount: "1000mg × 1"
+
+# ── Trigger Icons ────────────────────────────────────────────────────
+trigger_icons:
+  medicine_a: { icon: "🍽️", label: "Dinner ready" }
+  medicine_b: { icon: "☕", label: "Coffee done" }
+  laundry_c:  { icon: "👕", label: "Laundry done" }
+  laundry_d:  { icon: "🌅", label: "Getting dark" }
+  comm_e:     { icon: "📱", label: "Friend online" }
+  comm_f:     { icon: "🚪", label: "Doorbell" }
+  chores_g:   { icon: "🍲", label: "Slow cooker" }
+  chores_h:   { icon: "🗑️", label: "Rubbish truck" }
+
+# ── Audio ────────────────────────────────────────────────────────────
+audio:
+  bgm_normal_volume: 0.35
+  bgm_ducked_volume: 0.08
+  duck_in_ms: 300
+  duck_out_ms: 800
+  tts_lang: "en-US"
+  tts_rate: 0.9
+  tts_pitch: 1.0

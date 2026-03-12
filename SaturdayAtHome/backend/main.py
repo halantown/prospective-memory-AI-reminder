@@ -7,10 +7,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import DB_PATH
+from core.config_loader import load_config
 from core.database import init_db
 from routes.session import router as session_router, active_timelines
 from routes.experiment import router as experiment_router
 from routes.admin import router as admin_router
+from routes.config_routes import router as config_router
 
 
 # ── Logging ────────────────────────────────────────────────
@@ -27,6 +29,7 @@ logger = logging.getLogger("saturday")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    load_config()
     init_db(DB_PATH)
     yield
     for tl in active_timelines.values():
@@ -48,6 +51,7 @@ app.add_middleware(
 app.include_router(session_router)
 app.include_router(experiment_router)
 app.include_router(admin_router)
+app.include_router(config_router)
 
 
 # ── Entry point ────────────────────────────────────────────

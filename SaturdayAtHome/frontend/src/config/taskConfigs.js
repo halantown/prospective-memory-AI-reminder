@@ -2,6 +2,9 @@
  * PM Task configurations for the experiment.
  * NOTE: correct answers are NOT stored here — they stay backend-only
  * to prevent participants from inspecting via DevTools.
+ *
+ * These are defaults. When remote config is loaded, the store's remoteConfig
+ * takes priority.
  */
 
 export const MEDICINE_TASKS = {
@@ -33,4 +36,33 @@ export const TRIGGER_ICONS = {
   comm_f:     { icon: '🚪', label: 'Doorbell' },
   chores_g:   { icon: '🍲', label: 'Slow cooker' },
   chores_h:   { icon: '🗑️', label: 'Rubbish truck' },
+}
+
+/**
+ * Merge remote config pm_tasks into MEDICINE_TASKS.
+ * Call this after remote config loads.
+ */
+export function getMedicineConfig(remoteConfig) {
+  if (!remoteConfig?.pm_tasks) return MEDICINE_TASKS
+  const merged = { ...MEDICINE_TASKS }
+  for (const [id, remote] of Object.entries(remoteConfig.pm_tasks)) {
+    if (merged[id]) {
+      merged[id] = {
+        ...merged[id],
+        prompt: remote.prompt ?? merged[id].prompt,
+        bottles: remote.options ?? merged[id].bottles,
+        amounts: remote.amounts ?? merged[id].amounts,
+      }
+    }
+  }
+  return merged
+}
+
+export function getTriggerIcons(remoteConfig) {
+  if (!remoteConfig?.trigger_icons) return TRIGGER_ICONS
+  const merged = { ...TRIGGER_ICONS }
+  for (const [id, remote] of Object.entries(remoteConfig.trigger_icons)) {
+    merged[id] = { icon: remote.icon ?? '❓', label: remote.label ?? id }
+  }
+  return merged
 }

@@ -22,6 +22,10 @@ export default function GameShell() {
   const tickBlockTimer = useGameStore((s) => s.tickBlockTimer)
   const spawnSteak = useGameStore((s) => s.spawnSteak)
   const activeRoom = useGameStore((s) => s.activeRoom)
+  const loadRemoteConfig = useGameStore((s) => s.loadRemoteConfig)
+
+  // Load remote config on mount
+  useEffect(() => { loadRemoteConfig() }, [loadRemoteConfig])
 
   // SSE client — connects when sessionId + blockNumber + blockRunning are set
   useSSE()

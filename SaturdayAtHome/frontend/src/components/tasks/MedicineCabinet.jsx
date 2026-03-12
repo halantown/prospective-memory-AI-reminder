@@ -1,19 +1,22 @@
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
-import { MEDICINE_TASKS } from '../../config/taskConfigs'
+import { MEDICINE_TASKS, getMedicineConfig } from '../../config/taskConfigs'
 import { Pill } from 'lucide-react'
 
 /**
- * Medicine cabinet — a natural game element in the kitchen.
+ * Medicine cabinet — sits on the kitchen table, always visible.
  *
- * GDD A1: inactive=grey icon (not clickable), active=highlighted (clickable).
- * When clicked, opens an inline panel (not an overlay) showing bottles → dose → Done.
- * No countdown visible, no score feedback. Participant feels like "I took my medicine".
+ * Clickable anytime:
+ * - No PM trigger: opens to show contents (informational, greyed out)
+ * - PM trigger active: highlighted, opens the two-step selection flow
+ *
+ * GDD A1: No countdown visible, no score feedback.
  */
 export default function MedicineCabinet({ isExpanded = true }) {
   const interactableTasks = useGameStore((s) => s.interactableTasks)
   const openCabinetTask = useGameStore((s) => s.openCabinetTask)
+  const remoteConfig = useGameStore((s) => s.remoteConfig)
   const openCabinet = useGameStore((s) => s.openCabinet)
   const closeCabinet = useGameStore((s) => s.closeCabinet)
   const submitCabinetAction = useGameStore((s) => s.submitCabinetAction)
@@ -23,28 +26,33 @@ export default function MedicineCabinet({ isExpanded = true }) {
   const [selectedBottle, setSelectedBottle] = useState(null)
   const [selectedAmount, setSelectedAmount] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [browseOpen, setBrowseOpen] = useState(false)
 
-  // Which medicine tasks are currently interactable?
   const activeMedicineTask = interactableTasks.find(t => t.startsWith('medicine_'))
   const isActive = !!activeMedicineTask
   const isOpen = !!openCabinetTask
+  const medicineConfigs = getMedicineConfig(remoteConfig)
 
-  const config = openCabinetTask ? MEDICINE_TASKS[openCabinetTask] : null
+  // Get config for the open task, or first medicine task for browse mode
+  const config = openCabinetTask
+    ? medicineConfigs[openCabinetTask]
+    : medicineConfigs.medicine_a
 
   const handleCabinetClick = () => {
-    if (!isActive || isOpen || !isExpanded) return
-    setSelectedBottle(null)
-    setSelectedAmount(null)
-    openCabinet(activeMedicineTask)
+    if (!isExpanded) return
+    if (isActive && !isOpen) {
+      setSelectedBottle(null)
+      setSelectedAmount(null)
+      openCabinet(activeMedicineTask)
+      setBrowseOpen(false)
+    } else if (!isActive && !browseOpen) {
+      setBrowseOpen(true)
+    }
   }
 
-  const handleBottleSelect = (bottleId) => {
-    setSelectedBottle(bottleId)
-    setSelectedAmount(null)
-  }
-
-  const handleAmountSelect = (amount) => {
-    setSelectedAmount(amount)
+  const handleClose = () => {
+    if (isOpen) closeCabinet()
+    setBrowseOpen(false)
   }
 
   const handleDone = useCallback(async () => {
@@ -73,27 +81,24 @@ export default function MedicineCabinet({ isExpanded = true }) {
     }
   }, [selectedBottle, selectedAmount, openCabinetTask, sessionId, blockNumber, submitCabinetAction])
 
-  const handleClose = () => {
-    closeCabinet()
-  }
-
   const isComplete = selectedBottle && selectedAmount
+  const showPanel = isOpen || browseOpen
 
   return (
-    <>
-      {/* Cabinet icon — always visible in kitchen */}
+    <div className="relative">
+      {/* Cabinet icon — always visible on kitchen table */}
       <div className="flex flex-col items-center gap-1">
         <motion.button
           onClick={handleCabinetClick}
-          disabled={!isActive || !isExpanded}
-          whileHover={isActive && isExpanded ? { scale: 1.08 } : {}}
-          whileTap={isActive && isExpanded ? { scale: 0.95 } : {}}
+          disabled={!isExpanded}
+          whileHover={isExpanded ? { scale: 1.08 } : {}}
+          whileTap={isExpanded ? { scale: 0.95 } : {}}
           className={`relative rounded-xl flex items-center justify-center transition-all duration-300 ${
             isExpanded ? 'w-14 h-14' : 'w-9 h-9'
           } ${
             isActive
               ? 'bg-emerald-100 border-2 border-emerald-400 shadow-lg cursor-pointer'
-              : 'bg-slate-100 border-2 border-slate-200 opacity-50 cursor-default'
+              : 'bg-slate-100 border-2 border-slate-200 cursor-pointer hover:bg-slate-50'
           }`}
         >
           <Pill size={isExpanded ? 24 : 16} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
@@ -112,115 +117,152 @@ export default function MedicineCabinet({ isExpanded = true }) {
         )}
       </div>
 
-      {/* Inline cabinet panel — slides open when clicked */}
+      {/* Floating panel — opens either for PM task selection or browse mode */}
       <AnimatePresence>
-        {isOpen && config && (
+        {showPanel && config && (
           <motion.div
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.25 }}
-            className="absolute inset-0 z-20 bg-white/95 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-6"
+            className="absolute bottom-full right-0 mb-2 z-30 bg-white rounded-2xl shadow-xl border border-slate-200 p-5 w-80"
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Cabinet header */}
-            <div className="flex items-center gap-2 mb-5">
-              <Pill size={20} className="text-emerald-600" />
-              <span className="text-sm font-bold text-slate-700">Medicine Cabinet</span>
-            </div>
-
-            {/* Step 1: Bottles */}
-            <div className="mb-4 w-full max-w-sm">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">
-                Choose bottle
-              </p>
-              <div className="flex gap-3 justify-center">
-                {config.bottles.map((bottle) => {
-                  const isSel = selectedBottle === bottle.id
-                  return (
-                    <button
-                      key={bottle.id}
-                      onClick={() => handleBottleSelect(bottle.id)}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all w-28 ${
-                        isSel
-                          ? 'border-emerald-500 bg-emerald-50 shadow-md'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div
-                        className="w-12 h-16 flex items-center justify-center shadow-inner"
-                        style={{
-                          backgroundColor: bottle.color,
-                          borderRadius: bottle.shape === 'round' ? '50%' : '6px',
-                        }}
-                      >
-                        <span className="text-white text-lg font-bold opacity-80">💊</span>
-                      </div>
-                      <span className={`text-[10px] font-medium ${isSel ? 'text-emerald-700' : 'text-slate-500'}`}>
-                        {bottle.label}
-                      </span>
-                    </button>
-                  )
-                })}
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Pill size={18} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
+                <span className="text-sm font-bold text-slate-700">Medicine Cabinet</span>
               </div>
-            </div>
-
-            {/* Step 2: Amount (only after bottle selected) */}
-            <AnimatePresence>
-              {selectedBottle && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-4 w-full max-w-sm"
-                >
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">
-                    Choose amount
-                  </p>
-                  <div className="flex gap-2 justify-center">
-                    {config.amounts.map((amount) => {
-                      const isSel = selectedAmount === amount
-                      return (
-                        <button
-                          key={amount}
-                          onClick={() => handleAmountSelect(amount)}
-                          className={`px-4 py-2 rounded-lg border-2 font-bold text-xs transition-all ${
-                            isSel
-                              ? 'border-emerald-500 bg-emerald-500 text-white shadow-md'
-                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                          }`}
-                        >
-                          {amount}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Action buttons */}
-            <div className="flex gap-3 mt-2">
-              <button
-                onClick={handleDone}
-                disabled={!isComplete || submitting}
-                className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
-                  isComplete
-                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                Done
-              </button>
               <button
                 onClick={handleClose}
-                className="px-5 py-2.5 rounded-xl font-bold text-sm bg-slate-100 hover:bg-slate-200 text-slate-600"
+                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
               >
-                Close
+                ×
               </button>
             </div>
+
+            {isActive && isOpen ? (
+              /* ── PM Task Mode: two-step selection ── */
+              <>
+                <p className="text-xs text-emerald-700 font-medium mb-3 bg-emerald-50 rounded-lg px-3 py-2">
+                  {config.prompt}
+                </p>
+
+                {/* Step 1: Bottles */}
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Step 1 — Choose bottle
+                </p>
+                <div className="flex gap-2 mb-3">
+                  {config.bottles.map((bottle) => {
+                    const isSel = selectedBottle === bottle.id
+                    return (
+                      <button
+                        key={bottle.id}
+                        onClick={() => { setSelectedBottle(bottle.id); setSelectedAmount(null) }}
+                        className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 transition-all flex-1 ${
+                          isSel
+                            ? 'border-emerald-500 bg-emerald-50 shadow-md'
+                            : 'border-slate-200 bg-white hover:border-slate-300'
+                        }`}
+                      >
+                        <div
+                          className="w-10 h-14 flex items-center justify-center shadow-inner"
+                          style={{
+                            backgroundColor: bottle.color,
+                            borderRadius: bottle.shape === 'round' ? '50%' : '6px',
+                          }}
+                        >
+                          <span className="text-white text-sm font-bold opacity-80">💊</span>
+                        </div>
+                        <span className={`text-[10px] font-medium ${isSel ? 'text-emerald-700' : 'text-slate-500'}`}>
+                          {bottle.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Step 2: Amount */}
+                <AnimatePresence>
+                  {selectedBottle && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mb-3"
+                    >
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        Step 2 — Choose amount
+                      </p>
+                      <div className="flex gap-2">
+                        {config.amounts.map((amount) => {
+                          const isSel = selectedAmount === amount
+                          return (
+                            <button
+                              key={amount}
+                              onClick={() => setSelectedAmount(amount)}
+                              className={`flex-1 px-3 py-2 rounded-lg border-2 font-bold text-xs transition-all ${
+                                isSel
+                                  ? 'border-emerald-500 bg-emerald-500 text-white shadow-md'
+                                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                              }`}
+                            >
+                              {amount}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Done / Close */}
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={handleDone}
+                    disabled={!isComplete || submitting}
+                    className={`flex-1 py-2 rounded-xl font-bold text-sm transition-all ${
+                      isComplete
+                        ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {submitting ? 'Submitting…' : 'Done'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* ── Browse Mode: show contents informational ── */
+              <div className="opacity-60">
+                <p className="text-xs text-slate-500 mb-3 italic">
+                  Your medicines are stored here.
+                </p>
+                <div className="flex gap-2">
+                  {Object.values(medicineConfigs).map((task, i) => (
+                    <div key={i} className="flex flex-col items-center gap-1 flex-1 p-2 rounded-lg bg-slate-50">
+                      <div className="flex gap-1">
+                        {task.bottles?.map((b) => (
+                          <div
+                            key={b.id}
+                            className="w-6 h-9 shadow-inner"
+                            style={{
+                              backgroundColor: b.color,
+                              borderRadius: b.shape === 'round' ? '50%' : '4px',
+                              opacity: 0.5,
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[9px] text-slate-400">{task.prompt}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   )
 }

@@ -64,3 +64,18 @@ export async function reportPmAction(sessionId, blockNum, taskId, actionData) {
     ...actionData,
   })
 }
+
+/**
+ * Fetch game config (stripped of correct answers) from backend.
+ * Returns the config object or null on failure.
+ */
+export async function fetchGameConfig() {
+  try {
+    const res = await fetch(`${BASE.replace('/api', '')}/config/game`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    console.warn('[API] Failed to fetch game config:', err.message)
+    return null
+  }
+}

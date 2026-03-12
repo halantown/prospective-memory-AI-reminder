@@ -9,7 +9,8 @@ import uuid
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from core.config import DB_PATH, LATIN_SQUARE, TASK_PAIRS, REMINDER_TEXTS, assign_group
+from core.config import DB_PATH, assign_group
+from core.config_loader import get_latin_square, get_task_pairs, get_reminder_texts
 from core.database import get_db
 from utils.helpers import log_action
 from models.schemas import SessionStartRequest, SessionStartResponse
@@ -28,7 +29,7 @@ active_timelines: dict[str, BlockTimeline] = {}
 async def start_session(req: SessionStartRequest):
     session_id = str(uuid.uuid4())[:8]
     group = assign_group()
-    condition_order = LATIN_SQUARE[group]
+    condition_order = get_latin_square()[group]
 
     db = get_db(DB_PATH)
     db.execute(
@@ -64,7 +65,8 @@ async def get_block_config(session_id: str, block_num: int):
         raise HTTPException(400, "Block number must be 1-4")
 
     condition = condition_order[block_num - 1]
-    task_pair = TASK_PAIRS[block_num]
+    task_pair = get_task_pairs()[block_num]
+    reminder_texts = get_reminder_texts()
 
     return {
         "block_number": block_num,
@@ -72,8 +74,8 @@ async def get_block_config(session_id: str, block_num: int):
         "task_pair_id": block_num,
         "task_a": task_pair[0],
         "task_b": task_pair[1],
-        "reminder_text_a": REMINDER_TEXTS.get(condition, ""),
-        "reminder_text_b": REMINDER_TEXTS.get(condition, ""),
+        "reminder_text_a": reminder_texts.get(condition, ""),
+        "reminder_text_b": reminder_texts.get(condition, ""),
     }
 
 

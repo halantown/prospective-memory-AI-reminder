@@ -1,43 +1,35 @@
-"""Experiment configuration constants."""
+"""Experiment configuration — thin wrapper around config_loader.
+
+All actual values live in game_config.yaml.  Import from here for
+backwards-compatibility; the loader reads the YAML at startup.
+"""
 
 from pathlib import Path
+from core.config_loader import (
+    get_config, get_difficulty, get_latin_square,
+    get_task_pairs, get_reminder_texts,
+)
 
 DB_PATH = Path(__file__).parent / "experiment.db"
 
-# ── Difficulty presets ─────────────────────────────────────
 
-DIFFICULTY_CONFIG = {
-    "slow":   {"cooking_ms": 20000, "ready_ms": 5000, "max_steaks": 2},
-    "medium": {"cooking_ms": 13000, "ready_ms": 4000, "max_steaks": 3},
-    "fast":   {"cooking_ms": 9000,  "ready_ms": 3000, "max_steaks": 3},
-}
+# ── Convenience properties (read from YAML) ───────────────
 
-
-# ── Latin Square counterbalancing ──────────────────────────
-
-LATIN_SQUARE = {
-    "A": ["LowAF_LowCB", "HighAF_LowCB", "LowAF_HighCB", "HighAF_HighCB"],
-    "B": ["HighAF_LowCB", "LowAF_HighCB", "HighAF_HighCB", "LowAF_LowCB"],
-    "C": ["LowAF_HighCB", "HighAF_HighCB", "LowAF_LowCB", "HighAF_LowCB"],
-    "D": ["HighAF_HighCB", "LowAF_LowCB", "HighAF_LowCB", "LowAF_HighCB"],
-}
-
-TASK_PAIRS = {
-    1: ("medicine_a", "medicine_b"),
-    2: ("laundry_c", "laundry_d"),
-    3: ("comm_e", "comm_f"),
-    4: ("chores_g", "chores_h"),
-}
+def DIFFICULTY_CONFIG():
+    cfg = get_config().get("difficulty", {})
+    return {k: v for k, v in cfg.items() if k != "default"}
 
 
-# ── Reminder texts by condition ────────────────────────────
+def LATIN_SQUARE():
+    return get_latin_square()
 
-REMINDER_TEXTS = {
-    "LowAF_LowCB":  "By the way, remember — after dinner today, take your medicine.",
-    "HighAF_LowCB":  "By the way, remember — after dinner today, take your Doxycycline from the red round bottle, the one your cardiologist prescribed.",
-    "LowAF_HighCB":  "I can see you're keeping an eye on the stove. By the way — after dinner today, remember to take your medicine.",
-    "HighAF_HighCB": "I can see you're keeping an eye on the stove. By the way — after dinner today, take your Doxycycline from the red round bottle, the one your cardiologist prescribed.",
-}
+
+def TASK_PAIRS():
+    return get_task_pairs()
+
+
+def REMINDER_TEXTS():
+    return get_reminder_texts()
 
 
 # ── Group assignment ───────────────────────────────────────
@@ -48,7 +40,8 @@ _session_counter = 0
 def assign_group() -> str:
     """Assign a Latin Square group in round-robin fashion."""
     global _session_counter
-    groups = list(LATIN_SQUARE.keys())
+    ls = get_latin_square()
+    groups = list(ls.keys())
     group = groups[_session_counter % len(groups)]
     _session_counter += 1
     return group

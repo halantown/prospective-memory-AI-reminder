@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { reportSteakAction } from '../utils/api'
+import { reportSteakAction, fetchGameConfig } from '../utils/api'
 
 // ── Hob states ────────────────────────────────────────────
 const HOB_STATUS = {
@@ -9,11 +9,14 @@ const HOB_STATUS = {
   BURNING: 'burning',
 }
 
-const DIFFICULTY = {
+// Defaults (overwritten when remote config loads)
+let DIFFICULTY = {
   slow:   { cookingMs: 20000, readyMs: 5000, maxSteaks: 2 },
   medium: { cookingMs: 13000, readyMs: 4000, maxSteaks: 3 },
   fast:   { cookingMs: 9000,  readyMs: 3000, maxSteaks: 3 },
 }
+
+let MESSAGE_TIMEOUT_MS = 15000
 
 const makeHob = (id) => ({
   id, status: HOB_STATUS.EMPTY, startedAt: null,
@@ -22,14 +25,35 @@ const makeHob = (id) => ({
 
 const initialHobs = [makeHob(0), makeHob(1), makeHob(2)]
 
-// Timestamp helper — all internal timestamps use Date.now() (ms since epoch)
 const ts = () => Date.now()
-
-const MESSAGE_TIMEOUT_MS = 15000  // 15s to reply before penalty
 
 export { HOB_STATUS, DIFFICULTY }
 
 export const useGameStore = create((set, get) => ({
+  // ── Remote Config (loaded from backend) ──────────────────
+  remoteConfig: null,
+  configLoaded: false,
+
+  loadRemoteConfig: async () => {
+    const cfg = await fetchGameConfig()
+    if (!cfg) return
+    // Update module-level defaults from remote config
+    if (cfg.difficulty) {
+      for (const [k, v] of Object.entries(cfg.difficulty)) {
+        if (k === 'default') continue
+        DIFFICULTY[k] = {
+          cookingMs: v.cooking_ms ?? DIFFICULTY[k]?.cookingMs ?? 13000,
+          readyMs: v.ready_ms ?? DIFFICULTY[k]?.readyMs ?? 4000,
+          maxSteaks: v.max_steaks ?? DIFFICULTY[k]?.maxSteaks ?? 3,
+        }
+      }
+    }
+    if (cfg.timers?.message_timeout_ms) {
+      MESSAGE_TIMEOUT_MS = cfg.timers.message_timeout_ms
+    }
+    set({ remoteConfig: cfg, configLoaded: true })
+    console.log('[Config] Remote config loaded:', Object.keys(cfg))
+  },
   // ── Session ─────────────────────────────────────────────
   sessionId: null,
   participantId: null,

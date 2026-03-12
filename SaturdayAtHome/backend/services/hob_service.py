@@ -5,7 +5,7 @@ import logging
 import random
 import time
 
-from core.config import DIFFICULTY_CONFIG
+from core.config_loader import get_difficulty
 from models.entities import Hob, HobStatus
 
 logger = logging.getLogger("saturday.services.hob")
@@ -61,7 +61,7 @@ async def schedule_respawn(session_id: str, block_num: int, hob_id: int, send_ss
 
     hobs = get_session_hobs(session_id)
     if hob_id < len(hobs) and hobs[hob_id].status == HobStatus.EMPTY:
-        cfg = DIFFICULTY_CONFIG.get("medium")
+        cfg = get_difficulty("medium")
         dur = {"cooking": cfg["cooking_ms"], "ready": cfg["ready_ms"]}
         await send_sse_fn(session_id, "steak_spawn", {"hob_id": hob_id, "duration": dur})
         logger.info(f"Respawned steak [{session_id}] hob={hob_id}")

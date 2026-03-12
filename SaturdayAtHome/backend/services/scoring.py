@@ -1,21 +1,15 @@
-"""PM action scoring — correct answers are defined here (backend-only)."""
+"""PM action scoring — correct answers loaded from game_config.yaml."""
 
+from core.config_loader import get_correct_answer
 from models.schemas import PmActionReport
 
 
-# Correct answers for medicine tasks — NEVER sent to frontend
-_MEDICINE_CORRECT = {
-    "medicine_a": {"bottle": "round_red",   "amount": "2 tablets"},
-    "medicine_b": {"bottle": "round_orange", "amount": "1000mg × 1"},
-}
-
-
 def _score_medicine(task_id: str, action: PmActionReport) -> int:
-    correct = _MEDICINE_CORRECT.get(task_id)
+    correct = get_correct_answer(task_id)
     if not correct or not action.choice:
         return 0
-    bottle_ok = action.choice.get("bottle") == correct["bottle"]
-    amount_ok = action.choice.get("amount") == correct["amount"]
+    bottle_ok = action.choice.get("bottle") == correct.get("bottle")
+    amount_ok = action.choice.get("amount") == correct.get("amount")
     if bottle_ok and amount_ok:
         return 2
     if bottle_ok or amount_ok:
