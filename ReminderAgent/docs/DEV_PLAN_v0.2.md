@@ -3,11 +3,11 @@
 
 | | |
 |---|---|
-| **Version** | v0.1 |
+| **Version** | v0.2 — S2 complete; S3 updated with Ollama config and dual format strategy |
 | **Date** | 2026-03-11 |
 | **Owner** | Claude (project tracking) |
 | **Developer** | Thesis Candidate (local) |
-| **Status** | 🟡 Planning phase — not started |
+| **Status** | 🟡 S2 complete — S3 in progress |
 
 ---
 
@@ -16,6 +16,7 @@
 | Version | Date | Changes |
 |---|---|---|
 | v0.1 | 2026-03-11 | Initial plan |
+| v0.2 | 2026-03-11 | S1 closed (commit f3ff85a); S2 closed (commit e420846, 38 tests); S3 updated: Ollama local setup, dual format_context strategy, generation_config additions |
 
 ---
 
@@ -30,117 +31,31 @@
 
 ## Sprint Overview
 
-| Sprint | Focus | Gate to next sprint |
-|---|---|---|
-| **S1** | Project skeleton + Config layer | Directory created; configs load without error |
-| **S2** | Context Extractor | Passes all unit tests on Medicine A |
-| **S3** | LLM Backend + Prompt Constructor | Generates plausible text for Medicine A, all 4 conditions |
-| **S4** | Quality Gate | Auto-checks catch planted violations reliably |
-| **S5** | Batch Runner + Output Store | Full run: 32 combinations × 3 variants logged to DB |
-| **S6** | Scale to N=10 + Review Interface | 320 variants in DB; human review complete |
-| **S7** | Stage 1 Demo | ReAct agent extracts Medicine A JSON from email.txt |
+| Sprint | Focus | Status | Gate to next sprint |
+|---|---|---|---|
+| **S1** | Project skeleton + Config layer | ✅ `f3ff85a` | Directory created; configs load without error |
+| **S2** | Context Extractor | ✅ `e420846` | Passes all unit tests on Medicine A |
+| **S3** | LLM Backend + Prompt Constructor | 🔵 In progress | Generates plausible text for Medicine A, all 4 conditions |
+| **S4** | Quality Gate | ⬜ | Auto-checks catch planted violations reliably |
+| **S5** | Batch Runner + Output Store | ⬜ | Full run: 32 combinations × 3 variants logged to DB |
+| **S6** | Scale to N=10 + Review Interface | ⬜ | 320 variants in DB; human review complete |
+| **S7** | Stage 1 Demo | ⬜ | ReAct agent extracts Medicine A JSON from email.txt |
 
 Stage 1 (S7) is intentionally last — it does not block experiment data collection.
 
 ---
 
-## Sprint 1 — Project Skeleton + Config Layer
+## Sprint 1 — Project Skeleton + Config Layer ✅ `f3ff85a`
 
-**Goal:** Runnable project structure. No logic yet, just scaffolding and config loading.
-
-### Tasks
-
-- [ ] Create directory structure (as defined in TECH_DOC §4.1)
-- [ ] Write `config/condition_field_map.yaml` — full whitelist for all 4 conditions
-- [ ] Write `config/model_config.yaml` — backend selector + model name + temperature
-- [ ] Write `config/generation_config.yaml` — N variants, max retries, length limits
-- [ ] Write `stage2/config_loader.py` — loads and validates all three configs on startup; raises on missing required fields
-- [ ] Write `tests/test_config_loader.py` — assert all configs load cleanly
-
-### Deliverables
-
-```
-reminder_agent/
-├── config/
-│   ├── condition_field_map.yaml      ✓
-│   ├── model_config.yaml             ✓
-│   └── generation_config.yaml        ✓
-├── stage2/
-│   └── config_loader.py              ✓
-└── tests/
-    └── test_config_loader.py         ✓
-```
-
-### Config file specs
-
-**`model_config.yaml`**
-```yaml
-backend: "together"          # options: together | ollama | openai | anthropic
-model_name: "meta-llama/Meta-Llama-3-70B-Instruct"
-temperature: 0.8
-max_tokens: 150
-api_key_env: "TOGETHER_API_KEY"   # reads from environment variable
-```
-
-**`generation_config.yaml`**
-```yaml
-n_variants: 3                # start with 3; scale to 10 in S6
-max_retries: 3               # per variant before flagging as failed
-min_words: 5
-max_words: 35
-similarity_threshold: 0.85   # max Levenshtein similarity between variants
-```
-
-**`condition_field_map.yaml`** — see TECH_DOC §4.2 for full spec.
-
-### Exit criteria
-
-```bash
-python -m pytest tests/test_config_loader.py  # all pass
-python stage2/config_loader.py                # prints loaded config summary, no errors
-```
+All exit criteria met. 18 tests passing.
 
 ---
 
-## Sprint 2 — Context Extractor
+## Sprint 2 — Context Extractor ✅ `e420846`
 
-**Goal:** Given a full Task JSON and a condition string, return a pruned dict containing only whitelisted fields. LLM sees only this pruned dict.
+All exit criteria met. 20 new tests, 38 total passing.
 
-### Tasks
-
-- [ ] Write `data/task_schemas/medicine_a.json` — full Task JSON for Doxycycline (from meeting slides, cleaned)
-- [ ] Write `stage2/context_extractor.py`
-  - `load_field_map(condition)` — reads whitelist from config
-  - `extract(task_json, condition)` → pruned dict
-  - Handles conditional fields (`Creator_Is_Authority` check)
-  - Raises `MissingRequiredFieldError` if a required field is absent from input JSON
-  - Logs included/excluded fields for each call
-- [ ] Write `tests/test_context_extractor.py`
-  - Test: LowAF output contains no visual cue fields
-  - Test: HighAF output contains visual cue + domain properties
-  - Test: HighCB output contains Detected_Activity
-  - Test: LowCB output does not contain Detected_Activity
-  - Test: Task_Creator included in HighAF when authority=true, excluded when false
-  - Test: Missing required field raises error
-
-### Key logic — conditional field resolution
-
-```python
-# Pseudocode
-for field in conditional_fields[condition]:
-    if evaluate(field.condition, task_json):  # e.g., Creator_Is_Authority == true
-        include field.path in output
-    else:
-        skip
-```
-
-### Exit criteria
-
-```bash
-python -m pytest tests/test_context_extractor.py   # all pass
-```
-
-Manual check: print pruned output for Medicine A × LowAF_LowCB — should contain only entity name and action verb.
+Notable: `excluded_zones` implementation cleanly blocks `agent_reasoning_context` and `placeholder` at zone level rather than field level.
 
 ---
 
@@ -152,48 +67,43 @@ Manual check: print pruned output for Medicine A × LowAF_LowCB — should conta
 
 **LLM Backend (`stage2/llm_backend.py`)**
 - [ ] Define abstract interface: `generate(prompt: str) -> str`
-- [ ] Implement `TogetherBackend` (Together.ai API)
-- [ ] Implement `OllamaBackend` (local, for Phase 2 validation)
-- [ ] Backend selected from `model_config.yaml` at import time
+- [ ] Implement `OllamaBackend` — `POST localhost:11434/api/generate`, no API key
+- [ ] Implement `TogetherBackend` (Together.ai API) — for 70B validation
+- [ ] Backend + model selected from `model_config.yaml` at import time
 - [ ] Retry logic: if API call fails, retry up to 3 times with exponential backoff
 
 **Prompt Constructor (`stage2/prompt_constructor.py`)**
-- [ ] `build_system_prompt(condition)` — role definition, condition rules in plain English, length constraint, tone instruction
-- [ ] `build_user_prompt(pruned_context, prior_variants)` — task context + diversity instruction
-- [ ] `format_context(pruned_dict) -> str` — converts pruned JSON dict to natural language description (not raw JSON — LLM performs better with prose)
-- [ ] For variant N > 1: append prior variants with instruction to differ structurally
+- [ ] `build_system_prompt(condition)` — role definition, condition rules in plain English, length constraint (8–30 words), tone instruction
+- [ ] `build_user_prompt(pruned_context, prior_variants, context_format)` — task context + diversity instruction
+- [ ] `format_context(pruned_dict, style)` — `prose` or `json` mode, selected from `generation_config.yaml`
+- [ ] `_to_prose(pruned_dict)` — field-aware conversion (see TECH_DOC §4.2 for field mapping)
+- [ ] For variant N > 1: append prior variants with structural-difference instruction
 
-### Prompt structure (target)
+**Config update**
+- [ ] Add `context_format: "prose"` to `generation_config.yaml`
 
+### Local Ollama setup
+
+```bash
+ollama pull mistral:7b
+ollama serve                    # runs on localhost:11434
 ```
-[SYSTEM]
-You are generating reminder messages for a robot assistant in a cognitive psychology experiment.
-The reminder is spoken aloud by the robot (max 12 seconds).
 
-Condition: {condition_name}
-This condition requires you to include: {included_fields_plain_english}
-Do NOT include: {excluded_fields_plain_english}
-
-Tone: natural spoken English, warm and brief. Not clinical. Not robotic.
-Length: 8–30 words.
-Output: one reminder sentence or two short sentences. No bullet points. No explanation.
-
-[USER]
-Task context:
-{formatted_pruned_context}
-
-{if prior_variants:}
-Previously generated variants (generate something structurally different):
-{prior_variants_numbered}
-
-Generate one new reminder variant.
+`model_config.yaml` for local dev:
+```yaml
+backend: "ollama"
+model_name: "mistral:7b"
+temperature: 0.8
+max_tokens: 150
+base_url: "http://localhost:11434"
+api_key_env: null
 ```
 
 ### Exit criteria
 
-- Run manually: `python stage2/prompt_constructor.py` prints the assembled prompt for Medicine A × HighAF_HighCB
-- Run manually: `python stage2/llm_backend.py` returns one generated string without error
-- Eyeball check: generated text looks like a plausible reminder
+- Run manually: `python stage2/prompt_constructor.py` — prints assembled prompt for Medicine A × HighAF_HighCB
+- Run manually: `python stage2/llm_backend.py` — returns one generated string without error
+- Eyeball check: generated text looks like a plausible reminder, correct condition
 
 ---
 

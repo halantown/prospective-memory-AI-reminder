@@ -5,3 +5,4 @@ max_retries: 3                 # retry limit per variant before flagging as fail
 min_words: 5                   # minimum word count for generated text
 max_words: 35                  # maximum word count for generated text
 similarity_threshold: 0.85     # max Levenshtein similarity between variants in same batch
+context_format: "prose"        # prose | json — how pruned context is presented to the LLM

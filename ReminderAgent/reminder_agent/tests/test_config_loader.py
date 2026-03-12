@@ -33,6 +33,7 @@ def tmp_config_dir(tmp_path: Path) -> Path:
         model_name: "meta-llama/Meta-Llama-3-70B-Instruct"
         temperature: 0.8
         max_tokens: 150
+        base_url: null
         api_key_env: "TOGETHER_API_KEY"
     """))
 
@@ -42,6 +43,7 @@ def tmp_config_dir(tmp_path: Path) -> Path:
         min_words: 5
         max_words: 35
         similarity_threshold: 0.85
+        context_format: "prose"
     """))
 
     (cfg / "condition_field_map.yaml").write_text(textwrap.dedent("""\
@@ -110,17 +112,18 @@ class TestLoadFromProductionConfigs:
 
     def test_all_configs_load(self) -> None:
         model, gen, field_map = load_all_configs()
-        assert model.backend == "together"
+        assert model.backend == "ollama"
         assert gen.n_variants == 3
         assert len(field_map.conditions) == 4
 
     def test_model_config(self) -> None:
         cfg = load_model_config()
-        assert cfg.backend == "together"
-        assert cfg.model_name == "meta-llama/Meta-Llama-3-70B-Instruct"
+        assert cfg.backend == "ollama"
+        assert cfg.model_name == "llama3:latest"
         assert cfg.temperature == 0.8
         assert cfg.max_tokens == 150
-        assert cfg.api_key_env == "TOGETHER_API_KEY"
+        assert cfg.base_url == "http://localhost:11434"
+        assert cfg.api_key_env is None
 
     def test_generation_config(self) -> None:
         cfg = load_generation_config()

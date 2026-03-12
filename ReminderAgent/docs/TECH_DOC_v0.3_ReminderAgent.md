@@ -3,7 +3,7 @@
 
 | | |
 |---|---|
-| **Version** | v0.2 — Task JSON structure finalised; field paths updated |
+| **Version** | v0.3 — S2 complete; S3 LLM backend + prompt constructor design added |
 | **Date** | 2026-03-11 |
 | **Author** | Thesis Candidate |
 | **Status** | 🟡 Architecture defined; implementation not started |
@@ -16,7 +16,8 @@
 | Version | Date | Changes |
 |---|---|---|
 | v0.1 | 2026-03-11 | Initial document — architecture, modules, field map, data flow |
-| v0.2 | 2026-03-11 | Task JSON structure finalised (3-zone: reminder_context / agent_reasoning_context / placeholder); field paths updated to snake_case; §2.3 new section on JSON zone design; §4.2 condition_field_map updated |
+| v0.2 | 2026-03-11 | Task JSON structure finalised (3-zone); field paths updated to snake_case; §2.3 JSON zone design; §4.2 condition_field_map updated |
+| v0.3 | 2026-03-11 | S2 complete (context_extractor + 38 tests); S3 design: OllamaBackend config, dual format_context strategy (prose/json), generation_config additions |
 
 ---
 
@@ -381,21 +382,68 @@ Key logic:
 
 Assembles the final prompt from three components:
 
-1. **System instructions:** role definition, condition description, length constraints (target 10–20 words for delivery within 12 seconds), tone (natural spoken language, not clinical)
-2. **Task context:** pruned JSON from `context_extractor`
+1. **System instructions:** role definition, condition description, length constraints (target 8–30 words for delivery within 12 seconds), tone (natural spoken language, not clinical)
+2. **Task context:** pruned JSON from `context_extractor`, formatted via `format_context()`
 3. **Few-shot examples:** retrieved from `data/few_shot_examples/` by condition
 
 For variant N > 1, the prompt additionally includes all previously generated variants with instruction: *"Generate a new variant that differs in sentence structure from the examples above."*
+
+**Dual context format strategy:**
+
+Context format is selected via `generation_config.yaml: context_format: prose | json`.
+
+| Format | Best for | Rationale |
+|---|---|---|
+| `prose` | Small models (7B, local Ollama) | Reduces JSON parsing overhead; more natural input leads to more natural output |
+| `json` | Large models (70B, cloud API) | Large models handle structured input well; preserves field semantics exactly |
+
+```python
+def format_context(pruned_dict: dict, style: str) -> str:
+    if style == "json":
+        return json.dumps(pruned_dict, indent=2)
+    elif style == "prose":
+        return _to_prose(pruned_dict)  # field-aware prose conversion
+```
+
+`_to_prose()` converts fields by semantic role, not generic flattening:
+- `action_verb` + `entity_name` → `"Task: Take Doxycycline."`
+- `visual` → `"Target appearance: Red round bottle with white label."`
+- `dosage` / `form` → `"Details: dosage: 100mg, form: Tablet."`
+- `task_creator` → `"Prescribed by: Doctor."`
+- `detected_activity_raw` → `"Current context: User just finished eating dinner."`
+
+**`generation_config.yaml` additions for S3:**
+```yaml
+context_format: "prose"    # prose | json
+```
 
 #### `stage2/llm_backend.py`
 
 Model-agnostic interface. Implements a common `generate(prompt: str) -> str` method.
 
 Supported backends (selected via `model_config.yaml`):
-- `ollama`: local Ollama instance (e.g., `llama3:8b`, `mistral:7b`)
+- `ollama`: local Ollama instance — calls `POST http://localhost:11434/api/generate`; no API key required; recommended for development and 7B model validation
 - `together`: Together.ai API (e.g., `meta-llama/Meta-Llama-3-70B-Instruct`)
 - `openai`: OpenAI API (e.g., `gpt-4o`)
 - `anthropic`: Anthropic API (e.g., `claude-sonnet-4-20250514`)
+
+**Ollama configuration (`model_config.yaml`):**
+```yaml
+backend: "ollama"
+model_name: "mistral:7b"      # or llama3.2:3b for lower VRAM
+temperature: 0.8
+max_tokens: 150
+base_url: "http://localhost:11434"
+api_key_env: null              # not required for local
+```
+
+**Recommended local models by VRAM:**
+
+| VRAM | Model | Notes |
+|---|---|---|
+| 6GB (RTX 2060 mobile) | `mistral:7b` or `llama3.2:3b` | 4-bit quantised |
+| 24GB | `llama3:13b` | Full precision |
+| 80GB (A100) | `llama3:70b` | Full precision |
 
 Switching backends requires only changing `model_config.yaml`. No code changes needed.
 

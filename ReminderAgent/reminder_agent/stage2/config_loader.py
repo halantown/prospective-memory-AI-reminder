@@ -30,7 +30,8 @@ class ModelConfig(BaseModel):
     model_name: str
     temperature: float = Field(ge=0.0, le=2.0)
     max_tokens: int = Field(gt=0)
-    api_key_env: str
+    base_url: str | None = None
+    api_key_env: str | None = None
 
     @field_validator("backend")
     @classmethod
@@ -40,12 +41,16 @@ class ModelConfig(BaseModel):
         return v
 
 
+VALID_CONTEXT_FORMATS = {"prose", "json"}
+
+
 class GenerationConfig(BaseModel):
     n_variants: int = Field(gt=0)
     max_retries: int = Field(ge=0)
     min_words: int = Field(gt=0)
     max_words: int = Field(gt=0)
     similarity_threshold: float = Field(ge=0.0, le=1.0)
+    context_format: str = "prose"
 
     @field_validator("max_words")
     @classmethod
@@ -53,6 +58,13 @@ class GenerationConfig(BaseModel):
         min_w = info.data.get("min_words")
         if min_w is not None and v < min_w:
             raise ValueError(f"max_words ({v}) must be >= min_words ({min_w})")
+        return v
+
+    @field_validator("context_format")
+    @classmethod
+    def _validate_context_format(cls, v: str) -> str:
+        if v not in VALID_CONTEXT_FORMATS:
+            raise ValueError(f"context_format must be one of {VALID_CONTEXT_FORMATS}, got '{v}'")
         return v
 
 
@@ -155,6 +167,7 @@ if __name__ == "__main__":
     print(f"  Model:       {model_cfg.model_name}")
     print(f"  Temperature: {model_cfg.temperature}")
     print(f"  Max tokens:  {model_cfg.max_tokens}")
+    print(f"  Base URL:    {model_cfg.base_url}")
     print(f"  API key env: {model_cfg.api_key_env}")
 
     print("\n=== Generation Config ===")
@@ -162,6 +175,7 @@ if __name__ == "__main__":
     print(f"  Max retries: {gen_cfg.max_retries}")
     print(f"  Word range:  {gen_cfg.min_words}–{gen_cfg.max_words}")
     print(f"  Similarity:  {gen_cfg.similarity_threshold}")
+    print(f"  Context fmt: {gen_cfg.context_format}")
 
     print("\n=== Condition Field Map ===")
     for cond_name, entry in field_map_cfg.conditions.items():
