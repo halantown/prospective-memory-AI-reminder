@@ -49,25 +49,25 @@ function EmailListItem({ email, isSelected, onSelect, onExpire }) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onSelect(email.id) }}
-      className={`w-full text-left px-3 py-2.5 flex gap-3 items-start rounded-lg transition-colors ${
+      className={`w-full text-left px-3 py-3 flex gap-3 items-start rounded-lg transition-colors ${
         email.expired ? 'opacity-50 bg-red-50 border border-red-100' :
         isSelected ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50 border border-transparent'
       }`}
     >
-      <div className={`${color} w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 mt-0.5 ${email.expired ? 'grayscale' : ''}`}>
+      <div className={`${color} w-10 h-10 rounded-full flex items-center justify-center text-white text-base font-bold shrink-0 mt-0.5 ${email.expired ? 'grayscale' : ''}`}>
         {email.avatar}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 mb-0.5">
-          <span className={`text-sm truncate ${
+        <div className="flex items-center gap-2 mb-1">
+          <span className={`text-base truncate ${
             email.expired ? 'text-red-400 line-through' :
             !email.read ? 'font-bold text-slate-900' : 'font-medium text-slate-600'
           }`}>
             {email.from}
           </span>
-          <span className="text-[10px] text-slate-400 shrink-0 ml-auto">{fmtTime(email.receivedAt)}</span>
+          <span className="text-xs text-slate-400 shrink-0 ml-auto">{fmtTime(email.receivedAt)}</span>
         </div>
-        <p className={`text-xs truncate ${
+        <p className={`text-sm truncate ${
           email.expired ? 'text-red-300' :
           !email.read ? 'font-semibold text-slate-700' : 'text-slate-500'
         }`}>
@@ -79,9 +79,9 @@ function EmailListItem({ email, isSelected, onSelect, onExpire }) {
           </div>
         )}
       </div>
-      {email.expired && <X size={14} className="text-red-400 shrink-0 mt-3" />}
-      {!email.read && !email.expired && <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-3" />}
-      {email.replied && <Check size={14} className={email.replyCorrect ? 'text-green-500' : 'text-yellow-500'} />}
+      {email.expired && <X size={16} className="text-red-400 shrink-0 mt-3" />}
+      {!email.read && !email.expired && <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-3" />}
+      {email.replied && <Check size={16} className={email.replyCorrect ? 'text-green-500' : 'text-yellow-500'} />}
     </button>
   )
 }
@@ -93,61 +93,61 @@ function EmailDetail({ email, onReply, onExpire }) {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="border-b border-slate-200 px-5 py-4">
-        <h3 className="text-lg font-bold text-slate-800 mb-2">{email.subject}</h3>
+        <h3 className="text-xl font-bold text-slate-800 mb-2">{email.subject}</h3>
         <div className="flex items-center gap-3">
-          <div className={`${color} w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold`}>
+          <div className={`${color} w-10 h-10 rounded-full flex items-center justify-center text-white text-base font-bold`}>
             {email.avatar}
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-700">{email.from}</p>
-            <p className="text-xs text-slate-400">{fmtTime(email.receivedAt)}</p>
+            <p className="text-base font-semibold text-slate-700">{email.from}</p>
+            <p className="text-sm text-slate-400">{fmtTime(email.receivedAt)}</p>
           </div>
         </div>
       </div>
 
       {/* Body */}
       <div className="flex-1 px-5 py-4 overflow-auto">
-        <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{email.body}</p>
+        <p className="text-base text-slate-700 leading-relaxed whitespace-pre-wrap">{email.body}</p>
       </div>
 
       {/* Countdown bar for active messages */}
       {isActive && (
         <div className="px-5 py-1">
           <div className="flex items-center gap-2 mb-1">
-            <Clock size={12} className="text-slate-400" />
-            <span className="text-[10px] text-slate-400 font-medium">Reply before time runs out</span>
+            <Clock size={13} className="text-slate-400" />
+            <span className="text-xs text-slate-400 font-medium">Reply before time runs out</span>
           </div>
           <CountdownBar receivedAt={email.receivedAt} onExpire={() => onExpire(email.id)} />
         </div>
       )}
 
       {/* Reply actions */}
-      <div className="border-t border-slate-200 px-5 py-3">
+      <div className="border-t border-slate-200 px-5 py-4">
         {email.expired ? (
-          <div className="flex items-center gap-2 text-red-500 text-sm font-medium py-2">
-            <X size={16} />
+          <div className="flex items-center gap-2 text-red-500 text-base font-medium py-2">
+            <X size={18} />
             Expired — no reply sent (−2 points)
           </div>
         ) : !email.replied ? (
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <button
               onClick={(e) => { e.stopPropagation(); onReply(email.id, 'option_a') }}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold rounded-lg transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-indigo-500 hover:bg-indigo-600 text-white text-base font-bold rounded-xl transition-colors"
             >
-              <Reply size={14} />
+              <Reply size={16} />
               {email.option_a}
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onReply(email.id, 'option_b') }}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold rounded-lg transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 text-base font-bold rounded-xl transition-colors"
             >
-              <Reply size={14} />
+              <Reply size={16} />
               {email.option_b}
             </button>
           </div>
         ) : (
-          <div className={`flex items-center gap-2 text-sm font-medium py-2 ${email.replyCorrect ? 'text-green-600' : 'text-yellow-600'}`}>
-            <Check size={16} />
+          <div className={`flex items-center gap-2 text-base font-medium py-2 ${email.replyCorrect ? 'text-green-600' : 'text-yellow-600'}`}>
+            <Check size={18} />
             Replied: "{email.replyChoice === 'option_a' ? email.option_a : email.option_b}"
             {email.replyCorrect ? ' ✓' : ''}
           </div>
@@ -169,30 +169,36 @@ export default function MessagesCard({ isExpanded }) {
   const selectedEmail = messageBubbles.find((e) => e.id === selectedEmailId) || messageBubbles[messageBubbles.length - 1]
 
   if (!isExpanded) {
-    const recentSenders = [...new Set(messageBubbles.slice(-3).map(b => b.avatar))].slice(0, 3)
+    // Only show unread (pending) messages in overview
+    const pendingMessages = messageBubbles.filter(b => !b.replied && !b.expired)
+    const pendingAvatars = [...new Set(pendingMessages.map(b => b.avatar))].slice(0, 3)
     return (
       <div className="flex flex-col items-center justify-center w-full h-full p-4 gap-2">
         <div className="relative">
-          <Mail size={28} className="text-slate-400" />
+          <Mail size={30} className="text-slate-400" />
           {unreadCount > 0 && (
-            <span className="absolute -top-2 -right-3 bg-blue-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+            <span className="absolute -top-2 -right-3 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
               {unreadCount}
             </span>
           )}
         </div>
-        <h3 className="text-base font-black tracking-wider text-slate-700">Inbox</h3>
-        {recentSenders.length > 0 && (
+        <h3 className="text-lg font-black tracking-wider text-slate-700">Inbox</h3>
+        {pendingAvatars.length > 0 && (
           <div className="flex -space-x-2 mt-1">
-            {recentSenders.map((avatar, i) => (
-              <div key={i} className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-white ${AVATAR_COLORS[avatar] || AVATAR_COLORS.default}`}>
-                {avatar}
+            {pendingAvatars.map((avatar, i) => (
+              <div key={i} className="relative">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ring-2 ring-white ${AVATAR_COLORS[avatar] || AVATAR_COLORS.default}`}>
+                  {avatar}
+                </div>
+                {/* Red dot — unread */}
+                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full ring-1 ring-white" />
               </div>
             ))}
           </div>
         )}
         {messageBubbles.length > 0 && (
-          <p className="text-[11px] text-slate-400">
-            {messageBubbles.length} emails{activeCount > 0 ? ` · ${activeCount} pending` : ''}
+          <p className="text-sm text-slate-500 font-medium mt-0.5">
+            {activeCount > 0 ? `${activeCount} pending` : 'All read'}
           </p>
         )}
       </div>
@@ -203,10 +209,10 @@ export default function MessagesCard({ isExpanded }) {
     <div className="flex flex-col w-full h-full">
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-200 bg-white/80">
-        <Mail size={22} className="text-slate-600" />
-        <h2 className="text-lg font-black tracking-wider text-slate-700">Inbox</h2>
+        <Mail size={24} className="text-slate-600" />
+        <h2 className="text-xl font-black tracking-wider text-slate-700">Inbox</h2>
         {unreadCount > 0 && (
-          <span className="bg-blue-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+          <span className="bg-red-500 text-white text-sm font-bold rounded-full px-2.5 py-0.5">
             {unreadCount} new
           </span>
         )}
@@ -215,7 +221,7 @@ export default function MessagesCard({ isExpanded }) {
       {messageBubbles.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-2">
           <Mail size={40} className="opacity-30" />
-          <p className="text-sm">No emails yet</p>
+          <p className="text-base">No emails yet</p>
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
@@ -244,7 +250,7 @@ export default function MessagesCard({ isExpanded }) {
                 <EmailDetail email={selectedEmail} onReply={replyToBubble} onExpire={expireMessage} />
               </motion.div>
             ) : (
-              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+              <div className="h-full flex items-center justify-center text-slate-400 text-base">
                 Select an email to read
               </div>
             )}

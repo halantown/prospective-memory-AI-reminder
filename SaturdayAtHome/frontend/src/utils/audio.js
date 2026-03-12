@@ -19,10 +19,10 @@ let bgm = null
 const BGM_NORMAL = 0.35
 const BGM_DUCKED = 0.08
 
-export function initBGM(src = '/audio/bgm.wav') {
+export function initBGM(src = '/audio/bgm.mp3') {
   if (bgm) return
   bgm = new Howl({
-    src: [src],
+    src: [src, '/audio/bgm.wav'],   // mp3 preferred, wav fallback
     loop: true,
     volume: 0,
     html5: true,

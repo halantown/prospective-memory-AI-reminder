@@ -57,38 +57,38 @@ export default function Sidebar() {
   }
 
   return (
-    <div className="w-20 bg-slate-900 shadow-[10px_0_30px_rgba(0,0,0,0.1)] z-40 flex flex-col items-center py-6 gap-4 border-r border-slate-800 text-slate-400">
+    <div className="w-24 bg-slate-900 shadow-[10px_0_30px_rgba(0,0,0,0.1)] z-40 flex flex-col items-center py-6 gap-4 border-r border-slate-800 text-slate-400">
       {/* Home overview button */}
       <button
         onClick={() => setActiveRoom('overview')}
-        className={`p-2.5 rounded-xl transition-all group flex flex-col items-center ${
+        className={`p-3 rounded-xl transition-all group flex flex-col items-center ${
           activeRoom === 'overview'
             ? 'bg-slate-700 text-white'
             : 'hover:bg-slate-800 hover:text-slate-200'
         }`}
       >
-        <Home size={24} className="mb-1 group-hover:scale-110 transition-transform" />
-        <span className="text-[10px] font-bold tracking-wider">HOME</span>
+        <Home size={28} className="mb-1 group-hover:scale-110 transition-transform" />
+        <span className="text-xs font-bold tracking-wider">HOME</span>
       </button>
 
-      <div className="w-10 h-px bg-slate-800 my-1" />
+      <div className="w-12 h-px bg-slate-800 my-1" />
 
       {/* Room buttons */}
       {rooms.map((room) => (
         <button
           key={room.id}
           onClick={() => setActiveRoom(room.id)}
-          className={`relative w-12 py-3 rounded-xl font-bold text-xs flex flex-col items-center gap-0.5 transition-all ${
+          className={`relative w-16 py-3 rounded-xl font-bold text-xs flex flex-col items-center gap-1 transition-all ${
             activeRoom === room.id
               ? 'bg-indigo-500 text-white shadow-[0_0_12px_rgba(99,102,241,0.5)] scale-110'
               : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200'
           }`}
         >
-          <room.icon size={18} />
-          <span className="text-[9px] tracking-wider mt-0.5">{room.label}</span>
+          <room.icon size={22} />
+          <span className="text-[11px] tracking-wider">{room.label}</span>
           <StatusDot color={getStatusColor(room.id)} />
           {room.id === 'messages' && unreadCount > 0 && (
-            <span className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ring-2 ring-slate-900 z-10">
+            <span className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 ring-2 ring-slate-900 z-10">
               {unreadCount}
             </span>
           )}
