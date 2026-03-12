@@ -47,45 +47,55 @@ def tmp_config_dir(tmp_path: Path) -> Path:
     (cfg / "condition_field_map.yaml").write_text(textwrap.dedent("""\
         LowAF_LowCB:
           required_fields:
-            - "Element1.Action_Verb"
-            - "Element1.Target_Entity.Entity_Name"
+            - "reminder_context.element1.action_verb"
+            - "reminder_context.element1.target_entity.entity_name"
           conditional_fields: []
           excluded_fields:
-            - "Element1.Target_Entity.Cues.Visual"
+            - "reminder_context.element1.target_entity.cues.visual"
+          excluded_zones:
+            - "agent_reasoning_context"
+            - "placeholder"
 
         HighAF_LowCB:
           required_fields:
-            - "Element1.Action_Verb"
-            - "Element1.Target_Entity.Entity_Name"
-            - "Element1.Target_Entity.Cues.Visual"
-            - "Element1.Target_Entity.Domain_Specific_Properties"
+            - "reminder_context.element1.action_verb"
+            - "reminder_context.element1.target_entity.entity_name"
+            - "reminder_context.element1.target_entity.cues.visual"
+            - "reminder_context.element1.target_entity.domain_properties"
           conditional_fields:
-            - field: "Element2.Origin.Task_Creator"
-              condition: "Element2.Origin.Creator_Is_Authority == true"
+            - field: "reminder_context.element2.origin.task_creator"
+              condition: "reminder_context.element2.origin.creator_is_authority == true"
           excluded_fields:
-            - "Element3.Current_Live_State.Detected_Activity"
+            - "reminder_context.element3.detected_activity_raw"
+          excluded_zones:
+            - "agent_reasoning_context"
+            - "placeholder"
 
         LowAF_HighCB:
           required_fields:
-            - "Element1.Action_Verb"
-            - "Element1.Target_Entity.Entity_Name"
-            - "Element3.Current_Live_State.Detected_Activity"
+            - "reminder_context.element1.action_verb"
+            - "reminder_context.element1.target_entity.entity_name"
+            - "reminder_context.element3.detected_activity_raw"
           conditional_fields: []
           excluded_fields:
-            - "Element1.Target_Entity.Cues.Visual"
+            - "reminder_context.element1.target_entity.cues.visual"
+          excluded_zones:
+            - "agent_reasoning_context"
+            - "placeholder"
 
         HighAF_HighCB:
           required_fields:
-            - "Element1.Action_Verb"
-            - "Element1.Target_Entity.Entity_Name"
-            - "Element1.Target_Entity.Cues.Visual"
-            - "Element1.Target_Entity.Domain_Specific_Properties"
-            - "Element3.Current_Live_State.Detected_Activity"
+            - "reminder_context.element1.action_verb"
+            - "reminder_context.element1.target_entity.entity_name"
+            - "reminder_context.element1.target_entity.cues.visual"
+            - "reminder_context.element1.target_entity.domain_properties"
+            - "reminder_context.element3.detected_activity_raw"
           conditional_fields:
-            - field: "Element2.Origin.Task_Creator"
-              condition: "Element2.Origin.Creator_Is_Authority == true"
-          excluded_fields:
-            - "Element2.Motivation_Hierarchy"
+            - field: "reminder_context.element2.origin.task_creator"
+              condition: "reminder_context.element2.origin.creator_is_authority == true"
+          excluded_zones:
+            - "agent_reasoning_context"
+            - "placeholder"
     """))
 
     return cfg
@@ -129,31 +139,31 @@ class TestLoadFromProductionConfigs:
         cfg = load_condition_field_map()
         low_af = cfg.conditions["LowAF_LowCB"]
         required_paths = low_af.required_fields
-        assert "Element1.Target_Entity.Cues.Visual" not in required_paths
+        assert "reminder_context.element1.target_entity.cues.visual" not in required_paths
 
     def test_highaf_has_visual_cues(self) -> None:
         cfg = load_condition_field_map()
         high_af = cfg.conditions["HighAF_LowCB"]
-        assert "Element1.Target_Entity.Cues.Visual" in high_af.required_fields
+        assert "reminder_context.element1.target_entity.cues.visual" in high_af.required_fields
 
     def test_highcb_has_detected_activity(self) -> None:
         cfg = load_condition_field_map()
         for cond_name in ("LowAF_HighCB", "HighAF_HighCB"):
             entry = cfg.conditions[cond_name]
-            assert "Element3.Current_Live_State.Detected_Activity" in entry.required_fields
+            assert "reminder_context.element3.detected_activity_raw" in entry.required_fields
 
     def test_lowcb_excludes_detected_activity(self) -> None:
         cfg = load_condition_field_map()
         for cond_name in ("LowAF_LowCB", "HighAF_LowCB"):
             entry = cfg.conditions[cond_name]
-            assert "Element3.Current_Live_State.Detected_Activity" not in entry.required_fields
+            assert "reminder_context.element3.detected_activity_raw" not in entry.required_fields
 
     def test_conditional_authority_field(self) -> None:
         cfg = load_condition_field_map()
         for cond_name in ("HighAF_LowCB", "HighAF_HighCB"):
             entry = cfg.conditions[cond_name]
             cond_fields = [cf.field for cf in entry.conditional_fields]
-            assert "Element2.Origin.Task_Creator" in cond_fields
+            assert "reminder_context.element2.origin.task_creator" in cond_fields
 
 
 # ---------------------------------------------------------------------------

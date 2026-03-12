@@ -1,0 +1,58 @@
+{
+  "task_id": "medicine_a",
+  "description": "Take Doxycycline after dinner, from the red round bottle.",
+
+  "reminder_context": {
+    "element1": {
+      "action_verb": "Take",
+      "target_entity": {
+        "entity_name": "Doxycycline",
+        "cues": {
+          "visual": "Red round bottle with white label"
+        },
+        "domain_properties": {
+          "dosage": "100mg",
+          "form": "Tablet"
+        }
+      }
+    },
+    "element2": {
+      "origin": {
+        "task_creator": "Doctor",
+        "creator_is_authority": true
+      }
+    },
+    "element3": {
+      "detected_activity_raw": "User just finished eating dinner"
+    }
+  },
+
+  "agent_reasoning_context": {
+    "execution_protocol": {
+      "temporal_window": "Once daily for 7 days, after dinner",
+      "spatial_boundary": "Kitchen or dining area preferred",
+      "action_rules": {
+        "prerequisites": ["Full glass of water", "After dinner"],
+        "incompatible_contexts": ["Dairy products (milk, cheese, yogurt)"],
+        "post_action_requirements": ["Remain upright for 30 minutes"]
+      }
+    },
+    "encoding_info": {
+      "creation_background": "User visited doctor, diagnosed with throat infection. Doctor prescribed Doxycycline and explained intake instructions. User saw the medication bottle and instructions.",
+      "cognitive_load": "Low"
+    }
+  },
+
+  "placeholder": {
+    "_note": "Fields deferred — no current contribution to Stage 1 or Stage 2",
+    "motivation_hierarchy": {
+      "_future": "motivation-aware reminders",
+      "immediate_outcome": "Treat throat infection",
+      "high_level_goal": "Recover and return to normal functioning"
+    },
+    "user_state_at_creation": {
+      "_future": "motivation-aware reminders",
+      "state": "Uncomfortable, stuffy nose"
+    }
+  }
+}

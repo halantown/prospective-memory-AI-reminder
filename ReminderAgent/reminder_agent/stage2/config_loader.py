@@ -64,7 +64,8 @@ class ConditionalField(BaseModel):
 class ConditionEntry(BaseModel):
     required_fields: list[str]
     conditional_fields: list[ConditionalField] = []
-    excluded_fields: list[str] | str  # "*" or list
+    excluded_fields: list[str] = []
+    excluded_zones: list[str] = []
 
 
 class ConditionFieldMap(BaseModel):

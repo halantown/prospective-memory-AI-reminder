@@ -3,7 +3,7 @@
 
 | | |
 |---|---|
-| **Version** | v0.1 — Initial architecture document |
+| **Version** | v0.2 — Task JSON structure finalised; field paths updated |
 | **Date** | 2026-03-11 |
 | **Author** | Thesis Candidate |
 | **Status** | 🟡 Architecture defined; implementation not started |
@@ -16,6 +16,7 @@
 | Version | Date | Changes |
 |---|---|---|
 | v0.1 | 2026-03-11 | Initial document — architecture, modules, field map, data flow |
+| v0.2 | 2026-03-11 | Task JSON structure finalised (3-zone: reminder_context / agent_reasoning_context / placeholder); field paths updated to snake_case; §2.3 new section on JSON zone design; §4.2 condition_field_map updated |
 
 ---
 
@@ -125,6 +126,46 @@ The system follows the architecture established in the meeting slides (0309), co
 
 ### 2.2 Design Principles
 
+### 2.3  Task JSON Zone Design
+
+Each task schema is divided into three top-level zones. This is an **engineering control** — Context Extractor and Stage 1 agent read from different zones by design, with no cross-zone access.
+
+| Zone | Reader | Purpose |
+|---|---|---|
+| `reminder_context` | Stage 2 Context Extractor | Fields eligible for reminder text generation. Condition schema whitelists apply within this zone only. |
+| `agent_reasoning_context` | Stage 1 agent | Task execution rules and encoding background. Used for reasoning about when/whether to remind — never enters reminder text. |
+| `placeholder` | Nobody | Intentional defer. Each field annotated with `_future` note explaining anticipated future use. |
+
+**Rationale for `agent_reasoning_context.encoding_info.creation_background`:**
+The robot may only reference information the user encoded at task creation time. `creation_background` gives the Stage 1 agent ground truth of what the user actually knows — so the agent can verify that a candidate reminder does not reference information the user never received. Direct application of Encoding Specificity Principle (Tulving, 1973).
+
+**`reminder_context` canonical template (all 8 tasks follow this structure):**
+```json
+{
+  "reminder_context": {
+    "element1": {
+      "action_verb": "...",
+      "target_entity": {
+        "entity_name": "...",
+        "cues": { "visual": "..." },
+        "domain_properties": { "key": "value" }
+      }
+    },
+    "element2": {
+      "origin": {
+        "task_creator": "...",
+        "creator_is_authority": true
+      }
+    },
+    "element3": {
+      "detected_activity_raw": "..."
+    }
+  }
+}
+```
+
+---
+
 **P1 — Input truncation over output filtering.**
 The LLM must not see fields it is not allowed to use. For Low AF conditions, the JSON is pruned to contain only whitelisted fields before being passed to the LLM. This is more reliable than instructing the LLM to ignore information it has already seen.
 
@@ -158,19 +199,17 @@ AF and CB act on **different stages of the PM lifecycle** (encoding/retention vs
 
 This table is the authoritative definition of what information each condition may contain. It maps directly to `condition_field_map.yaml`.
 
-| JSON Field | LowAF LowCB | HighAF LowCB | LowAF HighCB | HighAF HighCB | Source Element |
+| JSON Field | Path | LowAF LowCB | HighAF LowCB | LowAF HighCB | HighAF HighCB |
 |---|---|---|---|---|---|
-| `Action_Verb` | ✅ | ✅ | ✅ | ✅ | Element 1 |
-| `Entity_Name` | ✅ | ✅ | ✅ | ✅ | Element 1 |
-| `Cues.Visual` | ❌ | ✅ | ❌ | ✅ | Element 1 |
-| `Domain_Specific_Properties` | ❌ | ✅ | ❌ | ✅ | Element 1 |
-| `Origin.Task_Creator` | ❌ | ✅ (if authority) | ❌ | ✅ (if authority) | Element 2 |
-| `Detected_Activity` | ❌ | ❌ | ✅ | ✅ | Element 3 |
-| `Temporal_Window` | ❌ | ❌ | ❌ | ❌ | — (excluded) |
-| `Action_Rules.*` | ❌ | ❌ | ❌ | ❌ | — (Stage 1 only) |
-| `Motivation_Hierarchy` | ❌ | ❌ | ❌ | ❌ | — (placeholder) |
-| `User_State_at_Creation` | ❌ | ❌ | ❌ | ❌ | — (placeholder) |
-| `Post_Action_Requirements` | ❌ | ❌ | ❌ | ❌ | — (excluded) |
+| `action_verb` | `reminder_context.element1.action_verb` | ✅ | ✅ | ✅ | ✅ |
+| `entity_name` | `reminder_context.element1.target_entity.entity_name` | ✅ | ✅ | ✅ | ✅ |
+| `cues.visual` | `reminder_context.element1.target_entity.cues.visual` | ❌ | ✅ | ❌ | ✅ |
+| `domain_properties` | `reminder_context.element1.target_entity.domain_properties` | ❌ | ✅ | ❌ | ✅ |
+| `task_creator` | `reminder_context.element2.origin.task_creator` | ❌ | ✅ (if authority) | ❌ | ✅ (if authority) |
+| `detected_activity_raw` | `reminder_context.element3.detected_activity_raw` | ❌ | ❌ | ✅ | ✅ |
+| `execution_protocol.*` | `agent_reasoning_context.execution_protocol.*` | ❌ | ❌ | ❌ | ❌ |
+| `encoding_info.*` | `agent_reasoning_context.encoding_info.*` | ❌ | ❌ | ❌ | ❌ |
+| `placeholder.*` | `placeholder.*` | ❌ | ❌ | ❌ | ❌ |
 
 **Notes on excluded fields:**
 
@@ -272,49 +311,55 @@ Single source of truth for the AF × CB operationalisation. Example structure:
 ```yaml
 LowAF_LowCB:
   required_fields:
-    - "Element1.Action_Verb"
-    - "Element1.Target_Entity.Entity_Name"
+    - "reminder_context.element1.action_verb"
+    - "reminder_context.element1.target_entity.entity_name"
   conditional_fields: []
-  excluded_fields: "*"  # everything else
+  excluded_zones:
+    - "agent_reasoning_context"
+    - "placeholder"
 
 HighAF_LowCB:
   required_fields:
-    - "Element1.Action_Verb"
-    - "Element1.Target_Entity.Entity_Name"
-    - "Element1.Target_Entity.Cues.Visual"
-    - "Element1.Target_Entity.Domain_Specific_Properties"
+    - "reminder_context.element1.action_verb"
+    - "reminder_context.element1.target_entity.entity_name"
+    - "reminder_context.element1.target_entity.cues.visual"
+    - "reminder_context.element1.target_entity.domain_properties"
   conditional_fields:
-    - field: "Element2.Origin.Task_Creator"
-      condition: "Element2.Origin.Creator_Is_Authority == true"
+    - field: "reminder_context.element2.origin.task_creator"
+      condition: "reminder_context.element2.origin.creator_is_authority == true"
   excluded_fields:
-    - "Element3.Current_Live_State.Detected_Activity"
-    - "Element2.Motivation_Hierarchy"
-    - "Element1.Execution_Protocol.Action_Rules.Post_Action_Requirements"
+    - "reminder_context.element3.detected_activity_raw"
+  excluded_zones:
+    - "agent_reasoning_context"
+    - "placeholder"
 
 LowAF_HighCB:
   required_fields:
-    - "Element1.Action_Verb"
-    - "Element1.Target_Entity.Entity_Name"
-    - "Element3.Current_Live_State.Detected_Activity"
+    - "reminder_context.element1.action_verb"
+    - "reminder_context.element1.target_entity.entity_name"
+    - "reminder_context.element3.detected_activity_raw"
   conditional_fields: []
   excluded_fields:
-    - "Element1.Target_Entity.Cues.Visual"
-    - "Element1.Target_Entity.Domain_Specific_Properties"
-    - "Element2.Origin.Task_Creator"
+    - "reminder_context.element1.target_entity.cues.visual"
+    - "reminder_context.element1.target_entity.domain_properties"
+    - "reminder_context.element2.origin.task_creator"
+  excluded_zones:
+    - "agent_reasoning_context"
+    - "placeholder"
 
 HighAF_HighCB:
   required_fields:
-    - "Element1.Action_Verb"
-    - "Element1.Target_Entity.Entity_Name"
-    - "Element1.Target_Entity.Cues.Visual"
-    - "Element1.Target_Entity.Domain_Specific_Properties"
-    - "Element3.Current_Live_State.Detected_Activity"
+    - "reminder_context.element1.action_verb"
+    - "reminder_context.element1.target_entity.entity_name"
+    - "reminder_context.element1.target_entity.cues.visual"
+    - "reminder_context.element1.target_entity.domain_properties"
+    - "reminder_context.element3.detected_activity_raw"
   conditional_fields:
-    - field: "Element2.Origin.Task_Creator"
-      condition: "Element2.Origin.Creator_Is_Authority == true"
-  excluded_fields:
-    - "Element2.Motivation_Hierarchy"
-    - "Element1.Execution_Protocol.Action_Rules.Post_Action_Requirements"
+    - field: "reminder_context.element2.origin.task_creator"
+      condition: "reminder_context.element2.origin.creator_is_authority == true"
+  excluded_zones:
+    - "agent_reasoning_context"
+    - "placeholder"
 ```
 
 #### `stage2/context_extractor.py`
