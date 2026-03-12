@@ -3,6 +3,7 @@ import { useGameStore, HOB_STATUS } from '../../store/gameStore'
 import { useHobProgress } from '../../hooks/useHobProgress'
 import { Flame, AlertCircle } from 'lucide-react'
 import MedicineCabinet from '../tasks/MedicineCabinet'
+import PressureCooker from '../tasks/PressureCooker'
 
 const steakColor = {
   [HOB_STATUS.EMPTY]:         'bg-gray-300',
@@ -194,19 +195,8 @@ export default function KitchenCard({ isExpanded }) {
           )
         })}
 
-        {/* 4th burner slot — placeholder for pressure cooker PM task */}
-        <div className="flex flex-col items-center">
-          <div className={`rounded-full border-dashed flex items-center justify-center ${
-            isExpanded ? 'w-24 h-24 border-[3px] border-slate-300' : 'w-14 h-14 border-2 border-slate-300'
-          }`}>
-            <span className={`text-slate-400 font-medium ${isExpanded ? 'text-xs' : 'text-[8px]'}`}>
-              Burner 4
-            </span>
-          </div>
-          {isExpanded && (
-            <span className="text-xs text-slate-400 mt-2 italic">Coming soon</span>
-          )}
-        </div>
+        {/* 4th burner — pressure cooker PM task */}
+        <PressureCooker isExpanded={isExpanded} />
       </div>
 
       {/* Kitchen table with medicine cabinet — bottom section */}

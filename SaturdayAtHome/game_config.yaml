@@ -190,6 +190,19 @@ pm_tasks:
       bottle: "round_orange"
       amount: "1000mg × 1"
 
+  chores_g:
+    type: "pressure_cooker"
+    prompt: "The pressure cooker is ready — handle it safely"
+    steps:
+      - id: "release_steam"
+        label: "Turn valve to release steam"
+        required: false
+      - id: "open_lid"
+        label: "Open the lid"
+        required: true
+    correct:
+      action: "release_steam_open_lid"
+
 # ── Trigger Icons ────────────────────────────────────────────────────
 trigger_icons:
   medicine_a: { icon: "🍽️", label: "Dinner ready" }

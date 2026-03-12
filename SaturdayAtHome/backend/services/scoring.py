@@ -17,6 +17,15 @@ def _score_medicine(task_id: str, action: PmActionReport) -> int:
     return 0
 
 
+def _score_pressure_cooker(task_id: str, action: PmActionReport) -> int:
+    """2 = release steam + open lid, 1 = open lid only (skipped steam), 0 = not executed."""
+    if action.action == "release_steam_open_lid":
+        return 2
+    if action.action == "open_lid_only":
+        return 1
+    return 0
+
+
 # Task-specific scoring functions
 _SCORING_TABLE = {
     "medicine_a": _score_medicine,
@@ -25,7 +34,7 @@ _SCORING_TABLE = {
     "laundry_d":  lambda tid, a: 2 if a.action == "shirt_only" else (1 if a.action else 0),
     "comm_e":     lambda tid, a: 2 if a.selected_target == "li_wei" and a.selected_detail == "restaurant_b" else (1 if a.selected_target else 0),
     "comm_f":     lambda tid, a: 2 if a.selected_detail == "3pm" else (1 if a.selected_detail else 0),
-    "chores_g":   lambda tid, a: 2 if a.action == "off_black_pepper" else (1 if a.action else 0),
+    "chores_g":   _score_pressure_cooker,
     "chores_h":   lambda tid, a: 2 if a.selected_target == "blue_bag" else (1 if a.selected_target else 0),
 }
 
