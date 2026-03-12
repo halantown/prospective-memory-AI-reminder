@@ -99,6 +99,16 @@ def init_db(db_path: Path):
         payload         TEXT,
         ts              REAL NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS reminder_room_logs (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id      TEXT NOT NULL REFERENCES sessions(session_id),
+        block_number    INTEGER NOT NULL,
+        slot            TEXT NOT NULL,
+        room            TEXT NOT NULL,
+        client_ts       REAL,
+        server_ts       REAL NOT NULL
+    );
     """)
 
     db.commit()

@@ -40,7 +40,20 @@ export default function useSSE() {
       force_yellow_steak: (d) => useGameStore.getState().forceYellowSteak(d.hob_id),
       trigger_appear:     (d) => useGameStore.getState().triggerAppear(d.task_id),
       window_close:       (d) => useGameStore.getState().windowClose(d.task_id),
-      reminder_fire:      (d) => useGameStore.getState().triggerRobot(d.text),
+      reminder_fire:      (d) => {
+        useGameStore.getState().triggerRobot(d.text)
+        // LOG-1: Report participant's current room when reminder plays
+        const state = useGameStore.getState()
+        fetch(`/api/session/${state.sessionId}/block/${state.blockNumber}/reminder-room`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slot: d.slot,
+            room: state.activeRoom,
+            client_ts: Date.now(),
+          }),
+        }).catch(err => console.warn('[SSE] reminder-room POST failed:', err))
+      },
       robot_neutral:      (d) => useGameStore.getState().triggerRobot(d.text),
       fake_trigger_fire:  (d) => useGameStore.getState().triggerFake(d.type),
       message_bubble:     (d) => useGameStore.getState().addMessageBubble(d),

@@ -23,8 +23,8 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
     reminder_a_text = _get_reminder_text(condition, "A")
     reminder_b_text = _get_reminder_text(condition, "B")
 
-    neutral_1 = "厨房好香啊！"
-    neutral_2 = "准备得怎么样了？"
+    neutral_1 = "Smells great in the kitchen!"
+    neutral_2 = "How's everything coming along?"
 
     timeline = [
         (0,    "block_start",        {"block_number": block_num, "condition": condition}),
@@ -75,58 +75,58 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
     # correct field used for backend scoring only
     timeline.extend([
         (55,   "message_bubble", {
-            "from": "张芳",
-            "subject": "今晚聚会",
-            "body": "嘿！今晚聚会几点开始？我好安排一下时间。",
-            "option_a": "7点",
-            "option_b": "8点",
+            "from": "Sarah",
+            "subject": "Tonight's party",
+            "body": "Hey! What time does the party start tonight? I need to plan my evening.",
+            "option_a": "7 o'clock",
+            "option_b": "8 o'clock",
             "correct": "option_a",
-            "avatar": "芳",
+            "avatar": "S",
         }),
         (130,  "message_bubble", {
-            "from": "外卖平台",
-            "subject": "配送确认",
-            "body": "您的订单即将送达，请问放在门口还是需要送上楼？",
-            "option_a": "放门口",
-            "option_b": "送上楼",
+            "from": "FoodDash",
+            "subject": "Delivery confirmation",
+            "body": "Your order is almost there! Should we leave it at the door or bring it upstairs?",
+            "option_a": "Leave at door",
+            "option_b": "Bring upstairs",
             "correct": "option_a",
             "avatar": "🛵",
         }),
         (220,  "message_bubble", {
-            "from": "李明",
-            "subject": "停车问题",
-            "body": "我开车过来，A12号车位靠入口那个还是B07号靠花园那个是你的？",
+            "from": "David",
+            "subject": "Parking question",
+            "body": "I'm driving over — is your spot A12 near the entrance or B07 by the garden?",
             "option_a": "A12",
             "option_b": "B07",
             "correct": "option_b",
-            "avatar": "明",
+            "avatar": "D",
         }),
         (310,  "message_bubble", {
-            "from": "物业",
-            "subject": "快递通知",
-            "body": "您有一个包裹到了，请问放在门卫处还是送到家门口？",
-            "option_a": "门卫处",
-            "option_b": "家门口",
+            "from": "Building Mgmt",
+            "subject": "Package notice",
+            "body": "A package arrived for you. Should we keep it at the front desk or deliver to your door?",
+            "option_a": "Front desk",
+            "option_b": "My door",
             "correct": "option_a",
             "avatar": "📦",
         }),
         (400,  "message_bubble", {
-            "from": "张芳",
-            "subject": "甜点选择",
-            "body": "我顺路买个甜点过来，你觉得巧克力蛋糕好还是苹果派好？",
-            "option_a": "巧克力蛋糕",
-            "option_b": "苹果派",
+            "from": "Sarah",
+            "subject": "Dessert pick",
+            "body": "I'll grab dessert on my way — chocolate cake or apple pie? What sounds good?",
+            "option_a": "Chocolate cake",
+            "option_b": "Apple pie",
             "correct": "option_b",
-            "avatar": "芳",
+            "avatar": "S",
         }),
         (460,  "message_bubble", {
-            "from": "王阿姨",
-            "subject": "来串门",
-            "body": "我想过来坐坐，你在家吗？要不要我带点水果过来？",
-            "option_a": "好的，来吧",
-            "option_b": "今天不太方便",
+            "from": "Neighbor Jan",
+            "subject": "Stopping by",
+            "body": "I was thinking of popping over for a bit. Are you home? Want me to bring some fruit?",
+            "option_a": "Sure, come by!",
+            "option_b": "Not a great time",
             "correct": "option_a",
-            "avatar": "王",
+            "avatar": "J",
         }),
     ])
 

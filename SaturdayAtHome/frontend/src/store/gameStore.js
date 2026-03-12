@@ -313,10 +313,17 @@ export const useGameStore = create((set, get) => ({
 
   triggerRobot: (text) => {
     set({ robotSpeaking: true, robotText: text })
+    // TTS onEnd callback will clear robotSpeaking via setRobotSpeaking.
+    // Fallback timeout clears state if TTS unavailable or fails.
     const words = text.split(' ').length
-    const duration = Math.max(3000, words * 300 + 2000)
-    setTimeout(() => set({ robotSpeaking: false, robotText: '' }), duration)
+    const fallback = Math.max(5000, words * 400 + 3000)
+    setTimeout(() => {
+      if (get().robotText === text) set({ robotSpeaking: false })
+    }, fallback)
   },
+
+  setRobotSpeaking: (v) => set({ robotSpeaking: v }),
+  clearRobotText: () => set({ robotText: '', robotSpeaking: false }),
 
   // ── Fake Trigger ───────────────────────────────────────
   fakeTriggered: false,

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useGameStore, HOB_STATUS } from '../store/gameStore'
 import useSSE from '../hooks/useSSE'
+import { useAudio } from '../hooks/useAudio'
 import TopBar from './ui/TopBar'
 import Sidebar from './ui/Sidebar'
 import RoomOverview from './rooms/RoomOverview'
@@ -24,6 +25,9 @@ export default function GameShell() {
 
   // SSE client — connects when sessionId + blockNumber + blockRunning are set
   useSSE()
+
+  // Audio engine — BGM, SFX, TTS tied to game state
+  useAudio()
 
   // ── 1s game loop (machine, block timer) ──
   useEffect(() => {

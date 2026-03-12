@@ -11,7 +11,7 @@ import { Pill } from 'lucide-react'
  * When clicked, opens an inline panel (not an overlay) showing bottles → dose → Done.
  * No countdown visible, no score feedback. Participant feels like "I took my medicine".
  */
-export default function MedicineCabinet() {
+export default function MedicineCabinet({ isExpanded = true }) {
   const interactableTasks = useGameStore((s) => s.interactableTasks)
   const openCabinetTask = useGameStore((s) => s.openCabinetTask)
   const openCabinet = useGameStore((s) => s.openCabinet)
@@ -32,7 +32,7 @@ export default function MedicineCabinet() {
   const config = openCabinetTask ? MEDICINE_TASKS[openCabinetTask] : null
 
   const handleCabinetClick = () => {
-    if (!isActive || isOpen) return
+    if (!isActive || isOpen || !isExpanded) return
     setSelectedBottle(null)
     setSelectedAmount(null)
     openCabinet(activeMedicineTask)
@@ -81,31 +81,35 @@ export default function MedicineCabinet() {
 
   return (
     <>
-      {/* Cabinet icon — always visible in kitchen expanded view */}
+      {/* Cabinet icon — always visible in kitchen */}
       <div className="flex flex-col items-center gap-1">
         <motion.button
           onClick={handleCabinetClick}
-          disabled={!isActive}
-          whileHover={isActive ? { scale: 1.08 } : {}}
-          whileTap={isActive ? { scale: 0.95 } : {}}
-          className={`relative w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 ${
+          disabled={!isActive || !isExpanded}
+          whileHover={isActive && isExpanded ? { scale: 1.08 } : {}}
+          whileTap={isActive && isExpanded ? { scale: 0.95 } : {}}
+          className={`relative rounded-xl flex items-center justify-center transition-all duration-300 ${
+            isExpanded ? 'w-14 h-14' : 'w-9 h-9'
+          } ${
             isActive
               ? 'bg-emerald-100 border-2 border-emerald-400 shadow-lg cursor-pointer'
               : 'bg-slate-100 border-2 border-slate-200 opacity-50 cursor-default'
           }`}
         >
-          <Pill size={24} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
+          <Pill size={isExpanded ? 24 : 16} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
           {isActive && (
             <motion.div
               animate={{ scale: [1, 1.3, 1] }}
               transition={{ repeat: Infinity, duration: 2 }}
-              className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full"
+              className={`absolute bg-emerald-400 rounded-full ${isExpanded ? '-top-1 -right-1 w-3 h-3' : '-top-0.5 -right-0.5 w-2 h-2'}`}
             />
           )}
         </motion.button>
-        <span className={`text-[10px] font-medium ${isActive ? 'text-emerald-700' : 'text-slate-400'}`}>
-          Medicine
-        </span>
+        {isExpanded && (
+          <span className={`text-[10px] font-medium ${isActive ? 'text-emerald-700' : 'text-slate-400'}`}>
+            Medicine
+          </span>
+        )}
       </div>
 
       {/* Inline cabinet panel — slides open when clicked */}

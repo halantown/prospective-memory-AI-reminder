@@ -88,7 +88,7 @@ export default function Sidebar() {
           <span className="text-[9px] tracking-wider mt-0.5">{room.label}</span>
           <StatusDot color={getStatusColor(room.id)} />
           {room.id === 'messages' && unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+            <span className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ring-2 ring-slate-900 z-10">
               {unreadCount}
             </span>
           )}

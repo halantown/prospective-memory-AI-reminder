@@ -150,12 +150,10 @@ export default function KitchenCard({ isExpanded }) {
         })}
       </div>
 
-      {/* Medicine cabinet — bottom right of kitchen (GDD A1) */}
-      {isExpanded && (
-        <div className="absolute bottom-6 right-6">
-          <MedicineCabinet />
-        </div>
-      )}
+      {/* Medicine cabinet — kitchen table corner (GDD A1), always visible */}
+      <div className={`absolute ${isExpanded ? 'bottom-6 right-6' : 'bottom-2 right-2'}`}>
+        <MedicineCabinet isExpanded={isExpanded} />
+      </div>
     </div>
   )
 }

@@ -207,12 +207,46 @@ async def report_questionnaire(session_id: str, report: QuestionnaireReport):
     return {"status": "ok"}
 
 
-# ── Data Export ────────────────────────────────────────────
+# ── Reminder Room (LOG-1) ──────────────────────────────────
+
+@router.post("/session/{session_id}/block/{block_num}/reminder-room")
+async def report_reminder_room(session_id: str, block_num: int, body: dict):
+    """Record which room the participant was in when a reminder fired."""
+    slot = body.get("slot", "?")
+    room = body.get("room", "unknown")
+    client_ts = body.get("client_ts")
+    logger.info(f"Reminder room [{session_id}] block={block_num} slot={slot} room={room}")
+
+    db = get_db(DB_PATH)
+    # Store in a dedicated table
+    db.execute(
+        """INSERT INTO reminder_room_logs (session_id, block_number, slot, room, client_ts, server_ts)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (session_id, block_num, slot, room, client_ts, time.time()),
+    )
+    db.commit()
+    db.close()
+
+    log_action(session_id, block_num, "reminder_room", {
+        "slot": slot, "room": room, "client_ts": client_ts,
+    })
+    return {"status": "ok"}
 
 @router.get("/session/{session_id}/export")
 async def export_session(session_id: str):
     db = get_db(DB_PATH)
-    trials = db.execute("SELECT * FROM pm_trials WHERE session_id = ?", (session_id,)).fetchall()
+    # Join PM trials with reminder room data
+    trials = db.execute("""
+        SELECT t.*,
+               ra.room AS reminder_a_room,
+               rb.room AS reminder_b_room
+        FROM pm_trials t
+        LEFT JOIN reminder_room_logs ra
+            ON ra.session_id = t.session_id AND ra.block_number = t.block_number AND ra.slot = 'A'
+        LEFT JOIN reminder_room_logs rb
+            ON rb.session_id = t.session_id AND rb.block_number = t.block_number AND rb.slot = 'B'
+        WHERE t.session_id = ?
+    """, (session_id,)).fetchall()
     db.close()
 
     output = io.StringIO()
