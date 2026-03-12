@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
-import { Mail, Reply, Check, X, Clock } from 'lucide-react'
+import { Mail, Check, X, Clock } from 'lucide-react'
 
 const AVATAR_COLORS = {
   S: 'bg-violet-500',
@@ -86,6 +86,24 @@ function EmailListItem({ email, isSelected, onSelect, onExpire }) {
   )
 }
 
+function TimeoutBar({ receivedAt, timeoutMs }) {
+  const [progress, setProgress] = useState(100)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - receivedAt
+      const remaining = Math.max(0, 100 - (elapsed / timeoutMs) * 100)
+      setProgress(remaining)
+    }, 200)
+    return () => clearInterval(interval)
+  }, [receivedAt, timeoutMs])
+  const color = progress > 50 ? 'bg-green-500' : progress > 25 ? 'bg-yellow-500' : 'bg-red-500'
+  return (
+    <div className="w-full h-1.5 bg-slate-200 rounded-full mt-2">
+      <div className={`h-full rounded-full transition-all duration-200 ${color}`} style={{ width: `${progress}%` }} />
+    </div>
+  )
+}
+
 function EmailDetail({ email, onReply, onExpire }) {
   const color = AVATAR_COLORS[email.avatar] || AVATAR_COLORS.default
   const isActive = !email.replied && !email.expired
@@ -129,27 +147,29 @@ function EmailDetail({ email, onReply, onExpire }) {
             Expired — no reply sent (−2 points)
           </div>
         ) : !email.replied ? (
-          <div className="flex gap-3">
-            <button
-              onClick={(e) => { e.stopPropagation(); onReply(email.id, 'option_a') }}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-indigo-500 hover:bg-indigo-600 text-white text-base font-bold rounded-xl transition-colors"
-            >
-              <Reply size={16} />
-              {email.option_a}
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onReply(email.id, 'option_b') }}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 text-base font-bold rounded-xl transition-colors"
-            >
-              <Reply size={16} />
-              {email.option_b}
-            </button>
+          <div className="flex flex-col gap-2">
+            {email.options?.map((opt, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => { e.stopPropagation(); onReply(email.id, idx) }}
+                className="w-full text-left px-4 py-3 rounded-lg border-2 transition-colors text-base border-slate-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer"
+              >
+                {opt}
+              </button>
+            ))}
+            {!email.replied && !email.expired && (
+              <TimeoutBar receivedAt={email.receivedAt} timeoutMs={email.timeoutMs || 30000} />
+            )}
           </div>
         ) : (
-          <div className={`flex items-center gap-2 text-base font-medium py-2 ${email.replyCorrect ? 'text-green-600' : 'text-yellow-600'}`}>
-            <Check size={18} />
-            Replied: "{email.replyChoice === 'option_a' ? email.option_a : email.option_b}"
-            {email.replyCorrect ? ' ✓' : ''}
+          <div className="flex items-center gap-2 text-base font-medium py-2">
+            <Check size={18} className={email.replyCorrect ? 'text-green-500' : 'text-red-500'} />
+            <span className={email.replyCorrect ? 'text-green-600' : 'text-red-600'}>
+              Replied: &ldquo;{email.options?.[email.replyChoice]}&rdquo;
+            </span>
+            <span className={`ml-2 font-bold ${email.replyCorrect ? 'text-green-600' : 'text-red-500'}`}>
+              {email.replyCorrect ? '+3 ✓' : '−2 ✗'}
+            </span>
           </div>
         )}
       </div>

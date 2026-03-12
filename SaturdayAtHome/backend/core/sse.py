@@ -5,7 +5,7 @@ import json
 import logging
 import time
 
-from core.config_loader import get_difficulty
+from core.config_loader import get_config
 from models.entities import HobStatus, Hob
 from services.hob_service import get_session_hobs, reconcile_hob
 
@@ -42,10 +42,13 @@ async def send_sse(session_id: str, event: str, data: dict):
                 )
                 return
             dur = data.get("duration", {})
-            hobs[hob_id].status = HobStatus.COOKING
+            hobs[hob_id].status = HobStatus.COOKING_SIDE1
             hobs[hob_id].started_at = time.time()
-            hobs[hob_id].cooking_ms = dur.get("cooking", get_difficulty()["cooking_ms"])
-            hobs[hob_id].ready_ms = dur.get("ready", get_difficulty()["ready_ms"])
+            steak_cfg = get_config().get("steak", {})
+            hobs[hob_id].cooking_ms = dur.get("cooking", steak_cfg.get("hob_base_cooking_ms", [11000, 13000, 15000])[1])
+            hobs[hob_id].ready_ms = dur.get("ready", steak_cfg.get("ready_ms", 4000))
+            hobs[hob_id].ash_ms = steak_cfg.get("ash_countdown_ms", 9000)
+            hobs[hob_id].peppered = False
 
     elif event == "trigger_appear":
         from services.window_service import open_window

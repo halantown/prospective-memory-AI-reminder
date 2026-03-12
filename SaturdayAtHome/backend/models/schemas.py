@@ -52,7 +52,7 @@ class QuestionnaireReport(BaseModel):
 
 class SteakActionReport(BaseModel):
     hob_id: int
-    action: str  # "flip", "serve", "clean"
+    action: str  # "flip", "serve", "clean", "pepper"
 
 
 # ── Admin ──────────────────────────────────────────────────

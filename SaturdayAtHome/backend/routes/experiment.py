@@ -101,7 +101,7 @@ async def report_pm_action(session_id: str, block_num: int, report: PmActionRepo
 
 @router.post("/session/{session_id}/block/{block_num}/steak-action")
 async def report_steak_action(session_id: str, block_num: int, report: SteakActionReport):
-    """Validate and apply a steak action (flip/serve/clean)."""
+    """Validate and apply a steak action (flip/serve/clean/pepper)."""
     hobs = get_session_hobs(session_id)
     if report.hob_id < 0 or report.hob_id >= len(hobs):
         raise HTTPException(400, "Invalid hob_id")
@@ -111,11 +111,14 @@ async def report_steak_action(session_id: str, block_num: int, report: SteakActi
     prev_status = hob.status.value
     score = 0
 
-    if report.action == "flip" and hob.status == HobStatus.READY:
-        hob.status = HobStatus.COOKING
+    if report.action == "pepper" and hob.status in (HobStatus.READY_SIDE1, HobStatus.READY_SIDE2) and not hob.peppered:
+        hob.peppered = True
+        score = 2
+    elif report.action == "flip" and hob.status == HobStatus.READY_SIDE1:
+        hob.status = HobStatus.COOKING_SIDE2
         hob.started_at = time.time()
         score = 5
-    elif report.action == "serve" and hob.status == HobStatus.READY:
+    elif report.action == "serve" and hob.status == HobStatus.READY_SIDE2:
         hob.status = HobStatus.EMPTY
         hob.started_at = 0.0
         score = 5

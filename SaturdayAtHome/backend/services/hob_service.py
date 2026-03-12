@@ -5,7 +5,7 @@ import logging
 import random
 import time
 
-from core.config_loader import get_difficulty
+from core.config_loader import get_config
 from models.entities import Hob, HobStatus
 
 logger = logging.getLogger("saturday.services.hob")
@@ -27,41 +27,64 @@ def clear_session_hobs(session_id: str):
 
 
 def reconcile_hob(hob: Hob):
-    """Update hob status based on elapsed time — keeps backend in sync with frontend.
+    """Update hob status based on elapsed time — multi-step steak state machine.
 
-    Uses cascading check: if total elapsed > cooking + ready, go straight to BURNING.
-    This prevents the bug where COOKING→READY and READY→BURNING both fire in the same tick.
+    States: EMPTY → COOKING_SIDE1 → READY_SIDE1 → COOKING_SIDE2 → READY_SIDE2 → (served)
+    Missed flips lead to BURNING → ASH.
     """
-    if hob.status == HobStatus.EMPTY or hob.started_at <= 0:
+    if hob.status == HobStatus.EMPTY or hob.status == HobStatus.ASH or hob.started_at <= 0:
         return
 
     elapsed_ms = (time.time() - hob.started_at) * 1000
 
-    if hob.status == HobStatus.COOKING and elapsed_ms >= hob.cooking_ms:
+    if hob.status == HobStatus.COOKING_SIDE1:
         if elapsed_ms >= hob.cooking_ms + hob.ready_ms:
             hob.status = HobStatus.BURNING
-            hob.started_at = 0.0
-        else:
-            hob.status = HobStatus.READY
+            hob.started_at = time.time()  # start ash countdown from now
+        elif elapsed_ms >= hob.cooking_ms:
+            hob.status = HobStatus.READY_SIDE1
             hob.started_at = hob.started_at + hob.cooking_ms / 1000.0
-    elif hob.status == HobStatus.READY and elapsed_ms >= hob.ready_ms:
-        hob.status = HobStatus.BURNING
-        hob.started_at = 0.0
+    elif hob.status == HobStatus.READY_SIDE1:
+        if elapsed_ms >= hob.ready_ms:
+            hob.status = HobStatus.BURNING
+            hob.started_at = time.time()
+    elif hob.status == HobStatus.COOKING_SIDE2:
+        if elapsed_ms >= hob.cooking_ms + hob.ready_ms:
+            hob.status = HobStatus.BURNING
+            hob.started_at = time.time()
+        elif elapsed_ms >= hob.cooking_ms:
+            hob.status = HobStatus.READY_SIDE2
+            hob.started_at = hob.started_at + hob.cooking_ms / 1000.0
+    elif hob.status == HobStatus.READY_SIDE2:
+        if elapsed_ms >= hob.ready_ms:
+            hob.status = HobStatus.BURNING
+            hob.started_at = time.time()
+    elif hob.status == HobStatus.BURNING:
+        if elapsed_ms >= hob.ash_ms:
+            hob.status = HobStatus.ASH
+            hob.started_at = time.time()
 
 
 async def schedule_respawn(session_id: str, block_num: int, hob_id: int, send_sse_fn):
-    """Wait 15-25s then send steak_spawn SSE if the hob is still empty.
+    """Wait then send steak_spawn SSE if the hob is still empty.
 
     Called after serve/clean actions to keep steaks flowing.
     The send_sse_fn parameter avoids circular imports with sse.py.
     """
-    delay = 15 + random.random() * 10
+    cfg = get_config().get("steak", {})
+    min_delay = cfg.get("respawn_min_ms", 8000) / 1000
+    max_delay = cfg.get("respawn_max_ms", 15000) / 1000
+    delay = min_delay + random.random() * (max_delay - min_delay)
     logger.info(f"Respawn scheduled [{session_id}] hob={hob_id} in {delay:.1f}s")
     await asyncio.sleep(delay)
 
     hobs = get_session_hobs(session_id)
     if hob_id < len(hobs) and hobs[hob_id].status == HobStatus.EMPTY:
-        cfg = get_difficulty("medium")
-        dur = {"cooking": cfg["cooking_ms"], "ready": cfg["ready_ms"]}
+        base_times = cfg.get("hob_base_cooking_ms", [11000, 13000, 15000])
+        jitter = cfg.get("cooking_jitter_ms", 1000)
+        base_cooking = base_times[hob_id] if hob_id < len(base_times) else 13000
+        cooking = base_cooking + random.randint(-jitter, jitter)
+        ready = cfg.get("ready_ms", 4000)
+        dur = {"cooking": cooking, "ready": ready}
         await send_sse_fn(session_id, "steak_spawn", {"hob_id": hob_id, "duration": dur})
         logger.info(f"Respawned steak [{session_id}] hob={hob_id}")

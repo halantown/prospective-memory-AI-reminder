@@ -51,6 +51,9 @@ def get_game_config() -> dict[str, Any]:
     # Strip correct answers from pm_tasks
     for task_id, task in cfg.get("pm_tasks", {}).items():
         task.pop("correct", None)
+    # Strip correct answers from messages
+    for msg in cfg.get("timeline", {}).get("messages", []):
+        msg.pop("correct", None)
     return cfg
 
 
@@ -58,9 +61,17 @@ def get_game_config() -> dict[str, Any]:
 
 def get_difficulty(level: str | None = None) -> dict:
     cfg = get_config()
+    # Legacy support: if old-format difficulty exists, use it
     diff = cfg.get("difficulty", {})
-    level = level or diff.get("default", "medium")
-    return diff.get(level, diff.get("medium", {"cooking_ms": 13000, "ready_ms": 4000, "max_steaks": 3}))
+    if diff:
+        level = level or diff.get("default", "medium")
+        return diff.get(level, diff.get("medium", {"cooking_ms": 13000, "ready_ms": 4000}))
+    # New format: read from steak config
+    steak = cfg.get("steak", {})
+    return {
+        "cooking_ms": steak.get("hob_base_cooking_ms", [11000, 13000, 15000])[1],
+        "ready_ms": steak.get("ready_ms", 4000),
+    }
 
 
 def get_scoring() -> dict:
@@ -85,6 +96,14 @@ def get_pm_tasks() -> dict:
 
 def get_audio_config() -> dict:
     return get_config().get("audio", {})
+
+
+def get_steak_config() -> dict:
+    return get_config().get("steak", {})
+
+
+def get_laundry_config() -> dict:
+    return get_config().get("laundry", {})
 
 
 def get_latin_square() -> dict:

@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import { useGameStore } from '../store/gameStore'
+import { useGameStore, HOB_STATUS } from '../store/gameStore'
 
 /**
  * RAF-based progress computation for hob animations.
@@ -17,8 +17,17 @@ export function useHobProgress() {
       const hobs = useGameStore.getState().hobs
 
       const p = hobs.map((hob) => {
-        if (!hob.startedAt || hob.status === 'empty' || hob.status === 'burning') return 0
-        const duration = hob.status === 'cooking' ? hob.cookingMs : hob.readyMs
+        const noProgress = !hob.startedAt
+          || hob.status === HOB_STATUS.EMPTY
+          || hob.status === HOB_STATUS.ASH
+        if (noProgress) return 0
+
+        const isCooking = hob.status === HOB_STATUS.COOKING_SIDE1
+          || hob.status === HOB_STATUS.COOKING_SIDE2
+        const isBurning = hob.status === HOB_STATUS.BURNING
+        const duration = isCooking ? hob.cookingMs
+          : isBurning ? hob.burnMs
+          : hob.readyMs
         if (!duration || duration <= 0) return 0
         return Math.min((now - hob.startedAt) / duration, 1.0)
       })

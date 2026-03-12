@@ -30,7 +30,7 @@ async def admin_fire_event(req: FireEventRequest):
         hobs = get_session_hobs(req.session_id)
         hob_id = req.data.get("hob_id", 0)
         if 0 <= hob_id < len(hobs):
-            hobs[hob_id].status = HobStatus.READY
+            hobs[hob_id].status = HobStatus.READY_SIDE1
             hobs[hob_id].started_at = time.time()
 
     log_action(req.session_id, 0, f"admin_{req.event}", req.data)
@@ -58,7 +58,8 @@ async def admin_session_state(session_id: str):
     return {
         "hobs": [
             {"id": h.id, "status": h.status.value, "started_at": h.started_at,
-             "cooking_ms": h.cooking_ms, "ready_ms": h.ready_ms}
+             "cooking_ms": h.cooking_ms, "ready_ms": h.ready_ms, "ash_ms": h.ash_ms,
+             "peppered": h.peppered}
             for h in hobs
         ],
         "active_timelines": [k for k in active_timelines.keys() if k.startswith(session_id)],

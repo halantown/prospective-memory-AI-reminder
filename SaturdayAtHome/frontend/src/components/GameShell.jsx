@@ -18,7 +18,7 @@ const HOB_CHECK_RATE = 500
 export default function GameShell() {
   const phase = useGameStore((s) => s.phase)
   const blockRunning = useGameStore((s) => s.blockRunning)
-  const tickMachine = useGameStore((s) => s.tickMachine)
+  const tickLaundry = useGameStore((s) => s.tickLaundry)
   const tickBlockTimer = useGameStore((s) => s.tickBlockTimer)
   const spawnSteak = useGameStore((s) => s.spawnSteak)
   const activeRoom = useGameStore((s) => s.activeRoom)
@@ -33,15 +33,15 @@ export default function GameShell() {
   // Audio engine — BGM, SFX, TTS tied to game state
   useAudio()
 
-  // ── 1s game loop (machine, block timer) ──
+  // ── 1s game loop (laundry, block timer) ──
   useEffect(() => {
     if (!blockRunning) return
     const timer = setInterval(() => {
-      tickMachine()
+      tickLaundry()
       tickBlockTimer()
     }, TICK_RATE)
     return () => clearInterval(timer)
-  }, [blockRunning, tickMachine, tickBlockTimer])
+  }, [blockRunning, tickLaundry, tickBlockTimer])
 
   // ── 500ms hob transition + PM timeout checker ──────────
   useEffect(() => {
@@ -50,14 +50,22 @@ export default function GameShell() {
       const state = useGameStore.getState()
       const now = Date.now()
 
-      // Hob transitions
+      // Hob transitions (multi-step steak)
       state.hobs.forEach((hob) => {
         if (!hob.startedAt) return
-        if (hob.status === HOB_STATUS.COOKING && now - hob.startedAt >= hob.cookingMs) {
-          state.transitionHob(hob.id, HOB_STATUS.READY)
-        }
-        if (hob.status === HOB_STATUS.READY && now - hob.startedAt >= hob.readyMs) {
+        const elapsed = now - hob.startedAt
+        if (hob.status === HOB_STATUS.COOKING_SIDE1 && elapsed >= hob.cookingMs) {
+          state.transitionHob(hob.id, HOB_STATUS.READY_SIDE1)
+        } else if (hob.status === HOB_STATUS.READY_SIDE1 && elapsed >= hob.readyMs) {
           state.transitionHob(hob.id, HOB_STATUS.BURNING)
+        } else if (hob.status === HOB_STATUS.COOKING_SIDE2 && elapsed >= hob.cookingMs) {
+          state.transitionHob(hob.id, HOB_STATUS.READY_SIDE2)
+        } else if (hob.status === HOB_STATUS.READY_SIDE2 && elapsed >= hob.readyMs) {
+          state.transitionHob(hob.id, HOB_STATUS.BURNING)
+        } else if (hob.status === HOB_STATUS.BURNING && elapsed >= hob.ashMs) {
+          state.transitionHob(hob.id, HOB_STATUS.ASH)
+        } else if (hob.status === HOB_STATUS.ASH && elapsed >= 2000) {
+          state.transitionHob(hob.id, HOB_STATUS.EMPTY)
         }
       })
 
@@ -101,8 +109,6 @@ export default function GameShell() {
 
   return (
     <div className="w-full h-screen bg-slate-100 flex font-sans overflow-hidden text-slate-800">
-      <Sidebar />
-
       <div className="flex-1 flex flex-col relative">
         <TopBar />
 
@@ -116,6 +122,8 @@ export default function GameShell() {
           <RobotAvatar />
         </div>
       </div>
+
+      <Sidebar />
     </div>
   )
 }

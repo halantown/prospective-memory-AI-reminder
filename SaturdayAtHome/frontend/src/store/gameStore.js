@@ -1,33 +1,52 @@
 import { create } from 'zustand'
 import { reportSteakAction, fetchGameConfig } from '../utils/api'
 
-// ── Hob states ────────────────────────────────────────────
+// ── Hob states (multi-step steak) ─────────────────────────
 const HOB_STATUS = {
   EMPTY: 'empty',
-  COOKING: 'cooking',
-  READY: 'ready',
+  COOKING_SIDE1: 'cooking_side1',
+  READY_SIDE1: 'ready_side1',
+  COOKING_SIDE2: 'cooking_side2',
+  READY_SIDE2: 'ready_side2',
   BURNING: 'burning',
+  ASH: 'ash',
 }
 
-// Defaults (overwritten when remote config loads)
-let DIFFICULTY = {
-  slow:   { cookingMs: 20000, readyMs: 5000, maxSteaks: 2 },
-  medium: { cookingMs: 13000, readyMs: 4000, maxSteaks: 3 },
-  fast:   { cookingMs: 9000,  readyMs: 3000, maxSteaks: 3 },
+// ── Laundry rules (exported for Sidebar display) ──────────
+const LAUNDRY_RULES = {
+  warm:  { detergent: 'Warm Detergent',  temp: '40°', colors: 'Red, Orange, Yellow' },
+  cold:  { detergent: 'Cold Detergent',  temp: '30°', colors: 'Blue, Green, Purple' },
+  white: { detergent: 'White Detergent', temp: '60°', colors: 'White, Gray' },
 }
-
-let MESSAGE_TIMEOUT_MS = 15000
 
 const makeHob = (id) => ({
-  id, status: HOB_STATUS.EMPTY, startedAt: null,
-  cookingMs: 18000, readyMs: 6000,
+  id,
+  status: HOB_STATUS.EMPTY,
+  startedAt: null,
+  cookingMs: 13000,
+  readyMs: 4000,
+  ashMs: 9000,
+  peppered: false,
 })
 
 const initialHobs = [makeHob(0), makeHob(1), makeHob(2)]
 
+const initialLaundry = () => ({
+  pile: [],
+  currentGarment: null,
+  selectedDetergent: null,
+  selectedTemp: null,
+  washStatus: 'idle',
+  washProgress: 0,
+  washDuration: 0,
+  jamFixDeadline: null,
+  completedCount: 0,
+  correctCount: 0,
+})
+
 const ts = () => Date.now()
 
-export { HOB_STATUS, DIFFICULTY }
+export { HOB_STATUS, LAUNDRY_RULES }
 
 export const useGameStore = create((set, get) => ({
   // ── Remote Config (loaded from backend) ──────────────────
@@ -37,23 +56,10 @@ export const useGameStore = create((set, get) => ({
   loadRemoteConfig: async () => {
     const cfg = await fetchGameConfig()
     if (!cfg) return
-    // Update module-level defaults from remote config
-    if (cfg.difficulty) {
-      for (const [k, v] of Object.entries(cfg.difficulty)) {
-        if (k === 'default') continue
-        DIFFICULTY[k] = {
-          cookingMs: v.cooking_ms ?? DIFFICULTY[k]?.cookingMs ?? 13000,
-          readyMs: v.ready_ms ?? DIFFICULTY[k]?.readyMs ?? 4000,
-          maxSteaks: v.max_steaks ?? DIFFICULTY[k]?.maxSteaks ?? 3,
-        }
-      }
-    }
-    if (cfg.timers?.message_timeout_ms) {
-      MESSAGE_TIMEOUT_MS = cfg.timers.message_timeout_ms
-    }
     set({ remoteConfig: cfg, configLoaded: true })
     console.log('[Config] Remote config loaded:', Object.keys(cfg))
   },
+
   // ── Session ─────────────────────────────────────────────
   sessionId: null,
   participantId: null,
@@ -88,49 +94,89 @@ export const useGameStore = create((set, get) => ({
   addScore: (pts) => set((s) => ({ score: s.score + pts })),
   resetScore: () => set({ score: 0 }),
 
-  // ── Steak / Kitchen ────────────────────────────────────
-  difficulty: 'medium',
+  // ── Steak / Kitchen (multi-step) ────────────────────────
   hobs: initialHobs.map(h => ({ ...h })),
 
-  getDifficultyParams: () => DIFFICULTY[get().difficulty],
-
   spawnSteak: (hobId, duration) => set((state) => {
-    const diff = DIFFICULTY[state.difficulty]
-    const cookingMs = duration?.cooking ?? diff.cookingMs
-    const readyMs = duration?.ready ?? diff.readyMs
+    const cfg = state.remoteConfig?.steak || {}
+    const baseTimes = cfg.hob_base_cooking_ms || [11000, 13000, 15000]
+    const jitter = cfg.cooking_jitter_ms || 1000
+    const baseCooking = baseTimes[hobId] || 13000
+    const cookingMs = duration?.cooking ?? (baseCooking + (Math.random() * 2 - 1) * jitter)
+    const readyMs = duration?.ready ?? (cfg.ready_ms || 4000)
+    const ashMs = cfg.ash_countdown_ms || 9000
     return {
       hobs: state.hobs.map(h =>
         h.id === hobId && h.status === HOB_STATUS.EMPTY
-          ? { ...h, status: HOB_STATUS.COOKING, startedAt: ts(), cookingMs, readyMs }
+          ? { ...h, status: HOB_STATUS.COOKING_SIDE1, startedAt: ts(), cookingMs, readyMs, ashMs, peppered: false }
           : h
       ),
     }
   }),
 
   transitionHob: (hobId, newStatus) => set((state) => {
+    const scoring = state.remoteConfig?.scoring || {}
+    let scoreDelta = 0
     const newHobs = state.hobs.map(h => {
       if (h.id !== hobId) return h
-      if (newStatus === HOB_STATUS.READY && h.status === HOB_STATUS.COOKING) {
-        return { ...h, status: HOB_STATUS.READY, startedAt: ts() }
+      // COOKING_SIDE1 → READY_SIDE1
+      if (newStatus === HOB_STATUS.READY_SIDE1 && h.status === HOB_STATUS.COOKING_SIDE1) {
+        return { ...h, status: HOB_STATUS.READY_SIDE1, startedAt: ts(), peppered: false }
       }
-      if (newStatus === HOB_STATUS.BURNING && h.status === HOB_STATUS.READY) {
-        return { ...h, status: HOB_STATUS.BURNING, startedAt: null }
+      // READY_SIDE1 → BURNING (timed out)
+      if (newStatus === HOB_STATUS.BURNING && h.status === HOB_STATUS.READY_SIDE1) {
+        return { ...h, status: HOB_STATUS.BURNING, startedAt: ts() }
+      }
+      // COOKING_SIDE2 → READY_SIDE2
+      if (newStatus === HOB_STATUS.READY_SIDE2 && h.status === HOB_STATUS.COOKING_SIDE2) {
+        return { ...h, status: HOB_STATUS.READY_SIDE2, startedAt: ts(), peppered: false }
+      }
+      // READY_SIDE2 → BURNING (timed out)
+      if (newStatus === HOB_STATUS.BURNING && h.status === HOB_STATUS.READY_SIDE2) {
+        return { ...h, status: HOB_STATUS.BURNING, startedAt: ts() }
+      }
+      // BURNING → ASH (ash countdown expired)
+      if (newStatus === HOB_STATUS.ASH && h.status === HOB_STATUS.BURNING) {
+        return { ...h, status: HOB_STATUS.ASH, startedAt: ts() }
+      }
+      // ASH → EMPTY (auto-clear after 2s)
+      if (newStatus === HOB_STATUS.EMPTY && h.status === HOB_STATUS.ASH) {
+        scoreDelta += (scoring.steak_ash_penalty ?? -20)
+        return { ...h, status: HOB_STATUS.EMPTY, startedAt: null, peppered: false }
       }
       return h
     })
-    return { hobs: newHobs }
+    return { hobs: newHobs, score: state.score + scoreDelta }
   }),
 
-  // Player actions on hobs — update local state + POST to backend
+  // Add pepper to the current ready side
+  pepperSteak: (hobId) => {
+    const state = get()
+    const hob = state.hobs.find(h => h.id === hobId)
+    if (!hob) return
+    const isReady = hob.status === HOB_STATUS.READY_SIDE1 || hob.status === HOB_STATUS.READY_SIDE2
+    if (!isReady || hob.peppered) return
+    const scoring = state.remoteConfig?.scoring || {}
+    set((s) => ({
+      hobs: s.hobs.map(h =>
+        h.id === hobId ? { ...h, peppered: true } : h
+      ),
+      score: s.score + (scoring.steak_pepper ?? 2),
+    }))
+  },
+
+  // Flip from READY_SIDE1 (peppered) → COOKING_SIDE2
   flipSteak: (hobId) => {
-    const { sessionId, blockNumber } = get()
-    set((state) => ({
-      hobs: state.hobs.map(h =>
-        h.id === hobId && h.status === HOB_STATUS.READY
-          ? { ...h, status: HOB_STATUS.COOKING, startedAt: ts() }
+    const state = get()
+    const hob = state.hobs.find(h => h.id === hobId)
+    if (!hob || hob.status !== HOB_STATUS.READY_SIDE1 || !hob.peppered) return
+    const { sessionId, blockNumber } = state
+    set((s) => ({
+      hobs: s.hobs.map(h =>
+        h.id === hobId
+          ? { ...h, status: HOB_STATUS.COOKING_SIDE2, startedAt: ts(), peppered: false }
           : h
       ),
-      score: state.score + 5,
     }))
     if (sessionId) {
       reportSteakAction(sessionId, blockNumber, hobId, 'flip').catch(err =>
@@ -139,22 +185,30 @@ export const useGameStore = create((set, get) => ({
     }
   },
 
+  // Serve from READY_SIDE2 (peppered) → EMPTY
   serveSteak: (hobId) => {
-    const { sessionId, blockNumber, sseConnected } = get()
-    set((state) => ({
-      hobs: state.hobs.map(h =>
-        h.id === hobId && h.status === HOB_STATUS.READY
-          ? { ...h, status: HOB_STATUS.EMPTY, startedAt: null }
+    const state = get()
+    const hob = state.hobs.find(h => h.id === hobId)
+    if (!hob || hob.status !== HOB_STATUS.READY_SIDE2 || !hob.peppered) return
+    const { sessionId, blockNumber, sseConnected } = state
+    const scoring = state.remoteConfig?.scoring || {}
+    set((s) => ({
+      hobs: s.hobs.map(h =>
+        h.id === hobId
+          ? { ...h, status: HOB_STATUS.EMPTY, startedAt: null, peppered: false }
           : h
       ),
-      score: state.score + 5,
+      score: s.score + (scoring.steak_serve ?? 5),
     }))
     if (sessionId) {
       reportSteakAction(sessionId, blockNumber, hobId, 'serve').catch(err =>
         console.error('[Steak] serve report failed:', err)
       )
     } else if (!sseConnected) {
-      const delay = 15000 + Math.random() * 10000
+      const cfg = state.remoteConfig?.steak || {}
+      const minMs = cfg.respawn_min_ms || 8000
+      const maxMs = cfg.respawn_max_ms || 15000
+      const delay = minMs + Math.random() * (maxMs - minMs)
       setTimeout(() => {
         const s = get()
         if (s.blockRunning && !s.sseConnected && s.hobs.find(h => h.id === hobId)?.status === HOB_STATUS.EMPTY) {
@@ -164,22 +218,30 @@ export const useGameStore = create((set, get) => ({
     }
   },
 
+  // Clean a BURNING hob → EMPTY
   cleanSteak: (hobId) => {
-    const { sessionId, blockNumber, sseConnected } = get()
-    set((state) => ({
-      hobs: state.hobs.map(h =>
-        h.id === hobId && h.status === HOB_STATUS.BURNING
-          ? { ...h, status: HOB_STATUS.EMPTY, startedAt: null }
+    const state = get()
+    const hob = state.hobs.find(h => h.id === hobId)
+    if (!hob || hob.status !== HOB_STATUS.BURNING) return
+    const { sessionId, blockNumber, sseConnected } = state
+    const scoring = state.remoteConfig?.scoring || {}
+    set((s) => ({
+      hobs: s.hobs.map(h =>
+        h.id === hobId
+          ? { ...h, status: HOB_STATUS.EMPTY, startedAt: null, peppered: false }
           : h
       ),
-      score: state.score - 10,
+      score: s.score + (scoring.steak_burn_penalty ?? -10),
     }))
     if (sessionId) {
       reportSteakAction(sessionId, blockNumber, hobId, 'clean').catch(err =>
         console.error('[Steak] clean report failed:', err)
       )
     } else if (!sseConnected) {
-      const delay = 15000 + Math.random() * 10000
+      const cfg = state.remoteConfig?.steak || {}
+      const minMs = cfg.respawn_min_ms || 8000
+      const maxMs = cfg.respawn_max_ms || 15000
+      const delay = minMs + Math.random() * (maxMs - minMs)
       setTimeout(() => {
         const s = get()
         if (s.blockRunning && !s.sseConnected && s.hobs.find(h => h.id === hobId)?.status === HOB_STATUS.EMPTY) {
@@ -190,42 +252,161 @@ export const useGameStore = create((set, get) => ({
   },
 
   forceYellowSteak: (hobId) => set((state) => ({
-    hobs: state.hobs.map(h =>
-      h.id === hobId
-        ? { ...h, status: HOB_STATUS.READY, startedAt: ts() }
-        : h
-    ),
+    hobs: state.hobs.map(h => {
+      if (h.id !== hobId) return h
+      if (h.status === HOB_STATUS.COOKING_SIDE2 || h.status === HOB_STATUS.READY_SIDE2) {
+        return { ...h, status: HOB_STATUS.READY_SIDE2, startedAt: ts(), peppered: false }
+      }
+      return { ...h, status: HOB_STATUS.READY_SIDE1, startedAt: ts(), peppered: false }
+    }),
   })),
 
-  // ── Washing Machine ────────────────────────────────────
-  machine: { status: 'empty', progress: 0 },
-  washTime: 60,
+  // ── Laundry (Washing Machine) ──────────────────────────
+  laundry: initialLaundry(),
 
-  tickMachine: () => set((state) => {
-    if (state.machine.status !== 'washing') return {}
-    const next = state.machine.progress + 1
-    if (next >= state.washTime) {
-      return { machine: { status: 'done', progress: 0 } }
+  initLaundryPile: () => set((state) => {
+    const pool = state.remoteConfig?.laundry?.garment_pool || [
+      { color: 'red',    category: 'warm',  label: 'Red T-Shirt' },
+      { color: 'orange', category: 'warm',  label: 'Orange Scarf' },
+      { color: 'yellow', category: 'warm',  label: 'Yellow Hoodie' },
+      { color: 'blue',   category: 'cold',  label: 'Blue Jeans' },
+      { color: 'green',  category: 'cold',  label: 'Green Jacket' },
+      { color: 'purple', category: 'cold',  label: 'Purple Socks' },
+      { color: 'white',  category: 'white', label: 'White Shirt' },
+      { color: 'gray',   category: 'white', label: 'Gray Towel' },
+    ]
+    // Fisher-Yates shuffle then take 8-10
+    const shuffled = [...pool]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
     }
-    return { machine: { ...state.machine, progress: next } }
+    const count = Math.min(shuffled.length, 8 + Math.floor(Math.random() * 3))
+    return {
+      laundry: { ...initialLaundry(), pile: shuffled.slice(0, count) },
+    }
   }),
 
-  handleMachineAction: () => set((state) => {
-    if (state.machine.status === 'empty') {
-      return { machine: { status: 'washing', progress: 0 } }
+  pickGarment: () => set((state) => {
+    if (state.laundry.pile.length === 0) return {}
+    const [first, ...rest] = state.laundry.pile
+    return {
+      laundry: {
+        ...state.laundry,
+        pile: rest,
+        currentGarment: first,
+        selectedDetergent: null,
+        selectedTemp: null,
+        washStatus: 'selecting',
+      },
     }
-    if (state.machine.status === 'done') {
-      return { machine: { status: 'empty', progress: 0 } }
+  }),
+
+  selectDetergent: (det) => set((state) => ({
+    laundry: { ...state.laundry, selectedDetergent: det },
+  })),
+
+  selectTemp: (temp) => set((state) => ({
+    laundry: { ...state.laundry, selectedTemp: temp },
+  })),
+
+  startWash: () => set((state) => {
+    const { laundry } = state
+    if (laundry.washStatus !== 'selecting' || !laundry.currentGarment) return {}
+    if (!laundry.selectedDetergent || !laundry.selectedTemp) return {}
+
+    const garment = laundry.currentGarment
+    const rules = state.remoteConfig?.laundry?.rules || LAUNDRY_RULES
+    const rule = rules[garment.category]
+    const isCorrect = rule
+      ? (laundry.selectedDetergent === rule.detergent && laundry.selectedTemp === rule.temp)
+      : false
+
+    const washDuration = 45 + Math.floor(Math.random() * 46) // 45-90s
+    return {
+      laundry: {
+        ...laundry,
+        washStatus: 'washing',
+        washProgress: 0,
+        washDuration,
+        isCorrect,
+      },
+    }
+  }),
+
+  tickLaundry: () => set((state) => {
+    const { laundry } = state
+    if (laundry.washStatus === 'washing') {
+      const next = laundry.washProgress + 1
+      if (next >= laundry.washDuration) {
+        return { laundry: { ...laundry, washStatus: 'done', washProgress: laundry.washDuration } }
+      }
+      return { laundry: { ...laundry, washProgress: next } }
+    }
+    if (laundry.washStatus === 'jammed' && laundry.jamFixDeadline && ts() >= laundry.jamFixDeadline) {
+      const scoring = state.remoteConfig?.scoring || {}
+      return {
+        laundry: {
+          ...laundry,
+          washStatus: 'idle',
+          currentGarment: null,
+          selectedDetergent: null,
+          selectedTemp: null,
+          washProgress: 0,
+          washDuration: 0,
+          jamFixDeadline: null,
+        },
+        score: state.score + (scoring.laundry_jam_fail ?? -5),
+      }
     }
     return {}
   }),
 
-  // ── Messages (Email Inbox) ──────────────────────────────
+  collectGarment: () => set((state) => {
+    const { laundry } = state
+    if (laundry.washStatus !== 'done') return {}
+    const scoring = state.remoteConfig?.scoring || {}
+    const pts = laundry.isCorrect
+      ? (scoring.laundry_correct ?? 3)
+      : (scoring.laundry_wrong ?? -2)
+    return {
+      laundry: {
+        ...laundry,
+        washStatus: 'idle',
+        currentGarment: null,
+        selectedDetergent: null,
+        selectedTemp: null,
+        washProgress: 0,
+        washDuration: 0,
+        isCorrect: undefined,
+        completedCount: laundry.completedCount + 1,
+        correctCount: laundry.correctCount + (laundry.isCorrect ? 1 : 0),
+      },
+      score: state.score + pts,
+    }
+  }),
+
+  triggerJam: () => set((state) => {
+    if (state.laundry.washStatus !== 'washing') return {}
+    return {
+      laundry: { ...state.laundry, washStatus: 'jammed', jamFixDeadline: ts() + 15000 },
+    }
+  }),
+
+  fixJam: () => set((state) => {
+    if (state.laundry.washStatus !== 'jammed') return {}
+    return {
+      laundry: { ...state.laundry, washStatus: 'washing', jamFixDeadline: null },
+    }
+  }),
+
+  // ── Messages (Email Inbox – 3-option) ───────────────────
   messageBubbles: [],
   unreadCount: 0,
   selectedEmailId: null,
 
   addMessageBubble: (bubble) => {
+    const timeoutMs = get().remoteConfig?.timers?.message_timeout_ms || 30000
     set((state) => ({
       messageBubbles: [...state.messageBubbles, {
         ...bubble,
@@ -235,13 +416,12 @@ export const useGameStore = create((set, get) => ({
         read: false,
         receivedAt: ts(),
         from: bubble.from || 'Unknown',
-        subject: bubble.subject || bubble.text?.slice(0, 40) || 'New message',
-        body: bubble.body || bubble.text || '',
-        avatar: bubble.avatar || (bubble.from ? bubble.from[0].toUpperCase() : '?'),
-        option_a: bubble.option_a || 'OK',
-        option_b: bubble.option_b || 'Skip',
-        correct: bubble.correct || null,  // "option_a" or "option_b" for scoring
-        timeoutMs: MESSAGE_TIMEOUT_MS,
+        subject: bubble.subject || 'New message',
+        body: bubble.body || '',
+        avatar: bubble.avatar || '?',
+        options: bubble.options || ['OK', 'Skip', 'Later'],
+        correct: bubble.correct ?? 0,
+        timeoutMs,
       }],
       unreadCount: state.unreadCount + 1,
     }))
@@ -259,15 +439,15 @@ export const useGameStore = create((set, get) => ({
     }, 0),
   })),
 
-  replyToBubble: (bubbleId, choice) => {
+  replyToBubble: (bubbleId, choiceIndex) => {
     const bubble = get().messageBubbles.find(b => b.id === bubbleId)
     if (!bubble || bubble.replied || bubble.expired) return
-    // Score: +2 for correct reply, +1 for wrong reply (still engaged)
-    const isCorrect = bubble.correct && choice === bubble.correct
-    const pts = isCorrect ? 2 : 1
+    const scoring = get().remoteConfig?.scoring || {}
+    const isCorrect = choiceIndex === bubble.correct
+    const pts = isCorrect ? (scoring.message_correct || 3) : (scoring.message_wrong || -2)
     set((state) => ({
       messageBubbles: state.messageBubbles.map((b) =>
-        b.id === bubbleId ? { ...b, replied: true, replyChoice: choice, repliedAt: ts(), replyCorrect: isCorrect } : b
+        b.id === bubbleId ? { ...b, replied: true, replyChoice: choiceIndex, repliedAt: ts(), replyCorrect: isCorrect } : b
       ),
       score: state.score + pts,
     }))
@@ -276,11 +456,12 @@ export const useGameStore = create((set, get) => ({
   expireMessage: (bubbleId) => {
     const bubble = get().messageBubbles.find(b => b.id === bubbleId)
     if (!bubble || bubble.replied || bubble.expired) return
+    const scoring = get().remoteConfig?.scoring || {}
     set((state) => ({
       messageBubbles: state.messageBubbles.map((b) =>
         b.id === bubbleId ? { ...b, expired: true, expiredAt: ts() } : b
       ),
-      score: state.score - 2,
+      score: state.score + (scoring.message_expire_penalty || -2),
     }))
   },
 
@@ -380,7 +561,7 @@ export const useGameStore = create((set, get) => ({
     openCabinetTask: null,
     encodingConfirmed: false,
     encodingQuizAttempts: 0,
-    machine: { status: 'empty', progress: 0 },
+    laundry: initialLaundry(),
     fakeTriggered: false,
     fakeType: null,
     robotSpeaking: false,
@@ -418,7 +599,7 @@ export const useGameStore = create((set, get) => ({
     selectedEmailId: null,
     interactableTasks: [],
     openCabinetTask: null,
-    machine: { status: 'empty', progress: 0 },
+    laundry: initialLaundry(),
     fakeTriggered: false,
     fakeType: null,
     robotSpeaking: false,
@@ -446,19 +627,20 @@ export const useGameStore = create((set, get) => ({
   }),
 
   setPhase: (phase) => set({ phase }),
-  setDifficulty: (d) => set({ difficulty: d }),
 
   // ── Sidebar Status ─────────────────────────────────────
   getKitchenStatus: () => {
     const hobs = get().hobs
-    if (hobs.some(h => h.status === HOB_STATUS.BURNING)) return 'red'
-    if (hobs.some(h => h.status === HOB_STATUS.READY)) return 'orange'
+    if (hobs.some(h => h.status === HOB_STATUS.BURNING || h.status === HOB_STATUS.ASH)) return 'red'
+    if (hobs.some(h => h.status === HOB_STATUS.READY_SIDE1 || h.status === HOB_STATUS.READY_SIDE2)) return 'orange'
     return null
   },
 
   getBalconyStatus: () => {
-    const m = get().machine
-    if (m.status === 'done') return 'blue'
+    const { laundry } = get()
+    if (laundry.washStatus === 'jammed') return 'red'
+    if (laundry.washStatus === 'done') return 'orange'
+    if (laundry.washStatus === 'washing') return 'blue'
     return null
   },
 
@@ -470,9 +652,10 @@ export const useGameStore = create((set, get) => ({
   },
 
   getInboxStatus: () => {
-    const { messageBubbles } = get()
+    const { messageBubbles, remoteConfig } = get()
     const now = ts()
-    const hasUrgent = messageBubbles.some(b => !b.replied && !b.expired && (now - b.receivedAt) > MESSAGE_TIMEOUT_MS * 0.7)
+    const timeoutMs = remoteConfig?.timers?.message_timeout_ms || 30000
+    const hasUrgent = messageBubbles.some(b => !b.replied && !b.expired && (now - b.receivedAt) > timeoutMs * 0.7)
     const hasUnreplied = messageBubbles.some(b => !b.replied && !b.expired)
     if (hasUrgent) return 'red'
     if (hasUnreplied) return 'orange'

@@ -5,7 +5,7 @@ import logging
 import random
 from typing import Callable, Coroutine
 
-from core.config_loader import get_timeline_config, get_difficulty, get_task_pairs, get_reminder_texts
+from core.config_loader import get_timeline_config, get_difficulty, get_task_pairs, get_reminder_texts, get_config
 
 logger = logging.getLogger("saturday.timeline")
 
@@ -15,8 +15,6 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
 
     tc = get_timeline_config()
     ev = tc.get("events", {})
-    diff = get_difficulty(difficulty)
-    dur = {"cooking": diff.get("cooking_ms", 13000), "ready": diff.get("ready_ms", 4000)}
     task_pairs = get_task_pairs()
     reminder_texts = get_reminder_texts()
     neutrals = tc.get("neutral_comments", ["", ""])
@@ -63,7 +61,12 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
         (tc.get("block_duration_s", 510), "block_end", {"block_number": block_num}),
     ]
 
-    # Steak spawns
+    # Steak spawns — per-hob cooking times
+    steak_cfg = get_config().get("steak", {})
+    base_times = steak_cfg.get("hob_base_cooking_ms", [11000, 13000, 15000])
+    jitter = steak_cfg.get("cooking_jitter_ms", 1000)
+    ready_ms = steak_cfg.get("ready_ms", 4000)
+
     ss = tc.get("steak_spawn", {})
     t = ss.get("start_s", 3)
     end_s = ss.get("end_s", 490)
@@ -71,19 +74,22 @@ def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -
     imax = ss.get("interval_max_s", 15)
     hob_cycle = 0
     while t < end_s:
-        timeline.append((t, "steak_spawn", {"hob_id": hob_cycle % 3, "duration": dur}))
+        hob_id = hob_cycle % 3
+        base_cooking = base_times[hob_id] if hob_id < len(base_times) else 13000
+        cooking = base_cooking + random.randint(-jitter, jitter)
+        dur = {"cooking": cooking, "ready": ready_ms}
+        timeline.append((t, "steak_spawn", {"hob_id": hob_id, "duration": dur}))
         hob_cycle += 1
         t += random.randint(imin, imax)
 
-    # Message bubbles from config
+    # Message bubbles from config (3-option format)
     for msg in tc.get("messages", []):
         timeline.append((msg["time_s"], "message_bubble", {
             "from": msg.get("from", "Unknown"),
             "subject": msg.get("subject", ""),
             "body": msg.get("body", ""),
-            "option_a": msg.get("option_a", "OK"),
-            "option_b": msg.get("option_b", "Skip"),
-            "correct": msg.get("correct", "option_a"),
+            "options": msg.get("options", ["OK", "Skip", "Later"]),
+            "correct": msg.get("correct", 0),
             "avatar": msg.get("avatar", "?"),
         }))
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from core.config_loader import (
     get_config, get_difficulty, get_latin_square,
     get_task_pairs, get_reminder_texts,
+    get_steak_config, get_laundry_config,
 )
 
 DB_PATH = Path(__file__).parent / "experiment.db"
