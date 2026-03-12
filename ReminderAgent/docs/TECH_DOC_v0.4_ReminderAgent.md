@@ -3,8 +3,8 @@
 
 | | |
 |---|---|
-| **Version** | v0.3 — S2 complete; S3 LLM backend + prompt constructor design added |
-| **Date** | 2026-03-11 |
+| **Version** | v0.4 — Theory review complete; tone constant added; Quality Gate updated with CB consistency check |
+| **Date** | 2026-03-12 |
 | **Author** | Thesis Candidate |
 | **Status** | 🟡 Architecture defined; implementation not started |
 | **Depends on** | PRD v1.7 (experiment platform); Task JSON schema |
@@ -15,9 +15,10 @@
 
 | Version | Date | Changes |
 |---|---|---|
-| v0.1 | 2026-03-11 | Initial document — architecture, modules, field map, data flow |
-| v0.2 | 2026-03-11 | Task JSON structure finalised (3-zone); field paths updated to snake_case; §2.3 JSON zone design; §4.2 condition_field_map updated |
-| v0.3 | 2026-03-11 | S2 complete (context_extractor + 38 tests); S3 design: OllamaBackend config, dual format_context strategy (prose/json), generation_config additions |
+| v0.1 | 2026-03-11 | Initial document |
+| v0.2 | 2026-03-11 | Task JSON 3-zone structure; snake_case field paths |
+| v0.3 | 2026-03-11 | S2 complete; S3 design: Ollama config, dual format_context |
+| v0.4 | 2026-03-12 | Theory review: tone constant (§2.4 new); Quality Gate adds CB activity consistency check; AF operationalization note added to §3.1 |
 
 ---
 
@@ -142,6 +143,27 @@ The robot may only reference information the user encoded at task creation time.
 
 **`reminder_context` canonical template (all 8 tasks follow this structure):**
 ```json
+
+### 2.4  Tone Constant
+
+Reminder tone (instruction-like vs. intention-reactivation) is an uncontrolled variable that would confound AF and CB effects if left free. All generated texts across all conditions must use **intention-reactivation framing** — this is a **constant, not a variable**.
+
+**Enforced in:** `prompt_constructor.build_system_prompt()` — hard constraint in system prompt for all 4 conditions:
+
+```
+Tone rule (applies to ALL conditions):
+✓ Use: "Remember to...", "By the way, remember...", "Don't forget to..."
+✗ Avoid: "It's time to...", "You need to now...", "Make sure you..."
+✗ Never imply the task should be executed immediately.
+```
+
+**Why this matters:** If Low AF texts happened to sound more conversational and High AF texts sounded more clinical, observed DV differences could reflect tone rather than AF. Fixing tone to intention-reactivation framing across all conditions removes this confound.
+
+**Thesis framing:**
+> "Reminder tone was held constant across conditions using standardised intention-reactivation framing (Option C), isolating the effects of AF and CB from potential confounds introduced by linguistic register."
+
+**`reminder_context` canonical template (all 8 tasks follow this structure):**
+```json
 {
   "reminder_context": {
     "element1": {
@@ -190,7 +212,7 @@ Automated quality checks filter obvious violations. Human review (spot-checking 
 
 The condition schema operationalises the 2×2 manipulation:
 
-- **Associative Fidelity (AF):** specificity of the target cue and intended action in the reminder, operationalising the target-action associative link described by McDaniel & Einstein's Multiprocess Framework. High AF provides information that allows the participant to identify the correct target (not the distractor) and execute the correct action.
+- **Associative Fidelity (AF):** specificity of the **encoded intention context** in the reminder, operationalising the associative link described by McDaniel & Einstein's Multiprocess Framework. High AF provides information that allows the participant to identify the correct target (not the distractor) and execute the correct action. AF is defined broadly as encoded intention specificity — encompassing target perceptual features (visual cue), action-relevant properties (domain properties), and encoding episode context (task_creator when authority). This broader definition is grounded in Encoding Specificity (Tulving, 1973): reinstatement of encoding context facilitates retrieval, not only reinstatement of the target-action link per se.
 
 - **Contextual Bridging (CB):** whether the reminder references the participant's currently detected activity, operationalising the interruption-softening mechanism described by Altmann & Trafton's Goal Activation Model.
 
@@ -453,13 +475,14 @@ Automated compliance checks applied to each generated variant before it is writt
 
 | Check | Method | Fail condition |
 |---|---|---|
-| **Forbidden field leak** | Keyword matching against excluded field values | Low AF text contains visual cue keywords (colour, shape, brand name) |
-| **Required field presence** | Check that whitelisted entity names / action verbs appear | Text doesn't mention the entity |
-| **Length constraint** | Word count | < 5 words or > 35 words |
-| **Duplicate detection** | Levenshtein similarity against existing variants | Similarity > 0.85 with any prior variant in same batch |
-| **Language check** | langdetect | Not English |
+| **Forbidden field leak** | Keyword matching against `forbidden_keywords.yaml` | Visual/domain keyword appears in Low AF text |
+| **Required field presence** | Check that whitelisted entity names / action verbs appear | Entity name absent from text |
+| **Length constraint** | Word count | < `min_words` or > `max_words` from config |
+| **Duplicate detection** | Levenshtein similarity against existing variants | Similarity > `similarity_threshold` with any prior variant in same batch |
+| **Language check** | `langdetect` | Not English |
+| **CB activity consistency** *(C1)* | Semantic similarity between activity phrases across all High CB variants in same batch | Any variant's activity phrase diverges from majority (heuristic: extract sentence containing "I can see" / "I notice") |
 
-Note: the forbidden field leak check is heuristic, not exhaustive. It catches obvious violations (e.g., "red bottle" appearing in Low AF text). Subtle semantic leakage (e.g., describing a location that implies the container) is caught in human review.
+Note: the forbidden field leak check is heuristic, not exhaustive. It catches obvious violations (e.g., "red bottle" in Low AF text). Subtle semantic leakage is caught in human review. CB consistency check runs at batch level (after all N variants are generated), not per-variant.
 
 #### `review/review_interface.py`
 

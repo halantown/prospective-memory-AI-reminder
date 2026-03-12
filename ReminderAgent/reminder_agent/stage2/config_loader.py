@@ -68,6 +68,29 @@ class GenerationConfig(BaseModel):
         return v
 
 
+"""
+===========================================
+*        ConditionFieldMap schema         *
+===========================================
+
+ConditionFieldMap
+└── conditions (dict[str, ConditionEntry])
+    ├── LowAF_LowCB (ConditionEntry)
+    │   ├── required_fields (list[str])
+    │   ├── conditional_fields (list[ConditionalField])
+    │   │   └── ConditionalField
+    │   │       ├── field (str)
+    │   │       └── condition (str)
+    │   ├── excluded_fields (list[str])
+    │   └── excluded_zones (list[str])
+    ├── HighAF_LowCB (ConditionEntry)
+    │   ├── ...
+    ├── LowAF_HighCB (ConditionEntry)
+    │   ├── ...
+    └── HighAF_HighCB (ConditionEntry)
+        ├── ...
+"""
+
 class ConditionalField(BaseModel):
     field: str
     condition: str

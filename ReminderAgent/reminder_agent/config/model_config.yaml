@@ -1,9 +1,18 @@
 # Model Configuration — LLM backend selection and parameters
 # Switch backends by changing 'backend' and 'model_name'. No code changes needed.
 
-backend: "ollama"                                      # options: together | ollama | openai | anthropic
-model_name: "llama3:latest"                            # model identifier for the selected backend
+# options: together | ollama | openai | anthropic
+backend: "ollama"                                 
+
+# model identifier for the selected backend 
+# For Ollama: qwen3:latest | llama3.1:latest | gemma3:4b
+model_name: "llama3.1:latest"                          
+
 temperature: 0.8
 max_tokens: 150
-base_url: "http://localhost:11434"                     # base URL for local backends (ollama)
-api_key_env: null                                      # environment variable holding the API key (null for local)
+
+# base URL for local backends (ollama)
+base_url: "http://localhost:11434"      
+
+# environment variable holding the API key (null for local)
+api_key_env: null                                      

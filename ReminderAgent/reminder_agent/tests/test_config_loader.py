@@ -119,7 +119,7 @@ class TestLoadFromProductionConfigs:
     def test_model_config(self) -> None:
         cfg = load_model_config()
         assert cfg.backend == "ollama"
-        assert cfg.model_name == "llama3:latest"
+        assert cfg.model_name == "llama3.1:latest"
         assert cfg.temperature == 0.8
         assert cfg.max_tokens == 150
         assert cfg.base_url == "http://localhost:11434"

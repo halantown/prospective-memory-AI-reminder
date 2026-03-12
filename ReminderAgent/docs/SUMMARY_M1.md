@@ -10,48 +10,48 @@ The Reminder Agent is an **offline batch generation pipeline** for a 2×2 within
 
 The two independent variables are:
 
-| Variable | Low | High |
-|---|---|---|
+| Variable                            | Low                                     | High                                      |
+| ----------------------------------- | --------------------------------------- | ----------------------------------------- |
 | **Associative Fidelity (AF)** | Generic reminder ("take your medicine") | Specific cues (visual, dosage, authority) |
-| **Contextual Bridging (CB)** | No activity reference | References user's current activity |
+| **Contextual Bridging (CB)**  | No activity reference                   | References user's current activity        |
 
 ---
 
 ## 2. Architecture Overview
 
 ```
-                    ┌─────────────────────────────────┐
-                    │  CONFIG LAYER                    │
-                    │  condition_field_map.yaml        │
-                    │  model_config.yaml               │
-                    │  generation_config.yaml          │
-                    │         ↓                        │
-                    │  config_loader.py                │
-                    │  (Pydantic validation)           │
-                    └──────────┬──────────────────────┘
+               ┌─────────────────────────────────┐
+               │          CONFIG LAYER           │
+               │    condition_field_map.yaml     │
+               │    model_config.yaml            │
+               │    generation_config.yaml       │
+               │               ↓                 │
+               │    config_loader.py             │
+               │    (Pydantic validation)        │
+               └───────────────┬─────────────────┘
                                │
-              ┌────────────────┼────────────────┐
-              ▼                ▼                 ▼
+            ┌──────────────────┼─────────────────┐
+            ▼                  ▼                 ▼
    ┌──────────────────┐ ┌───────────────┐ ┌──────────────┐
    │ Context Extractor│ │ Prompt        │ │ LLM Backend  │
    │                  │ │ Constructor   │ │              │
    │ Task JSON →      │ │ pruned ctx →  │ │ prompt →     │
    │ pruned dict      │ │ system+user   │ │ text         │
    │                  │ │ prompts       │ │              │
-   └────────┬─────────┘ └───────┬───────┘ └──────┬───────┘
-            │                   │                  │
-            └───────────────────┴──────────────────┘
+   └────────┬─────────┘ └──────┬────────┘ └──────┬───────┘
+            │                  │                 │
+            └──────────────────┴─────────────────┘
                                │
-                    [S4–S6: Quality Gate → Batch Runner → Output Store]
+       [S4–S6: Quality Gate → Batch Runner → Output Store]
                     (not yet implemented)
 ```
 
 ### Two-Stage Design
 
-| Stage | Purpose | Status |
-|---|---|---|
-| **Stage 2** (production) | Condition-controlled batch text generation | S1–S3 done; S4–S6 pending |
-| **Stage 1** (demo) | ReAct agent: extract Task JSON from unstructured text | S7 pending (independent) |
+| Stage                          | Purpose                                               | Status                      |
+| ------------------------------ | ----------------------------------------------------- | --------------------------- |
+| **Stage 2** (production) | Condition-controlled batch text generation            | S1–S3 done; S4–S6 pending |
+| **Stage 1** (demo)       | ReAct agent: extract Task JSON from unstructured text | S7 pending (independent)    |
 
 ---
 
@@ -116,19 +116,21 @@ ReminderAgent/
 
 **Purpose:** Load, validate, and expose all YAML configuration as typed Python objects. Fail-loud on invalid input.
 
-| Pydantic Model | Config File | Key Fields |
-|---|---|---|
-| `ModelConfig` | `model_config.yaml` | `backend`, `model_name`, `temperature`, `max_tokens`, `base_url`, `api_key_env` |
-| `GenerationConfig` | `generation_config.yaml` | `n_variants`, `max_retries`, `min_words`, `max_words`, `similarity_threshold`, `context_format` |
-| `ConditionFieldMap` | `condition_field_map.yaml` | 4 × `ConditionEntry` (each with `required_fields`, `conditional_fields`, `excluded_fields`, `excluded_zones`) |
+| Pydantic Model        | Config File                  | Key Fields                                                                                                              |
+| --------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `ModelConfig`       | `model_config.yaml`        | `backend`, `model_name`, `temperature`, `max_tokens`, `base_url`, `api_key_env`                             |
+| `GenerationConfig`  | `generation_config.yaml`   | `n_variants`, `max_retries`, `min_words`, `max_words`, `similarity_threshold`, `context_format`             |
+| `ConditionFieldMap` | `condition_field_map.yaml` | 4 ×`ConditionEntry` (each with `required_fields`, `conditional_fields`, `excluded_fields`, `excluded_zones`) |
 
 **Public functions:**
+
 - `load_model_config(path?) → ModelConfig`
 - `load_generation_config(path?) → GenerationConfig`
 - `load_condition_field_map(path?) → ConditionFieldMap`
 - `load_all_configs(config_dir?) → (ModelConfig, GenerationConfig, ConditionFieldMap)`
 
 **Validation rules:**
+
 - Backend must be one of `{together, ollama, openai, anthropic}`
 - Temperature: 0.0–2.0 | max_tokens > 0 | max_words ≥ min_words
 - Context format must be `prose` or `json`
@@ -141,10 +143,12 @@ ReminderAgent/
 **Purpose:** Prune a full Task JSON so the LLM only sees fields permitted by the condition. Implements Design Principle P1 (input truncation over output filtering).
 
 **Public functions:**
+
 - `load_field_map(condition, field_map?) → ConditionEntry`
 - `extract(task_json, condition, field_map?) → dict` — the core pruning function
 
 **Logic flow:**
+
 ```
 extract(task_json, "LowAF_LowCB")
   1. Load condition entry from field map
@@ -155,6 +159,33 @@ extract(task_json, "LowAF_LowCB")
      → if true: resolve and copy; if false: skip
   4. excluded_fields and excluded_zones: logged only (not present in output by construction)
   5. Return pruned dict
+```
+
+**Example:**
+
+**Input**:
+
+```json
+{
+  "task_id": "123",
+  "zone1": {
+    "field1": true,
+    "field2": "value2"
+  },
+  "zone2": {
+    "field3": false
+  }
+}
+```
+
+**Output:**
+
+```json
+{
+  "zone1": {
+    "field1": true
+  }
+}
 ```
 
 **Condition expression evaluator:** Supports `"path.to.field == value"` syntax. Values: `true`/`false` (boolean) or string literals.
@@ -168,6 +199,7 @@ extract(task_json, "LowAF_LowCB")
 **Purpose:** Provide a uniform `generate()` interface across 4 LLM backends. Backend selection is config-driven, not code-driven.
 
 **Class hierarchy:**
+
 ```
 LLMBackend (ABC)
   ├── OllamaBackend    — POST {base_url}/api/chat (local, no API key)
@@ -177,6 +209,7 @@ LLMBackend (ABC)
 ```
 
 **Interface:**
+
 - `generate(system_prompt, user_prompt) → str` — with retry (3× exponential backoff)
 - `_call(system_prompt, user_prompt) → str` — single API call (subclass-specific)
 
@@ -191,18 +224,21 @@ LLMBackend (ABC)
 **Purpose:** Assemble condition-specific system and user prompts for the LLM.
 
 **Public functions:**
+
 - `build_system_prompt(condition) → str` — role, rules, constraints, tone
 - `build_user_prompt(pruned_context, prior_variants?, context_format?) → str` — task context + diversity instruction
 - `format_context(pruned_dict, style) → str` — `"prose"` or `"json"` formatting
 - `build_prompts(task_json, condition, ...) → (system_prompt, user_prompt)` — convenience wrapper
 
 **Dual format strategy:**
-| Format | Use Case | Behaviour |
-|---|---|---|
-| `prose` | Small models (7B) | Field-aware conversion: `action_verb + entity_name → "Task: Take Doxycycline."` |
-| `json` | Large models (70B) | Raw `json.dumps(pruned_dict, indent=2)` |
+
+| Format    | Use Case           | Behaviour                                                                         |
+| --------- | ------------------ | --------------------------------------------------------------------------------- |
+| `prose` | Small models (7B)  | Field-aware conversion:`action_verb + entity_name → "Task: Take Doxycycline."` |
+| `json`  | Large models (70B) | Raw `json.dumps(pruned_dict, indent=2)`                                         |
 
 **Prose field mapping (`_to_prose`):**
+
 - `action_verb` + `entity_name` → `"Task: Take Doxycycline."`
 - `cues.visual` → `"Target appearance: Red round bottle with white label."`
 - `domain_properties` → `"Details: dosage: 100mg, form: Tablet."`
@@ -219,27 +255,27 @@ LLMBackend (ABC)
 medicine_a.json                    condition_field_map.yaml
       │                                     │
       ▼                                     ▼
- ┌─────────────────────────────────────────────────┐
+ ┌──────────────────────────────────────────────────┐
  │                context_extractor.extract()       │
- │  Full JSON + "HighAF_LowCB" → pruned dict       │
+ │  Full JSON + "HighAF_LowCB" → pruned dict        │
  │  (only: action_verb, entity_name, visual,        │
- │   domain_properties, + task_creator if authority) │
- └───────────────────────┬─────────────────────────┘
+ │   domain_properties, + task_creator if authority)│
+ └───────────────────────┬──────────────────────────┘
                          │
                          ▼
- ┌─────────────────────────────────────────────────┐
+ ┌──────────────────────────────────────────────────┐
  │          prompt_constructor.build_prompts()      │
  │  pruned dict → format_context(prose) →           │
  │  system_prompt (condition rules, constraints) +  │
  │  user_prompt (task context + diversity instr.)   │
- └───────────────────────┬─────────────────────────┘
+ └───────────────────────┬──────────────────────────┘
                          │
                          ▼
- ┌─────────────────────────────────────────────────┐
- │            llm_backend.generate()               │
- │  system_prompt + user_prompt → LLM → text       │
- │  (retry up to 3× with exponential backoff)      │
- └───────────────────────┬─────────────────────────┘
+ ┌──────────────────────────────────────────────────┐
+ │            llm_backend.generate()                │
+ │  system_prompt + user_prompt → LLM → text        │
+ │  (retry up to 3× with exponential backoff)       │
+ └───────────────────────┬──────────────────────────┘
                          │
                          ▼
               "Remember to take your Doxycycline —
@@ -297,16 +333,16 @@ Each task schema is divided into three zones as an **engineering control** — d
 
 ## 7. Condition Field Whitelist Summary
 
-| Field | LowAF_LowCB | HighAF_LowCB | LowAF_HighCB | HighAF_HighCB |
-|---|---|---|---|---|
-| `action_verb` | ✅ | ✅ | ✅ | ✅ |
-| `entity_name` | ✅ | ✅ | ✅ | ✅ |
-| `cues.visual` | ❌ | ✅ | ❌ | ✅ |
-| `domain_properties` | ❌ | ✅ | ❌ | ✅ |
-| `task_creator` | ❌ | ✅ (if authority) | ❌ | ✅ (if authority) |
-| `detected_activity_raw` | ❌ | ❌ | ✅ | ✅ |
-| `agent_reasoning_context.*` | ❌ zone | ❌ zone | ❌ zone | ❌ zone |
-| `placeholder.*` | ❌ zone | ❌ zone | ❌ zone | ❌ zone |
+| Field                         | LowAF_LowCB | HighAF_LowCB      | LowAF_HighCB | HighAF_HighCB     |
+| ----------------------------- | ----------- | ----------------- | ------------ | ----------------- |
+| `action_verb`               | ✅          | ✅                | ✅           | ✅                |
+| `entity_name`               | ✅          | ✅                | ✅           | ✅                |
+| `cues.visual`               | ❌          | ✅                | ❌           | ✅                |
+| `domain_properties`         | ❌          | ✅                | ❌           | ✅                |
+| `task_creator`              | ❌          | ✅ (if authority) | ❌           | ✅ (if authority) |
+| `detected_activity_raw`     | ❌          | ❌                | ✅           | ✅                |
+| `agent_reasoning_context.*` | ❌ zone     | ❌ zone           | ❌ zone      | ❌ zone           |
+| `placeholder.*`             | ❌ zone     | ❌ zone           | ❌ zone      | ❌ zone           |
 
 ---
 
@@ -326,11 +362,11 @@ External dependencies: `pydantic`, `pyyaml`, `httpx`, `pytest`
 
 ## 9. Test Coverage
 
-| Test Module | Tests | Covers |
-|---|---|---|
-| `test_config_loader.py` | 18 | All 3 config files: happy path loading, field semantics, validation errors (bad backend, missing fields, out-of-range values), round-trip |
-| `test_context_extractor.py` | 20 | All 4 conditions × medicine_a: field inclusion/exclusion, zone stripping, conditional authority logic, error handling |
-| **Total** | **38** | **All pass** |
+| Test Module                   | Tests        | Covers                                                                                                                                    |
+| ----------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `test_config_loader.py`     | 18           | All 3 config files: happy path loading, field semantics, validation errors (bad backend, missing fields, out-of-range values), round-trip |
+| `test_context_extractor.py` | 20           | All 4 conditions × medicine_a: field inclusion/exclusion, zone stripping, conditional authority logic, error handling                    |
+| **Total**               | **38** | **All pass**                                                                                                                        |
 
 *Note: llm_backend and prompt_constructor are tested via CLI entry points (manual verification), not automated tests. Their outputs depend on an LLM and are inherently non-deterministic.*
 
@@ -338,10 +374,10 @@ External dependencies: `pydantic`, `pyyaml`, `httpx`, `pytest`
 
 ## 10. Completed Work (Sprints 1–3)
 
-| Sprint | Commit | What was built |
-|---|---|---|
-| **S1** | `f3ff85a` | Directory structure, 3 YAML configs, `config_loader.py` with Pydantic validation, 18 tests |
-| **S2** | `e420846` | `context_extractor.py` (JSON pruner), `medicine_a.json`, v0.2 schema migration (snake_case + `excluded_zones`), 20 tests |
+| Sprint       | Commit      | What was built                                                                                                                                                           |
+| ------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **S1** | `f3ff85a` | Directory structure, 3 YAML configs,`config_loader.py` with Pydantic validation, 18 tests                                                                              |
+| **S2** | `e420846` | `context_extractor.py` (JSON pruner), `medicine_a.json`, v0.2 schema migration (snake_case + `excluded_zones`), 20 tests                                           |
 | **S3** | `7c7caee` | `llm_backend.py` (4 backends + retry), `prompt_constructor.py` (dual format + diversity), config updates (`base_url`, `context_format`), end-to-end verification |
 
 ---
@@ -349,23 +385,27 @@ External dependencies: `pydantic`, `pyyaml`, `httpx`, `pytest`
 ## 11. Pending Work (Sprints 4–7)
 
 ### S4 — Quality Gate
+
 - `quality_gate.py`: forbidden keyword leak check, entity presence, word count, Levenshtein duplicate detection, language detection
 - `forbidden_keywords.yaml`: per-task visual cue keywords
 - `test_quality_gate.py`: planted violations, valid passes, duplicate detection
 - **Key concern:** LowAF text currently sometimes leaks entity name (e.g., "Doxycycline") — this sprint addresses it
 
 ### S5 — Batch Runner + Output Store
+
 - `output_store.py`: SQLite `reminders.db` (schema: task_id, condition, variant_idx, text, review_status, model_used, ...)
 - `batch_runner.py`: loop over 8 tasks × 4 conditions × N variants, with quality gate retry
 - Remaining 7 task JSON files (medicine_b through chores_h)
 - `generation_log.json`: full log of all generation attempts
 
 ### S6 — Scale + Review Interface
+
 - Scale `n_variants` from 3 to 10
 - `review_interface.py`: CLI tool for human keep/reject/flag review
 - Target: 320 approved variants in `reminders.db`
 
 ### S7 — Stage 1 Demo (independent, can run in parallel)
+
 - `stage1/extractor.py`: ReAct agent loop (read source → reason → extract)
 - `data/simulated_sources/email.txt`: simulated doctor's letter
 - Output: partial Task JSON with gap report
@@ -375,6 +415,7 @@ External dependencies: `pydantic`, `pyyaml`, `httpx`, `pytest`
 ## 12. Configuration Summary (Current State)
 
 **model_config.yaml:**
+
 ```yaml
 backend: "ollama"
 model_name: "llama3:latest"
@@ -385,6 +426,7 @@ api_key_env: null
 ```
 
 **generation_config.yaml:**
+
 ```yaml
 n_variants: 3
 max_retries: 3

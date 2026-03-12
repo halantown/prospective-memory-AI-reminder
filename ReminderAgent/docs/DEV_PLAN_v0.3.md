@@ -3,11 +3,11 @@
 
 | | |
 |---|---|
-| **Version** | v0.2 — S2 complete; S3 updated with Ollama config and dual format strategy |
-| **Date** | 2026-03-11 |
+| **Version** | v0.3 — Theory review complete; S4 Quality Gate spec updated (CB consistency check + tone constant) |
+| **Date** | 2026-03-12 |
 | **Owner** | Claude (project tracking) |
 | **Developer** | Thesis Candidate (local) |
-| **Status** | 🟡 S2 complete — S3 in progress |
+| **Status** | 🔵 S3 complete — S4 ready to start |
 
 ---
 
@@ -16,7 +16,8 @@
 | Version | Date | Changes |
 |---|---|---|
 | v0.1 | 2026-03-11 | Initial plan |
-| v0.2 | 2026-03-11 | S1 closed (commit f3ff85a); S2 closed (commit e420846, 38 tests); S3 updated: Ollama local setup, dual format_context strategy, generation_config additions |
+| v0.2 | 2026-03-11 | S1 closed (`f3ff85a`); S2 closed (`e420846`); S3 updated with Ollama + dual format |
+| v0.3 | 2026-03-12 | S3 closed (`7c7caee`); theory review: S4 Quality Gate adds CB activity consistency check; prompt_constructor adds tone constant (Option C); open items C3–C6 logged |
 
 ---
 
@@ -35,8 +36,8 @@
 |---|---|---|---|
 | **S1** | Project skeleton + Config layer | ✅ `f3ff85a` | Directory created; configs load without error |
 | **S2** | Context Extractor | ✅ `e420846` | Passes all unit tests on Medicine A |
-| **S3** | LLM Backend + Prompt Constructor | 🔵 In progress | Generates plausible text for Medicine A, all 4 conditions |
-| **S4** | Quality Gate | ⬜ | Auto-checks catch planted violations reliably |
+| **S3** | LLM Backend + Prompt Constructor | ✅ `7c7caee` | Generates plausible text for Medicine A, all 4 conditions |
+| **S4** | Quality Gate | 🔵 Ready | Auto-checks catch planted violations reliably |
 | **S5** | Batch Runner + Output Store | ⬜ | Full run: 32 combinations × 3 variants logged to DB |
 | **S6** | Scale to N=10 + Review Interface | ⬜ | 320 variants in DB; human review complete |
 | **S7** | Stage 1 Demo | ⬜ | ReAct agent extracts Medicine A JSON from email.txt |
@@ -59,51 +60,32 @@ Notable: `excluded_zones` implementation cleanly blocks `agent_reasoning_context
 
 ---
 
-## Sprint 3 — LLM Backend + Prompt Constructor
+## Sprint 3 — LLM Backend + Prompt Constructor ✅ `7c7caee`
 
-**Goal:** For one (task, condition) pair, generate one reminder text that looks correct.
+All exit criteria met. End-to-end verified: all 4 conditions produce plausible reminders via local Ollama (`llama3:latest`). 38 tests passing.
 
-### Tasks
+**Post-sprint finding:** LowAF text occasionally includes entity name (e.g., "Doxycycline") — confirmed **not a violation** (entity_name is must_include for all conditions). Quality Gate should not flag this.
 
-**LLM Backend (`stage2/llm_backend.py`)**
-- [ ] Define abstract interface: `generate(prompt: str) -> str`
-- [ ] Implement `OllamaBackend` — `POST localhost:11434/api/generate`, no API key
-- [ ] Implement `TogetherBackend` (Together.ai API) — for 70B validation
-- [ ] Backend + model selected from `model_config.yaml` at import time
-- [ ] Retry logic: if API call fails, retry up to 3 times with exponential backoff
+**Post-sprint action (before S4 starts):** Add tone constant to `prompt_constructor.py` system prompt — intention-reactivation framing required for all conditions (see §Tone Constant below).
 
-**Prompt Constructor (`stage2/prompt_constructor.py`)**
-- [ ] `build_system_prompt(condition)` — role definition, condition rules in plain English, length constraint (8–30 words), tone instruction
-- [ ] `build_user_prompt(pruned_context, prior_variants, context_format)` — task context + diversity instruction
-- [ ] `format_context(pruned_dict, style)` — `prose` or `json` mode, selected from `generation_config.yaml`
-- [ ] `_to_prose(pruned_dict)` — field-aware conversion (see TECH_DOC §4.2 for field mapping)
-- [ ] For variant N > 1: append prior variants with structural-difference instruction
+---
 
-**Config update**
-- [ ] Add `context_format: "prose"` to `generation_config.yaml`
+## Tone Constant — Required Addition to S3 (before S4)
 
-### Local Ollama setup
+**Problem:** Reminder tone (instruction-like vs. intention-reactivation) is an uncontrolled variable that could confound AF and CB effects if not fixed.
 
-```bash
-ollama pull mistral:7b
-ollama serve                    # runs on localhost:11434
+**Solution:** Add the following hard constraint to `build_system_prompt()` in `prompt_constructor.py`:
+
+```
+Tone rule (applies to ALL conditions):
+Use intention-reactivation framing ONLY:
+  ✓ "Remember to...", "By the way, remember...", "Don't forget to..."
+  ✗ "It's time to...", "You need to now...", "Make sure you..."
+  ✗ Never imply the task should be executed immediately.
 ```
 
-`model_config.yaml` for local dev:
-```yaml
-backend: "ollama"
-model_name: "mistral:7b"
-temperature: 0.8
-max_tokens: 150
-base_url: "http://localhost:11434"
-api_key_env: null
-```
-
-### Exit criteria
-
-- Run manually: `python stage2/prompt_constructor.py` — prints assembled prompt for Medicine A × HighAF_HighCB
-- Run manually: `python stage2/llm_backend.py` — returns one generated string without error
-- Eyeball check: generated text looks like a plausible reminder, correct condition
+**Thesis framing:**
+> "Reminder tone was held constant across conditions using standardised intention-reactivation framing, isolating AF and CB effects from linguistic register confounds."
 
 ---
 
@@ -114,35 +96,45 @@ api_key_env: null
 ### Tasks
 
 - [ ] Write `stage2/quality_gate.py`
-- [ ] Build `forbidden_keywords.yaml` — per-task list of visual cue keywords that must not appear in Low AF texts
+- [ ] Write `data/forbidden_keywords.yaml` — per-task visual/domain keywords forbidden in Low AF
 
 **Checks to implement:**
 
-| Check | Implementation |
-|---|---|
-| Forbidden keyword leak | String match against `forbidden_keywords[task_id]` — fails if any keyword found in Low AF text |
-| Required entity present | Check entity name appears in output |
-| Length constraint | Word count between `min_words` and `max_words` from config |
-| Duplicate detection | Levenshtein ratio against all prior variants in batch; fail if > threshold |
-| Language check | `langdetect` — must be `en` |
+| Check | Method | Fail condition |
+|---|---|---|
+| **Forbidden keyword leak** | String match vs `forbidden_keywords[task_id]` | Visual/domain keyword in Low AF text |
+| **Required entity present** | Check entity name appears in output | Entity name absent |
+| **Length constraint** | Word count | < `min_words` or > `max_words` from config |
+| **Duplicate detection** | Levenshtein ratio vs prior variants | Ratio > `similarity_threshold` |
+| **Language check** | `langdetect` | Not `en` |
+| **CB activity consistency** *(new — C1)* | Check High CB variants all reference the same activity | CB sentence describes different activity across variants in same batch |
 
-- [ ] Write `tests/test_quality_gate.py`
-  - Plant a deliberate violation (red bottle mention in Low AF text) → assert fails
-  - Valid High AF text → assert passes all checks
-  - Duplicate text → assert fails similarity check
+**CB activity consistency check detail:**
+- Extract the activity phrase from each High CB variant (heuristic: sentence containing "I can see" or "I notice")
+- Compute semantic similarity between all activity phrases in the batch
+- Flag if any variant's activity phrase diverges significantly from the majority
+- This ensures the 10 variants for a given (task, HighCB) pair all bridge to the same detected activity
 
 **`forbidden_keywords.yaml` structure:**
 ```yaml
 medicine_a:
-  visual_cue_keywords: ["red", "round", "doxycycline", "white label"]
+  visual_keywords: ["red", "round", "white label"]
   domain_keywords: ["100mg", "tablet"]
 medicine_b:
-  visual_cue_keywords: ["orange", "square", "vitamin c", "chewable"]
+  visual_keywords: ["orange", "square", "chewable"]
   domain_keywords: ["500mg"]
-# ... etc for all 8 tasks
+# ... all 8 tasks
 ```
 
-*Note: domain_keywords only forbidden in Low AF. Visual_cue_keywords forbidden in all Low AF. This distinction needs encoding in the gate logic.*
+*Note: `domain_keywords` forbidden in Low AF only. `visual_keywords` forbidden in all Low AF. Gate logic must encode this distinction.*
+
+- [ ] Write `tests/test_quality_gate.py`
+  - Plant deliberate visual keyword in Low AF → assert fails
+  - Plant domain keyword in Low AF → assert fails
+  - Valid High AF text → assert passes all checks
+  - Duplicate text → assert fails similarity check
+  - High CB batch with inconsistent activity → assert CB consistency check fails
+  - High CB batch with consistent activity → assert passes
 
 ### Exit criteria
 
@@ -236,6 +228,19 @@ python stage1/demo_run.py
 ```
 
 The demo does not need to be perfect — partial extraction with transparent gap reporting is the expected and acceptable outcome.
+
+---
+
+## Open Items (Non-Blocking)
+
+These do not block S4–S6 development but must be resolved before data collection.
+
+| ID | Priority | Item | Owner | Blocks |
+|---|---|---|---|---|
+| **C3** | 🔴 Pre-data | Encoding card content (domain_properties confirmed) — finalise exact wording shown to participants | Thesis candidate | Methods section |
+| **C4** | 🔴 Pre-data | AF×CB interaction direction: predict null or positive? Choose one, write into Hypotheses section | Thesis candidate | Introduction/Hypotheses |
+| **C5** | 🟡 Pre-submission | AF operationalization: write "encoded intention specificity" framing into Methods section | Thesis candidate | Reviewer defence |
+| **C6** | 🟢 S6 | Human review: add semantic equivalence check dimension across variants in same batch | S6 Review interface | Review quality |
 
 ---
 

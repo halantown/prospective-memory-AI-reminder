@@ -1,0 +1,22 @@
+# Forbidden Keywords — per-task visual/domain keywords forbidden in Low AF conditions.
+# visual_keywords: appearance cues (colour, shape, container) — forbidden in LowAF
+# domain_keywords: specific properties (dosage, form) — forbidden in LowAF
+#
+# Only medicine_a is fully populated now; remaining tasks will be added in S5
+# when their task JSON files are authored.
+
+medicine_a:
+  visual_keywords:
+    - "red"
+    - "round"
+    - "white label"
+    - "bottle"
+  domain_keywords:
+    - "100mg"
+    - "tablet"
+    - "100 mg"
+
+# Placeholders for S5 — populate when task JSON is authored
+medicine_b:
+  visual_keywords: []
+  domain_keywords: []

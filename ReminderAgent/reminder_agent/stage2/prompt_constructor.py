@@ -1,6 +1,7 @@
 """Prompt Constructor — assembles system and user prompts for reminder generation.
 
 Implements the dual format strategy (prose/json) from TECH_DOC v0.3 §4.2.
+Tone constant (intention-reactivation framing) per TECH_DOC v0.4 §2.4.
 """
 
 from __future__ import annotations
@@ -69,6 +70,12 @@ You MUST include: {desc['include']}.
 You MUST NOT include: {desc['exclude']}.
 
 {desc['tone']}
+
+Tone rule (applies to ALL conditions):
+Use intention-reactivation framing ONLY:
+  ✓ "Remember to...", "By the way, remember...", "Don't forget to..."
+  ✗ "It's time to...", "You need to now...", "Make sure you..."
+  ✗ Never imply the task should be executed immediately.
 
 Constraints:
 - Length: 8–30 words.
