@@ -35,14 +35,16 @@ def REMINDER_TEXTS():
 
 # ── Group assignment ───────────────────────────────────────
 
-_session_counter = 0
-
-
 def assign_group() -> str:
-    """Assign a Latin Square group in round-robin fashion."""
-    global _session_counter
+    """Assign a Latin Square group in round-robin fashion.
+
+    Uses the current session count from DB so assignment is stable across
+    server restarts.  Called before INSERT, so count reflects completed sessions.
+    """
+    from core.database import get_db
+    db = get_db(DB_PATH)
+    count = db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+    db.close()
     ls = get_latin_square()
     groups = list(ls.keys())
-    group = groups[_session_counter % len(groups)]
-    _session_counter += 1
-    return group
+    return groups[count % len(groups)]

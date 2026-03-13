@@ -97,6 +97,19 @@ Correct PM answers are stored in the YAML (under `pm_tasks.*.correct`) but are *
 | `GET` | `/config/game` | Config stripped of correct answers (safe for game frontend) |
 | `PUT` | `/config` | Save updated config to YAML and reload |
 
+### Admin API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/admin/sessions` | List all sessions |
+| `GET` | `/admin/active-session` | Find currently connected session (used by dashboard) |
+| `GET` | `/admin/session/{id}/state` | Live hob state, SSE clients, active timelines |
+| `GET` | `/admin/logs/{id}` | Action log for a session (most recent first) |
+| `POST` | `/admin/fire-event` | Manually push an SSE event to a session |
+| `POST` | `/admin/force-block/{id}/{n}` | Force-start block N's full timeline (admin override) |
+| `DELETE` | `/admin/session/{id}` | Delete a session and all its data |
+| `GET` | `/admin/export/{id}` | Export session data as JSON |
+
 ## Communication: SSE
 
 The backend pushes events to the frontend via **Server-Sent Events**:
@@ -139,7 +152,8 @@ Key SSE events: `steak_spawn`, `message_bubble`, `trigger_appear`, `window_close
 
 - **2×2 within-subjects**: Aftereffects (Low/High) × Cue Busyness (Low/High)
 - **4 blocks** per participant, one condition each
-- **Latin Square** counterbalancing (4 groups, assigned round-robin)
+- **Latin Square** counterbalancing (4 groups A/B/C/D): group assigned by `COUNT(sessions) % 4` — restart-safe, DB-backed
+- **Per-slot reminder texts**: each condition has distinct text for Slot A (t=120s) and Slot B (t=300s), configured in `game_config.yaml` under `experiment.reminder_texts.<condition>.{A,B}`
 - **8 PM task types** in 4 pairs (medicine, laundry, communication, chores)
 - PM scoring: 0 (miss) / 1 (partial) / 2 (correct) — **not shown to participant**
 

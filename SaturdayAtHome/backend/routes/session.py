@@ -16,6 +16,8 @@ from utils.helpers import log_action
 from models.schemas import SessionStartRequest, SessionStartResponse
 from core.sse import send_sse, register_client, event_generator
 from core.timeline import BlockTimeline
+from services.hob_service import reset_session_hobs
+from services.window_service import reset_session_windows
 
 logger = logging.getLogger("saturday.routes.session")
 
@@ -66,7 +68,12 @@ async def get_block_config(session_id: str, block_num: int):
 
     condition = condition_order[block_num - 1]
     task_pair = get_task_pairs()[block_num]
-    reminder_texts = get_reminder_texts()
+    cond_texts = get_reminder_texts().get(condition, {})
+    if isinstance(cond_texts, dict):
+        text_a = cond_texts.get("A", "")
+        text_b = cond_texts.get("B", "")
+    else:
+        text_a = text_b = cond_texts or ""
 
     return {
         "block_number": block_num,
@@ -74,8 +81,8 @@ async def get_block_config(session_id: str, block_num: int):
         "task_pair_id": block_num,
         "task_a": task_pair[0],
         "task_b": task_pair[1],
-        "reminder_text_a": reminder_texts.get(condition, ""),
-        "reminder_text_b": reminder_texts.get(condition, ""),
+        "reminder_text_a": text_a,
+        "reminder_text_b": text_b,
     }
 
 
@@ -101,9 +108,13 @@ async def block_stream(session_id: str, block_num: int, auto_start: bool = True)
                 condition_order = json.loads(row["condition_order"])
                 condition = condition_order[block_num - 1] if block_num <= len(condition_order) else "HighAF_HighCB"
 
+                # Cross-block state reset — must run before timeline starts
+                reset_session_hobs(session_id)
+                reset_session_windows(session_id)
+
                 tl = BlockTimeline(session_id, block_num, condition, send_sse)
                 active_timelines[timeline_key] = tl
-                asyncio.create_task(tl.run())
+                tl._task = asyncio.create_task(tl.run())
 
     return StreamingResponse(
         event_generator(session_id, queue),

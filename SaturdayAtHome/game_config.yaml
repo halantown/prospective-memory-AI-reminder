@@ -79,14 +79,19 @@ timeline:
 
   events:
     fake_trigger_s: 35
+    fake_trigger_jitter_s: 8         # fires within [27, 43]s
     robot_neutral_1_s: 75
+    robot_neutral_1_jitter_s: 12     # fires within [63, 87]s
     force_yellow_1_s: 95
+    force_yellow_1_jitter_s: 8       # fires within [87, 103]s
     force_yellow_1_hob: 0
     reminder_a_s: 120
     trigger_a_appear_s: 210
     trigger_a_close_s: 240
     robot_neutral_2_s: 270
+    robot_neutral_2_jitter_s: 12     # fires within [258, 282]s
     force_yellow_2_s: 275
+    force_yellow_2_jitter_s: 8       # fires within [267, 283]s
     force_yellow_2_hob: 1
     reminder_b_s: 300
     trigger_b_appear_s: 390
@@ -148,10 +153,18 @@ experiment:
     4: ["chores_g", "chores_h"]
 
   reminder_texts:
-    LowAF_LowCB: "By the way, remember — after dinner today, take your medicine."
-    HighAF_LowCB: "By the way, remember — after dinner today, take your Doxycycline from the red round bottle, the one your cardiologist prescribed."
-    LowAF_HighCB: "I can see you're keeping an eye on the stove. By the way — after dinner today, remember to take your medicine."
-    HighAF_HighCB: "I can see you're keeping an eye on the stove. By the way — after dinner today, take your Doxycycline from the red round bottle, the one your cardiologist prescribed."
+    LowAF_LowCB:
+      A: "By the way, remember — after dinner today, take your medicine."
+      B: "Don't forget — after dinner, take your medicine."
+    HighAF_LowCB:
+      A: "By the way, remember — after dinner today, take your Doxycycline from the red round bottle, the one your cardiologist prescribed."
+      B: "Don't forget — after dinner, take your Doxycycline, the red round bottle your cardiologist prescribed."
+    LowAF_HighCB:
+      A: "I can see you're keeping an eye on the stove. By the way — after dinner today, remember to take your medicine."
+      B: "You're busy in the kitchen — don't forget, after dinner, take your medicine."
+    HighAF_HighCB:
+      A: "I can see you're keeping an eye on the stove. By the way — after dinner today, take your Doxycycline from the red round bottle, the one your cardiologist prescribed."
+      B: "You're busy in the kitchen — don't forget, after dinner, take your Doxycycline, the red round bottle your cardiologist prescribed."
 
   fake_trigger_type: "delivery"
   execution_window_ms: 30000

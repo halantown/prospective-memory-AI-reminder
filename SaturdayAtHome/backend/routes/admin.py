@@ -1,16 +1,18 @@
 """Admin & dashboard endpoints."""
 
+import asyncio
+import json
 import logging
 import time
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from core.config import DB_PATH
 from core.database import get_db
 from utils.helpers import log_action
 from models.entities import HobStatus
-from services.hob_service import get_session_hobs, reconcile_hob, clear_session_hobs
-from services.window_service import clear_session_windows
+from services.hob_service import get_session_hobs, reconcile_hob, clear_session_hobs, reset_session_hobs
+from services.window_service import clear_session_windows, reset_session_windows
 from models.schemas import FireEventRequest
 from core.sse import send_sse, sse_queues, clear_session_queues
 
@@ -35,6 +37,46 @@ async def admin_fire_event(req: FireEventRequest):
 
     log_action(req.session_id, 0, f"admin_{req.event}", req.data)
     return {"status": "ok"}
+
+
+@router.post("/force-block/{session_id}/{block_num}")
+async def admin_force_block(session_id: str, block_num: int):
+    """Force-start a specific block timeline for a session (admin override).
+
+    Cancels any existing timeline for this block, resets hob/window state,
+    then starts a fresh BlockTimeline — identical to what the SSE auto_start
+    path does, but triggerable from the dashboard without participant input.
+    """
+    from routes.session import active_timelines
+    from core.timeline import BlockTimeline
+
+    if block_num < 1 or block_num > 4:
+        raise HTTPException(400, "block_num must be 1-4")
+
+    db = get_db(DB_PATH)
+    row = db.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
+    db.close()
+    if not row:
+        raise HTTPException(404, "Session not found")
+
+    condition_order = json.loads(row["condition_order"])
+    condition = condition_order[block_num - 1]
+
+    timeline_key = f"{session_id}_{block_num}"
+    if timeline_key in active_timelines:
+        active_timelines[timeline_key].cancel()
+        del active_timelines[timeline_key]
+
+    reset_session_hobs(session_id)
+    reset_session_windows(session_id)
+
+    tl = BlockTimeline(session_id, block_num, condition, send_sse)
+    active_timelines[timeline_key] = tl
+    tl._task = asyncio.create_task(tl.run())
+
+    logger.info(f"Admin: force-started block {block_num} for session {session_id} (condition={condition})")
+    log_action(session_id, block_num, "admin_force_block", {"block_num": block_num, "condition": condition})
+    return {"status": "ok", "block_num": block_num, "condition": condition}
 
 
 @router.get("/sessions")

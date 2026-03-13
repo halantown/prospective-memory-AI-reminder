@@ -247,6 +247,21 @@ export default function Dashboard() {
                   <button onClick={() => fireEvent('block_end', { block_number: blockNum })}
                     className={btnRed}>⏹</button>
                 </div>
+                {/* Super-admin: force-start the full timeline for this block */}
+                <div className="border-t border-gray-700 pt-2">
+                  <button
+                    onClick={async () => {
+                      if (!sessionRef.current) return showToast('No session', 'error')
+                      const ok = window.confirm(`Force-start Block ${blockNum} timeline?\nThis resets hobs/windows and launches the scheduler.`)
+                      if (!ok) return
+                      const res = await api(`/admin/force-block/${sessionRef.current.session_id}/${blockNum}`, { method: 'POST' })
+                      if (res) showToast(`⚡ Block ${blockNum} started (${res.condition})`, 'ok', 3000)
+                    }}
+                    className={`${btnOrange} w-full text-xs`}
+                  >
+                    ⚡ Force-Start Block {blockNum}
+                  </button>
+                </div>
                 <div className="text-[10px] text-gray-600">Steak:</div>
                 <div className="grid grid-cols-3 gap-1">
                   {[0,1,2].map(id => (
