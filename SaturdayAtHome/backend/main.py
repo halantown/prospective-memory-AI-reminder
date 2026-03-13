@@ -1,5 +1,6 @@
 """Saturday At Home — Experiment Server (FastAPI entry point)."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -9,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import DB_PATH
 from core.config_loader import load_config
 from core.database import init_db
+from core.session_lifecycle import heartbeat_monitor
 from routes.session import router as session_router, active_timelines
 from routes.experiment import router as experiment_router
 from routes.admin import router as admin_router
@@ -31,12 +33,15 @@ logger = logging.getLogger("saturday")
 async def lifespan(app: FastAPI):
     load_config()
     init_db(DB_PATH)
+    monitor_task = asyncio.create_task(heartbeat_monitor(DB_PATH, active_timelines))
     yield
-    # Shutdown: cancel timelines first, then signal SSE queues to close
+    monitor_task.cancel()
     from core.sse import shutdown_all_queues
+    from core.session_lifecycle import shutdown_admin_queues
     for tl in active_timelines.values():
         tl.cancel()
     shutdown_all_queues()
+    shutdown_admin_queues()
 
 
 # ── App factory ────────────────────────────────────────────

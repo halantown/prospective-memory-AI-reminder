@@ -19,11 +19,15 @@ def init_db(db_path: Path):
         participant_id   TEXT NOT NULL,
         latin_square_group TEXT NOT NULL,
         condition_order  TEXT NOT NULL,   -- JSON array of 4 condition strings
-        phase            TEXT NOT NULL DEFAULT 'welcome',
+        phase            TEXT NOT NULL DEFAULT 'created',
         difficulty       TEXT DEFAULT 'medium',
         created_at       REAL NOT NULL,
         completed_at     REAL,
-        experimenter_notes TEXT
+        experimenter_notes TEXT,
+        token            TEXT UNIQUE,
+        current_block    INTEGER DEFAULT -1,
+        is_interrupted   BOOLEAN DEFAULT 0,
+        last_heartbeat   REAL
     );
 
     CREATE TABLE IF NOT EXISTS encoding_logs (
@@ -109,7 +113,45 @@ def init_db(db_path: Path):
         client_ts       REAL,
         server_ts       REAL NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS block_events (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id   TEXT    NOT NULL REFERENCES sessions(session_id),
+        block_num    INTEGER NOT NULL,
+        event_type   TEXT    NOT NULL,
+        scheduled_t  REAL    NOT NULL,   -- seconds relative to block start (planned)
+        actual_t     REAL,               -- seconds relative to block start (actual fire time)
+        is_fixed     INTEGER NOT NULL DEFAULT 1,
+        payload      TEXT    NOT NULL DEFAULT '{}',  -- JSON
+        seed         INTEGER NOT NULL,
+        created_at   REAL    NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS session_events (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id   TEXT NOT NULL,
+        event_type   TEXT NOT NULL,
+        from_phase   TEXT,
+        to_phase     TEXT,
+        block_idx    INTEGER,
+        payload      TEXT NOT NULL DEFAULT '{}',
+        ts           REAL NOT NULL
+    );
     """)
 
     db.commit()
+
+    # Migrate existing DBs — add columns that may not exist yet
+    for col_sql in [
+        "ALTER TABLE sessions ADD COLUMN token TEXT UNIQUE",
+        "ALTER TABLE sessions ADD COLUMN current_block INTEGER DEFAULT -1",
+        "ALTER TABLE sessions ADD COLUMN is_interrupted BOOLEAN DEFAULT 0",
+        "ALTER TABLE sessions ADD COLUMN last_heartbeat REAL",
+    ]:
+        try:
+            db.execute(col_sql)
+            db.commit()
+        except Exception:
+            pass  # Column already exists
+
     db.close()

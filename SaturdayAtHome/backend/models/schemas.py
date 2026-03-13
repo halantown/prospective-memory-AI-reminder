@@ -17,6 +17,23 @@ class SessionStartResponse(BaseModel):
     condition_order: list[str]
 
 
+class ParticipantCreateResponse(BaseModel):
+    participant_id: str
+    group: str
+    token: str
+
+
+class TokenSessionStartRequest(BaseModel):
+    token: str
+
+
+class SessionResumeResponse(BaseModel):
+    phase: str
+    block_idx: int
+    elapsed_t: float
+    condition: Optional[str] = None
+
+
 # ── Experiment data reports ────────────────────────────────
 
 class EncodingReport(BaseModel):

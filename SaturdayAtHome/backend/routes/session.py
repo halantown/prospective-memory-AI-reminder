@@ -13,11 +13,15 @@ from core.config import DB_PATH, assign_group
 from core.config_loader import get_latin_square, get_task_pairs, get_reminder_texts
 from core.database import get_db
 from utils.helpers import log_action
-from models.schemas import SessionStartRequest, SessionStartResponse
+from models.schemas import (
+    SessionStartRequest, SessionStartResponse,
+    TokenSessionStartRequest, SessionResumeResponse,
+)
 from core.sse import send_sse, register_client, event_generator
 from core.timeline import BlockTimeline
 from services.hob_service import reset_session_hobs
 from services.window_service import reset_session_windows
+from core.session_lifecycle import SessionPhase, transition_phase, broadcast_admin
 
 logger = logging.getLogger("saturday.routes.session")
 
@@ -28,27 +32,38 @@ active_timelines: dict[str, BlockTimeline] = {}
 
 
 @router.post("/session/start", response_model=SessionStartResponse)
-async def start_session(req: SessionStartRequest):
-    session_id = str(uuid.uuid4())[:8]
-    group = assign_group()
-    condition_order = get_latin_square()[group]
+async def start_session(req: TokenSessionStartRequest):
+    """Start a session by presenting the 6-char token issued by the experimenter.
 
+    Looks up the pre-registered session, validates it is in CREATED phase,
+    and transitions it to ENCODING.
+    """
     db = get_db(DB_PATH)
-    db.execute(
-        """INSERT INTO sessions (session_id, participant_id, latin_square_group, condition_order, phase, created_at)
-           VALUES (?, ?, ?, ?, 'welcome', ?)""",
-        (session_id, req.participant_id, group, json.dumps(condition_order), time.time()),
-    )
-    db.commit()
-    db.close()
+    row = db.execute(
+        "SELECT * FROM sessions WHERE token = ?", (req.token.strip().upper(),)
+    ).fetchone()
 
-    logger.info(f"Session started: {session_id} (participant={req.participant_id}, group={group})")
-    log_action(session_id, 0, "session_start", {"participant_id": req.participant_id, "group": group})
+    if not row:
+        db.close()
+        raise HTTPException(404, "Token not found — ask the experimenter to register you first")
 
+    if row["phase"] != SessionPhase.CREATED.value:
+        db.close()
+        raise HTTPException(409, f"Session already in phase '{row['phase']}'")
+
+    try:
+        transition_phase(db, row["session_id"], SessionPhase.ENCODING)
+    finally:
+        db.close()
+
+    logger.info(f"Session started via token: {row['session_id']} (participant={row['participant_id']})")
+    log_action(row["session_id"], 0, "session_start_token", {"token": req.token})
+
+    condition_order = json.loads(row["condition_order"])
     return SessionStartResponse(
-        session_id=session_id,
-        participant_id=req.participant_id,
-        group=group,
+        session_id=row["session_id"],
+        participant_id=row["participant_id"],
+        group=row["latin_square_group"],
         condition_order=condition_order,
     )
 
@@ -88,15 +103,11 @@ async def get_block_config(session_id: str, block_num: int):
 
 @router.get("/session/{session_id}/block/{block_num}/stream")
 async def block_stream(session_id: str, block_num: int, auto_start: bool = True):
-    """SSE endpoint — pushes block timeline events to the frontend.
-
-    Use auto_start=false from dashboard to observe without triggering timeline.
-    """
+    """SSE endpoint — pushes block timeline events to the frontend."""
     logger.info(f"SSE connect [{session_id}] block={block_num} auto_start={auto_start}")
 
     queue = register_client(session_id)
 
-    # Start block timeline if not already running
     if auto_start:
         timeline_key = f"{session_id}_{block_num}"
         if timeline_key not in active_timelines:
@@ -108,7 +119,6 @@ async def block_stream(session_id: str, block_num: int, auto_start: bool = True)
                 condition_order = json.loads(row["condition_order"])
                 condition = condition_order[block_num - 1] if block_num <= len(condition_order) else "HighAF_HighCB"
 
-                # Cross-block state reset — must run before timeline starts
                 reset_session_hobs(session_id)
                 reset_session_windows(session_id)
 
@@ -120,4 +130,56 @@ async def block_stream(session_id: str, block_num: int, auto_start: bool = True)
         event_generator(session_id, queue),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+@router.post("/session/{session_id}/heartbeat")
+async def session_heartbeat(session_id: str):
+    """Frontend sends this every 10s to signal the participant is still connected."""
+    db = get_db(DB_PATH)
+    row = db.execute(
+        "UPDATE sessions SET last_heartbeat = ?, is_interrupted = 0 "
+        "WHERE session_id = ? RETURNING session_id",
+        (time.time(), session_id),
+    ).fetchone()
+    db.commit()
+    db.close()
+    if not row:
+        raise HTTPException(404, "Session not found")
+    return {"status": "ok"}
+
+
+@router.get("/session/{session_id}/resume", response_model=SessionResumeResponse)
+async def resume_session(session_id: str):
+    """Return current phase/block state so the frontend can recover after a page refresh."""
+    db = get_db(DB_PATH)
+    row = db.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
+    db.close()
+
+    if not row:
+        raise HTTPException(404, "Session not found")
+
+    phase = row["phase"]
+    block_idx = row["current_block"] if row["current_block"] is not None else -1
+    condition_order = json.loads(row["condition_order"])
+
+    elapsed_t = 0.0
+    condition = None
+    if phase == SessionPhase.BLOCK.value and block_idx >= 0:
+        db2 = get_db(DB_PATH)
+        start_row = db2.execute(
+            "SELECT ts FROM action_logs WHERE session_id = ? AND block_number = ? AND action_type = 'block_start' ORDER BY ts LIMIT 1",
+            (session_id, block_idx),
+        ).fetchone()
+        db2.close()
+        if start_row:
+            elapsed_t = time.time() - start_row["ts"]
+        if 0 < block_idx <= len(condition_order):
+            condition = condition_order[block_idx - 1]
+
+    return SessionResumeResponse(
+        phase=phase,
+        block_idx=block_idx,
+        elapsed_t=elapsed_t,
+        condition=condition,
     )

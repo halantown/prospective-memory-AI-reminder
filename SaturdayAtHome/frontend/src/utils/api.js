@@ -1,7 +1,5 @@
 /**
  * Shared API helper for backend communication.
- * All game HTTP requests go through this module.
- * Every request includes client_ts (ms since epoch) for precise experiment timing.
  */
 
 const BASE = '/api'
@@ -36,16 +34,30 @@ export async function apiGet(path) {
 }
 
 /**
- * Create a new experiment session.
+ * Start an experiment session by presenting the 6-char token.
  * Returns { session_id, participant_id, group, condition_order }
  */
-export async function createSession(participantId) {
-  return apiPost('/session/start', { participant_id: participantId })
+export async function createSession(token) {
+  return apiPost('/session/start', { token })
+}
+
+/**
+ * Send a heartbeat to keep the session alive.
+ * Should be called every 10s while in the block phase.
+ */
+export async function sendHeartbeat(sessionId) {
+  return apiPost(`/session/${sessionId}/heartbeat`, {})
+}
+
+/**
+ * Fetch session state for recovery after page refresh.
+ */
+export async function resumeSession(sessionId) {
+  return apiGet(`/session/${sessionId}/resume`)
 }
 
 /**
  * Report a steak action (flip/serve/clean) to the backend.
- * Returns { status, score, hob_status }
  */
 export async function reportSteakAction(sessionId, blockNum, hobId, action) {
   return apiPost(`/session/${sessionId}/block/${blockNum}/steak-action`, {
@@ -56,7 +68,6 @@ export async function reportSteakAction(sessionId, blockNum, hobId, action) {
 
 /**
  * Report a PM task action.
- * Returns { status, score }
  */
 export async function reportPmAction(sessionId, blockNum, taskId, actionData) {
   return apiPost(`/session/${sessionId}/block/${blockNum}/action`, {
@@ -67,7 +78,6 @@ export async function reportPmAction(sessionId, blockNum, taskId, actionData) {
 
 /**
  * Fetch game config (stripped of correct answers) from backend.
- * Returns the config object or null on failure.
  */
 export async function fetchGameConfig() {
   try {
