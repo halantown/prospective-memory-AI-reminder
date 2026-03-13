@@ -1,113 +1,108 @@
-"""Block timeline engine — schedules SSE events per GDD §12.2."""
+"""Block timeline engine — sequential async runner over a ScheduledEvent list.
+
+The full schedule is produced by block_scheduler.generate_block_schedule()
+before the block starts.  This module owns the async dispatch loop that fires
+each event at its scheduled wall-clock time and writes audit rows to the DB.
+"""
 
 import asyncio
+import json
 import logging
-import random
-from typing import Callable, Coroutine
+import time
+from typing import Callable, Coroutine, List
 
-from core.config_loader import get_timeline_config, get_difficulty, get_task_pairs, get_reminder_texts, get_config
+from core.block_scheduler import derive_seed, generate_block_schedule
+from core.config import DB_PATH
+from core.database import get_db
+from core.event_schedule import AUDITED_EVENT_TYPES, SSE_EVENT_MAP, EventType, ScheduledEvent
 
 logger = logging.getLogger("saturday.timeline")
 
 
-def build_timeline(block_num: int, condition: str, difficulty: str = "medium") -> list[tuple[float, str, dict]]:
-    """Build the event timeline for a block.  All timings come from game_config.yaml."""
+# ── Busy-window check ────────────────────────────────────────────────────────
 
-    tc = get_timeline_config()
-    ev = tc.get("events", {})
-    task_pairs = get_task_pairs()
-    reminder_texts = get_reminder_texts()
-    neutrals = tc.get("neutral_comments", ["", ""])
-    exec_window_ms = 30000
+def _is_busy(session_id: str) -> bool:
+    """Return True when the kitchen is in a high-urgency moment.
 
-    task_a = task_pairs.get(block_num, ["medicine_a", "medicine_b"])[0]
-    task_b = task_pairs.get(block_num, ["medicine_a", "medicine_b"])[1]
-    reminder_a_text = reminder_texts.get(condition, "Remember your task.")
-    reminder_b_text = reminder_texts.get(condition, "Remember your task.")
+    Currently checks whether any hob is BURNING (steak about to be lost).
+    This gate is consulted before opening a PM trigger window so the
+    participant is not overwhelmed.  Max delay is capped in the run loop.
 
-    timeline = [
-        (0, "block_start", {"block_number": block_num, "condition": condition}),
+    TODO: also check active laundry jams and unread message bubbles.
+    """
+    try:
+        from models.entities import HobStatus
+        from services.hob_service import get_session_hobs
+        hobs = get_session_hobs(session_id)
+        return any(h.status == HobStatus.BURNING for h in hobs)
+    except Exception:
+        return False
 
-        # Fake trigger
-        (ev.get("fake_trigger_s", 35), "fake_trigger_fire", {"type": "delivery"}),
 
-        # Robot neutral #1
-        (ev.get("robot_neutral_1_s", 75), "robot_neutral", {"text": neutrals[0] if neutrals else ""}),
+async def _wait_for_not_busy(session_id: str, timeout: float = 10.0):
+    """Poll until kitchen is no longer busy, or timeout expires."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not _is_busy(session_id):
+            return
+        await asyncio.sleep(0.5)
 
-        # Force yellow before Reminder A
-        (ev.get("force_yellow_1_s", 95), "force_yellow_steak", {"hob_id": ev.get("force_yellow_1_hob", 0)}),
 
-        # Reminder A
-        (ev.get("reminder_a_s", 120), "reminder_fire", {"text": reminder_a_text, "slot": "A", "condition": condition}),
+# ── DB persistence ───────────────────────────────────────────────────────────
 
-        # Trigger A
-        (ev.get("trigger_a_appear_s", 210), "trigger_appear", {"task_id": task_a, "slot": "A", "window_ms": exec_window_ms}),
-        (ev.get("trigger_a_close_s", 240), "window_close", {"task_id": task_a, "slot": "A"}),
-
-        # Robot neutral #2
-        (ev.get("robot_neutral_2_s", 270), "robot_neutral", {"text": neutrals[1] if len(neutrals) > 1 else ""}),
-
-        # Force yellow before Reminder B
-        (ev.get("force_yellow_2_s", 275), "force_yellow_steak", {"hob_id": ev.get("force_yellow_2_hob", 1)}),
-
-        # Reminder B
-        (ev.get("reminder_b_s", 300), "reminder_fire", {"text": reminder_b_text, "slot": "B", "condition": condition}),
-
-        # Trigger B
-        (ev.get("trigger_b_appear_s", 390), "trigger_appear", {"task_id": task_b, "slot": "B", "window_ms": exec_window_ms}),
-        (ev.get("trigger_b_close_s", 420), "window_close", {"task_id": task_b, "slot": "B"}),
-
-        # Block end
-        (tc.get("block_duration_s", 510), "block_end", {"block_number": block_num}),
+def _persist_schedule(session_id: str, block_num: int, seed: int,
+                      events: List[ScheduledEvent]):
+    """Write all audited events to block_events before the block runs."""
+    now = time.time()
+    rows = [
+        (
+            session_id, block_num, e.event_type.value,
+            e.t, None, 1 if e.is_fixed else 0,
+            json.dumps(e.payload), seed, now,
+        )
+        for e in events
+        if e.event_type in AUDITED_EVENT_TYPES
     ]
+    if not rows:
+        return
+    db = get_db(DB_PATH)
+    db.executemany(
+        """INSERT INTO block_events
+           (session_id, block_num, event_type, scheduled_t, actual_t,
+            is_fixed, payload, seed, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        rows,
+    )
+    db.commit()
+    db.close()
+    logger.info(f"block_events: persisted {len(rows)} audited events for [{session_id}] block={block_num}")
 
-    # Steak spawns — per-hob cooking times
-    steak_cfg = get_config().get("steak", {})
-    base_times = steak_cfg.get("hob_base_cooking_ms", [11000, 13000, 15000])
-    jitter = steak_cfg.get("cooking_jitter_ms", 1000)
-    ready_ms = steak_cfg.get("ready_ms", 4000)
 
-    ss = tc.get("steak_spawn", {})
-    t = ss.get("start_s", 3)
-    end_s = ss.get("end_s", 490)
-    imin = ss.get("interval_min_s", 8)
-    imax = ss.get("interval_max_s", 15)
-    hob_cycle = 0
-    while t < end_s:
-        hob_id = hob_cycle % 3
-        base_cooking = base_times[hob_id] if hob_id < len(base_times) else 13000
-        cooking = base_cooking + random.randint(-jitter, jitter)
-        dur = {"cooking": cooking, "ready": ready_ms}
-        timeline.append((t, "steak_spawn", {"hob_id": hob_id, "duration": dur}))
-        hob_cycle += 1
-        t += random.randint(imin, imax)
+def _update_actual_t(session_id: str, block_num: int,
+                     event_type: EventType, actual_t: float):
+    """Back-fill actual_t for a dispatched audited event."""
+    db = get_db(DB_PATH)
+    db.execute(
+        """UPDATE block_events
+           SET actual_t = ?
+           WHERE session_id = ? AND block_num = ? AND event_type = ?
+             AND actual_t IS NULL
+           ORDER BY id LIMIT 1""",
+        (actual_t, session_id, block_num, event_type.value),
+    )
+    db.commit()
+    db.close()
 
-    # Message bubbles from config (3-option format)
-    for msg in tc.get("messages", []):
-        timeline.append((msg["time_s"], "message_bubble", {
-            "from": msg.get("from", "Unknown"),
-            "subject": msg.get("subject", ""),
-            "body": msg.get("body", ""),
-            "options": msg.get("options", ["OK", "Skip", "Later"]),
-            "correct": msg.get("correct", 0),
-            "avatar": msg.get("avatar", "?"),
-        }))
 
-    # Plant needs water
-    pw = tc.get("plant_water", {})
-    plant_t = pw.get("start_s", 60) + random.randint(0, pw.get("start_jitter_s", 30))
-    pw_min = pw.get("interval_min_s", 60)
-    pw_max = pw.get("interval_max_s", 90)
-    while plant_t < end_s:
-        timeline.append((plant_t, "plant_needs_water", {}))
-        plant_t += random.randint(pw_min, pw_max)
-
-    timeline.sort(key=lambda x: x[0])
-    return timeline
-
+# ── BlockTimeline ────────────────────────────────────────────────────────────
 
 class BlockTimeline:
-    """Manages the async execution of a block's event timeline."""
+    """Manages the async execution of one block's event schedule.
+
+    The schedule is generated once in __init__ and the seed is stored so
+    it can be replayed.  run() iterates events sequentially, sleeping until
+    each event's scheduled time then dispatching via send_fn.
+    """
 
     def __init__(self, session_id: str, block_num: int, condition: str,
                  send_fn: Callable[..., Coroutine], difficulty: str = "medium"):
@@ -115,29 +110,63 @@ class BlockTimeline:
         self.block_num = block_num
         self.condition = condition
         self.send_fn = send_fn
-        self.timeline = build_timeline(block_num, condition, difficulty)
-        self._tasks: list[asyncio.Task] = []
+        self.seed = derive_seed(session_id, block_num)
+        self.schedule: List[ScheduledEvent] = generate_block_schedule(
+            block_num, condition, self.seed
+        )
         self._cancelled = False
+        self._task: asyncio.Task | None = None
+
+        # Persist the audited subset immediately (before run())
+        _persist_schedule(session_id, block_num, self.seed, self.schedule)
 
     async def run(self):
-        for delay, event, data in self.timeline:
+        block_start = time.monotonic()
+
+        for event in self.schedule:
             if self._cancelled:
                 break
-            task = asyncio.create_task(self._fire_after(delay, event, data))
-            self._tasks.append(task)
-        await asyncio.gather(*self._tasks, return_exceptions=True)
 
-    async def _fire_after(self, delay: float, event: str, data: dict):
-        try:
-            await asyncio.sleep(delay)
-            if not self._cancelled:
-                logger.info(f"Timeline [{self.session_id}] t={delay}s → {event}")
-                await self.send_fn(self.session_id, event, data)
-        except asyncio.CancelledError:
-            pass
+            # Sleep until this event's scheduled time
+            wait = event.t - (time.monotonic() - block_start)
+            if wait > 0:
+                try:
+                    await asyncio.sleep(wait)
+                except asyncio.CancelledError:
+                    break
+
+            if self._cancelled:
+                break
+
+            # Busy-window gate: delay PM trigger opens if kitchen is hectic
+            if event.event_type == EventType.TRIGGER_WINDOW_OPEN:
+                if _is_busy(self.session_id):
+                    logger.info(
+                        f"Timeline [{self.session_id}] t={event.t:.1f}s "
+                        f"TRIGGER_WINDOW_OPEN delayed (busy kitchen)"
+                    )
+                    await _wait_for_not_busy(self.session_id, timeout=10.0)
+
+            # Translate to SSE event name
+            sse_name = SSE_EVENT_MAP.get(event.event_type)
+            if sse_name is None:
+                continue  # internal marker, not dispatched
+
+            actual_t = time.monotonic() - block_start
+            event.dispatched = True
+            event.dispatched_at = actual_t
+
+            logger.info(
+                f"Timeline [{self.session_id}] t={event.t:.1f}s "
+                f"(actual={actual_t:.1f}s) → {sse_name}"
+            )
+            await self.send_fn(self.session_id, sse_name, event.payload)
+
+            # Back-fill actual dispatch time for audited events
+            if event.event_type in AUDITED_EVENT_TYPES:
+                _update_actual_t(self.session_id, self.block_num, event.event_type, actual_t)
 
     def cancel(self):
         self._cancelled = True
-        for t in self._tasks:
-            if not t.done():
-                t.cancel()
+        if self._task and not self._task.done():
+            self._task.cancel()

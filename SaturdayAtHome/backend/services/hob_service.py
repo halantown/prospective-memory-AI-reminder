@@ -26,6 +26,12 @@ def clear_session_hobs(session_id: str):
     _session_hobs.pop(session_id, None)
 
 
+def reset_session_hobs(session_id: str):
+    """Reset all hobs to EMPTY for a new block (keeps the session entry)."""
+    _session_hobs[session_id] = [Hob(id=i) for i in range(3)]
+    logger.info(f"Hobs reset to EMPTY [{session_id}]")
+
+
 def reconcile_hob(hob: Hob):
     """Update hob status based on elapsed time — multi-step steak state machine.
 

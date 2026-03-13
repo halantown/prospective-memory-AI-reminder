@@ -1,24 +1,25 @@
 # Reminder Agent System — Technical Documentation
+
 ## Context-Aware Robot Reminder: Prospective Memory Experiment Platform
 
-| | |
-|---|---|
-| **Version** | v0.4 — Theory review complete; tone constant added; Quality Gate updated with CB consistency check |
-| **Date** | 2026-03-12 |
-| **Author** | Thesis Candidate |
-| **Status** | 🟡 Architecture defined; implementation not started |
-| **Depends on** | PRD v1.7 (experiment platform); Task JSON schema |
+|                      |                                                                                                     |
+| -------------------- | --------------------------------------------------------------------------------------------------- |
+| **Version**    | v0.4 — Theory review complete; tone constant added; Quality Gate updated with CB consistency check |
+| **Date**       | 2026-03-12                                                                                          |
+| **Author**     | Thesis Candidate                                                                                    |
+| **Status**     | 🟡 Architecture defined; implementation not started                                                 |
+| **Depends on** | PRD v1.7 (experiment platform); Task JSON schema                                                    |
 
 ---
 
 ## Changelog
 
-| Version | Date | Changes |
-|---|---|---|
-| v0.1 | 2026-03-11 | Initial document |
-| v0.2 | 2026-03-11 | Task JSON 3-zone structure; snake_case field paths |
-| v0.3 | 2026-03-11 | S2 complete; S3 design: Ollama config, dual format_context |
-| v0.4 | 2026-03-12 | Theory review: tone constant (§2.4 new); Quality Gate adds CB activity consistency check; AF operationalization note added to §3.1 |
+| Version | Date       | Changes                                                                                                                              |
+| ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| v0.1    | 2026-03-11 | Initial document                                                                                                                     |
+| v0.2    | 2026-03-11 | Task JSON 3-zone structure; snake_case field paths                                                                                   |
+| v0.3    | 2026-03-11 | S2 complete; S3 design: Ollama config, dual format_context                                                                           |
+| v0.4    | 2026-03-12 | Theory review: tone constant (§2.4 new); Quality Gate adds CB activity consistency check; AF operationalization note added to §3.1 |
 
 ---
 
@@ -31,7 +32,6 @@ The Reminder Agent is an **offline batch generation pipeline** that produces all
 This pre-generation approach serves two experimental goals:
 
 1. **Decoupling LLM variance from condition effects.** If only one text per condition were generated, observed differences between conditions could reflect idiosyncratic phrasing quality rather than the manipulation itself. With N=10 semantically equivalent but linguistically varied variants per condition-task pair, text quality effects are averaged out across participants.
-
 2. **Manipulation fidelity control.** Reminder texts are the primary experimental stimulus. Their correctness — whether Low AF texts genuinely withhold discriminating information, whether High CB texts sound natural — directly determines whether the AF and CB manipulations are valid. Pre-generation allows human review before the stimuli are deployed.
 
 ### 1.2 Relationship to Experiment Platform
@@ -56,12 +56,14 @@ The Reminder Agent is a **separate offline system** from the experiment platform
 ### 1.3 Scope
 
 **In scope (this document):**
+
 - Stage 2: Condition-controlled reminder text generation
 - Stage 1: Demo-level task schema extraction pipeline (architecture + 1-2 runnable examples)
 - Quality gate: automated compliance checking + human review interface
 - Output format: structured storage consumed by experiment platform
 
 **Out of scope:**
+
 - Real-time generation during experiment sessions
 - Multimodal perception (no camera, no sensors)
 - Full automation of Stage 1 for all 8 tasks (deferred to future work)
@@ -81,29 +83,29 @@ The system follows the architecture established in the meeting slides (0309), co
 │  Input: simulated data sources (.txt files)                          │
 │         [calendar entries, medical instructions, user notes]         │
 │                                                                      │
-│  ┌──────────────┐   iterate   ┌─────────────┐   ┌────────────────┐  │
-│  │ Information  │ ◄─────────► │ Event       │──►│ Structured     │  │
-│  │ Fetch        │             │ Define      │   │ Task JSON      │  │
-│  └──────────────┘             └─────────────┘   └───────┬────────┘  │
-│         ↑                                               │           │
-│  [calendar.txt]                                         │           │
-│  [email.txt]            LLM ReAct reasoning loop        │           │
-│  [user_notes.txt]                                       │           │
-└─────────────────────────────────────────────────────────┼───────────┘
+│  ┌──────────────┐   iterate   ┌─────────────┐   ┌────────────────┐   │
+│  │ Information  │ ◄─────────► │ Event       │──►│ Structured     │   │
+│  │ Fetch        │             │ Define      │   │ Task JSON      │   │
+│  └──────────────┘             └─────────────┘   └───────┬────────┘   │
+│         ↑                                               │            │
+│  [calendar.txt]                                         │            │
+│  [email.txt]            LLM ReAct reasoning loop        │            │
+│  [user_notes.txt]                                       │            │
+└─────────────────────────────────────────────────────────┼────────────┘
                                                           │
                                             External Planning Storage
                                             (task_schemas/*.json)
                                                           │
 ┌─────────────────────────────────────────────────────────▼───────────┐
-│  STAGE 2 — Contextual Delivery: Batch Generation  (production)       │
-│                                                                      │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
-│  │ Condition Schema │  │ Context Extractor │  │ Few-shot         │   │
-│  │ (field map)      │  │ (JSON pruner)     │  │ Example Store    │   │
+│  STAGE 2 — Contextual Delivery: Batch Generation  (production)      │
+│                                                                     │
+│  ┌──────────────────┐  ┌───────────────────┐  ┌──────────────────┐  │
+│  │ Condition Schema │  │ Context Extractor │  │ Few-shot         │  │
+│  │ (field map)      │  │ (JSON pruner)     │  │ Example Store    │  │
 │  └────────┬─────────┘  └────────┬──────────┘  └────────┬─────────┘  │
-│           └──────────────┬──────┘                      │           │
-│                          ▼                              │           │
-│                  ┌───────────────┐◄────────────────────┘           │
+│           └──────────────┬──────┘                      │            │
+│                          ▼                             │            │
+│                  ┌───────────────┐◄────────────────────┘            │
 │                  │ Prompt        │                                  │
 │                  │ Constructor   │                                  │
 │                  └───────┬───────┘                                  │
@@ -123,7 +125,7 @@ The system follows the architecture established in the meeting slides (0309), co
 │                  │ Output Store  │                                  │
 │                  │ reminders.db  │                                  │
 │                  └───────────────┘                                  │
-└──────────────────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 2.2 Design Principles
@@ -132,16 +134,17 @@ The system follows the architecture established in the meeting slides (0309), co
 
 Each task schema is divided into three top-level zones. This is an **engineering control** — Context Extractor and Stage 1 agent read from different zones by design, with no cross-zone access.
 
-| Zone | Reader | Purpose |
-|---|---|---|
-| `reminder_context` | Stage 2 Context Extractor | Fields eligible for reminder text generation. Condition schema whitelists apply within this zone only. |
-| `agent_reasoning_context` | Stage 1 agent | Task execution rules and encoding background. Used for reasoning about when/whether to remind — never enters reminder text. |
-| `placeholder` | Nobody | Intentional defer. Each field annotated with `_future` note explaining anticipated future use. |
+| Zone                        | Reader                    | Purpose                                                                                                                      |
+| --------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `reminder_context`        | Stage 2 Context Extractor | Fields eligible for reminder text generation. Condition schema whitelists apply within this zone only.                       |
+| `agent_reasoning_context` | Stage 1 agent             | Task execution rules and encoding background. Used for reasoning about when/whether to remind — never enters reminder text. |
+| `placeholder`             | Nobody                    | Intentional defer. Each field annotated with `_future` note explaining anticipated future use.                             |
 
 **Rationale for `agent_reasoning_context.encoding_info.creation_background`:**
 The robot may only reference information the user encoded at task creation time. `creation_background` gives the Stage 1 agent ground truth of what the user actually knows — so the agent can verify that a candidate reminder does not reference information the user never received. Direct application of Encoding Specificity Principle (Tulving, 1973).
 
 **`reminder_context` canonical template (all 8 tasks follow this structure):**
+
 ```json
 
 ### 2.4  Tone Constant
@@ -151,10 +154,12 @@ Reminder tone (instruction-like vs. intention-reactivation) is an uncontrolled v
 **Enforced in:** `prompt_constructor.build_system_prompt()` — hard constraint in system prompt for all 4 conditions:
 
 ```
+
 Tone rule (applies to ALL conditions):
 ✓ Use: "Remember to...", "By the way, remember...", "Don't forget to..."
 ✗ Avoid: "It's time to...", "You need to now...", "Make sure you..."
 ✗ Never imply the task should be executed immediately.
+
 ```
 
 **Why this matters:** If Low AF texts happened to sound more conversational and High AF texts sounded more clinical, observed DV differences could reflect tone rather than AF. Fixing tone to intention-reactivation framing across all conditions removes this confound.
@@ -213,7 +218,6 @@ Automated quality checks filter obvious violations. Human review (spot-checking 
 The condition schema operationalises the 2×2 manipulation:
 
 - **Associative Fidelity (AF):** specificity of the **encoded intention context** in the reminder, operationalising the associative link described by McDaniel & Einstein's Multiprocess Framework. High AF provides information that allows the participant to identify the correct target (not the distractor) and execute the correct action. AF is defined broadly as encoded intention specificity — encompassing target perceptual features (visual cue), action-relevant properties (domain properties), and encoding episode context (task_creator when authority). This broader definition is grounded in Encoding Specificity (Tulving, 1973): reinstatement of encoding context facilitates retrieval, not only reinstatement of the target-action link per se.
-
 - **Contextual Bridging (CB):** whether the reminder references the participant's currently detected activity, operationalising the interruption-softening mechanism described by Altmann & Trafton's Goal Activation Model.
 
 AF and CB act on **different stages of the PM lifecycle** (encoding/retention vs. noticing/switching cost) and are operationalised using **different JSON elements**, making them theoretically and empirically orthogonal.
@@ -222,17 +226,17 @@ AF and CB act on **different stages of the PM lifecycle** (encoding/retention vs
 
 This table is the authoritative definition of what information each condition may contain. It maps directly to `condition_field_map.yaml`.
 
-| JSON Field | Path | LowAF LowCB | HighAF LowCB | LowAF HighCB | HighAF HighCB |
-|---|---|---|---|---|---|
-| `action_verb` | `reminder_context.element1.action_verb` | ✅ | ✅ | ✅ | ✅ |
-| `entity_name` | `reminder_context.element1.target_entity.entity_name` | ✅ | ✅ | ✅ | ✅ |
-| `cues.visual` | `reminder_context.element1.target_entity.cues.visual` | ❌ | ✅ | ❌ | ✅ |
-| `domain_properties` | `reminder_context.element1.target_entity.domain_properties` | ❌ | ✅ | ❌ | ✅ |
-| `task_creator` | `reminder_context.element2.origin.task_creator` | ❌ | ✅ (if authority) | ❌ | ✅ (if authority) |
-| `detected_activity_raw` | `reminder_context.element3.detected_activity_raw` | ❌ | ❌ | ✅ | ✅ |
-| `execution_protocol.*` | `agent_reasoning_context.execution_protocol.*` | ❌ | ❌ | ❌ | ❌ |
-| `encoding_info.*` | `agent_reasoning_context.encoding_info.*` | ❌ | ❌ | ❌ | ❌ |
-| `placeholder.*` | `placeholder.*` | ❌ | ❌ | ❌ | ❌ |
+| JSON Field                | Path                                                          | LowAF LowCB | HighAF LowCB      | LowAF HighCB | HighAF HighCB     |
+| ------------------------- | ------------------------------------------------------------- | ----------- | ----------------- | ------------ | ----------------- |
+| `action_verb`           | `reminder_context.element1.action_verb`                     | ✅          | ✅                | ✅           | ✅                |
+| `entity_name`           | `reminder_context.element1.target_entity.entity_name`       | ✅          | ✅                | ✅           | ✅                |
+| `cues.visual`           | `reminder_context.element1.target_entity.cues.visual`       | ❌          | ✅                | ❌           | ✅                |
+| `domain_properties`     | `reminder_context.element1.target_entity.domain_properties` | ❌          | ✅                | ❌           | ✅                |
+| `task_creator`          | `reminder_context.element2.origin.task_creator`             | ❌          | ✅ (if authority) | ❌           | ✅ (if authority) |
+| `detected_activity_raw` | `reminder_context.element3.detected_activity_raw`           | ❌          | ❌                | ✅           | ✅                |
+| `execution_protocol.*`  | `agent_reasoning_context.execution_protocol.*`              | ❌          | ❌                | ❌           | ❌                |
+| `encoding_info.*`       | `agent_reasoning_context.encoding_info.*`                   | ❌          | ❌                | ❌           | ❌                |
+| `placeholder.*`         | `placeholder.*`                                             | ❌          | ❌                | ❌           | ❌                |
 
 **Notes on excluded fields:**
 
@@ -245,27 +249,31 @@ This table is the authoritative definition of what information each condition ma
 The following examples illustrate the four conditions for Task A (Doxycycline). These serve as seed few-shot examples in the generation pipeline.
 
 **LowAF_LowCB:**
+
 > "Don't forget to take your medicine."
 
 **HighAF_LowCB:**
+
 > "Remember to take your Doxycycline — the 100mg tablet in the red round bottle. Your doctor prescribed it."
 
 **LowAF_HighCB:**
+
 > "I can see you just finished dinner. Don't forget to take your medicine."
 
 **HighAF_HighCB:**
+
 > "I can see you just finished dinner. Remember to take your Doxycycline — the 100mg tablet in the red round bottle. Your doctor prescribed it."
 
 ### 3.4 CB Text per Task Pair
 
 CB text is a fixed string per task pair (PRD §2.5 fixed-state method). The detected activity string injected into High CB reminders is:
 
-| Task Pair | Primary Activity | Fixed Detected_Activity String |
-|---|---|---|
-| Pair 1 (Medicine) | Cooking / just finished dinner | `"I can see you just finished dinner."` |
-| Pair 2 (Laundry) | Washing machine running | `"I can see the laundry is almost done."` |
-| Pair 3 (Communication) | Checking messages | `"I can see you're going through your messages."` |
-| Pair 4 (Chores) | Slow cooker running | `"I can see the soup is almost ready."` |
+| Task Pair              | Primary Activity               | Fixed Detected_Activity String                      |
+| ---------------------- | ------------------------------ | --------------------------------------------------- |
+| Pair 1 (Medicine)      | Cooking / just finished dinner | `"I can see you just finished dinner."`           |
+| Pair 2 (Laundry)       | Washing machine running        | `"I can see the laundry is almost done."`         |
+| Pair 3 (Communication) | Checking messages              | `"I can see you're going through your messages."` |
+| Pair 4 (Chores)        | Slow cooker running            | `"I can see the soup is almost ready."`           |
 
 ---
 
@@ -395,6 +403,7 @@ Output: pruned context dict containing only whitelisted fields
 ```
 
 Key logic:
+
 - Reads field map from `condition_field_map.yaml`
 - Resolves conditional fields (e.g., checks `Creator_Is_Authority`)
 - Raises an error if any required field is missing from the input JSON
@@ -414,10 +423,10 @@ For variant N > 1, the prompt additionally includes all previously generated var
 
 Context format is selected via `generation_config.yaml: context_format: prose | json`.
 
-| Format | Best for | Rationale |
-|---|---|---|
+| Format    | Best for                        | Rationale                                                                      |
+| --------- | ------------------------------- | ------------------------------------------------------------------------------ |
 | `prose` | Small models (7B, local Ollama) | Reduces JSON parsing overhead; more natural input leads to more natural output |
-| `json` | Large models (70B, cloud API) | Large models handle structured input well; preserves field semantics exactly |
+| `json`  | Large models (70B, cloud API)   | Large models handle structured input well; preserves field semantics exactly   |
 
 ```python
 def format_context(pruned_dict: dict, style: str) -> str:
@@ -428,6 +437,7 @@ def format_context(pruned_dict: dict, style: str) -> str:
 ```
 
 `_to_prose()` converts fields by semantic role, not generic flattening:
+
 - `action_verb` + `entity_name` → `"Task: Take Doxycycline."`
 - `visual` → `"Target appearance: Red round bottle with white label."`
 - `dosage` / `form` → `"Details: dosage: 100mg, form: Tablet."`
@@ -435,6 +445,7 @@ def format_context(pruned_dict: dict, style: str) -> str:
 - `detected_activity_raw` → `"Current context: User just finished eating dinner."`
 
 **`generation_config.yaml` additions for S3:**
+
 ```yaml
 context_format: "prose"    # prose | json
 ```
@@ -444,12 +455,14 @@ context_format: "prose"    # prose | json
 Model-agnostic interface. Implements a common `generate(prompt: str) -> str` method.
 
 Supported backends (selected via `model_config.yaml`):
+
 - `ollama`: local Ollama instance — calls `POST http://localhost:11434/api/generate`; no API key required; recommended for development and 7B model validation
 - `together`: Together.ai API (e.g., `meta-llama/Meta-Llama-3-70B-Instruct`)
 - `openai`: OpenAI API (e.g., `gpt-4o`)
 - `anthropic`: Anthropic API (e.g., `claude-sonnet-4-20250514`)
 
 **Ollama configuration (`model_config.yaml`):**
+
 ```yaml
 backend: "ollama"
 model_name: "mistral:7b"      # or llama3.2:3b for lower VRAM
@@ -461,11 +474,11 @@ api_key_env: null              # not required for local
 
 **Recommended local models by VRAM:**
 
-| VRAM | Model | Notes |
-|---|---|---|
+| VRAM                  | Model                             | Notes           |
+| --------------------- | --------------------------------- | --------------- |
 | 6GB (RTX 2060 mobile) | `mistral:7b` or `llama3.2:3b` | 4-bit quantised |
-| 24GB | `llama3:13b` | Full precision |
-| 80GB (A100) | `llama3:70b` | Full precision |
+| 24GB                  | `llama3:13b`                    | Full precision  |
+| 80GB (A100)           | `llama3:70b`                    | Full precision  |
 
 Switching backends requires only changing `model_config.yaml`. No code changes needed.
 
@@ -473,13 +486,13 @@ Switching backends requires only changing `model_config.yaml`. No code changes n
 
 Automated compliance checks applied to each generated variant before it is written to the output store. A variant must pass all checks; failure triggers re-generation (up to `max_retries` from config).
 
-| Check | Method | Fail condition |
-|---|---|---|
-| **Forbidden field leak** | Keyword matching against `forbidden_keywords.yaml` | Visual/domain keyword appears in Low AF text |
-| **Required field presence** | Check that whitelisted entity names / action verbs appear | Entity name absent from text |
-| **Length constraint** | Word count | < `min_words` or > `max_words` from config |
-| **Duplicate detection** | Levenshtein similarity against existing variants | Similarity > `similarity_threshold` with any prior variant in same batch |
-| **Language check** | `langdetect` | Not English |
+| Check                                      | Method                                                                                 | Fail condition                                                                                                         |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Forbidden field leak**             | Keyword matching against `forbidden_keywords.yaml`                                   | Visual/domain keyword appears in Low AF text                                                                           |
+| **Required field presence**          | Check that whitelisted entity names / action verbs appear                              | Entity name absent from text                                                                                           |
+| **Length constraint**                | Word count                                                                             | <`min_words` or > `max_words` from config                                                                          |
+| **Duplicate detection**              | Levenshtein similarity against existing variants                                       | Similarity >`similarity_threshold` with any prior variant in same batch                                              |
+| **Language check**                   | `langdetect`                                                                         | Not English                                                                                                            |
 | **CB activity consistency** *(C1)* | Semantic similarity between activity phrases across all High CB variants in same batch | Any variant's activity phrase diverges from majority (heuristic: extract sentence containing "I can see" / "I notice") |
 
 Note: the forbidden field leak check is heuristic, not exhaustive. It catches obvious violations (e.g., "red bottle" in Low AF text). Subtle semantic leakage is caught in human review. CB consistency check runs at batch level (after all N variants are generated), not per-variant.
@@ -489,6 +502,7 @@ Note: the forbidden field leak check is heuristic, not exhaustive. It catches ob
 CLI tool that presents generated texts grouped by `(task_id, condition)`. Reviewer actions per variant: `keep`, `reject`, `flag` (keep but note concern). Decisions written to `review_log.json`.
 
 Suggested review workflow:
+
 - Full review of all 32 × first variants (one per condition-task pair) before expanding to 10 variants
 - Spot-check 3 random variants per condition-task pair for subsequent variants
 - Special attention: Low AF conditions (check for leakage), High CB conditions (check naturalness)
@@ -518,17 +532,17 @@ for task_id in all_8_tasks:
 
 ### 5.1 SQLite Table: `reminders`
 
-| Field | Type | Description |
-|---|---|---|
-| `task_id` | TEXT | e.g., `medicine_a` |
-| `condition` | TEXT | `LowAF_LowCB` / `HighAF_LowCB` / `LowAF_HighCB` / `HighAF_HighCB` |
-| `variant_idx` | INTEGER | 0–9 |
-| `text` | TEXT | Final approved reminder text |
-| `audio_file` | TEXT | `reminder_{task_id}_{condition}_{idx}.mp3` (populated after TTS generation) |
-| `duration_s` | REAL | Audio duration in seconds (populated after TTS generation) |
-| `review_status` | TEXT | `approved` / `flagged` / `rejected` |
-| `generated_at` | TIMESTAMP | |
-| `model_used` | TEXT | LLM backend identifier |
+| Field             | Type      | Description                                                                   |
+| ----------------- | --------- | ----------------------------------------------------------------------------- |
+| `task_id`       | TEXT      | e.g.,`medicine_a`                                                           |
+| `condition`     | TEXT      | `LowAF_LowCB` / `HighAF_LowCB` / `LowAF_HighCB` / `HighAF_HighCB`     |
+| `variant_idx`   | INTEGER   | 0–9                                                                          |
+| `text`          | TEXT      | Final approved reminder text                                                  |
+| `audio_file`    | TEXT      | `reminder_{task_id}_{condition}_{idx}.mp3` (populated after TTS generation) |
+| `duration_s`    | REAL      | Audio duration in seconds (populated after TTS generation)                    |
+| `review_status` | TEXT      | `approved` / `flagged` / `rejected`                                     |
+| `generated_at`  | TIMESTAMP |                                                                               |
+| `model_used`    | TEXT      | LLM backend identifier                                                        |
 
 ### 5.2 Query Interface for Experiment Platform
 
@@ -611,12 +625,12 @@ The Stage 1 agent produces a Task JSON conforming to the three-element schema:
 
 ```
 Phase 1 — Prompt development
-  Backend: Llama-3-70B via Together.ai API
+  Backend: qwen3-max via Aliyun Bailian API
   Goal: Stabilise prompts until condition compliance is consistent
   Cost estimate: ~$2–3 for full 320-variant run at $0.9/1M tokens
 
 Phase 2 — Local model validation
-  Backend: Mistral-7B or Llama-3-8B via Ollama (local, RTX 2060 mobile)
+  Backend: Gemma3-4B or Llama-3.1 or Qwen-3 via Ollama (local, RTX 2060 mobile)
   Goal: Determine quality gap between 70B and 7B for this specific task
   Accept threshold: automated quality gate pass rate ≥ 85%
 
@@ -632,6 +646,15 @@ Phase 3B — If 7B not acceptable
   fidelity is not required"
 ```
 
+Remote API Example
+
+```python
+client = OpenAI(
+    api_key=os.getenv("THESIS_API_KEY"),
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+)
+```
+
 ### 7.2 Thesis Framing
 
 Regardless of which LLM is used for final generation, the system is documented and cited as a **model-agnostic pipeline**. The LLM backend selection is treated as a configuration decision driven by empirical quality assessment, not a fundamental architectural constraint. This framing:
@@ -644,25 +667,25 @@ Regardless of which LLM is used for final generation, the system is documented a
 
 ## 8. Open Questions
 
-| ID | Priority | Topic | Status |
-|---|---|---|---|
-| **TQ-1** | 🔴 P0 | Few-shot examples | Need to author 2–3 seed examples per condition (8 total) before generation can begin. These are the ground truth for quality assessment. |
-| **TQ-2** | 🟡 P1 | Forbidden keyword list for Low AF check | Need to enumerate all visual cue keywords per task (colours, shapes, brand names) to populate the automated leak checker. |
-| **TQ-3** | 🟡 P1 | Stage 1 demo scope | Confirm: one task (Medicine) from one source (email.txt) is sufficient for thesis demonstration. |
-| **TQ-4** | 🟡 P1 | N variants per condition | Currently set to 10. Confirm with supervisor whether this is sufficient for statistical purposes. |
-| **TQ-5** | 🟢 P2 | TTS pipeline | Audio generation (ElevenLabs or equivalent) is a downstream step after text approval. Document the naming convention and loading procedure for Pepper separately. |
-| **TQ-6** | 🟢 P2 | review_interface UX | CLI is sufficient for now; web-based review tool is a nice-to-have if time permits. |
+| ID             | Priority | Topic                                   | Status                                                                                                                                                            |
+| -------------- | -------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **TQ-1** | 🔴 P0    | Few-shot examples                       | Need to author 2–3 seed examples per condition (8 total) before generation can begin. These are the ground truth for quality assessment.                         |
+| **TQ-2** | 🟡 P1    | Forbidden keyword list for Low AF check | Need to enumerate all visual cue keywords per task (colours, shapes, brand names) to populate the automated leak checker.                                         |
+| **TQ-3** | 🟡 P1    | Stage 1 demo scope                      | Confirm: one task (Medicine) from one source (email.txt) is sufficient for thesis demonstration.                                                                  |
+| **TQ-4** | 🟡 P1    | N variants per condition                | Currently set to 10. Confirm with supervisor whether this is sufficient for statistical purposes.                                                                 |
+| **TQ-5** | 🟢 P2    | TTS pipeline                            | Audio generation (ElevenLabs or equivalent) is a downstream step after text approval. Document the naming convention and loading procedure for Pepper separately. |
+| **TQ-6** | 🟢 P2    | review_interface UX                     | CLI is sufficient for now; web-based review tool is a nice-to-have if time permits.                                                                               |
 
 ---
 
 ## 9. Thesis Contribution Summary
 
-| Component | Contribution type | Location in thesis |
-|---|---|---|
-| Condition schema (field map) | Formal operationalisation of AF × CB | Methods: Operationalisation section |
-| Context extractor (JSON pruner) | Engineering: input-level manipulation control | System Design chapter |
-| Stage 2 generation pipeline | System implementation | System Design chapter |
-| Stage 1 ReAct demo | Architecture demonstration | System Design chapter |
-| Quality gate + review log | Stimulus validation methodology | Methods: Stimulus preparation |
-| Model-agnostic backend | Design principle, future work enabler | Discussion |
-| 320 approved reminder texts | Experimental stimuli | Appendix |
+| Component                       | Contribution type                             | Location in thesis                  |
+| ------------------------------- | --------------------------------------------- | ----------------------------------- |
+| Condition schema (field map)    | Formal operationalisation of AF × CB         | Methods: Operationalisation section |
+| Context extractor (JSON pruner) | Engineering: input-level manipulation control | System Design chapter               |
+| Stage 2 generation pipeline     | System implementation                         | System Design chapter               |
+| Stage 1 ReAct demo              | Architecture demonstration                    | System Design chapter               |
+| Quality gate + review log       | Stimulus validation methodology               | Methods: Stimulus preparation       |
+| Model-agnostic backend          | Design principle, future work enabler         | Discussion                          |
+| 320 approved reminder texts     | Experimental stimuli                          | Appendix                            |

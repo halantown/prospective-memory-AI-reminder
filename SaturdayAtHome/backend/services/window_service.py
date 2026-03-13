@@ -84,3 +84,9 @@ def submit_to_window(session_id: str, task_id: str, score: int) -> dict:
 def clear_session_windows(session_id: str):
     """Remove all windows for a session (on delete)."""
     _session_windows.pop(session_id, None)
+
+
+def reset_session_windows(session_id: str):
+    """Clear all execution windows at block boundary (keeps session entry)."""
+    _session_windows[session_id] = {}
+    logger.info(f"Execution windows reset [{session_id}]")
