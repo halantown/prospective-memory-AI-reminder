@@ -116,6 +116,11 @@ async def block_stream(session_id: str, block_num: int, auto_start: bool = True)
     logger.info(f"SSE connect [{session_id}] block={block_num} auto_start={auto_start}")
 
     queue = register_client(session_id)
+    # Send an immediate heartbeat frame so EventSource transitions to OPEN quickly.
+    try:
+        queue.put_nowait({"event": "keepalive", "data": {}, "ts": time.time()})
+    except asyncio.QueueFull:
+        logger.warning(f"SSE bootstrap keepalive dropped [{session_id}] queue full")
 
     if auto_start:
         timeline_key = f"{session_id}_{block_num}"

@@ -29,6 +29,7 @@ logger = logging.getLogger("saturday.routes.admin")
 router = APIRouter(prefix="/admin")
 
 ALLOWED_ADMIN_EVENTS = {
+    "block_start",
     "trigger_appear",
     "window_close",
     "reminder_fire",
@@ -36,6 +37,10 @@ ALLOWED_ADMIN_EVENTS = {
     "force_steak_ready",
     "force_yellow_steak",
     "robot_neutral",
+    "steak_spawn",
+    "message_bubble",
+    "fake_trigger_fire",
+    "plant_needs_water",
 }
 
 

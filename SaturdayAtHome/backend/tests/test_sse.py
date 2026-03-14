@@ -1,6 +1,7 @@
 import asyncio
 
 from core import sse
+from routes.session import block_stream
 
 
 def test_send_sse_and_generator():
@@ -15,5 +16,16 @@ def test_send_sse_and_generator():
         assert "\"ok\": true" in msg
 
         await gen.aclose()
+
+    asyncio.run(run())
+
+
+def test_block_stream_bootstraps_keepalive():
+    async def run():
+        sid = "session-bootstrap"
+        resp = await block_stream(sid, 1, auto_start=False)
+        msg = await resp.body_iterator.__anext__()
+        assert "event: keepalive" in msg
+        await resp.body_iterator.aclose()
 
     asyncio.run(run())
