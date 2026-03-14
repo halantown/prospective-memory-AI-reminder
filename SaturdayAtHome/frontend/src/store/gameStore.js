@@ -40,6 +40,8 @@ const initialLaundry = () => ({
   washProgress: 0,
   washDuration: 0,
   jamFixDeadline: null,
+  jamTriggered: false,
+  lastCorrect: null,
   completedCount: 0,
   correctCount: 0,
 })
@@ -325,8 +327,21 @@ export const useGameStore = create((set, get) => ({
     const garment = laundry.currentGarment
     const rules = state.remoteConfig?.laundry?.rules || LAUNDRY_RULES
     const rule = rules[garment.category]
-    const isCorrect = rule
-      ? (laundry.selectedDetergent === rule.detergent && laundry.selectedTemp === rule.temp)
+    const normalizeDetergent = (value) => {
+      const s = String(value || '').toLowerCase()
+      if (s.includes('warm')) return 'warm'
+      if (s.includes('cold')) return 'cold'
+      if (s.includes('white')) return 'white'
+      return s.trim()
+    }
+    const normalizeTemp = (value) => {
+      const n = parseInt(String(value || '').replace(/[^\d]/g, ''), 10)
+      return Number.isNaN(n) ? null : n
+    }
+    const expectedDetergent = normalizeDetergent(rule?.detergent)
+    const expectedTemp = normalizeTemp(rule?.temp)
+    const isCorrect = expectedDetergent !== ''
+      ? (laundry.selectedDetergent === expectedDetergent && laundry.selectedTemp === expectedTemp)
       : false
 
     const washDuration = 45 + Math.floor(Math.random() * 46) // 45-90s
@@ -337,14 +352,35 @@ export const useGameStore = create((set, get) => ({
         washProgress: 0,
         washDuration,
         isCorrect,
+        jamTriggered: false,
+        lastCorrect: isCorrect,
       },
     }
   }),
+  startWashing: () => get().startWash(),
 
   tickLaundry: () => set((state) => {
     const { laundry } = state
     if (laundry.washStatus === 'washing') {
       const next = laundry.washProgress + 1
+
+      // One-time jam check after halfway point.
+      if (!laundry.jamTriggered && next >= Math.floor(laundry.washDuration * 0.5)) {
+        const jamProb = Number(state.remoteConfig?.laundry?.jam_probability ?? 0.4)
+        if (Math.random() < jamProb) {
+          const jamFixMs = Number(state.remoteConfig?.timers?.laundry_jam_fix_ms ?? 15000)
+          return {
+            laundry: {
+              ...laundry,
+              washStatus: 'jammed',
+              jamFixDeadline: ts() + jamFixMs,
+              jamTriggered: true,
+            },
+          }
+        }
+        return { laundry: { ...laundry, washProgress: next, jamTriggered: true } }
+      }
+
       if (next >= laundry.washDuration) {
         return { laundry: { ...laundry, washStatus: 'done', washProgress: laundry.washDuration } }
       }
@@ -362,8 +398,9 @@ export const useGameStore = create((set, get) => ({
           washProgress: 0,
           washDuration: 0,
           jamFixDeadline: null,
+          jamTriggered: false,
         },
-        score: state.score + (scoring.laundry_jam_fail ?? -5),
+        score: state.score + (scoring.laundry_jam_miss ?? scoring.laundry_jam_fail ?? -5),
       }
     }
     return {}
@@ -386,6 +423,8 @@ export const useGameStore = create((set, get) => ({
         washProgress: 0,
         washDuration: 0,
         isCorrect: undefined,
+        jamTriggered: false,
+        lastCorrect: laundry.isCorrect,
         completedCount: laundry.completedCount + 1,
         correctCount: laundry.correctCount + (laundry.isCorrect ? 1 : 0),
       },
@@ -544,7 +583,7 @@ export const useGameStore = create((set, get) => ({
   triggerFake: (type) => set({ fakeTriggered: true, fakeType: type }),
   clearFake: () => set({ fakeTriggered: false, fakeType: null }),
 
-  // ── SSE ────────────────────────────────────────────────
+  // ── WS ─────────────────────────────────────────────────
   sseConnected: false,
   setSseConnected: (val) => set({ sseConnected: val }),
 
@@ -552,34 +591,37 @@ export const useGameStore = create((set, get) => ({
   encodingConfirmed: false,
   encodingQuizAttempts: 0,
 
-  startBlockEncoding: (blockData) => set({
-    phase: 'block_encoding',
-    blockNumber: blockData.blockNumber,
-    condition: blockData.condition,
-    taskPairId: blockData.taskPairId,
-    blockRunning: false,
-    blockTimer: 0,
-    score: 0,
-    servedCount: 0,
-    hobs: initialHobs.map(h => ({ ...h })),
-    messageBubbles: [],
-    unreadCount: 0,
-    selectedEmailId: null,
-    interactableTasks: [],
-    openCabinetTask: null,
-    encodingConfirmed: false,
-    encodingQuizAttempts: 0,
-    laundry: initialLaundry(),
-    fakeTriggered: false,
-    fakeType: null,
-    robotSpeaking: false,
-    robotText: '',
-    activeRoom: 'overview',
-    plantNeedsWater: false,
-    plantWilted: false,
-    plantLastWatered: null,
-    plantNeedsWaterSince: null,
-  }),
+  startBlockEncoding: (blockData) => {
+    set({
+      phase: 'block_encoding',
+      blockNumber: blockData.blockNumber,
+      condition: blockData.condition,
+      taskPairId: blockData.taskPairId,
+      blockRunning: false,
+      blockTimer: 0,
+      score: 0,
+      servedCount: 0,
+      hobs: initialHobs.map(h => ({ ...h })),
+      messageBubbles: [],
+      unreadCount: 0,
+      selectedEmailId: null,
+      interactableTasks: [],
+      openCabinetTask: null,
+      encodingConfirmed: false,
+      encodingQuizAttempts: 0,
+      laundry: initialLaundry(),
+      fakeTriggered: false,
+      fakeType: null,
+      robotSpeaking: false,
+      robotText: '',
+      activeRoom: 'overview',
+      plantNeedsWater: false,
+      plantWilted: false,
+      plantLastWatered: null,
+      plantNeedsWaterSince: null,
+    })
+    get().initLaundryPile()
+  },
 
   confirmEncoding: (quizAttempts = 1) => set({
     phase: 'block_running',
@@ -593,32 +635,35 @@ export const useGameStore = create((set, get) => ({
   blockTimer: 0,
   blockRunning: false,
 
-  startBlock: (blockData) => set({
-    phase: 'block_running',
-    blockNumber: blockData.blockNumber,
-    condition: blockData.condition,
-    taskPairId: blockData.taskPairId,
-    blockRunning: true,
-    blockTimer: 0,
-    score: 0,
-    servedCount: 0,
-    hobs: initialHobs.map(h => ({ ...h })),
-    messageBubbles: [],
-    unreadCount: 0,
-    selectedEmailId: null,
-    interactableTasks: [],
-    openCabinetTask: null,
-    laundry: initialLaundry(),
-    fakeTriggered: false,
-    fakeType: null,
-    robotSpeaking: false,
-    robotText: '',
-    activeRoom: 'overview',
-    plantNeedsWater: false,
-    plantWilted: false,
-    plantLastWatered: null,
-    plantNeedsWaterSince: null,
-  }),
+  startBlock: (blockData) => {
+    set({
+      phase: 'block_running',
+      blockNumber: blockData.blockNumber,
+      condition: blockData.condition,
+      taskPairId: blockData.taskPairId,
+      blockRunning: true,
+      blockTimer: 0,
+      score: 0,
+      servedCount: 0,
+      hobs: initialHobs.map(h => ({ ...h })),
+      messageBubbles: [],
+      unreadCount: 0,
+      selectedEmailId: null,
+      interactableTasks: [],
+      openCabinetTask: null,
+      laundry: initialLaundry(),
+      fakeTriggered: false,
+      fakeType: null,
+      robotSpeaking: false,
+      robotText: '',
+      activeRoom: 'overview',
+      plantNeedsWater: false,
+      plantWilted: false,
+      plantLastWatered: null,
+      plantNeedsWaterSince: null,
+    })
+    get().initLaundryPile()
+  },
 
   endBlock: () => set((s) => ({
     blockRunning: false,

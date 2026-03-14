@@ -5,8 +5,8 @@ import json
 import logging
 import time
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, WebSocket
+from starlette.websockets import WebSocketDisconnect
 
 from core.config import DB_PATH, assign_group
 from core.config_loader import get_latin_square
@@ -16,7 +16,7 @@ from models.entities import HobStatus
 from services.hob_service import get_session_hobs, reconcile_hob, clear_session_hobs, reset_session_hobs
 from services.window_service import clear_session_windows, reset_session_windows
 from models.schemas import FireEventRequest
-from core.sse import send_sse, sse_queues, clear_session_queues
+from core.ws import send_ws, ws_queues, clear_session_ws_queues
 from core.session_lifecycle import (
     broadcast_admin, register_admin_client, unregister_admin_client,
     _ADMIN_SHUTDOWN, next_participant_id, generate_token, SessionPhase,
@@ -90,41 +90,35 @@ async def create_participant():
     return {"participant_id": pid, "group": group, "token": token, "session_id": session_id}
 
 
-@router.get("/stream")
-async def admin_stream():
-    """SSE stream for Dashboard — receives all lifecycle and admin events."""
+@router.websocket("/stream")
+async def admin_stream(websocket: WebSocket):
+    """WebSocket stream for Dashboard lifecycle/admin events."""
+    await websocket.accept()
     q = register_admin_client()
-
-    async def generate():
-        try:
-            while not session_lifecycle._admin_shutdown:
-                try:
-                    event = await asyncio.wait_for(q.get(), timeout=30)
-                    if event is _ADMIN_SHUTDOWN:
-                        break
-                    yield f"data: {json.dumps(event)}\n\n"
-                except asyncio.TimeoutError:
-                    yield "event: keepalive\ndata: {}\n\n"
-        except (asyncio.CancelledError, GeneratorExit):
-            pass
-        finally:
-            unregister_admin_client(q)
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
-    )
+    try:
+        await websocket.send_json({"event_type": "keepalive", "ts": time.time()})
+        while not session_lifecycle._admin_shutdown:
+            try:
+                event = await asyncio.wait_for(q.get(), timeout=30)
+                if event is _ADMIN_SHUTDOWN:
+                    break
+                await websocket.send_json(event)
+            except asyncio.TimeoutError:
+                await websocket.send_json({"event_type": "keepalive", "ts": time.time()})
+    except (WebSocketDisconnect, RuntimeError, asyncio.CancelledError):
+        pass
+    finally:
+        unregister_admin_client(q)
 
 
 @router.post("/fire-event")
 async def admin_fire_event(req: FireEventRequest):
-    """Manually fire an SSE event to a session (from dashboard)."""
+    """Manually fire an event to a session (from dashboard)."""
     if req.event not in ALLOWED_ADMIN_EVENTS:
         raise HTTPException(400, f"Event '{req.event}' not in allowed list: {sorted(ALLOWED_ADMIN_EVENTS)}")
 
     logger.info(f"Admin fire [{req.session_id}] → {req.event}: {req.data}")
-    await send_sse(req.session_id, req.event, req.data)
+    await send_ws(req.session_id, req.event, req.data)
 
     # Update backend hob state for force_yellow events
     if req.event == "force_yellow_steak":
@@ -182,7 +176,7 @@ async def admin_force_block(session_id: str, block_num: int):
     reset_session_hobs(session_id)
     reset_session_windows(session_id)
 
-    tl = BlockTimeline(session_id, block_num, condition, send_sse)
+    tl = BlockTimeline(session_id, block_num, condition, send_ws)
     active_timelines[timeline_key] = tl
     tl._task = asyncio.create_task(tl.run())
 
@@ -202,7 +196,7 @@ async def admin_list_sessions():
 
 @router.get("/session/{session_id}/state")
 async def admin_session_state(session_id: str):
-    """Get live session state (hobs, SSE clients, timelines)."""
+    """Get live session state (hobs, WS clients, timelines)."""
     from routes.session import active_timelines
 
     hobs = get_session_hobs(session_id)
@@ -217,7 +211,7 @@ async def admin_session_state(session_id: str):
             for h in hobs
         ],
         "active_timelines": [k for k in active_timelines.keys() if k.startswith(session_id)],
-        "sse_clients": len(sse_queues.get(session_id, [])),
+        "ws_clients": len(ws_queues.get(session_id, [])),
     }
 
 
@@ -237,13 +231,13 @@ async def admin_get_logs(session_id: str):
 async def admin_active_session():
     """Find the currently active session.
 
-    Returns the session that has live SSE clients connected, if any.
+    Returns the session that has live WS clients connected, if any.
     Falls back to the most recent non-finished, non-interrupted session from the DB
     so the experimenter can see an in-progress session after a dashboard reload —
-    but marks it as ``live: false`` so the frontend knows not to auto-connect SSE.
+     but marks it as ``live: false`` so the frontend knows not to auto-connect WS.
     Returns null if no meaningful session exists.
     """
-    for sid, queues in sse_queues.items():
+    for sid, queues in ws_queues.items():
         if len(queues) > 0:
             db = get_db(DB_PATH)
             row = db.execute("SELECT * FROM sessions WHERE session_id = ?", (sid,)).fetchone()
@@ -276,7 +270,7 @@ async def admin_delete_session(session_id: str):
     db.close()
 
     clear_session_hobs(session_id)
-    clear_session_queues(session_id)
+    clear_session_ws_queues(session_id)
     clear_session_windows(session_id)
 
     for k in list(active_timelines.keys()):

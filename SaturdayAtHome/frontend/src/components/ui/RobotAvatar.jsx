@@ -7,7 +7,7 @@ import { Bot } from 'lucide-react'
  * Robot avatar — fixed bottom-right, 80px.
  * T20-1: Always visible, subtle idle pulse.
  * T20-3: Speech bubble with typewriter effect, stays 2s after text completes, then fades.
- * T20-4: Triggered by SSE reminder_fire → triggerRobot(text).
+ * T20-4: Triggered by WS reminder_fire → triggerRobot(text).
  */
 const CHAR_DELAY = 15    // ms per character for typewriter
 const LINGER_MS = 2000   // stay visible after typewriter finishes

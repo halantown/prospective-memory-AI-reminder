@@ -66,10 +66,10 @@ export default function Dashboard() {
   const [sessionState, setSessionState] = useState(null)
   const [events, setEvents] = useState([])
   const [logs, setLogs] = useState([])
-  const [sseStatus, setSseStatus] = useState('disconnected')
+  const [wsStatus, setWsStatus] = useState('disconnected')
   const [toast, setToast] = useState(null)
   const [blockNum, setBlockNum] = useState(1)
-  const esRef = useRef(null)
+  const wsRef = useRef(null)
   const sessionRef = useRef(null)
 
   useEffect(() => { sessionRef.current = session }, [session])
@@ -122,53 +122,48 @@ export default function Dashboard() {
     return () => clearInterval(timer)
   }, [session, api])
 
-  // SSE connection
-  const connectSSE = useCallback(() => {
+  // WS connection
+  const connectWS = useCallback(() => {
     if (!sessionRef.current) return
-    if (esRef.current) { esRef.current.close(); esRef.current = null }
+    if (wsRef.current) { wsRef.current.close(); wsRef.current = null }
 
-    const url = `/api/session/${sessionRef.current.session_id}/block/${blockNum}/stream?auto_start=false`
-    setSseStatus('connecting')
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    const url = `${protocol}://${window.location.host}/api/session/${sessionRef.current.session_id}/block/${blockNum}/stream?auto_start=false`
+    setWsStatus('connecting')
 
-    const es = new EventSource(url)
-    esRef.current = es
+    const ws = new WebSocket(url)
+    wsRef.current = ws
 
-    const ALL_EVENTS = [
-      'steak_spawn', 'force_yellow_steak', 'trigger_appear', 'window_close',
-      'reminder_fire', 'robot_neutral', 'fake_trigger_fire', 'message_bubble',
-      'plant_needs_water', 'block_start', 'block_end', 'keepalive',
-    ]
-
-    ALL_EVENTS.forEach(type => {
-      es.addEventListener(type, (e) => {
-        let parsed = {}
-        try { parsed = JSON.parse(e.data) } catch { parsed = { raw: e.data } }
-        if (type === 'keepalive') return
-        setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type, data: parsed }, ...prev].slice(0, 200))
-      })
-    })
-
-    es.onopen = () => {
-      setSseStatus('connected')
+    ws.onopen = () => {
+      setWsStatus('connected')
       setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type: '🟢 CONNECTED', data: {} }, ...prev])
-      showToast('SSE connected', 'ok')
+      showToast('WS connected', 'ok')
     }
 
-    es.onerror = () => {
-      if (es.readyState === EventSource.CLOSED) {
-        setSseStatus('disconnected')
-      } else {
-        setSseStatus('reconnecting')
-      }
+    ws.onmessage = (msg) => {
+      let payload = {}
+      try { payload = JSON.parse(msg.data) } catch { payload = { event: 'unknown', data: { raw: msg.data } } }
+      const type = payload.event || payload.event_type || 'unknown'
+      const data = payload.data || payload
+      if (type === 'keepalive') return
+      setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type, data }, ...prev].slice(0, 200))
+    }
+
+    ws.onerror = () => {
+      setWsStatus('reconnecting')
+    }
+
+    ws.onclose = () => {
+      setWsStatus('disconnected')
     }
   }, [blockNum, showToast])
 
-  useEffect(() => { return () => { if (esRef.current) esRef.current.close() } }, [])
+  useEffect(() => { return () => { if (wsRef.current) wsRef.current.close() } }, [])
 
-  // Auto-connect SSE only when a live participant is detected
+  // Auto-connect WS only when a live participant is detected
   useEffect(() => {
-    if (session && session.live && sseStatus === 'disconnected') connectSSE()
-  }, [session]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (session && session.live && wsStatus === 'disconnected') connectWS()
+  }, [session, wsStatus, connectWS])
 
   const fireEvent = useCallback(async (event, data = {}) => {
     if (!sessionRef.current) return showToast('No session', 'error')
@@ -189,10 +184,10 @@ export default function Dashboard() {
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center gap-4">
         <h1 className="text-lg font-bold text-cyan-400">🔬 Experiment Observer</h1>
         <span className={`text-xs px-2 py-0.5 rounded ${
-          sseStatus === 'connected' ? 'bg-green-900 text-green-300' :
-          sseStatus === 'connecting' || sseStatus === 'reconnecting' ? 'bg-yellow-900 text-yellow-300' :
+          wsStatus === 'connected' ? 'bg-green-900 text-green-300' :
+          wsStatus === 'connecting' || wsStatus === 'reconnecting' ? 'bg-yellow-900 text-yellow-300' :
           'bg-gray-700 text-gray-500'
-        }`}>SSE: {sseStatus}</span>
+        }`}>WS: {wsStatus}</span>
         {session && (
           <span className="text-xs text-gray-400">
             Participant: <b className="text-cyan-300">{session.participant_id}</b> ·
@@ -230,7 +225,7 @@ export default function Dashboard() {
             {/* Session Info */}
             <Panel title="📋 Session">
               <div className="text-xs space-y-1 text-gray-400">
-                <div>SSE clients: <b className="text-cyan-400">{sessionState?.sse_clients || 0}</b></div>
+                <div>WS clients: <b className="text-cyan-400">{sessionState?.ws_clients || 0}</b></div>
                 <div>Active timelines: <b className="text-cyan-400">{sessionState?.active_timelines?.length || 0}</b></div>
               </div>
             </Panel>
@@ -243,7 +238,7 @@ export default function Dashboard() {
                     className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs">
                     {[1,2,3,4].map(n => <option key={n} value={n}>Block {n}</option>)}
                   </select>
-                  <button onClick={connectSSE} className={btnPrimary}>📡 SSE</button>
+                  <button onClick={connectWS} className={btnPrimary}>📡 WS</button>
                   <button onClick={() => fireEvent('block_start', { block_number: blockNum, condition: 'HighAF_HighCB' })}
                     className={btnGreen}>▶</button>
                   <button onClick={() => fireEvent('block_end', { block_number: blockNum })}

@@ -38,7 +38,15 @@ def reconcile_hob(hob: Hob):
     States: EMPTY → COOKING_SIDE1 → READY_SIDE1 → COOKING_SIDE2 → READY_SIDE2 → (served)
     Missed flips lead to BURNING → ASH.
     """
-    if hob.status == HobStatus.EMPTY or hob.status == HobStatus.ASH or hob.started_at <= 0:
+    if hob.status == HobStatus.ASH:
+        # Keep backend and frontend consistent: ash auto-clears after 2s.
+        if hob.started_at > 0 and (time.time() - hob.started_at) * 1000 >= 2000:
+            hob.status = HobStatus.EMPTY
+            hob.started_at = 0.0
+            hob.peppered = False
+        return
+
+    if hob.status == HobStatus.EMPTY or hob.started_at <= 0:
         return
 
     elapsed_ms = (time.time() - hob.started_at) * 1000
@@ -71,11 +79,11 @@ def reconcile_hob(hob: Hob):
             hob.started_at = time.time()
 
 
-async def schedule_respawn(session_id: str, block_num: int, hob_id: int, send_sse_fn):
-    """Wait then send steak_spawn SSE if the hob is still empty.
+async def schedule_respawn(session_id: str, block_num: int, hob_id: int, send_event_fn):
+    """Wait then send steak_spawn event if the hob is still empty.
 
     Called after serve/clean actions to keep steaks flowing.
-    The send_sse_fn parameter avoids circular imports with sse.py.
+    The send_event_fn parameter avoids circular imports with ws.py.
     """
     cfg = get_config().get("steak", {})
     min_delay = cfg.get("respawn_min_ms", 8000) / 1000
@@ -92,5 +100,5 @@ async def schedule_respawn(session_id: str, block_num: int, hob_id: int, send_ss
         cooking = base_cooking + random.randint(-jitter, jitter)
         ready = cfg.get("ready_ms", 4000)
         dur = {"cooking": cooking, "ready": ready}
-        await send_sse_fn(session_id, "steak_spawn", {"hob_id": hob_id, "duration": dur})
+        await send_event_fn(session_id, "steak_spawn", {"hob_id": hob_id, "duration": dur})
         logger.info(f"Respawned steak [{session_id}] hob={hob_id}")

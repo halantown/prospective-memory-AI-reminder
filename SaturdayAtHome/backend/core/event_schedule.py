@@ -23,13 +23,14 @@ class EventType(str, Enum):
     MESSAGE_BUBBLE       = "message_bubble"
     PLANT_NEEDS_WATER    = "plant_needs_water"
 
-    # ── Internal state markers (not dispatched over SSE) ─────────────────
+    # ── Internal state markers (not dispatched to realtime clients) ──────
     BUSY_WINDOW_START    = "busy_window_start"
     BUSY_WINDOW_END      = "busy_window_end"
 
 
-# Map internal EventType → SSE event name sent to the frontend.
-# Must match what useSSE.js / the frontend expects.
+# Map internal EventType → pushed event name sent to the frontend.
+# NOTE: name kept for compatibility; transport is now WebSocket.
+# Must match what useWebSocket.js / the frontend expects.
 SSE_EVENT_MAP: dict[EventType, str] = {
     EventType.BLOCK_START:          "block_start",
     EventType.REMINDER:             "reminder_fire",

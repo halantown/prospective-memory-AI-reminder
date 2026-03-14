@@ -85,9 +85,13 @@ def _update_actual_t(session_id: str, block_num: int,
     db.execute(
         """UPDATE block_events
            SET actual_t = ?
-           WHERE session_id = ? AND block_num = ? AND event_type = ?
-             AND actual_t IS NULL
-           ORDER BY id LIMIT 1""",
+           WHERE id = (
+               SELECT id FROM block_events
+               WHERE session_id = ? AND block_num = ? AND event_type = ?
+                 AND actual_t IS NULL
+               ORDER BY id
+               LIMIT 1
+           )""",
         (actual_t, session_id, block_num, event_type.value),
     )
     db.commit()
@@ -147,7 +151,7 @@ class BlockTimeline:
                     )
                     await _wait_for_not_busy(self.session_id, timeout=10.0)
 
-            # Translate to SSE event name
+            # Translate to pushed event name
             sse_name = SSE_EVENT_MAP.get(event.event_type)
             if sse_name is None:
                 continue  # internal marker, not dispatched

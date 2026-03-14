@@ -1,26 +1,28 @@
-"""SSE (Server-Sent Events) — queue management and event broadcasting."""
+"""WebSocket event hub — queue management and event broadcasting."""
 
 import asyncio
-import json
 import logging
 import time
+from typing import Any
+
+from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from core.config_loader import get_config
-from models.entities import HobStatus, Hob
+from models.entities import HobStatus
 from services.hob_service import get_session_hobs, reconcile_hob
 
-logger = logging.getLogger("saturday.sse")
+logger = logging.getLogger("saturday.ws")
 
-# Active SSE connections: session_id → list[asyncio.Queue]
-sse_queues: dict[str, list[asyncio.Queue]] = {}
+# Active WebSocket subscriber queues: session_id → list[asyncio.Queue]
+ws_queues: dict[str, list[asyncio.Queue]] = {}
 
-# Sentinel value — pushed to queues on shutdown to unblock generators
-_SHUTDOWN = object()
+# Sentinel value — pushed to queues on shutdown to unblock websocket pumps
+_WS_SHUTDOWN = object()
 _shutting_down = False
 
 
-async def send_sse(session_id: str, event: str, data: dict):
-    """Push an SSE event to all connected clients for this session.
+async def send_ws(session_id: str, event: str, data: dict):
+    """Push an event to all connected WebSocket clients for one session.
 
     Special handling:
     - steak_spawn: reconciles hob state, only spawns on empty hobs
@@ -37,7 +39,7 @@ async def send_sse(session_id: str, event: str, data: dict):
             reconcile_hob(hobs[hob_id])
             if hobs[hob_id].status != HobStatus.EMPTY:
                 logger.info(
-                    f"SSE [{session_id}] → steak_spawn hob={hob_id} "
+                    f"WS [{session_id}] → steak_spawn hob={hob_id} "
                     f"SKIPPED (status={hobs[hob_id].status.value})"
                 )
                 return
@@ -63,71 +65,70 @@ async def send_sse(session_id: str, event: str, data: dict):
         if task_id:
             close_window(session_id, task_id, reason="missed")
 
-    logger.info(f"SSE [{session_id}] → {event}: {data}")
+    logger.info(f"WS [{session_id}] → {event}: {data}")
 
-    if session_id not in sse_queues:
+    if session_id not in ws_queues:
         return
 
     payload = {"event": event, "data": data, "ts": time.time()}
-    for q in list(sse_queues.get(session_id, [])):
+    for q in list(ws_queues.get(session_id, [])):
         try:
             q.put_nowait(payload)
         except asyncio.QueueFull:
             pass
 
 
-def register_client(session_id: str) -> asyncio.Queue:
-    """Register a new SSE client and return its queue."""
+def register_ws_client(session_id: str) -> asyncio.Queue:
+    """Register a new WS subscriber queue for this session."""
     queue: asyncio.Queue = asyncio.Queue(maxsize=256)
-    if session_id not in sse_queues:
-        sse_queues[session_id] = []
-    sse_queues[session_id].append(queue)
+    if session_id not in ws_queues:
+        ws_queues[session_id] = []
+    ws_queues[session_id].append(queue)
     return queue
 
 
-def unregister_client(session_id: str, queue: asyncio.Queue):
-    """Remove an SSE client queue."""
-    if session_id in sse_queues and queue in sse_queues[session_id]:
-        sse_queues[session_id].remove(queue)
-    logger.info(f"SSE disconnect [{session_id}]")
+def unregister_ws_client(session_id: str, queue: asyncio.Queue):
+    """Remove a WS subscriber queue."""
+    if session_id in ws_queues and queue in ws_queues[session_id]:
+        ws_queues[session_id].remove(queue)
+    logger.info(f"WS disconnect [{session_id}]")
 
 
-async def event_generator(session_id: str, queue: asyncio.Queue):
-    """Async generator that yields SSE-formatted strings from a queue.
+async def websocket_pump(session_id: str, queue: asyncio.Queue, websocket: WebSocket):
+    """Forward queued events to an accepted websocket connection.
 
-    Sends a keepalive every 30s to prevent connection timeout.
-    Stops cleanly on shutdown sentinel or CancelledError.
+    Sends a keepalive event every 30s when idle.
     """
     try:
         while not _shutting_down:
             try:
-                payload = await asyncio.wait_for(queue.get(), timeout=30)
-                if payload is _SHUTDOWN:
+                payload: Any = await asyncio.wait_for(queue.get(), timeout=30)
+                if payload is _WS_SHUTDOWN:
                     break
-                yield f"event: {payload['event']}\ndata: {json.dumps(payload['data'])}\n\n"
             except asyncio.TimeoutError:
-                yield "event: keepalive\ndata: {}\n\n"
+                payload = {"event": "keepalive", "data": {}, "ts": time.time()}
+            await websocket.send_json(payload)
+    except (WebSocketDisconnect, RuntimeError):
+        pass
     except asyncio.CancelledError:
         pass
-    except GeneratorExit:
-        pass
     finally:
-        unregister_client(session_id, queue)
+        unregister_ws_client(session_id, queue)
 
 
-def shutdown_all_queues():
-    """Signal every connected SSE client to stop. Called during server shutdown."""
+def shutdown_all_ws_queues():
+    """Signal every connected WS client pump to stop. Called during shutdown."""
     global _shutting_down
     _shutting_down = True
-    for sid, queues in sse_queues.items():
+    for queues in ws_queues.values():
         for q in queues:
             try:
-                q.put_nowait(_SHUTDOWN)
+                q.put_nowait(_WS_SHUTDOWN)
             except asyncio.QueueFull:
                 pass
-    logger.info("SSE: shutdown sentinel pushed to all queues")
+    logger.info("WS: shutdown sentinel pushed to all queues")
 
 
-def clear_session_queues(session_id: str):
-    """Remove all SSE queues for a session (on delete)."""
-    sse_queues.pop(session_id, None)
+def clear_session_ws_queues(session_id: str):
+    """Remove all WS queues for a session (on delete)."""
+    ws_queues.pop(session_id, None)

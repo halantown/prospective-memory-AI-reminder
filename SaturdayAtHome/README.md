@@ -9,7 +9,7 @@ SaturdayAtHome/
 ├── game_config.yaml          # ← Single source of truth for ALL game parameters
 ├── backend/                  # Python FastAPI + SQLite (port 5000)
 │   ├── main.py               # Entry point
-│   ├── core/                 # Config loader, database, SSE, timeline engine
+│   ├── core/                 # Config loader, database, WebSocket hub, timeline engine
 │   ├── models/               # Pydantic schemas, dataclass entities
 │   ├── routes/               # HTTP endpoints (session, experiment, admin, config)
 │   ├── services/             # Business logic (scoring, hob state, PM windows)
@@ -17,7 +17,7 @@ SaturdayAtHome/
 ├── frontend/                 # React + Vite + Tailwind + Zustand (port 3000)
 │   ├── src/components/       # Game UI, rooms, screens, dashboard, config page
 │   ├── src/store/            # Zustand global state
-│   ├── src/hooks/            # SSE client, audio engine, animation hooks
+│   ├── src/hooks/            # WebSocket client, audio engine, animation hooks
 │   ├── src/config/           # Task configs (populated from backend)
 │   └── src/utils/            # API helpers
 └── docs/                     # GDD, addendum, design documents
@@ -59,7 +59,7 @@ npm run build
 | Route | Purpose |
 |-------|---------|
 | `/` | Game (participant-facing) |
-| `/dashboard` | Experimenter monitoring (live SSE events, scores) |
+| `/dashboard` | Experimenter monitoring (live WebSocket events, scores) |
 | `/manage` | Database management (sessions, raw data) |
 | `/config` | Game configuration editor (reads/writes `game_config.yaml`) |
 
@@ -103,23 +103,42 @@ Correct PM answers are stored in the YAML (under `pm_tasks.*.correct`) but are *
 |--------|------|-------------|
 | `GET` | `/admin/sessions` | List all sessions |
 | `GET` | `/admin/active-session` | Find currently connected session (used by dashboard) |
-| `GET` | `/admin/session/{id}/state` | Live hob state, SSE clients, active timelines |
+| `GET` | `/admin/session/{id}/state` | Live hob state, WS clients, active timelines |
 | `GET` | `/admin/logs/{id}` | Action log for a session (most recent first) |
-| `POST` | `/admin/fire-event` | Manually push an SSE event to a session |
+| `POST` | `/admin/fire-event` | Manually push an event to a session |
 | `POST` | `/admin/force-block/{id}/{n}` | Force-start block N's full timeline (admin override) |
 | `DELETE` | `/admin/session/{id}` | Delete a session and all its data |
 | `GET` | `/admin/export/{id}` | Export session data as JSON |
 
-## Communication: SSE
+## Communication: WebSocket
 
-The backend pushes events to the frontend via **Server-Sent Events**:
+The backend pushes events to the frontend via **WebSocket**:
 
-1. Frontend connects to `GET /session/{id}/block/{n}/stream`
+1. Frontend connects to `WS /session/{id}/block/{n}/stream`
 2. Backend `BlockTimeline` runs scheduled events on a thread
-3. Events are pushed to per-session SSE queues
-4. Frontend `useSSE.js` maps event types to Zustand store actions
+3. Events are pushed to per-session WS queues
+4. Frontend `useWebSocket.js` maps event types to Zustand store actions
 
-Key SSE events: `steak_spawn`, `message_bubble`, `trigger_appear`, `window_close`, `reminder_fire`, `robot_neutral`, `force_yellow`, `plant_needs_water`, `block_end`
+Key WS events: `steak_spawn`, `message_bubble`, `trigger_appear`, `window_close`, `reminder_fire`, `robot_neutral`, `force_yellow`, `plant_needs_water`, `block_end`
+
+### Troubleshooting: heartbeat-only but no timeline events
+
+If the frontend only sends heartbeat and receives no scheduled events, check `backend/core/timeline.py::_update_actual_t`.
+
+Root cause (fixed): using `UPDATE ... ORDER BY ... LIMIT` can fail on SQLite builds without `SQLITE_ENABLE_UPDATE_DELETE_LIMIT`, causing `BlockTimeline.run()` to terminate at the first event.
+
+Resolution: use a SQLite-compatible subquery update:
+
+```sql
+UPDATE block_events
+SET actual_t = ?
+WHERE id = (
+  SELECT id FROM block_events
+  WHERE session_id = ? AND block_num = ? AND event_type = ? AND actual_t IS NULL
+  ORDER BY id
+  LIMIT 1
+)
+```
 
 ## Game Components
 

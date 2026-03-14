@@ -1,4 +1,25 @@
-# Saturday At Home — SSE 技术文档
+# Saturday At Home — SSE 技术文档（历史版本）
+
+> ⚠️ 本文档主要描述旧版 SSE 架构，现已迁移为 WebSocket。
+>
+> 当前实时通道：
+> - 参与者/观察端事件流：`WS /api/session/{id}/block/{n}/stream`
+> - 管理端生命周期流：`WS /api/admin/stream`
+>
+> 事件语义（`steak_spawn`、`reminder_fire` 等）保持不变，仅传输协议由 SSE 改为 WebSocket。
+
+## 故障记录（2026-03-14）
+
+### 现象
+- 前端仅持续发送 heartbeat，收不到时间线事件（提醒/触发/消息等）。
+
+### 根因
+- `backend/core/timeline.py::_update_actual_t` 使用了 `UPDATE ... ORDER BY ... LIMIT`。
+- 当前环境 SQLite 构建不支持该语法，导致 `BlockTimeline.run()` 在首个事件后异常终止。
+
+### 修复
+- 将更新语句改为 SQLite 兼容写法：`WHERE id = (SELECT ... ORDER BY id LIMIT 1)`。
+- 同时在 session stream 连接时，若 `active_timelines` 中已有同 key 且 task 已完成/异常结束，自动清理并允许重启 timeline。
 
 ## 1. 系统架构总览
 

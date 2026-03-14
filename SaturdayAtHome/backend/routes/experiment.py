@@ -20,7 +20,7 @@ from models.schemas import (
     OngoingScoreReport, FakeTriggerReport, QuestionnaireReport,
 )
 from services.scoring import score_pm_action
-from core.sse import send_sse
+from core.ws import send_ws
 
 logger = logging.getLogger("saturday.routes.experiment")
 
@@ -150,9 +150,9 @@ async def report_steak_action(session_id: str, block_num: int, report: SteakActi
     db.commit()
     db.close()
 
-    # Schedule respawn via SSE after serve/clean (15-25s delay)
+    # Schedule respawn via WS after serve/clean (15-25s delay)
     if report.action in ("serve", "clean"):
-        asyncio.create_task(schedule_respawn(session_id, block_num, report.hob_id, send_sse))
+        asyncio.create_task(schedule_respawn(session_id, block_num, report.hob_id, send_ws))
 
     return {"status": "ok", "score": score, "hob_status": hob.status.value}
 

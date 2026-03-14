@@ -186,7 +186,7 @@ export default function MessagesCard({ isExpanded }) {
   const unreadCount = useGameStore((s) => s.unreadCount)
 
   const activeCount = messageBubbles.filter(b => !b.replied && !b.expired).length
-  const selectedEmail = messageBubbles.find((e) => e.id === selectedEmailId) || messageBubbles[messageBubbles.length - 1]
+  const selectedEmail = messageBubbles.find((e) => e.id === selectedEmailId) || null
 
   if (!isExpanded) {
     // Only show unread (pending) messages in overview

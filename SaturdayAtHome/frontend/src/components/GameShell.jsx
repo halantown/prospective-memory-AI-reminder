@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useGameStore, HOB_STATUS } from '../store/gameStore'
-import useSSE from '../hooks/useSSE'
+import useWebSocket from '../hooks/useWebSocket'
 import { useAudio } from '../hooks/useAudio'
 import { sendHeartbeat } from '../utils/api'
 import TopBar from './ui/TopBar'
@@ -29,8 +29,8 @@ export default function GameShell() {
   // Load remote config on mount
   useEffect(() => { loadRemoteConfig() }, [loadRemoteConfig])
 
-  // SSE client — connects when sessionId + blockNumber + blockRunning are set
-  useSSE()
+  // WebSocket client — connects when sessionId + blockNumber + blockRunning are set
+  useWebSocket()
 
   // Audio engine — BGM, SFX, TTS tied to game state
   useAudio()
@@ -94,11 +94,11 @@ export default function GameShell() {
     return () => clearInterval(timer)
   }, [blockRunning])
 
-  // ── Demo steak spawning (only when SSE not connected = no backend) ───
+  // ── Demo steak spawning (only when WS not connected = no backend) ───
   useEffect(() => {
     if (!blockRunning) return
     if (useGameStore.getState().sseConnected) return
-    if (useGameStore.getState().sessionId) return // has session → SSE will connect, wait for backend spawns
+    if (useGameStore.getState().sessionId) return // has session → WS will connect, wait for backend spawns
     const timeouts = [
       setTimeout(() => spawnSteak(0), 2000),
       setTimeout(() => spawnSteak(1), 8000),

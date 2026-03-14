@@ -36,11 +36,11 @@ async def lifespan(app: FastAPI):
     monitor_task = asyncio.create_task(heartbeat_monitor(DB_PATH, active_timelines))
     yield
     monitor_task.cancel()
-    from core.sse import shutdown_all_queues
+    from core.ws import shutdown_all_ws_queues
     from core.session_lifecycle import shutdown_admin_queues
     for tl in active_timelines.values():
         tl.cancel()
-    shutdown_all_queues()
+    shutdown_all_ws_queues()
     shutdown_admin_queues()
 
 

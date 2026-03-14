@@ -1,13 +1,12 @@
-"""Session management & SSE stream endpoints."""
+"""Session management & WebSocket stream endpoints."""
 
-import asyncio
 import json
 import logging
 import time
 import uuid
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+import asyncio
+from fastapi import APIRouter, HTTPException, WebSocket
 
 from core.config import DB_PATH, assign_group
 from core.config_loader import get_latin_square, get_task_pairs, get_reminder_texts
@@ -17,7 +16,7 @@ from models.schemas import (
     SessionStartRequest, SessionStartResponse,
     TokenSessionStartRequest, SessionResumeResponse,
 )
-from core.sse import send_sse, register_client, event_generator
+from core.ws import send_ws, register_ws_client, websocket_pump
 from core.timeline import BlockTimeline
 from services.hob_service import reset_session_hobs
 from services.window_service import reset_session_windows
@@ -110,20 +109,24 @@ async def get_block_config(session_id: str, block_num: int):
     }
 
 
-@router.get("/session/{session_id}/block/{block_num}/stream")
-async def block_stream(session_id: str, block_num: int, auto_start: bool = True):
-    """SSE endpoint — pushes block timeline events to the frontend."""
-    logger.info(f"SSE connect [{session_id}] block={block_num} auto_start={auto_start}")
+@router.websocket("/session/{session_id}/block/{block_num}/stream")
+async def block_stream(websocket: WebSocket, session_id: str, block_num: int, auto_start: bool = True):
+    """WebSocket endpoint — pushes block timeline events to the frontend."""
+    await websocket.accept()
+    logger.info(f"WS connect [{session_id}] block={block_num} auto_start={auto_start}")
 
-    queue = register_client(session_id)
-    # Send an immediate heartbeat frame so EventSource transitions to OPEN quickly.
+    queue = register_ws_client(session_id)
+    # Send an immediate heartbeat frame so the client transitions to OPEN quickly.
     try:
         queue.put_nowait({"event": "keepalive", "data": {}, "ts": time.time()})
     except asyncio.QueueFull:
-        logger.warning(f"SSE bootstrap keepalive dropped [{session_id}] queue full")
+        logger.warning(f"WS bootstrap keepalive dropped [{session_id}] queue full")
 
     if auto_start:
         timeline_key = f"{session_id}_{block_num}"
+        existing = active_timelines.get(timeline_key)
+        if existing and (existing._task is None or existing._task.done()):
+            del active_timelines[timeline_key]
         if timeline_key not in active_timelines:
             db = get_db(DB_PATH)
             row = db.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
@@ -136,15 +139,11 @@ async def block_stream(session_id: str, block_num: int, auto_start: bool = True)
                 reset_session_hobs(session_id)
                 reset_session_windows(session_id)
 
-                tl = BlockTimeline(session_id, block_num, condition, send_sse)
+                tl = BlockTimeline(session_id, block_num, condition, send_ws)
                 active_timelines[timeline_key] = tl
                 tl._task = asyncio.create_task(tl.run())
 
-    return StreamingResponse(
-        event_generator(session_id, queue),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
-    )
+    await websocket_pump(session_id, queue, websocket)
 
 
 @router.post("/session/{session_id}/heartbeat")
