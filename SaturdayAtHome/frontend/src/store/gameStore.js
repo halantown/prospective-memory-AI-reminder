@@ -93,6 +93,7 @@ export const useGameStore = create((set, get) => ({
   score: 0,
   addScore: (pts) => set((s) => ({ score: s.score + pts })),
   resetScore: () => set({ score: 0 }),
+  servedCount: 0,
 
   // ── Steak / Kitchen (multi-step) ────────────────────────
   hobs: initialHobs.map(h => ({ ...h })),
@@ -204,6 +205,7 @@ export const useGameStore = create((set, get) => ({
           : h
       ),
       score: s.score + (scoring.steak_serve ?? 5),
+      servedCount: s.servedCount + 1,
     }))
     if (sessionId) {
       reportSteakAction(sessionId, blockNumber, hobId, 'serve').catch(err =>
@@ -558,6 +560,7 @@ export const useGameStore = create((set, get) => ({
     blockRunning: false,
     blockTimer: 0,
     score: 0,
+    servedCount: 0,
     hobs: initialHobs.map(h => ({ ...h })),
     messageBubbles: [],
     unreadCount: 0,
@@ -598,6 +601,7 @@ export const useGameStore = create((set, get) => ({
     blockRunning: true,
     blockTimer: 0,
     score: 0,
+    servedCount: 0,
     hobs: initialHobs.map(h => ({ ...h })),
     messageBubbles: [],
     unreadCount: 0,

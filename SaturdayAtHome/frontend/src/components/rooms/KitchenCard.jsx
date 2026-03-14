@@ -37,7 +37,10 @@ export default function KitchenCard({ isExpanded }) {
   const flipSteak = useGameStore((s) => s.flipSteak)
   const serveSteak = useGameStore((s) => s.serveSteak)
   const cleanSteak = useGameStore((s) => s.cleanSteak)
+  const servedCount = useGameStore((s) => s.servedCount)
   const progresses = useHobProgress()
+  const maxStack = 6
+  const stackCount = Math.min(servedCount, maxStack)
 
   return (
     <div className="flex flex-col items-center justify-between w-full h-full p-6 relative">
@@ -48,16 +51,17 @@ export default function KitchenCard({ isExpanded }) {
       </div>
 
       {/* Stove area — 2×2 grid */}
-      <div className={`grid grid-cols-2 ${isExpanded ? 'gap-8 mt-14' : 'gap-3 w-full'}`}>
-        {hobs.map((hob, idx) => {
-          const progress = progresses[idx] ?? 0
-          const side = sideLabel(hob.status)
-          const isCooking = hob.status === HOB_STATUS.COOKING_SIDE1 || hob.status === HOB_STATUS.COOKING_SIDE2
-          const isReady = hob.status === HOB_STATUS.READY_SIDE1 || hob.status === HOB_STATUS.READY_SIDE2
-          const bar = barStyle[hob.status] || barStyle[HOB_STATUS.EMPTY]
+      <div className={`flex items-start ${isExpanded ? 'gap-10 mt-14' : 'gap-4 w-full'}`}>
+        <div className={`grid grid-cols-2 ${isExpanded ? 'gap-8' : 'gap-3 w-full'}`}>
+          {hobs.map((hob, idx) => {
+            const progress = progresses[idx] ?? 0
+            const side = sideLabel(hob.status)
+            const isCooking = hob.status === HOB_STATUS.COOKING_SIDE1 || hob.status === HOB_STATUS.COOKING_SIDE2
+            const isReady = hob.status === HOB_STATUS.READY_SIDE1 || hob.status === HOB_STATUS.READY_SIDE2
+            const bar = barStyle[hob.status] || barStyle[HOB_STATUS.EMPTY]
 
-          return (
-            <div key={hob.id} className="flex flex-col items-center">
+            return (
+              <div key={hob.id} className="flex flex-col items-center">
               {/* Pan */}
               <div className={`rounded-full bg-zinc-800 border-zinc-900 flex items-center justify-center relative shadow-[0_8px_12px_rgba(0,0,0,0.3)] ${
                 isExpanded ? 'w-24 h-24 border-[5px]' : 'w-14 h-14 border-4'
@@ -191,12 +195,35 @@ export default function KitchenCard({ isExpanded }) {
                   </div>
                 )}
               </div>
-            </div>
-          )
-        })}
+              </div>
+            )
+          })}
 
-        {/* 4th burner — pressure cooker PM task */}
-        <PressureCooker isExpanded={isExpanded} />
+          {/* 4th burner — pressure cooker PM task */}
+          <PressureCooker isExpanded={isExpanded} />
+        </div>
+
+        {/* Plate stack (expanded only) */}
+        {isExpanded && (
+          <div className="relative w-24 h-36 flex items-end justify-center">
+            {/* Patties */}
+            {Array.from({ length: stackCount }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute w-16 h-3.5 rounded-full bg-amber-700 shadow-[0_2px_0_rgba(0,0,0,0.2)]"
+                style={{ bottom: 12 + i * 6 }}
+              />
+            ))}
+            {servedCount > maxStack && (
+              <div className="absolute top-2 text-xs font-bold text-amber-900 bg-amber-200/70 px-1.5 py-0.5 rounded">
+                +{servedCount - maxStack}
+              </div>
+            )}
+            {/* Plate (side view) */}
+            <div className="absolute bottom-2 w-20 h-3 rounded-full bg-slate-200 shadow-inner" />
+            <div className="absolute bottom-1 w-16 h-2 rounded-full bg-slate-300" />
+          </div>
+        )}
       </div>
 
       {/* Kitchen table with medicine cabinet — bottom section */}
