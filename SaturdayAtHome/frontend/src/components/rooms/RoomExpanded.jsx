@@ -39,15 +39,17 @@ export default function RoomExpanded() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm pointer-events-auto"
+        className="absolute inset-0 bg-slate-900/30 pointer-events-auto"
         onClick={() => setActiveRoom('overview')}
       />
 
       {/* Expanded room card — scaled to ~70% */}
       <motion.div
-        layoutId={`card-container-${activeRoom}`}
-        className={`relative w-[68%] h-[72%] rounded-[32px] shadow-2xl pointer-events-auto overflow-hidden ${roomBg[activeRoom]}`}
-        transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.98 }}
+        className={`relative w-[68%] h-[72%] rounded-[32px] shadow-2xl pointer-events-auto overflow-hidden will-change-transform transform-gpu ${roomBg[activeRoom]}`}
+        transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}
       >
         <RoomComponent isExpanded={true} />
 

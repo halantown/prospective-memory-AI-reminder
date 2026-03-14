@@ -31,10 +31,9 @@ export default function RoomOverview() {
     >
       {/* Balcony - top left */}
       <motion.div
-        layoutId="card-container-balcony"
         onClick={() => setActiveRoom('balcony')}
         whileHover={activeRoom === 'overview' ? { scale: 1.015, y: -2 } : {}}
-        className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-sky-50 ${
+        className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-sky-50 will-change-transform transform-gpu ${
           activeRoom === 'balcony' ? 'opacity-0' : ''
         }`}
         style={{ gridArea: 'balcony' }}
@@ -44,10 +43,9 @@ export default function RoomOverview() {
 
       {/* Kitchen - right (tall) */}
       <motion.div
-        layoutId="card-container-kitchen"
         onClick={() => setActiveRoom('kitchen')}
         whileHover={activeRoom === 'overview' ? { scale: 1.015, y: -2 } : {}}
-        className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-orange-50 ${
+        className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-orange-50 will-change-transform transform-gpu ${
           activeRoom === 'kitchen' ? 'opacity-0' : ''
         }`}
         style={{ gridArea: 'kitchen' }}
@@ -58,10 +56,9 @@ export default function RoomOverview() {
       {/* Bottom row - 3 cards */}
       <div className="grid grid-cols-3 gap-4" style={{ gridArea: 'bottom' }}>
         <motion.div
-          layoutId="card-container-living"
           onClick={() => setActiveRoom('living')}
           whileHover={activeRoom === 'overview' ? { scale: 1.02, y: -2 } : {}}
-          className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-amber-50 ${
+          className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-amber-50 will-change-transform transform-gpu ${
             activeRoom === 'living' ? 'opacity-0' : ''
           }`}
         >
@@ -69,10 +66,9 @@ export default function RoomOverview() {
         </motion.div>
 
         <motion.div
-          layoutId="card-container-entrance"
           onClick={() => setActiveRoom('entrance')}
           whileHover={activeRoom === 'overview' ? { scale: 1.02, y: -2 } : {}}
-          className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-emerald-50 ${
+          className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-emerald-50 will-change-transform transform-gpu ${
             activeRoom === 'entrance' ? 'opacity-0' : ''
           }`}
         >
@@ -80,10 +76,9 @@ export default function RoomOverview() {
         </motion.div>
 
         <motion.div
-          layoutId="card-container-messages"
           onClick={() => setActiveRoom('messages')}
           whileHover={activeRoom === 'overview' ? { scale: 1.02, y: -2 } : {}}
-          className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-slate-50 ${
+          className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-slate-50 will-change-transform transform-gpu ${
             activeRoom === 'messages' ? 'opacity-0' : ''
           }`}
         >
