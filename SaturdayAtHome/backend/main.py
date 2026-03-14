@@ -56,10 +56,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(session_router)
-app.include_router(experiment_router)
-app.include_router(admin_router)
-app.include_router(config_router)
+app.include_router(session_router, prefix="/api")
+app.include_router(experiment_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
+app.include_router(config_router, prefix="/api")
 
 
 # ── Entry point ────────────────────────────────────────────
@@ -67,4 +67,3 @@ app.include_router(config_router)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)
-

@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import { useGameStore, HOB_STATUS } from '../store/gameStore'
 import useSSE from '../hooks/useSSE'
 import { useAudio } from '../hooks/useAudio'
+import { sendHeartbeat } from '../utils/api'
 import TopBar from './ui/TopBar'
 import Sidebar from './ui/Sidebar'
 import RoomOverview from './rooms/RoomOverview'
@@ -18,6 +19,7 @@ const HOB_CHECK_RATE = 500
 export default function GameShell() {
   const phase = useGameStore((s) => s.phase)
   const blockRunning = useGameStore((s) => s.blockRunning)
+  const sessionId = useGameStore((s) => s.sessionId)
   const tickLaundry = useGameStore((s) => s.tickLaundry)
   const tickBlockTimer = useGameStore((s) => s.tickBlockTimer)
   const spawnSteak = useGameStore((s) => s.spawnSteak)
@@ -42,6 +44,19 @@ export default function GameShell() {
     }, TICK_RATE)
     return () => clearInterval(timer)
   }, [blockRunning, tickLaundry, tickBlockTimer])
+
+  // ── Heartbeat (every 10s during block) ──
+  useEffect(() => {
+    if (!blockRunning || !sessionId) return
+    const ping = () => {
+      sendHeartbeat(sessionId).catch(err => {
+        console.warn('[Heartbeat] failed:', err.message || err)
+      })
+    }
+    ping()
+    const timer = setInterval(ping, 10000)
+    return () => clearInterval(timer)
+  }, [blockRunning, sessionId])
 
   // ── 500ms hob transition + PM timeout checker ──────────
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
+import { reportEncoding } from '../../utils/api'
 import { CheckCircle, XCircle } from 'lucide-react'
 
 const TASK_PAIRS = {
@@ -95,6 +96,8 @@ const TASK_PAIRS = {
 export default function EncodingScreen() {
   const taskPairId = useGameStore((s) => s.taskPairId)
   const confirmEncoding = useGameStore((s) => s.confirmEncoding)
+  const sessionId = useGameStore((s) => s.sessionId)
+  const blockNumber = useGameStore((s) => s.blockNumber)
 
   const [readAloud, setReadAloud] = useState(false)
   const [selectedAnswer, setSelectedAnswer] = useState(null)
@@ -120,7 +123,14 @@ export default function EncodingScreen() {
     }
   }
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (sessionId && blockNumber) {
+      try {
+        await reportEncoding(sessionId, blockNumber, attempts)
+      } catch (err) {
+        console.warn('[Encoding] report failed:', err)
+      }
+    }
     confirmEncoding(attempts)
   }
 

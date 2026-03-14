@@ -163,6 +163,11 @@ export const useGameStore = create((set, get) => ({
       ),
       score: s.score + (scoring.steak_pepper ?? 2),
     }))
+    if (state.sessionId) {
+      reportSteakAction(state.sessionId, state.blockNumber, hobId, 'pepper').catch(err =>
+        console.error('[Steak] pepper report failed:', err)
+      )
+    }
   },
 
   // Flip from READY_SIDE1 (peppered) → COOKING_SIDE2

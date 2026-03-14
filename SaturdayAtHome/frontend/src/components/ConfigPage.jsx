@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const API = import.meta.env.VITE_API_URL || '/api'
 
 /* ── Editable JSON textarea ─────────────────────────────── */
 function JsonEditor({ label, value, onChange, rows = 8 }) {

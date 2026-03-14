@@ -67,6 +67,15 @@ export async function reportSteakAction(sessionId, blockNum, hobId, action) {
 }
 
 /**
+ * Report encoding quiz confirmation.
+ */
+export async function reportEncoding(sessionId, blockNum, quizAttempts) {
+  return apiPost(`/session/${sessionId}/block/${blockNum}/encoding`, {
+    quiz_attempts: quizAttempts,
+  })
+}
+
+/**
  * Report a PM task action.
  */
 export async function reportPmAction(sessionId, blockNum, taskId, actionData) {
@@ -81,7 +90,7 @@ export async function reportPmAction(sessionId, blockNum, taskId, actionData) {
  */
 export async function fetchGameConfig() {
   try {
-    const res = await fetch(`${BASE.replace('/api', '')}/config/game`)
+    const res = await fetch(`${BASE}/config/game`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } catch (err) {
