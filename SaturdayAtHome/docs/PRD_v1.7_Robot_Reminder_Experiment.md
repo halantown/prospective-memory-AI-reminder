@@ -4,11 +4,17 @@
 
 | | |
 |---|---|
-| **Version** | v1.7 — Robot/TTS architecture confirmed; reminder agent dependency explicit; prototype scope defined |
-| **Date** | 2026-03-10 |
+| **Version** | v1.8 — Dashboard SSE stale-session bug fixed |
+| **Date** | 2026-03-13 |
 | **Author** | Thesis Candidate |
 | **Status** | 🟢 No P0 blockers remain — prototype development can begin |
 | **Ethics** | Approved — Within-subjects, n ≈ 28 (G*Power); recruit n = 32 for dropout buffer |
+
+### Changelog v1.7 → v1.8
+
+| Section | Change |
+|---|---|
+| §4.8 | **Bug fix — Dashboard stale-session auto-SSE:** `GET /admin/active-session` 修复了DB fallback逻辑，不再在服务器重启后返回已结束（`finished`）或已中断的session。新增 `live` 字段区分"有SSE客户端在线"和"仅DB记录存在"两种情况。Dashboard在 `live: false` 时不再自动连接SSE，避免显示误导性的 connected 状态。 |
 
 ### Changelog v1.6 → v1.7
 

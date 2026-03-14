@@ -100,7 +100,8 @@ export default function Dashboard() {
     api('/admin/active-session').then((s) => {
       if (s) {
         setSession(s)
-        showToast(`Auto-connected: ${s.session_id}`, 'ok')
+        const msg = s.live ? `Auto-connected: ${s.session_id}` : `Session found (no live client): ${s.session_id}`
+        showToast(msg, s.live ? 'ok' : 'info')
       }
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -164,9 +165,9 @@ export default function Dashboard() {
 
   useEffect(() => { return () => { if (esRef.current) esRef.current.close() } }, [])
 
-  // Auto-connect SSE when session detected
+  // Auto-connect SSE only when a live participant is detected
   useEffect(() => {
-    if (session && sseStatus === 'disconnected') connectSSE()
+    if (session && session.live && sseStatus === 'disconnected') connectSSE()
   }, [session]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fireEvent = useCallback(async (event, data = {}) => {
@@ -197,6 +198,7 @@ export default function Dashboard() {
             Participant: <b className="text-cyan-300">{session.participant_id}</b> ·
             Session: <b className="text-cyan-300">{session.session_id}</b> ·
             Group: <b className="text-cyan-300">{session.latin_square_group || session.group}</b>
+            {!session.live && <span className="ml-2 text-amber-400">(no live client)</span>}
           </span>
         )}
         <div className="ml-auto flex gap-2">

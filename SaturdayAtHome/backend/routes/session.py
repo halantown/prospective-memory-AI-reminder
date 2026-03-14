@@ -48,16 +48,25 @@ async def start_session(req: TokenSessionStartRequest):
         raise HTTPException(404, "Token not found — ask the experimenter to register you first")
 
     if row["phase"] != SessionPhase.CREATED.value:
+        logger.info(f"Session re-join via token: {row['session_id']} (phase={row['phase']})")
+        
+        # Reset interruption status on rejoin
+        db.execute(
+            "UPDATE sessions SET is_interrupted = 0, last_heartbeat = ? WHERE session_id = ?",
+            (time.time(), row["session_id"])
+        )
+        db.commit()
         db.close()
-        raise HTTPException(409, f"Session already in phase '{row['phase']}'")
+        
+        log_action(row["session_id"], 0, "session_rejoin_token", {"token": req.token, "phase": row["phase"]})
+    else:
+        try:
+            transition_phase(db, row["session_id"], SessionPhase.ENCODING)
+        finally:
+            db.close()
 
-    try:
-        transition_phase(db, row["session_id"], SessionPhase.ENCODING)
-    finally:
-        db.close()
-
-    logger.info(f"Session started via token: {row['session_id']} (participant={row['participant_id']})")
-    log_action(row["session_id"], 0, "session_start_token", {"token": req.token})
+        logger.info(f"Session started via token: {row['session_id']} (participant={row['participant_id']})")
+        log_action(row["session_id"], 0, "session_start_token", {"token": req.token})
 
     condition_order = json.loads(row["condition_order"])
     return SessionStartResponse(

@@ -230,18 +230,28 @@ async def admin_get_logs(session_id: str):
 
 @router.get("/active-session")
 async def admin_active_session():
-    """Find the currently active session (has SSE clients connected)."""
+    """Find the currently active session.
+
+    Returns the session that has live SSE clients connected, if any.
+    Falls back to the most recent non-finished, non-interrupted session from the DB
+    so the experimenter can see an in-progress session after a dashboard reload —
+    but marks it as ``live: false`` so the frontend knows not to auto-connect SSE.
+    Returns null if no meaningful session exists.
+    """
     for sid, queues in sse_queues.items():
         if len(queues) > 0:
             db = get_db(DB_PATH)
             row = db.execute("SELECT * FROM sessions WHERE session_id = ?", (sid,)).fetchone()
             db.close()
             if row:
-                return dict(row)
+                return {**dict(row), "live": True}
     db = get_db(DB_PATH)
-    row = db.execute("SELECT * FROM sessions ORDER BY created_at DESC LIMIT 1").fetchone()
+    row = db.execute(
+        "SELECT * FROM sessions WHERE phase NOT IN ('finished') AND is_interrupted = 0"
+        " ORDER BY created_at DESC LIMIT 1"
+    ).fetchone()
     db.close()
-    return dict(row) if row else None
+    return {**dict(row), "live": False} if row else None
 
 
 @router.delete("/session/{session_id}")
