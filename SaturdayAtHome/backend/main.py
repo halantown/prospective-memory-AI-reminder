@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import DB_PATH
 from core.config_loader import load_config
 from core.database import init_db
-from core.session_lifecycle import heartbeat_monitor
+from core.session_lifecycle import heartbeat_monitor, pause_all_online_sessions
 from routes.session import router as session_router, active_timelines
 from routes.experiment import router as experiment_router
 from routes.admin import router as admin_router
@@ -33,6 +33,7 @@ logger = logging.getLogger("saturday")
 async def lifespan(app: FastAPI):
     load_config()
     init_db(DB_PATH)
+    pause_all_online_sessions(DB_PATH)
     monitor_task = asyncio.create_task(heartbeat_monitor(DB_PATH, active_timelines))
     yield
     monitor_task.cancel()
@@ -66,4 +67,10 @@ app.include_router(config_router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=5000,
+        reload=True,
+        timeout_graceful_shutdown=5,
+    )

@@ -14,9 +14,17 @@ const roomConfig = [
   { id: 'messages', bg: 'bg-slate-50',    Component: MessagesCard, gridArea: 'messages' },
 ]
 
+const balconyBgByPhase = {
+  morning: 'bg-sky-50',
+  afternoon: 'bg-amber-50',
+  evening: 'bg-indigo-100',
+}
+
 export default function RoomOverview() {
   const activeRoom = useGameStore((s) => s.activeRoom)
   const setActiveRoom = useGameStore((s) => s.setActiveRoom)
+  const dayPhase = useGameStore((s) => s.dayPhase)
+  const balconyBg = balconyBgByPhase[dayPhase] || balconyBgByPhase.morning
 
   return (
     <div className="absolute inset-0 p-6 grid gap-4 z-0"
@@ -33,7 +41,7 @@ export default function RoomOverview() {
       <motion.div
         onClick={() => setActiveRoom('balcony')}
         whileHover={activeRoom === 'overview' ? { scale: 1.015, y: -2 } : {}}
-        className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-shadow overflow-hidden bg-sky-50 will-change-transform transform-gpu ${
+        className={`rounded-3xl cursor-pointer shadow-sm hover:shadow-lg transition-all duration-700 overflow-hidden ${balconyBg} will-change-transform transform-gpu ${
           activeRoom === 'balcony' ? 'opacity-0' : ''
         }`}
         style={{ gridArea: 'balcony' }}

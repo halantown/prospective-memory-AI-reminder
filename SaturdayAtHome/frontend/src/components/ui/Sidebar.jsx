@@ -84,6 +84,9 @@ export default function Sidebar() {
   const getInboxStatus = useGameStore((s) => s.getInboxStatus)
   const unreadCount = useGameStore((s) => s.unreadCount)
   const score = useGameStore((s) => s.score)
+  const dayPhase = useGameStore((s) => s.dayPhase)
+  const worldClockLabel = useGameStore((s) => s.worldClockLabel)
+  const worldClockMilestones = useGameStore((s) => s.worldClockMilestones)
 
   const kitchenStatus = getKitchenStatus()
   const balconyStatus = getBalconyStatus()
@@ -116,6 +119,11 @@ export default function Sidebar() {
     { label: 'Plant',   color: livingStatus },
     { label: 'Inbox',   color: inboxStatus },
   ]
+
+  const phaseLabel =
+    dayPhase === 'evening' ? 'Evening glow' :
+    dayPhase === 'afternoon' ? 'Afternoon light' :
+    'Morning light'
 
   return (
     <div className="w-52 bg-slate-900 shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-40 flex flex-col py-4 px-3 gap-2 border-l border-slate-800 text-slate-400 overflow-y-auto">
@@ -176,6 +184,27 @@ export default function Sidebar() {
             </div>
           ))}
         </div>
+      </div>
+
+      <Divider />
+
+      {/* ── Time progression ── */}
+      <div className="px-1">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">Time of Day</h3>
+        <div className="text-xs text-slate-300 mb-1.5">{(worldClockMilestones || []).join(' → ')}</div>
+        <div className="flex items-center justify-between gap-1">
+          {(worldClockMilestones || []).map((label) => (
+            <span
+              key={label}
+              className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${
+                label === worldClockLabel ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400'
+              }`}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+        <div className="text-[11px] text-slate-500 mt-1.5">Now: {worldClockLabel} | {phaseLabel}</div>
       </div>
 
       <Divider />

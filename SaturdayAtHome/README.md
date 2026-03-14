@@ -159,8 +159,16 @@ WHERE id = (
 - TV (idle, no score impact)
 
 ### Balcony
-- Sky gradient changes (day → dusk) as visual PM trigger cue
+- Fixed in-block ambience milestones: `14:00 → 17:00 → 19:00` (sidebar + room light palette)
+- Sky/light palette shifts morning → afternoon → evening with non-interruptive transitions
 - Washing machine
+
+### Ambient Audio
+- BGM keeps playing continuously during block
+- Subtle level contour by day phase (morning > afternoon > evening) while preserving robot ducking
+
+### TODO Backlog
+- Dedicated window lighting renderer is not yet modeled in current room scene; current build uses balcony/room tint transitions as a proxy.
 
 ### Robot Avatar
 - Fixed bottom-right, always visible

@@ -16,8 +16,11 @@ function getCtx() {
 
 // ─── BGM ───────────────────────────────────────────────────────────────────
 let bgm = null
-const BGM_NORMAL = 0.35
+let BGM_NORMAL = 0.35
 const BGM_DUCKED = 0.08
+let bgmDuckActive = false
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
 export function initBGM(src = '/audio/bgm.mp3') {
   if (bgm) return
@@ -34,15 +37,28 @@ export function initBGM(src = '/audio/bgm.mp3') {
 export function stopBGM() {
   if (!bgm) return
   bgm.fade(bgm.volume(), 0, 1000)
-  setTimeout(() => { bgm?.stop(); bgm = null }, 1100)
+  setTimeout(() => {
+    bgm?.stop()
+    bgm = null
+    bgmDuckActive = false
+  }, 1100)
 }
 
 function duckBGM() {
+  bgmDuckActive = true
   bgm?.fade(bgm.volume(), BGM_DUCKED, 300)
 }
 
 function unduckBGM() {
+  bgmDuckActive = false
   bgm?.fade(bgm.volume(), BGM_NORMAL, 800)
+}
+
+export function setBGMNormalVolume(volume, fadeMs = 1400) {
+  BGM_NORMAL = clamp(Number(volume) || 0, 0.05, 0.8)
+  if (bgm && !bgmDuckActive) {
+    bgm.fade(bgm.volume(), BGM_NORMAL, fadeMs)
+  }
 }
 
 // ─── Web Audio API procedural SFX ──────────────────────────────────────────

@@ -15,6 +15,7 @@ logger = logging.getLogger("saturday.ws")
 
 # Active WebSocket subscriber queues: session_id → list[asyncio.Queue]
 ws_queues: dict[str, list[asyncio.Queue]] = {}
+_PUMP_IDLE_TIMEOUT_S = 5
 
 # Sentinel value — pushed to queues on shutdown to unblock websocket pumps
 _WS_SHUTDOWN = object()
@@ -97,12 +98,12 @@ def unregister_ws_client(session_id: str, queue: asyncio.Queue):
 async def websocket_pump(session_id: str, queue: asyncio.Queue, websocket: WebSocket):
     """Forward queued events to an accepted websocket connection.
 
-    Sends a keepalive event every 30s when idle.
+    Sends a keepalive event every few seconds when idle.
     """
     try:
         while not _shutting_down:
             try:
-                payload: Any = await asyncio.wait_for(queue.get(), timeout=30)
+                payload: Any = await asyncio.wait_for(queue.get(), timeout=_PUMP_IDLE_TIMEOUT_S)
                 if payload is _WS_SHUTDOWN:
                     break
             except asyncio.TimeoutError:

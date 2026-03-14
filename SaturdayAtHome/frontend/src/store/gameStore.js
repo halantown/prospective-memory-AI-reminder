@@ -47,6 +47,26 @@ const initialLaundry = () => ({
 })
 
 const ts = () => Date.now()
+const DEFAULT_BLOCK_DURATION_S = 510
+const DAY_TIME_LABELS = ['14:00', '17:00', '19:00']
+const DAY_PHASES = ['morning', 'afternoon', 'evening']
+
+function getBlockDurationS(remoteConfig) {
+  const ms = Number(remoteConfig?.timers?.block_duration_ms)
+  if (!Number.isFinite(ms) || ms <= 0) return DEFAULT_BLOCK_DURATION_S
+  return Math.max(1, Math.round(ms / 1000))
+}
+
+function deriveTimeContext(blockTimer, blockDurationS = DEFAULT_BLOCK_DURATION_S) {
+  const safeDuration = Math.max(1, blockDurationS)
+  const switch1 = Math.floor(safeDuration / 3)
+  const switch2 = Math.floor((safeDuration * 2) / 3)
+  const index = blockTimer >= switch2 ? 2 : blockTimer >= switch1 ? 1 : 0
+  return {
+    dayPhase: DAY_PHASES[index],
+    worldClockLabel: DAY_TIME_LABELS[index],
+  }
+}
 
 export { HOB_STATUS, LAUNDRY_RULES }
 
@@ -74,6 +94,9 @@ export const useGameStore = create((set, get) => ({
   totalBlocks: 4,
   condition: null,
   taskPairId: null,
+  dayPhase: 'morning',
+  worldClockLabel: DAY_TIME_LABELS[0],
+  worldClockMilestones: DAY_TIME_LABELS,
 
   // ── Room Navigation ─────────────────────────────────────
   activeRoom: 'overview',
@@ -599,6 +622,8 @@ export const useGameStore = create((set, get) => ({
       taskPairId: blockData.taskPairId,
       blockRunning: false,
       blockTimer: 0,
+      dayPhase: 'morning',
+      worldClockLabel: DAY_TIME_LABELS[0],
       score: 0,
       servedCount: 0,
       hobs: initialHobs.map(h => ({ ...h })),
@@ -627,6 +652,8 @@ export const useGameStore = create((set, get) => ({
     phase: 'block_running',
     blockRunning: true,
     blockTimer: 0,
+    dayPhase: 'morning',
+    worldClockLabel: DAY_TIME_LABELS[0],
     encodingConfirmed: true,
     encodingQuizAttempts: quizAttempts,
   }),
@@ -643,6 +670,8 @@ export const useGameStore = create((set, get) => ({
       taskPairId: blockData.taskPairId,
       blockRunning: true,
       blockTimer: 0,
+      dayPhase: 'morning',
+      worldClockLabel: DAY_TIME_LABELS[0],
       score: 0,
       servedCount: 0,
       hobs: initialHobs.map(h => ({ ...h })),
@@ -670,7 +699,15 @@ export const useGameStore = create((set, get) => ({
     phase: 'block_end',
   })),
 
-  tickBlockTimer: () => set((s) => ({ blockTimer: s.blockTimer + 1 })),
+  tickBlockTimer: () => set((s) => {
+    const nextTimer = s.blockTimer + 1
+    const { dayPhase, worldClockLabel } = deriveTimeContext(nextTimer, getBlockDurationS(s.remoteConfig))
+    return {
+      blockTimer: nextTimer,
+      dayPhase,
+      worldClockLabel,
+    }
+  }),
 
   // ── Session Setup ──────────────────────────────────────
   setSession: (data) => set({

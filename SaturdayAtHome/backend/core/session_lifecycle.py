@@ -46,6 +46,95 @@ def shutdown_admin_queues():
             pass
 
 
+def compute_session_timer_s(row, now: float | None = None) -> float:
+    """Compute current elapsed session timer seconds from a DB row."""
+    if row is None:
+        return 0.0
+    now = now if now is not None else time.time()
+    elapsed = float(row["timer_elapsed_s"] or 0.0)
+    running_since = row["timer_running_since"]
+    if running_since is not None:
+        elapsed += max(0.0, now - float(running_since))
+    return elapsed
+
+
+def mark_session_online(session_id: str, db_path=None):
+    """Mark participant online and (re)start running timer for this session."""
+    from core.config import DB_PATH as DEFAULT_DB_PATH
+    from core.database import get_db
+
+    now = time.time()
+    db = get_db(db_path or DEFAULT_DB_PATH)
+    row = db.execute(
+        "SELECT timer_started_at, timer_running_since FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    if not row:
+        db.close()
+        return
+
+    timer_started_at = row["timer_started_at"] if row["timer_started_at"] is not None else now
+    timer_running_since = row["timer_running_since"] if row["timer_running_since"] is not None else now
+    db.execute(
+        "UPDATE sessions SET is_online = 1, timer_started_at = ?, timer_running_since = ? WHERE session_id = ?",
+        (timer_started_at, timer_running_since, session_id),
+    )
+    db.commit()
+    db.close()
+
+
+def mark_session_offline(session_id: str, db_path=None):
+    """Mark participant offline and pause timer accumulation for this session."""
+    from core.config import DB_PATH as DEFAULT_DB_PATH
+    from core.database import get_db
+
+    now = time.time()
+    db = get_db(db_path or DEFAULT_DB_PATH)
+    row = db.execute(
+        "SELECT timer_elapsed_s, timer_running_since FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    if not row:
+        db.close()
+        return
+
+    elapsed = float(row["timer_elapsed_s"] or 0.0)
+    running_since = row["timer_running_since"]
+    if running_since is not None:
+        elapsed += max(0.0, now - float(running_since))
+
+    db.execute(
+        "UPDATE sessions SET is_online = 0, timer_elapsed_s = ?, timer_running_since = NULL WHERE session_id = ?",
+        (elapsed, session_id),
+    )
+    db.commit()
+    db.close()
+
+
+def pause_all_online_sessions(db_path):
+    """Pause timers for sessions left online by stale connections (e.g., server restart)."""
+    from core.database import get_db
+
+    now = time.time()
+    db = get_db(db_path)
+    rows = db.execute(
+        "SELECT session_id, timer_elapsed_s, timer_running_since FROM sessions "
+        "WHERE is_online = 1 OR timer_running_since IS NOT NULL"
+    ).fetchall()
+
+    for row in rows:
+        elapsed = float(row["timer_elapsed_s"] or 0.0)
+        running_since = row["timer_running_since"]
+        if running_since is not None:
+            elapsed += max(0.0, now - float(running_since))
+        db.execute(
+            "UPDATE sessions SET is_online = 0, timer_elapsed_s = ?, timer_running_since = NULL WHERE session_id = ?",
+            (elapsed, row["session_id"]),
+        )
+    db.commit()
+    db.close()
+
+
 # ── SessionPhase ────────────────────────────────────────────
 
 class SessionPhase(str, Enum):
@@ -151,15 +240,21 @@ async def heartbeat_monitor(db_path, active_timelines: dict):
             conn.row_factory = sqlite3.Row
             now = time.time()
             rows = conn.execute(
-                "SELECT session_id, participant_id, latin_square_group, last_heartbeat "
+                "SELECT session_id, participant_id, latin_square_group, last_heartbeat, "
+                "timer_elapsed_s, timer_running_since "
                 "FROM sessions WHERE phase = 'block' AND is_interrupted = 0"
             ).fetchall()
             for row in rows:
                 last = row["last_heartbeat"]
                 if last and (now - last) > 30:
+                    elapsed = float(row["timer_elapsed_s"] or 0.0)
+                    running_since = row["timer_running_since"]
+                    if running_since is not None:
+                        elapsed += max(0.0, now - float(running_since))
                     conn.execute(
-                        "UPDATE sessions SET is_interrupted = 1 WHERE session_id = ?",
-                        (row["session_id"],),
+                        "UPDATE sessions SET is_interrupted = 1, is_online = 0, "
+                        "timer_elapsed_s = ?, timer_running_since = NULL WHERE session_id = ?",
+                        (elapsed, row["session_id"]),
                     )
                     conn.execute(
                         """INSERT INTO session_events

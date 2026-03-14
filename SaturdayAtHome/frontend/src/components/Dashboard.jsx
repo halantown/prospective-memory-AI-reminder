@@ -12,6 +12,13 @@ const btnPurple = `${btn} bg-purple-600 hover:bg-purple-700 text-white`
 
 const HOB_COLORS = { empty: 'bg-gray-600', cooking: 'bg-pink-500', ready: 'bg-amber-400 animate-pulse', burning: 'bg-red-600 animate-ping' }
 const HOB_TEXT = { empty: 'text-gray-500', cooking: 'text-pink-300', ready: 'text-amber-300', burning: 'text-red-300' }
+const fmtDuration = (seconds = 0) => {
+  const total = Math.max(0, Math.floor(seconds))
+  const h = String(Math.floor(total / 3600)).padStart(2, '0')
+  const m = String(Math.floor((total % 3600) / 60)).padStart(2, '0')
+  const s = String(total % 60).padStart(2, '0')
+  return `${h}:${m}:${s}`
+}
 
 function Panel({ title, children, className = '' }) {
   return (
@@ -128,7 +135,7 @@ export default function Dashboard() {
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null }
 
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const url = `${protocol}://${window.location.host}/api/session/${sessionRef.current.session_id}/block/${blockNum}/stream?auto_start=false`
+    const url = `${protocol}://${window.location.host}/api/session/${sessionRef.current.session_id}/block/${blockNum}/stream?auto_start=false&client=dashboard`
     setWsStatus('connecting')
 
     const ws = new WebSocket(url)
@@ -226,6 +233,8 @@ export default function Dashboard() {
             <Panel title="📋 Session">
               <div className="text-xs space-y-1 text-gray-400">
                 <div>WS clients: <b className="text-cyan-400">{sessionState?.ws_clients || 0}</b></div>
+                <div>Participant: <b className={sessionState?.is_online ? 'text-emerald-400' : 'text-gray-500'}>{sessionState?.is_online ? 'online' : 'offline'}</b></div>
+                <div>Timer: <b className="text-cyan-300">{fmtDuration(sessionState?.session_timer_s || 0)}</b></div>
                 <div>Active timelines: <b className="text-cyan-400">{sessionState?.active_timelines?.length || 0}</b></div>
               </div>
             </Panel>

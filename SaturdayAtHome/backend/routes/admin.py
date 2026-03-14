@@ -20,11 +20,12 @@ from core.ws import send_ws, ws_queues, clear_session_ws_queues
 from core.session_lifecycle import (
     broadcast_admin, register_admin_client, unregister_admin_client,
     _ADMIN_SHUTDOWN, next_participant_id, generate_token, SessionPhase,
-    transition_phase,
+    transition_phase, compute_session_timer_s,
 )
 import core.session_lifecycle as session_lifecycle
 
 logger = logging.getLogger("saturday.routes.admin")
+_ADMIN_STREAM_IDLE_TIMEOUT_S = 5
 
 router = APIRouter(prefix="/admin")
 
@@ -99,7 +100,7 @@ async def admin_stream(websocket: WebSocket):
         await websocket.send_json({"event_type": "keepalive", "ts": time.time()})
         while not session_lifecycle._admin_shutdown:
             try:
-                event = await asyncio.wait_for(q.get(), timeout=30)
+                event = await asyncio.wait_for(q.get(), timeout=_ADMIN_STREAM_IDLE_TIMEOUT_S)
                 if event is _ADMIN_SHUTDOWN:
                     break
                 await websocket.send_json(event)
@@ -202,6 +203,14 @@ async def admin_session_state(session_id: str):
     hobs = get_session_hobs(session_id)
     for h in hobs:
         reconcile_hob(h)
+    db = get_db(DB_PATH)
+    srow = db.execute(
+        "SELECT is_online, timer_started_at, timer_running_since, timer_elapsed_s "
+        "FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    db.close()
+    timer_s = compute_session_timer_s(srow, time.time()) if srow else 0.0
 
     return {
         "hobs": [
@@ -212,6 +221,9 @@ async def admin_session_state(session_id: str):
         ],
         "active_timelines": [k for k in active_timelines.keys() if k.startswith(session_id)],
         "ws_clients": len(ws_queues.get(session_id, [])),
+        "is_online": bool(srow["is_online"]) if srow else False,
+        "timer_started_at": srow["timer_started_at"] if srow else None,
+        "session_timer_s": timer_s,
     }
 
 
@@ -237,14 +249,13 @@ async def admin_active_session():
      but marks it as ``live: false`` so the frontend knows not to auto-connect WS.
     Returns null if no meaningful session exists.
     """
-    for sid, queues in ws_queues.items():
-        if len(queues) > 0:
-            db = get_db(DB_PATH)
-            row = db.execute("SELECT * FROM sessions WHERE session_id = ?", (sid,)).fetchone()
-            db.close()
-            if row:
-                return {**dict(row), "live": True}
     db = get_db(DB_PATH)
+    row = db.execute(
+        "SELECT * FROM sessions WHERE is_online = 1 ORDER BY created_at DESC LIMIT 1"
+    ).fetchone()
+    if row:
+        db.close()
+        return {**dict(row), "live": True}
     row = db.execute(
         "SELECT * FROM sessions WHERE phase NOT IN ('finished') AND is_interrupted = 0"
         " ORDER BY created_at DESC LIMIT 1"
@@ -256,7 +267,7 @@ async def admin_active_session():
 @router.delete("/session/{session_id}")
 async def admin_delete_session(session_id: str):
     """Delete a session and all its data."""
-    from routes.session import active_timelines
+    from routes.session import active_timelines, participant_ws_counts
 
     db = get_db(DB_PATH)
     db.execute("DELETE FROM action_logs WHERE session_id = ?", (session_id,))
@@ -272,6 +283,7 @@ async def admin_delete_session(session_id: str):
     clear_session_hobs(session_id)
     clear_session_ws_queues(session_id)
     clear_session_windows(session_id)
+    participant_ws_counts.pop(session_id, None)
 
     for k in list(active_timelines.keys()):
         if k.startswith(session_id):

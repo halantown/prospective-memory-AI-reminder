@@ -27,7 +27,11 @@ def init_db(db_path: Path):
         token            TEXT UNIQUE,
         current_block    INTEGER DEFAULT -1,
         is_interrupted   BOOLEAN DEFAULT 0,
-        last_heartbeat   REAL
+        last_heartbeat   REAL,
+        timer_started_at REAL,
+        timer_running_since REAL,
+        timer_elapsed_s  REAL DEFAULT 0,
+        is_online        BOOLEAN DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS encoding_logs (
@@ -147,6 +151,10 @@ def init_db(db_path: Path):
         "ALTER TABLE sessions ADD COLUMN current_block INTEGER DEFAULT -1",
         "ALTER TABLE sessions ADD COLUMN is_interrupted BOOLEAN DEFAULT 0",
         "ALTER TABLE sessions ADD COLUMN last_heartbeat REAL",
+        "ALTER TABLE sessions ADD COLUMN timer_started_at REAL",
+        "ALTER TABLE sessions ADD COLUMN timer_running_since REAL",
+        "ALTER TABLE sessions ADD COLUMN timer_elapsed_s REAL DEFAULT 0",
+        "ALTER TABLE sessions ADD COLUMN is_online BOOLEAN DEFAULT 0",
     ]:
         try:
             db.execute(col_sql)

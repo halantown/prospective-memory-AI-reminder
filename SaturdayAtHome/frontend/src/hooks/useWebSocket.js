@@ -52,7 +52,7 @@ export default function useWebSocket() {
 
     const connect = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      const url = `${protocol}://${window.location.host}/api/session/${sessionId}/block/${blockNumber}/stream`
+      const url = `${protocol}://${window.location.host}/api/session/${sessionId}/block/${blockNumber}/stream?client=participant`
       console.log('[WS] Connecting to', url)
 
       const ws = new WebSocket(url)

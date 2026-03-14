@@ -12,6 +12,26 @@ const DETERGENTS = ['warm', 'cold', 'white']
 const TEMPS = [30, 40, 60]
 
 const STATUS_ICON = { washing: '🫧', jammed: '⚠️', done: '✅', idle: '📦', selecting: '👕' }
+const LIGHT_THEME = {
+  morning: {
+    icon: 'text-sky-400',
+    title: 'text-sky-800',
+    collapsedText: 'text-slate-600',
+    overlay: 'bg-gradient-to-b from-sky-100/90 via-white/20 to-transparent',
+  },
+  afternoon: {
+    icon: 'text-amber-500',
+    title: 'text-amber-900',
+    collapsedText: 'text-slate-700',
+    overlay: 'bg-gradient-to-b from-amber-200/80 via-orange-50/30 to-transparent',
+  },
+  evening: {
+    icon: 'text-indigo-300',
+    title: 'text-indigo-900',
+    collapsedText: 'text-slate-700',
+    overlay: 'bg-gradient-to-b from-indigo-200/75 via-purple-100/40 to-transparent',
+  },
+}
 
 function JamCountdown({ deadline }) {
   const [seconds, setSeconds] = useState(0)
@@ -27,6 +47,7 @@ function JamCountdown({ deadline }) {
 
 export default function BalconyCard({ isExpanded }) {
   const laundry = useGameStore((s) => s.laundry)
+  const dayPhase = useGameStore((s) => s.dayPhase)
   const pickGarment = useGameStore((s) => s.pickGarment)
   const selectDetergent = useGameStore((s) => s.selectDetergent)
   const selectTemp = useGameStore((s) => s.selectTemp)
@@ -42,17 +63,20 @@ export default function BalconyCard({ isExpanded }) {
     ? Math.max(0, Math.ceil((washDuration - washProgress) / 1000))
     : 0
   const progressPct = washDuration > 0 ? (washProgress / washDuration) * 100 : 0
+  const lightTheme = LIGHT_THEME[dayPhase] || LIGHT_THEME.morning
 
   /* ── Collapsed (overview) mode ── */
   if (!isExpanded) {
     return (
-      <div className="flex flex-col items-center justify-center w-full h-full p-4 gap-2">
-        <Droplets size={28} className="text-sky-400" />
-        <h3 className="text-lg font-black tracking-wider text-sky-800">Balcony</h3>
-        <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
+      <div className="flex flex-col items-center justify-center w-full h-full p-4 gap-2 transition-colors duration-700">
+        <Droplets size={28} className={lightTheme.icon} />
+        <h3 className={`text-lg font-black tracking-wider ${lightTheme.title}`}>Balcony</h3>
+        <div className={`flex items-center gap-2 text-sm font-medium ${lightTheme.collapsedText}`}>
           <span>📦 {pile?.length ?? 0}</span>
           <span>{STATUS_ICON[washStatus] || STATUS_ICON.idle}</span>
-          <span className="text-xs text-slate-400">{completedCount ?? 0} done</span>
+          <span className="text-xs text-slate-400">
+            {completedCount ?? 0} done
+          </span>
         </div>
       </div>
     )
@@ -60,9 +84,11 @@ export default function BalconyCard({ isExpanded }) {
 
   /* ── Expanded mode ── */
   return (
-    <div className="flex flex-col w-full h-full p-6 relative overflow-auto">
+    <div className="flex flex-col w-full h-full p-6 relative overflow-auto transition-colors duration-700">
+      <div className={`absolute inset-0 pointer-events-none ${lightTheme.overlay}`} />
+
       {/* Header */}
-      <div className="flex items-center gap-3 text-sky-800 mb-4">
+      <div className={`relative z-10 flex items-center gap-3 mb-4 ${lightTheme.title}`}>
         <Droplets size={28} />
         <h2 className="text-2xl font-black tracking-wider">Balcony — Laundry Station</h2>
         <span className="ml-auto text-sm text-slate-500 font-medium">
@@ -71,7 +97,7 @@ export default function BalconyCard({ isExpanded }) {
       </div>
 
       {/* Top row: garment pile + washing machine status */}
-      <div className="flex gap-6 mb-6">
+      <div className="relative z-10 flex gap-6 mb-6">
         {/* Garment pile */}
         <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-200 p-4 flex flex-col items-center gap-2">
           <span className="text-sm font-bold text-slate-600 uppercase tracking-wide">Garment Pile</span>
@@ -163,7 +189,7 @@ export default function BalconyCard({ isExpanded }) {
 
       {/* Current garment selection area */}
       {washStatus === 'selecting' && currentGarment && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="relative z-10 bg-white rounded-2xl border border-slate-200 p-5">
           <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
             <span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Current Garment</span>
           </div>

@@ -20,7 +20,10 @@ from core.ws import send_ws, register_ws_client, websocket_pump
 from core.timeline import BlockTimeline
 from services.hob_service import reset_session_hobs
 from services.window_service import reset_session_windows
-from core.session_lifecycle import SessionPhase, transition_phase, broadcast_admin
+from core.session_lifecycle import (
+    SessionPhase, transition_phase, broadcast_admin,
+    mark_session_online, mark_session_offline,
+)
 
 logger = logging.getLogger("saturday.routes.session")
 
@@ -28,6 +31,8 @@ router = APIRouter()
 
 # Active block timelines: "sessionId_blockNum" → BlockTimeline
 active_timelines: dict[str, BlockTimeline] = {}
+# Active participant stream connections per session (dashboard/observer excluded)
+participant_ws_counts: dict[str, int] = {}
 
 
 @router.post("/session/start", response_model=SessionStartResponse)
@@ -61,6 +66,15 @@ async def start_session(req: TokenSessionStartRequest):
     else:
         try:
             transition_phase(db, row["session_id"], SessionPhase.ENCODING)
+            now = time.time()
+            db.execute(
+                "UPDATE sessions SET timer_started_at = COALESCE(timer_started_at, ?), "
+                "timer_running_since = COALESCE(timer_running_since, ?), "
+                "timer_elapsed_s = COALESCE(timer_elapsed_s, 0), is_online = 1 "
+                "WHERE session_id = ?",
+                (now, now, row["session_id"]),
+            )
+            db.commit()
         finally:
             db.close()
 
@@ -110,12 +124,28 @@ async def get_block_config(session_id: str, block_num: int):
 
 
 @router.websocket("/session/{session_id}/block/{block_num}/stream")
-async def block_stream(websocket: WebSocket, session_id: str, block_num: int, auto_start: bool = True):
+async def block_stream(
+    websocket: WebSocket,
+    session_id: str,
+    block_num: int,
+    auto_start: bool = True,
+    client: str = "participant",
+):
     """WebSocket endpoint — pushes block timeline events to the frontend."""
     await websocket.accept()
-    logger.info(f"WS connect [{session_id}] block={block_num} auto_start={auto_start}")
+    client = (client or "participant").strip().lower()
+    is_participant_client = client != "dashboard"
+    logger.info(
+        f"WS connect [{session_id}] block={block_num} auto_start={auto_start} client={client}"
+    )
 
     queue = register_ws_client(session_id)
+    if is_participant_client:
+        prev = participant_ws_counts.get(session_id, 0)
+        participant_ws_counts[session_id] = prev + 1
+        if prev == 0:
+            mark_session_online(session_id)
+
     # Send an immediate heartbeat frame so the client transitions to OPEN quickly.
     try:
         queue.put_nowait({"event": "keepalive", "data": {}, "ts": time.time()})
@@ -143,7 +173,16 @@ async def block_stream(websocket: WebSocket, session_id: str, block_num: int, au
                 active_timelines[timeline_key] = tl
                 tl._task = asyncio.create_task(tl.run())
 
-    await websocket_pump(session_id, queue, websocket)
+    try:
+        await websocket_pump(session_id, queue, websocket)
+    finally:
+        if is_participant_client:
+            count = participant_ws_counts.get(session_id, 0)
+            if count <= 1:
+                participant_ws_counts.pop(session_id, None)
+                mark_session_offline(session_id)
+            else:
+                participant_ws_counts[session_id] = count - 1
 
 
 @router.post("/session/{session_id}/heartbeat")

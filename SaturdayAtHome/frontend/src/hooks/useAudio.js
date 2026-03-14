@@ -8,6 +8,7 @@ import { useEffect, useRef } from 'react'
 import { useGameStore } from '../store/gameStore'
 import {
   initBGM, stopBGM, unlockAudio,
+  setBGMNormalVolume,
   sfxSteakReady, sfxSteakBurning,
   sfxMessageNotify, sfxMessageTimeout,
   sfxScorePlus, sfxScoreMinus,
@@ -19,6 +20,7 @@ export function useAudio() {
   const score = useGameStore((s) => s.score)
   const hobs = useGameStore((s) => s.hobs)
   const messageBubbles = useGameStore((s) => s.messageBubbles)
+  const dayPhase = useGameStore((s) => s.dayPhase)
   const robotText = useGameStore((s) => s.robotText)
   const robotSpeaking = useGameStore((s) => s.robotSpeaking)
   const setRobotSpeaking = useGameStore((s) => s.setRobotSpeaking)
@@ -49,6 +51,16 @@ export function useAudio() {
       stopBGM()
     }
   }, [phase])
+
+  // Day phase ambience → subtle BGM contour changes
+  useEffect(() => {
+    if (phase !== 'block_running') return
+    const targetVolume =
+      dayPhase === 'evening' ? 0.28 :
+      dayPhase === 'afternoon' ? 0.32 :
+      0.35
+    setBGMNormalVolume(targetVolume, 1800)
+  }, [dayPhase, phase])
 
   // Score change → ding / thud
   useEffect(() => {

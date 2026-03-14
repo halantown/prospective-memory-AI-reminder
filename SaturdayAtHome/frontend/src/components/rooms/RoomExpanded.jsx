@@ -23,14 +23,26 @@ const roomBg = {
   messages: 'bg-slate-50',
 }
 
+const balconyBgByPhase = {
+  morning: 'bg-sky-50',
+  afternoon: 'bg-amber-50',
+  evening: 'bg-indigo-100',
+}
+
 export default function RoomExpanded() {
   const activeRoom = useGameStore((s) => s.activeRoom)
   const setActiveRoom = useGameStore((s) => s.setActiveRoom)
+  const dayPhase = useGameStore((s) => s.dayPhase)
 
   if (activeRoom === 'overview') return null
 
   const RoomComponent = roomComponents[activeRoom]
   if (!RoomComponent) return null
+
+  const bgClass =
+    activeRoom === 'balcony'
+      ? (balconyBgByPhase[dayPhase] || balconyBgByPhase.morning)
+      : roomBg[activeRoom]
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -48,7 +60,7 @@ export default function RoomExpanded() {
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.98 }}
-        className={`relative w-[68%] h-[72%] rounded-[32px] shadow-2xl pointer-events-auto overflow-hidden will-change-transform transform-gpu ${roomBg[activeRoom]}`}
+        className={`relative w-[68%] h-[72%] rounded-[32px] shadow-2xl pointer-events-auto overflow-hidden will-change-transform transform-gpu transition-colors duration-700 ${bgClass}`}
         transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}
       >
         <RoomComponent isExpanded={true} />
