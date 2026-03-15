@@ -25,8 +25,11 @@ const roomBg = {
 
 const balconyBgByPhase = {
   morning: 'bg-sky-50',
+  noon: 'bg-cyan-50',
   afternoon: 'bg-amber-50',
+  sunset: 'bg-orange-100',
   evening: 'bg-indigo-100',
+  night: 'bg-slate-200',
 }
 
 export default function RoomExpanded() {

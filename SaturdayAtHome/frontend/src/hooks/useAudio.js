@@ -56,8 +56,11 @@ export function useAudio() {
   useEffect(() => {
     if (phase !== 'block_running') return
     const targetVolume =
+      dayPhase === 'night' ? 0.26 :
       dayPhase === 'evening' ? 0.28 :
+      dayPhase === 'sunset' ? 0.30 :
       dayPhase === 'afternoon' ? 0.32 :
+      dayPhase === 'noon' ? 0.34 :
       0.35
     setBGMNormalVolume(targetVolume, 1800)
   }, [dayPhase, phase])

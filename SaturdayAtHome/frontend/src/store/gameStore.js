@@ -48,8 +48,33 @@ const initialLaundry = () => ({
 
 const ts = () => Date.now()
 const DEFAULT_BLOCK_DURATION_S = 510
-const DAY_TIME_LABELS = ['14:00', '17:00', '19:00']
-const DAY_PHASES = ['morning', 'afternoon', 'evening']
+const SIM_DAY_START_SEC = 10 * 3600
+const SIM_DAY_END_SEC = 23 * 3600
+const SIM_DAY_RANGE_SEC = SIM_DAY_END_SEC - SIM_DAY_START_SEC
+const DAY_PHASE_SPECS = [
+  { phase: 'morning', clockSec: 10 * 3600, cue: 'Wake-up light' },
+  { phase: 'noon', clockSec: 13 * 3600, cue: 'Bright noon light' },
+  { phase: 'afternoon', clockSec: 16 * 3600, cue: 'Warm afternoon light' },
+  { phase: 'sunset', clockSec: 19 * 3600, cue: 'Sunset amber light' },
+  { phase: 'evening', clockSec: 21 * 3600, cue: 'Evening blue light' },
+  { phase: 'night', clockSec: 23 * 3600, cue: 'Night calm ambience' },
+]
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+function formatClock(secondsOfDay) {
+  const total = ((Math.floor(secondsOfDay) % 86400) + 86400) % 86400
+  const hh = String(Math.floor(total / 3600)).padStart(2, '0')
+  const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
+function formatBlockTimer(totalSec) {
+  const safe = Math.max(0, Math.floor(totalSec))
+  const mm = String(Math.floor(safe / 60)).padStart(2, '0')
+  const ss = String(safe % 60).padStart(2, '0')
+  return `${mm}:${ss}`
+}
 
 function getBlockDurationS(remoteConfig) {
   const ms = Number(remoteConfig?.timers?.block_duration_ms)
@@ -57,14 +82,29 @@ function getBlockDurationS(remoteConfig) {
   return Math.max(1, Math.round(ms / 1000))
 }
 
+function buildWorldClockSchedule(blockDurationS = DEFAULT_BLOCK_DURATION_S) {
+  const safeDuration = Math.max(1, blockDurationS)
+  return DAY_PHASE_SPECS.map((spec) => {
+    const ratio = (spec.clockSec - SIM_DAY_START_SEC) / SIM_DAY_RANGE_SEC
+    const atSec = Math.round(safeDuration * clamp(ratio, 0, 1))
+    return {
+      atSec,
+      atLabel: formatBlockTimer(atSec),
+      worldClockLabel: formatClock(spec.clockSec),
+      phase: spec.phase,
+      cue: spec.cue,
+    }
+  })
+}
+
 function deriveTimeContext(blockTimer, blockDurationS = DEFAULT_BLOCK_DURATION_S) {
   const safeDuration = Math.max(1, blockDurationS)
-  const switch1 = Math.floor(safeDuration / 3)
-  const switch2 = Math.floor((safeDuration * 2) / 3)
-  const index = blockTimer >= switch2 ? 2 : blockTimer >= switch1 ? 1 : 0
+  const progress = clamp(blockTimer / safeDuration, 0, 1)
+  const simulatedSec = SIM_DAY_START_SEC + progress * SIM_DAY_RANGE_SEC
+  const currentSpec = [...DAY_PHASE_SPECS].reverse().find((spec) => simulatedSec >= spec.clockSec) || DAY_PHASE_SPECS[0]
   return {
-    dayPhase: DAY_PHASES[index],
-    worldClockLabel: DAY_TIME_LABELS[index],
+    dayPhase: currentSpec.phase,
+    worldClockLabel: formatClock(simulatedSec),
   }
 }
 
@@ -78,7 +118,15 @@ export const useGameStore = create((set, get) => ({
   loadRemoteConfig: async () => {
     const cfg = await fetchGameConfig()
     if (!cfg) return
-    set({ remoteConfig: cfg, configLoaded: true })
+    const durationS = getBlockDurationS(cfg)
+    const timeContext = deriveTimeContext(get().blockTimer, durationS)
+    set({
+      remoteConfig: cfg,
+      configLoaded: true,
+      worldClockSchedule: buildWorldClockSchedule(durationS),
+      dayPhase: timeContext.dayPhase,
+      worldClockLabel: timeContext.worldClockLabel,
+    })
     console.log('[Config] Remote config loaded:', Object.keys(cfg))
   },
 
@@ -95,8 +143,8 @@ export const useGameStore = create((set, get) => ({
   condition: null,
   taskPairId: null,
   dayPhase: 'morning',
-  worldClockLabel: DAY_TIME_LABELS[0],
-  worldClockMilestones: DAY_TIME_LABELS,
+  worldClockLabel: '10:00',
+  worldClockSchedule: buildWorldClockSchedule(DEFAULT_BLOCK_DURATION_S),
 
   // ── Room Navigation ─────────────────────────────────────
   activeRoom: 'overview',
@@ -615,6 +663,8 @@ export const useGameStore = create((set, get) => ({
   encodingQuizAttempts: 0,
 
   startBlockEncoding: (blockData) => {
+    const durationS = getBlockDurationS(get().remoteConfig)
+    const timeContext = deriveTimeContext(0, durationS)
     set({
       phase: 'block_encoding',
       blockNumber: blockData.blockNumber,
@@ -622,8 +672,9 @@ export const useGameStore = create((set, get) => ({
       taskPairId: blockData.taskPairId,
       blockRunning: false,
       blockTimer: 0,
-      dayPhase: 'morning',
-      worldClockLabel: DAY_TIME_LABELS[0],
+      dayPhase: timeContext.dayPhase,
+      worldClockLabel: timeContext.worldClockLabel,
+      worldClockSchedule: buildWorldClockSchedule(durationS),
       score: 0,
       servedCount: 0,
       hobs: initialHobs.map(h => ({ ...h })),
@@ -648,21 +699,28 @@ export const useGameStore = create((set, get) => ({
     get().initLaundryPile()
   },
 
-  confirmEncoding: (quizAttempts = 1) => set({
-    phase: 'block_running',
-    blockRunning: true,
-    blockTimer: 0,
-    dayPhase: 'morning',
-    worldClockLabel: DAY_TIME_LABELS[0],
-    encodingConfirmed: true,
-    encodingQuizAttempts: quizAttempts,
-  }),
+  confirmEncoding: (quizAttempts = 1) => {
+    const durationS = getBlockDurationS(get().remoteConfig)
+    const timeContext = deriveTimeContext(0, durationS)
+    set({
+      phase: 'block_running',
+      blockRunning: true,
+      blockTimer: 0,
+      dayPhase: timeContext.dayPhase,
+      worldClockLabel: timeContext.worldClockLabel,
+      worldClockSchedule: buildWorldClockSchedule(durationS),
+      encodingConfirmed: true,
+      encodingQuizAttempts: quizAttempts,
+    })
+  },
 
   // ── Block Control ──────────────────────────────────────
   blockTimer: 0,
   blockRunning: false,
 
   startBlock: (blockData) => {
+    const durationS = getBlockDurationS(get().remoteConfig)
+    const timeContext = deriveTimeContext(0, durationS)
     set({
       phase: 'block_running',
       blockNumber: blockData.blockNumber,
@@ -670,8 +728,9 @@ export const useGameStore = create((set, get) => ({
       taskPairId: blockData.taskPairId,
       blockRunning: true,
       blockTimer: 0,
-      dayPhase: 'morning',
-      worldClockLabel: DAY_TIME_LABELS[0],
+      dayPhase: timeContext.dayPhase,
+      worldClockLabel: timeContext.worldClockLabel,
+      worldClockSchedule: buildWorldClockSchedule(durationS),
       score: 0,
       servedCount: 0,
       hobs: initialHobs.map(h => ({ ...h })),

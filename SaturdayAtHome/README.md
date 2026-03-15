@@ -159,13 +159,22 @@ WHERE id = (
 - TV (idle, no score impact)
 
 ### Balcony
-- Fixed in-block ambience milestones: `14:00 → 17:00 → 19:00` (sidebar + room light palette)
-- Sky/light palette shifts morning → afternoon → evening with non-interruptive transitions
+- In-block day simulation now runs from **10:00 → 23:00** based on block timer progress
+- Sidebar shows strict trigger schedule: **at `mm:ss`, switch to a defined world-time cue**
+- Sky/light palette shifts by phase (morning/noon/afternoon/sunset/evening/night) with non-interruptive transitions
 - Washing machine
 
 ### Ambient Audio
 - BGM keeps playing continuously during block
-- Subtle level contour by day phase (morning > afternoon > evening) while preserving robot ducking
+- Subtle level contour by day phase (morning > noon > afternoon > sunset > evening > night) while preserving robot ducking
+
+Default trigger points when block duration is 510s:
+- `00:00` → `10:00` (Wake-up light)
+- `01:58` → `13:00` (Bright noon light)
+- `03:55` → `16:00` (Warm afternoon light)
+- `05:53` → `19:00` (Sunset amber light)
+- `07:12` → `21:00` (Evening blue light)
+- `08:30` → `23:00` (Night calm ambience)
 
 ### TODO Backlog
 - Dedicated window lighting renderer is not yet modeled in current room scene; current build uses balcony/room tint transitions as a proxy.

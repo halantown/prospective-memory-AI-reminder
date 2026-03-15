@@ -9,6 +9,13 @@ const rooms = [
   { id: 'messages', label: 'Inbox',    icon: Mail },
 ]
 
+function formatBlockTimer(totalSec) {
+  const safe = Math.max(0, Math.floor(totalSec))
+  const mm = String(Math.floor(safe / 60)).padStart(2, '0')
+  const ss = String(safe % 60).padStart(2, '0')
+  return `${mm}:${ss}`
+}
+
 function StatusDot({ color }) {
   if (color === 'red') return (
     <span className="relative flex h-3.5 w-3.5 shrink-0">
@@ -84,9 +91,10 @@ export default function Sidebar() {
   const getInboxStatus = useGameStore((s) => s.getInboxStatus)
   const unreadCount = useGameStore((s) => s.unreadCount)
   const score = useGameStore((s) => s.score)
+  const blockTimer = useGameStore((s) => s.blockTimer)
   const dayPhase = useGameStore((s) => s.dayPhase)
   const worldClockLabel = useGameStore((s) => s.worldClockLabel)
-  const worldClockMilestones = useGameStore((s) => s.worldClockMilestones)
+  const worldClockSchedule = useGameStore((s) => s.worldClockSchedule)
 
   const kitchenStatus = getKitchenStatus()
   const balconyStatus = getBalconyStatus()
@@ -121,9 +129,18 @@ export default function Sidebar() {
   ]
 
   const phaseLabel =
-    dayPhase === 'evening' ? 'Evening glow' :
+    dayPhase === 'night' ? 'Night calm' :
+    dayPhase === 'evening' ? 'Evening blue' :
+    dayPhase === 'sunset' ? 'Sunset amber' :
+    dayPhase === 'noon' ? 'Bright noon' :
     dayPhase === 'afternoon' ? 'Afternoon light' :
     'Morning light'
+
+  const currentScheduleIndex = (worldClockSchedule || []).reduce(
+    (idx, row, i) => (blockTimer >= row.atSec ? i : idx),
+    -1
+  )
+  const endAt = worldClockSchedule?.[worldClockSchedule.length - 1]?.atSec || 0
 
   return (
     <div className="w-52 bg-slate-900 shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-40 flex flex-col py-4 px-3 gap-2 border-l border-slate-800 text-slate-400 overflow-y-auto">
@@ -191,17 +208,19 @@ export default function Sidebar() {
       {/* ── Time progression ── */}
       <div className="px-1">
         <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">Time of Day</h3>
-        <div className="text-xs text-slate-300 mb-1.5">{(worldClockMilestones || []).join(' → ')}</div>
-        <div className="flex items-center justify-between gap-1">
-          {(worldClockMilestones || []).map((label) => (
-            <span
-              key={label}
-              className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${
-                label === worldClockLabel ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400'
-              }`}
-            >
-              {label}
-            </span>
+        <div className="text-[11px] text-slate-500 mb-1.5">
+          Game timer: {formatBlockTimer(blockTimer)} / {formatBlockTimer(endAt)}
+        </div>
+        <div className="space-y-1.5 mb-1.5">
+          {(worldClockSchedule || []).map((row, i) => (
+            <div key={`${row.phase}-${row.atSec}`} className="grid grid-cols-[40px_1fr] gap-1.5 text-[10px] leading-tight">
+              <span className={`${i <= currentScheduleIndex ? 'text-indigo-300 font-semibold' : 'text-slate-500'}`}>
+                {row.atLabel}
+              </span>
+              <span className={`${i === currentScheduleIndex ? 'text-slate-100' : 'text-slate-300'}`}>
+                {row.worldClockLabel} {row.cue}
+              </span>
+            </div>
           ))}
         </div>
         <div className="text-[11px] text-slate-500 mt-1.5">Now: {worldClockLabel} | {phaseLabel}</div>
