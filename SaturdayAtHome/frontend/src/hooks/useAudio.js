@@ -9,8 +9,9 @@ import { useGameStore } from '../store/gameStore'
 import {
   initBGM, stopBGM, unlockAudio,
   setBGMNormalVolume,
-  sfxSteakReady, sfxSteakBurning,
-  sfxMessageNotify, sfxMessageTimeout,
+  sfxSteakReady, sfxSteakFlip, sfxSteakBurning, sfxSteakAsh,
+  sfxMessageNotify,
+  sfxLaundryJam,
   sfxScorePlus, sfxScoreMinus,
   robotSpeak,
 } from '../utils/audio'
@@ -20,6 +21,7 @@ export function useAudio() {
   const score = useGameStore((s) => s.score)
   const hobs = useGameStore((s) => s.hobs)
   const messageBubbles = useGameStore((s) => s.messageBubbles)
+  const washStatus = useGameStore((s) => s.laundry?.washStatus)
   const dayPhase = useGameStore((s) => s.dayPhase)
   const robotText = useGameStore((s) => s.robotText)
   const robotSpeaking = useGameStore((s) => s.robotSpeaking)
@@ -28,6 +30,7 @@ export function useAudio() {
   const prevScore = useRef(score)
   const prevHobStatuses = useRef(hobs.map(h => h.status))
   const prevMsgCount = useRef(messageBubbles.length)
+  const prevWashStatus = useRef(washStatus)
   const prevRobotText = useRef(robotText)
   const audioUnlocked = useRef(false)
 
@@ -56,11 +59,8 @@ export function useAudio() {
   useEffect(() => {
     if (phase !== 'block_running') return
     const targetVolume =
-      dayPhase === 'night' ? 0.26 :
-      dayPhase === 'evening' ? 0.28 :
       dayPhase === 'sunset' ? 0.30 :
-      dayPhase === 'afternoon' ? 0.32 :
-      dayPhase === 'noon' ? 0.34 :
+      dayPhase === 'moon' ? 0.26 :
       0.35
     setBGMNormalVolume(targetVolume, 1800)
   }, [dayPhase, phase])
@@ -78,8 +78,10 @@ export function useAudio() {
     hobs.forEach((hob, i) => {
       const prev = prevHobStatuses.current[i]
       if (prev !== hob.status) {
-        if (hob.status === 'ready') sfxSteakReady()
+        if (prev === 'ready_side1' && hob.status === 'cooking_side2') sfxSteakFlip()
+        if (hob.status === 'ready_side1' || hob.status === 'ready_side2') sfxSteakReady()
         else if (hob.status === 'burning') sfxSteakBurning()
+        else if (hob.status === 'ash') sfxSteakAsh()
       }
     })
     prevHobStatuses.current = hobs.map(h => h.status)
@@ -92,6 +94,14 @@ export function useAudio() {
     }
     prevMsgCount.current = messageBubbles.length
   }, [messageBubbles.length])
+
+  // Laundry jam state → warning cue
+  useEffect(() => {
+    if (prevWashStatus.current !== washStatus && washStatus === 'jammed') {
+      sfxLaundryJam()
+    }
+    prevWashStatus.current = washStatus
+  }, [washStatus])
 
   // Message expired → check last expired
   useEffect(() => {

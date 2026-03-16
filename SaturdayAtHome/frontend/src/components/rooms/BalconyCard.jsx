@@ -13,41 +13,23 @@ const TEMPS = [30, 40, 60]
 
 const STATUS_ICON = { washing: '🫧', jammed: '⚠️', done: '✅', idle: '📦', selecting: '👕' }
 const LIGHT_THEME = {
-  morning: {
-    icon: 'text-sky-400',
-    title: 'text-sky-800',
-    collapsedText: 'text-slate-600',
-    overlay: 'bg-gradient-to-b from-sky-100/90 via-white/20 to-transparent',
-  },
-  noon: {
-    icon: 'text-cyan-500',
-    title: 'text-cyan-900',
-    collapsedText: 'text-slate-700',
-    overlay: 'bg-gradient-to-b from-cyan-100/80 via-sky-50/30 to-transparent',
-  },
-  afternoon: {
-    icon: 'text-amber-500',
-    title: 'text-amber-900',
-    collapsedText: 'text-slate-700',
-    overlay: 'bg-gradient-to-b from-amber-200/80 via-orange-50/30 to-transparent',
-  },
-  sunset: {
+  sun: {
     icon: 'text-orange-500',
     title: 'text-orange-900',
     collapsedText: 'text-slate-700',
-    overlay: 'bg-gradient-to-b from-orange-200/80 via-rose-100/35 to-transparent',
+    overlay: 'bg-gradient-to-b from-orange-200/85 via-amber-100/35 to-transparent',
   },
-  evening: {
-    icon: 'text-indigo-300',
-    title: 'text-indigo-900',
+  sunset: {
+    icon: 'text-amber-600',
+    title: 'text-amber-900',
     collapsedText: 'text-slate-700',
-    overlay: 'bg-gradient-to-b from-indigo-200/75 via-purple-100/40 to-transparent',
+    overlay: 'bg-gradient-to-b from-amber-100/75 via-slate-50/40 to-transparent',
   },
-  night: {
-    icon: 'text-slate-500',
-    title: 'text-slate-800',
-    collapsedText: 'text-slate-700',
-    overlay: 'bg-gradient-to-b from-slate-300/70 via-slate-200/35 to-transparent',
+  moon: {
+    icon: 'text-slate-400',
+    title: 'text-slate-100',
+    collapsedText: 'text-slate-200',
+    overlay: 'bg-gradient-to-b from-slate-400/65 via-slate-200/35 to-transparent',
   },
 }
 
@@ -81,7 +63,9 @@ export default function BalconyCard({ isExpanded }) {
     ? Math.max(0, Math.ceil((washDuration - washProgress) / 1000))
     : 0
   const progressPct = washDuration > 0 ? (washProgress / washDuration) * 100 : 0
-  const lightTheme = LIGHT_THEME[dayPhase] || LIGHT_THEME.morning
+  const lightTheme = LIGHT_THEME[dayPhase] || LIGHT_THEME.sun
+  const overflowThreshold = laundry?.overflowThreshold ?? 5
+  const isOverflowing = (pile?.length ?? 0) > overflowThreshold
 
   /* ── Collapsed (overview) mode ── */
   if (!isExpanded) {
@@ -92,10 +76,13 @@ export default function BalconyCard({ isExpanded }) {
         <div className={`flex items-center gap-2 text-sm font-medium ${lightTheme.collapsedText}`}>
           <span>📦 {pile?.length ?? 0}</span>
           <span>{STATUS_ICON[washStatus] || STATUS_ICON.idle}</span>
-          <span className="text-xs text-slate-400">
+          <span className={`text-xs ${dayPhase === 'moon' ? 'text-slate-300' : 'text-slate-400'}`}>
             {completedCount ?? 0} done
           </span>
         </div>
+        {isOverflowing && (
+          <span className="text-[11px] font-semibold text-red-500">Balcony pile is full</span>
+        )}
       </div>
     )
   }
@@ -129,6 +116,9 @@ export default function BalconyCard({ isExpanded }) {
             )}
           </div>
           <span className="text-base font-semibold text-slate-700">📦 {pile?.length ?? 0} items remaining</span>
+          {isOverflowing && (
+            <span className="text-sm font-semibold text-red-600">Over capacity: dry clothes area blocked</span>
+          )}
           {washStatus === 'idle' && (
             <motion.button whileTap={{ scale: 0.95 }}
               onClick={(e) => { e.stopPropagation(); pickGarment() }}
@@ -140,7 +130,7 @@ export default function BalconyCard({ isExpanded }) {
 
         {/* Washing machine box */}
         <div className={`flex-1 rounded-2xl border-2 p-4 flex flex-col items-center gap-2 transition-colors ${
-          washStatus === 'jammed' ? 'bg-red-50 border-red-300'
+          washStatus === 'jammed' ? 'bg-red-50 border-red-300 laundry-jam-shake'
           : washStatus === 'done' ? 'bg-green-50 border-green-300'
           : 'bg-sky-50 border-sky-200'
         }`}>

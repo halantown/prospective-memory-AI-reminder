@@ -5,7 +5,6 @@ export default function TopBar() {
   const score = useGameStore((s) => s.score)
   const blockNumber = useGameStore((s) => s.blockNumber)
   const totalBlocks = useGameStore((s) => s.totalBlocks)
-
   return (
     <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-30 shadow-sm">
       <div className="flex items-center gap-2">

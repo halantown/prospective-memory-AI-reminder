@@ -26,7 +26,7 @@ async def send_ws(session_id: str, event: str, data: dict):
     """Push an event to all connected WebSocket clients for one session.
 
     Special handling:
-    - steak_spawn: reconciles hob state, only spawns on empty hobs
+    - steak_spawn: reconciles hobs, reroutes to an empty hob when target is busy
     - trigger_appear: opens an execution window (GDD A1)
     - window_close: closes the execution window, records miss if not submitted
     """
@@ -35,23 +35,44 @@ async def send_ws(session_id: str, event: str, data: dict):
 
     if event == "steak_spawn":
         hobs = get_session_hobs(session_id)
-        hob_id = data.get("hob_id", 0)
-        if 0 <= hob_id < len(hobs):
-            reconcile_hob(hobs[hob_id])
-            if hobs[hob_id].status != HobStatus.EMPTY:
+        for hob in hobs:
+            reconcile_hob(hob)
+
+        requested_hob_id = data.get("hob_id", 0)
+        target_hob_id = requested_hob_id if 0 <= requested_hob_id < len(hobs) else 0
+
+        if hobs[target_hob_id].status != HobStatus.EMPTY:
+            empty_hob_id = next(
+                (idx for idx, hob in enumerate(hobs) if hob.status == HobStatus.EMPTY),
+                None,
+            )
+            if empty_hob_id is None:
                 logger.info(
-                    f"WS [{session_id}] → steak_spawn hob={hob_id} "
-                    f"SKIPPED (status={hobs[hob_id].status.value})"
+                    f"WS [{session_id}] → steak_spawn hob={requested_hob_id} "
+                    "SKIPPED (all hobs busy)"
                 )
                 return
-            dur = data.get("duration", {})
-            hobs[hob_id].status = HobStatus.COOKING_SIDE1
-            hobs[hob_id].started_at = time.time()
-            steak_cfg = get_config().get("steak", {})
-            hobs[hob_id].cooking_ms = dur.get("cooking", steak_cfg.get("hob_base_cooking_ms", [11000, 13000, 15000])[1])
-            hobs[hob_id].ready_ms = dur.get("ready", steak_cfg.get("ready_ms", 4000))
-            hobs[hob_id].ash_ms = steak_cfg.get("ash_countdown_ms", 9000)
-            hobs[hob_id].peppered = False
+            logger.info(
+                f"WS [{session_id}] → steak_spawn rerouted {requested_hob_id} -> {empty_hob_id}"
+            )
+            target_hob_id = empty_hob_id
+
+        dur = data.get("duration", {})
+        steak_cfg = get_config().get("steak", {})
+        base_times = steak_cfg.get("hob_base_cooking_ms", [11000, 13000, 15000])
+        base_cooking = (
+            base_times[target_hob_id]
+            if target_hob_id < len(base_times)
+            else 13000
+        )
+
+        hobs[target_hob_id].status = HobStatus.COOKING_SIDE1
+        hobs[target_hob_id].started_at = time.time()
+        hobs[target_hob_id].cooking_ms = dur.get("cooking", base_cooking)
+        hobs[target_hob_id].ready_ms = dur.get("ready", steak_cfg.get("ready_ms", 4000))
+        hobs[target_hob_id].ash_ms = steak_cfg.get("ash_countdown_ms", 9000)
+        hobs[target_hob_id].peppered = False
+        data = {**data, "hob_id": target_hob_id}
 
     elif event == "trigger_appear":
         from services.window_service import open_window

@@ -6,9 +6,11 @@ import { useAudio } from '../hooks/useAudio'
 import { sendHeartbeat } from '../utils/api'
 import TopBar from './ui/TopBar'
 import Sidebar from './ui/Sidebar'
+import ScoreBurstLayer from './ui/ScoreBurstLayer'
 import RoomOverview from './rooms/RoomOverview'
 import RoomExpanded from './rooms/RoomExpanded'
 import RobotAvatar from './ui/RobotAvatar'
+import MailToast from './ui/MailToast'
 import EncodingScreen from './screens/EncodingScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import BlockEndScreen from './screens/BlockEndScreen'
@@ -21,6 +23,7 @@ export default function GameShell() {
   const blockRunning = useGameStore((s) => s.blockRunning)
   const sessionId = useGameStore((s) => s.sessionId)
   const tickLaundry = useGameStore((s) => s.tickLaundry)
+  const tickLaundryPile = useGameStore((s) => s.tickLaundryPile)
   const tickBlockTimer = useGameStore((s) => s.tickBlockTimer)
   const spawnSteak = useGameStore((s) => s.spawnSteak)
   const activeRoom = useGameStore((s) => s.activeRoom)
@@ -40,10 +43,11 @@ export default function GameShell() {
     if (!blockRunning) return
     const timer = setInterval(() => {
       tickLaundry()
+      tickLaundryPile()
       tickBlockTimer()
     }, TICK_RATE)
     return () => clearInterval(timer)
-  }, [blockRunning, tickLaundry, tickBlockTimer])
+  }, [blockRunning, tickLaundry, tickLaundryPile, tickBlockTimer])
 
   // ── Heartbeat (every 10s during block) ──
   useEffect(() => {
@@ -126,8 +130,10 @@ export default function GameShell() {
     <div className="w-full h-screen bg-slate-100 flex font-sans overflow-hidden text-slate-800">
       <div className="flex-1 flex flex-col relative">
         <TopBar />
+        <ScoreBurstLayer />
 
         <div className="flex-1 relative">
+          <MailToast />
           <RoomOverview />
 
           <AnimatePresence>

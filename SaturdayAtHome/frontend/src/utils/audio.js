@@ -2,7 +2,7 @@
  * Audio engine — BGM, sound effects, and TTS.
  *
  * BGM: Howler.js loop, auto-duck during robot speech.
- * SFX: Web Audio API procedural generation (no files needed).
+ * SFX: Web Audio API procedural generation + targeted file-based effects.
  * TTS: Web Speech API with ducking callbacks.
  */
 import { Howl } from 'howler'
@@ -19,6 +19,7 @@ let bgm = null
 let BGM_NORMAL = 0.35
 const BGM_DUCKED = 0.08
 let bgmDuckActive = false
+let mailNotify = null
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -32,6 +33,17 @@ export function initBGM(src = '/audio/bgm.mp3') {
   })
   bgm.play()
   bgm.fade(0, BGM_NORMAL, 2000)
+}
+
+function getMailNotify() {
+  if (!mailNotify) {
+    mailNotify = new Howl({
+      src: ['/audio/newmail.wav'],
+      volume: 0.65,
+      preload: true,
+    })
+  }
+  return mailNotify
 }
 
 export function stopBGM() {
@@ -107,22 +119,42 @@ export function sfxSteakReady() {
   playTone(800, 0.15, 'sine', 0.1)
 }
 
+/** Steak flip: quick pan sizzle */
+export function sfxSteakFlip() {
+  playNoise(0.18, 0.18)
+  playTone(560, 0.08, 'triangle', 0.11)
+  setTimeout(() => playTone(740, 0.1, 'sine', 0.09), 70)
+}
+
 /** Steak → BURNING: low alarm */
 export function sfxSteakBurning() {
   playTone(180, 0.3, 'sawtooth', 0.25)
   setTimeout(() => playTone(150, 0.3, 'sawtooth', 0.2), 300)
 }
 
-/** New message notification */
+/** Steak → ASH: distinctive collapse cue */
+export function sfxSteakAsh() {
+  playNoise(0.22, 0.2)
+  setTimeout(() => playTone(170, 0.12, 'square', 0.18), 40)
+  setTimeout(() => playTone(110, 0.2, 'square', 0.2), 140)
+}
+
+/** New message notification (custom mail wav) */
 export function sfxMessageNotify() {
-  playTone(880, 0.08, 'sine', 0.2)
-  setTimeout(() => playTone(1100, 0.12, 'sine', 0.2), 100)
-  setTimeout(() => playTone(1320, 0.15, 'sine', 0.15), 200)
+  const mail = getMailNotify()
+  mail.stop()
+  mail.play()
 }
 
 /** Message timeout: low thud */
 export function sfxMessageTimeout() {
   playTone(200, 0.25, 'sine', 0.25)
+}
+
+/** Laundry jam: urgent wobble alarm */
+export function sfxLaundryJam() {
+  playTone(420, 0.16, 'sawtooth', 0.17)
+  setTimeout(() => playTone(360, 0.2, 'square', 0.2), 140)
 }
 
 /** Score gained: bright ding */

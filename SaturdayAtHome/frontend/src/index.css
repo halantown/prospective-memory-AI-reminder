@@ -1,3 +1,18 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes laundry-jam-shake {
+  0% { transform: translateX(0); }
+  18% { transform: translateX(-5px) rotate(-0.7deg); }
+  36% { transform: translateX(5px) rotate(0.7deg); }
+  54% { transform: translateX(-4px) rotate(-0.5deg); }
+  72% { transform: translateX(4px) rotate(0.5deg); }
+  100% { transform: translateX(0); }
+}
+
+.laundry-jam-shake {
+  animation: laundry-jam-shake 0.32s ease-in-out infinite;
+  transform-origin: center;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25), 0 16px 28px rgba(220, 38, 38, 0.2);
+}

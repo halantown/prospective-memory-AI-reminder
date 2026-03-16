@@ -31,6 +31,49 @@ const makeHob = (id) => ({
 
 const initialHobs = [makeHob(0), makeHob(1), makeHob(2)]
 
+const DEFAULT_GARMENT_POOL = [
+  { color: 'red',    category: 'warm',  label: 'Red T-Shirt' },
+  { color: 'orange', category: 'warm',  label: 'Orange Scarf' },
+  { color: 'yellow', category: 'warm',  label: 'Yellow Hoodie' },
+  { color: 'blue',   category: 'cold',  label: 'Blue Jeans' },
+  { color: 'green',  category: 'cold',  label: 'Green Jacket' },
+  { color: 'purple', category: 'cold',  label: 'Purple Socks' },
+  { color: 'white',  category: 'white', label: 'White Shirt' },
+  { color: 'gray',   category: 'white', label: 'Gray Towel' },
+]
+
+const LAUNDRY_PILE_MIN_INTERVAL_S = 40
+const LAUNDRY_PILE_MAX_INTERVAL_S = 50
+const LAUNDRY_WASH_MIN_S = 25
+const LAUNDRY_WASH_MAX_S = 45
+const LAUNDRY_OVERFLOW_THRESHOLD = 5
+const LAUNDRY_OVERFLOW_PENALTY = -1
+const LAUNDRY_OVERFLOW_PENALTY_EVERY_S = 10
+
+const randomLaundryDropDelayS = (remoteConfig = null) => {
+  const min = Number(remoteConfig?.laundry?.pile_drop_min_s ?? LAUNDRY_PILE_MIN_INTERVAL_S)
+  const max = Number(remoteConfig?.laundry?.pile_drop_max_s ?? LAUNDRY_PILE_MAX_INTERVAL_S)
+  const low = Math.max(1, Math.min(min, max))
+  const high = Math.max(low, Math.max(min, max))
+  return low + Math.floor(Math.random() * (high - low + 1))
+}
+
+const randomLaundryWashDurationS = (remoteConfig = null) => {
+  const minMs = Number(remoteConfig?.timers?.laundry_wash_min_ms)
+  const maxMs = Number(remoteConfig?.timers?.laundry_wash_max_ms)
+  const minS = Number.isFinite(minMs) && minMs > 0 ? Math.round(minMs / 1000) : LAUNDRY_WASH_MIN_S
+  const maxS = Number.isFinite(maxMs) && maxMs > 0 ? Math.round(maxMs / 1000) : LAUNDRY_WASH_MAX_S
+  const low = Math.max(5, Math.min(minS, maxS))
+  const high = Math.max(low, Math.max(minS, maxS))
+  return low + Math.floor(Math.random() * (high - low + 1))
+}
+
+const pickRandomGarment = (pool) => {
+  const source = Array.isArray(pool) && pool.length > 0 ? pool : DEFAULT_GARMENT_POOL
+  const idx = Math.floor(Math.random() * source.length)
+  return { ...source[idx] }
+}
+
 const initialLaundry = () => ({
   pile: [],
   currentGarment: null,
@@ -44,6 +87,11 @@ const initialLaundry = () => ({
   lastCorrect: null,
   completedCount: 0,
   correctCount: 0,
+  nextPileDropAt: randomLaundryDropDelayS(),
+  nextOverflowPenaltyAt: null,
+  overflowThreshold: LAUNDRY_OVERFLOW_THRESHOLD,
+  familyDropCount: 0,
+  lastFamilyDropAt: null,
 })
 
 const ts = () => Date.now()
@@ -51,13 +99,11 @@ const DEFAULT_BLOCK_DURATION_S = 510
 const SIM_DAY_START_SEC = 10 * 3600
 const SIM_DAY_END_SEC = 23 * 3600
 const SIM_DAY_RANGE_SEC = SIM_DAY_END_SEC - SIM_DAY_START_SEC
-const DAY_PHASE_SPECS = [
-  { phase: 'morning', clockSec: 10 * 3600, cue: 'Wake-up light' },
-  { phase: 'noon', clockSec: 13 * 3600, cue: 'Bright noon light' },
-  { phase: 'afternoon', clockSec: 16 * 3600, cue: 'Warm afternoon light' },
-  { phase: 'sunset', clockSec: 19 * 3600, cue: 'Sunset amber light' },
-  { phase: 'evening', clockSec: 21 * 3600, cue: 'Evening blue light' },
-  { phase: 'night', clockSec: 23 * 3600, cue: 'Night calm ambience' },
+const HALF_HOUR_S = 30 * 60
+const SKY_PHASE_SPECS = [
+  { phase: 'sun', clockSec: 10 * 3600, label: 'Sunrise' },
+  { phase: 'sunset', clockSec: 18 * 3600, label: 'Sunset' },
+  { phase: 'moon', clockSec: 20 * 3600, label: 'Moonrise' },
 ]
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
@@ -82,17 +128,27 @@ function getBlockDurationS(remoteConfig) {
   return Math.max(1, Math.round(ms / 1000))
 }
 
+function quantizeHalfHour(secondsOfDay) {
+  const snapped = Math.floor(secondsOfDay / HALF_HOUR_S) * HALF_HOUR_S
+  return clamp(snapped, SIM_DAY_START_SEC, SIM_DAY_END_SEC)
+}
+
+function getSkyPhase(clockSec) {
+  if (clockSec >= 20 * 3600) return 'moon'
+  if (clockSec >= 18 * 3600) return 'sunset'
+  return 'sun'
+}
+
 function buildWorldClockSchedule(blockDurationS = DEFAULT_BLOCK_DURATION_S) {
   const safeDuration = Math.max(1, blockDurationS)
-  return DAY_PHASE_SPECS.map((spec) => {
+  return SKY_PHASE_SPECS.map((spec) => {
     const ratio = (spec.clockSec - SIM_DAY_START_SEC) / SIM_DAY_RANGE_SEC
     const atSec = Math.round(safeDuration * clamp(ratio, 0, 1))
     return {
       atSec,
-      atLabel: formatBlockTimer(atSec),
       worldClockLabel: formatClock(spec.clockSec),
       phase: spec.phase,
-      cue: spec.cue,
+      label: spec.label,
     }
   })
 }
@@ -101,10 +157,10 @@ function deriveTimeContext(blockTimer, blockDurationS = DEFAULT_BLOCK_DURATION_S
   const safeDuration = Math.max(1, blockDurationS)
   const progress = clamp(blockTimer / safeDuration, 0, 1)
   const simulatedSec = SIM_DAY_START_SEC + progress * SIM_DAY_RANGE_SEC
-  const currentSpec = [...DAY_PHASE_SPECS].reverse().find((spec) => simulatedSec >= spec.clockSec) || DAY_PHASE_SPECS[0]
+  const quantizedSec = quantizeHalfHour(simulatedSec)
   return {
-    dayPhase: currentSpec.phase,
-    worldClockLabel: formatClock(simulatedSec),
+    dayPhase: getSkyPhase(quantizedSec),
+    worldClockLabel: formatClock(quantizedSec),
   }
 }
 
@@ -142,7 +198,7 @@ export const useGameStore = create((set, get) => ({
   totalBlocks: 4,
   condition: null,
   taskPairId: null,
-  dayPhase: 'morning',
+  dayPhase: 'sun',
   worldClockLabel: '10:00',
   worldClockSchedule: buildWorldClockSchedule(DEFAULT_BLOCK_DURATION_S),
 
@@ -345,25 +401,25 @@ export const useGameStore = create((set, get) => ({
   laundry: initialLaundry(),
 
   initLaundryPile: () => set((state) => {
-    const pool = state.remoteConfig?.laundry?.garment_pool || [
-      { color: 'red',    category: 'warm',  label: 'Red T-Shirt' },
-      { color: 'orange', category: 'warm',  label: 'Orange Scarf' },
-      { color: 'yellow', category: 'warm',  label: 'Yellow Hoodie' },
-      { color: 'blue',   category: 'cold',  label: 'Blue Jeans' },
-      { color: 'green',  category: 'cold',  label: 'Green Jacket' },
-      { color: 'purple', category: 'cold',  label: 'Purple Socks' },
-      { color: 'white',  category: 'white', label: 'White Shirt' },
-      { color: 'gray',   category: 'white', label: 'Gray Towel' },
-    ]
-    // Fisher-Yates shuffle then take 8-10
+    const pool = state.remoteConfig?.laundry?.garment_pool || DEFAULT_GARMENT_POOL
+    // Fisher-Yates shuffle then take 3-5 starter garments
     const shuffled = [...pool]
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
     }
-    const count = Math.min(shuffled.length, 8 + Math.floor(Math.random() * 3))
+    const count = Math.min(shuffled.length, 3 + Math.floor(Math.random() * 3))
+    const overflowThreshold = Number(
+      state.remoteConfig?.laundry?.pile_overflow_threshold
+      ?? LAUNDRY_OVERFLOW_THRESHOLD
+    )
     return {
-      laundry: { ...initialLaundry(), pile: shuffled.slice(0, count) },
+      laundry: {
+        ...initialLaundry(),
+        pile: shuffled.slice(0, count),
+        overflowThreshold,
+        nextPileDropAt: randomLaundryDropDelayS(state.remoteConfig),
+      },
     }
   }),
 
@@ -415,7 +471,7 @@ export const useGameStore = create((set, get) => ({
       ? (laundry.selectedDetergent === expectedDetergent && laundry.selectedTemp === expectedTemp)
       : false
 
-    const washDuration = 45 + Math.floor(Math.random() * 46) // 45-90s
+    const washDuration = randomLaundryWashDurationS(state.remoteConfig)
     return {
       laundry: {
         ...laundry,
@@ -477,6 +533,61 @@ export const useGameStore = create((set, get) => ({
     return {}
   }),
 
+  tickLaundryPile: () => set((state) => {
+    const { laundry, blockTimer } = state
+    let nextLaundry = laundry
+    let scoreDelta = 0
+
+    const pool = state.remoteConfig?.laundry?.garment_pool || DEFAULT_GARMENT_POOL
+    const overflowThreshold = Number(
+      state.remoteConfig?.laundry?.pile_overflow_threshold
+      ?? laundry.overflowThreshold
+      ?? LAUNDRY_OVERFLOW_THRESHOLD
+    )
+    const overflowPenaltyEveryS = Number(
+      state.remoteConfig?.laundry?.pile_overflow_penalty_every_s
+      ?? LAUNDRY_OVERFLOW_PENALTY_EVERY_S
+    )
+    const scoring = state.remoteConfig?.scoring || {}
+    const overflowPenalty = Number(
+      scoring.laundry_pile_overflow_penalty
+      ?? LAUNDRY_OVERFLOW_PENALTY
+    )
+
+    if (typeof laundry.nextPileDropAt === 'number' && blockTimer >= laundry.nextPileDropAt) {
+      nextLaundry = {
+        ...nextLaundry,
+        pile: [...nextLaundry.pile, pickRandomGarment(pool)],
+        nextPileDropAt: blockTimer + randomLaundryDropDelayS(state.remoteConfig),
+        familyDropCount: (nextLaundry.familyDropCount || 0) + 1,
+        lastFamilyDropAt: ts(),
+      }
+    }
+
+    const isOverflowing = nextLaundry.pile.length > overflowThreshold
+    if (isOverflowing) {
+      const dueAt = nextLaundry.nextOverflowPenaltyAt ?? blockTimer
+      if (blockTimer >= dueAt) {
+        scoreDelta += overflowPenalty
+        nextLaundry = {
+          ...nextLaundry,
+          nextOverflowPenaltyAt: blockTimer + Math.max(1, overflowPenaltyEveryS),
+        }
+      }
+    } else if (nextLaundry.nextOverflowPenaltyAt != null) {
+      nextLaundry = {
+        ...nextLaundry,
+        nextOverflowPenaltyAt: null,
+      }
+    }
+
+    if (nextLaundry === laundry && scoreDelta === 0) return {}
+    return {
+      laundry: nextLaundry,
+      score: state.score + scoreDelta,
+    }
+  }),
+
   collectGarment: () => set((state) => {
     const { laundry } = state
     if (laundry.washStatus !== 'done') return {}
@@ -521,27 +632,48 @@ export const useGameStore = create((set, get) => ({
   messageBubbles: [],
   unreadCount: 0,
   selectedEmailId: null,
+  mailToast: null,
 
   addMessageBubble: (bubble) => {
     const timeoutMs = get().remoteConfig?.timers?.message_timeout_ms || 30000
+    const now = ts()
+    const normalized = {
+      ...bubble,
+      id: now,
+      replied: false,
+      expired: false,
+      read: false,
+      receivedAt: now,
+      from: bubble.from || 'Unknown',
+      subject: bubble.subject || 'New message',
+      body: bubble.body || '',
+      avatar: bubble.avatar || '?',
+      options: bubble.options || ['OK', 'Skip', 'Later'],
+      correct: bubble.correct ?? 0,
+      timeoutMs,
+    }
+    const preview = (normalized.body || normalized.subject || '').replace(/\s+/g, ' ').trim().slice(0, 76)
     set((state) => ({
-      messageBubbles: [...state.messageBubbles, {
-        ...bubble,
-        id: ts(),
-        replied: false,
-        expired: false,
-        read: false,
-        receivedAt: ts(),
-        from: bubble.from || 'Unknown',
-        subject: bubble.subject || 'New message',
-        body: bubble.body || '',
-        avatar: bubble.avatar || '?',
-        options: bubble.options || ['OK', 'Skip', 'Later'],
-        correct: bubble.correct ?? 0,
-        timeoutMs,
-      }],
+      messageBubbles: [...state.messageBubbles, normalized],
       unreadCount: state.unreadCount + 1,
+      mailToast: {
+        id: normalized.id,
+        from: normalized.from,
+        avatar: normalized.avatar,
+        preview,
+      },
     }))
+  },
+
+  dismissMailToast: () => set({ mailToast: null }),
+
+  openInboxFromToast: () => {
+    const state = get()
+    state.dismissMailToast()
+    state.setActiveRoom('overview')
+    setTimeout(() => {
+      get().setActiveRoom('messages')
+    }, 340)
   },
 
   selectEmail: (emailId) => set((state) => ({
@@ -681,6 +813,7 @@ export const useGameStore = create((set, get) => ({
       messageBubbles: [],
       unreadCount: 0,
       selectedEmailId: null,
+      mailToast: null,
       interactableTasks: [],
       openCabinetTask: null,
       encodingConfirmed: false,
@@ -737,6 +870,7 @@ export const useGameStore = create((set, get) => ({
       messageBubbles: [],
       unreadCount: 0,
       selectedEmailId: null,
+      mailToast: null,
       interactableTasks: [],
       openCabinetTask: null,
       laundry: initialLaundry(),
@@ -756,6 +890,7 @@ export const useGameStore = create((set, get) => ({
   endBlock: () => set((s) => ({
     blockRunning: false,
     phase: 'block_end',
+    mailToast: null,
   })),
 
   tickBlockTimer: () => set((s) => {
@@ -789,6 +924,7 @@ export const useGameStore = create((set, get) => ({
   getBalconyStatus: () => {
     const { laundry } = get()
     if (laundry.washStatus === 'jammed') return 'red'
+    if (laundry.pile.length > (laundry.overflowThreshold ?? LAUNDRY_OVERFLOW_THRESHOLD)) return 'red'
     if (laundry.washStatus === 'done') return 'orange'
     if (laundry.washStatus === 'washing') return 'blue'
     return null

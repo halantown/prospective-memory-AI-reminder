@@ -24,12 +24,9 @@ const roomBg = {
 }
 
 const balconyBgByPhase = {
-  morning: 'bg-sky-50',
-  noon: 'bg-cyan-50',
-  afternoon: 'bg-amber-50',
-  sunset: 'bg-orange-100',
-  evening: 'bg-indigo-100',
-  night: 'bg-slate-200',
+  sun: 'bg-orange-100',
+  sunset: 'bg-amber-50',
+  moon: 'bg-slate-700',
 }
 
 export default function RoomExpanded() {
@@ -44,7 +41,7 @@ export default function RoomExpanded() {
 
   const bgClass =
     activeRoom === 'balcony'
-      ? (balconyBgByPhase[dayPhase] || balconyBgByPhase.morning)
+      ? (balconyBgByPhase[dayPhase] || balconyBgByPhase.sun)
       : roomBg[activeRoom]
 
   return (

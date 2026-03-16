@@ -1,6 +1,8 @@
 import asyncio
 
 from core import ws
+from models.entities import HobStatus
+from services.hob_service import get_session_hobs, clear_session_hobs
 
 
 class DummyWebSocket:
@@ -51,3 +53,28 @@ def test_register_unregister_and_clear_ws_clients():
     ws.unregister_ws_client(sid, q2)
     ws.clear_session_ws_queues(sid)
     assert sid not in ws.ws_queues
+
+
+def test_steak_spawn_reroutes_when_target_hob_busy():
+    async def run():
+        sid = "session-steak-reroute"
+        queue = ws.register_ws_client(sid)
+        hobs = get_session_hobs(sid)
+        hobs[0].status = HobStatus.BURNING
+        hobs[1].status = HobStatus.EMPTY
+        hobs[2].status = HobStatus.EMPTY
+
+        try:
+            await ws.send_ws(sid, "steak_spawn", {"hob_id": 0, "duration": {"cooking": 9000, "ready": 3000}})
+            payload = await asyncio.wait_for(queue.get(), timeout=0.2)
+            assert payload["event"] == "steak_spawn"
+            assert payload["data"]["hob_id"] == 1
+            assert hobs[1].status == HobStatus.COOKING_SIDE1
+            assert hobs[1].cooking_ms == 9000
+            assert hobs[1].ready_ms == 3000
+        finally:
+            ws.unregister_ws_client(sid, queue)
+            ws.clear_session_ws_queues(sid)
+            clear_session_hobs(sid)
+
+    asyncio.run(run())

@@ -15,19 +15,16 @@ const roomConfig = [
 ]
 
 const balconyBgByPhase = {
-  morning: 'bg-sky-50',
-  noon: 'bg-cyan-50',
-  afternoon: 'bg-amber-50',
-  sunset: 'bg-orange-100',
-  evening: 'bg-indigo-100',
-  night: 'bg-slate-200',
+  sun: 'bg-orange-100',
+  sunset: 'bg-amber-50',
+  moon: 'bg-slate-700',
 }
 
 export default function RoomOverview() {
   const activeRoom = useGameStore((s) => s.activeRoom)
   const setActiveRoom = useGameStore((s) => s.setActiveRoom)
   const dayPhase = useGameStore((s) => s.dayPhase)
-  const balconyBg = balconyBgByPhase[dayPhase] || balconyBgByPhase.morning
+  const balconyBg = balconyBgByPhase[dayPhase] || balconyBgByPhase.sun
 
   return (
     <div className="absolute inset-0 p-6 grid gap-4 z-0"

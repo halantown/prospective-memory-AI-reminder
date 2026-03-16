@@ -1,5 +1,5 @@
 import { useGameStore } from '../../store/gameStore'
-import { Home, Flame, Droplets, Sofa, DoorOpen, Mail } from 'lucide-react'
+import { Home, Flame, Droplets, Sofa, DoorOpen, Mail, Sun, Sunset, Moon } from 'lucide-react'
 
 const rooms = [
   { id: 'kitchen',  label: 'Kitchen',  icon: Flame },
@@ -8,13 +8,6 @@ const rooms = [
   { id: 'entrance', label: 'Entry',    icon: DoorOpen },
   { id: 'messages', label: 'Inbox',    icon: Mail },
 ]
-
-function formatBlockTimer(totalSec) {
-  const safe = Math.max(0, Math.floor(totalSec))
-  const mm = String(Math.floor(safe / 60)).padStart(2, '0')
-  const ss = String(safe % 60).padStart(2, '0')
-  return `${mm}:${ss}`
-}
 
 function StatusDot({ color }) {
   if (color === 'red') return (
@@ -45,6 +38,15 @@ function StatusDot({ color }) {
 }
 
 const Divider = () => <div className="w-full h-px bg-slate-700/60 my-1" />
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+function parseClockToMinutes(label) {
+  const [hh = '10', mm = '00'] = String(label || '10:00').split(':')
+  const hour = Number(hh)
+  const minute = Number(mm)
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 10 * 60
+  return hour * 60 + minute
+}
 
 function useKitchenSummary() {
   const hobs = useGameStore((s) => s.hobs)
@@ -62,6 +64,7 @@ function useKitchenSummary() {
 
 function useBalconySummary() {
   const laundry = useGameStore((s) => s.laundry)
+  if (laundry.pile.length > (laundry.overflowThreshold ?? 5)) return `Pile overfull (${laundry.pile.length})`
   if (laundry.washStatus === 'jammed') return 'Jammed!'
   if (laundry.washStatus === 'washing') return `Washing — ${laundry.washProgress}s`
   if (laundry.washStatus === 'done') return 'Done — collect!'
@@ -91,7 +94,6 @@ export default function Sidebar() {
   const getInboxStatus = useGameStore((s) => s.getInboxStatus)
   const unreadCount = useGameStore((s) => s.unreadCount)
   const score = useGameStore((s) => s.score)
-  const blockTimer = useGameStore((s) => s.blockTimer)
   const dayPhase = useGameStore((s) => s.dayPhase)
   const worldClockLabel = useGameStore((s) => s.worldClockLabel)
   const worldClockSchedule = useGameStore((s) => s.worldClockSchedule)
@@ -128,22 +130,79 @@ export default function Sidebar() {
     { label: 'Inbox',   color: inboxStatus },
   ]
 
-  const phaseLabel =
-    dayPhase === 'night' ? 'Night calm' :
-    dayPhase === 'evening' ? 'Evening blue' :
-    dayPhase === 'sunset' ? 'Sunset amber' :
-    dayPhase === 'noon' ? 'Bright noon' :
-    dayPhase === 'afternoon' ? 'Afternoon light' :
-    'Morning light'
-
-  const currentScheduleIndex = (worldClockSchedule || []).reduce(
-    (idx, row, i) => (blockTimer >= row.atSec ? i : idx),
-    -1
-  )
-  const endAt = worldClockSchedule?.[worldClockSchedule.length - 1]?.atSec || 0
+  const phaseTheme =
+    dayPhase === 'moon'
+      ? 'from-slate-900 via-slate-800 to-black text-slate-100 border-slate-700'
+      : dayPhase === 'sunset'
+        ? 'from-orange-300 via-amber-200 to-slate-100 text-slate-800 border-orange-200'
+        : 'from-orange-500 via-amber-400 to-yellow-100 text-white border-orange-300'
+  const iconByPhase = {
+    sun: Sun,
+    sunset: Sunset,
+    moon: Moon,
+  }
+  const currentIndex = Math.max(0, (worldClockSchedule || []).findIndex((s) => s.phase === dayPhase))
+  const clockMinutes = parseClockToMinutes(worldClockLabel)
+  const sunProgress = clamp((clockMinutes - 10 * 60) / (20 * 60 - 10 * 60), 0, 1)
+  const moonProgress = clamp((clockMinutes - 18 * 60) / (23 * 60 - 18 * 60), 0, 1)
+  const sunX = 8 + sunProgress * 84
+  const moonX = 8 + moonProgress * 84
+  const sunY = 74 - Math.sin(Math.PI * sunProgress) * 46
+  const moonY = 74 - Math.sin(Math.PI * moonProgress) * 34
 
   return (
     <div className="w-52 bg-slate-900 shadow-[-10px_0_30px_rgba(0,0,0,0.1)] z-40 flex flex-col py-4 px-3 gap-2 border-l border-slate-800 text-slate-400 overflow-y-auto">
+      <div className={`-mx-3 -mt-4 border-b bg-gradient-to-b px-3 py-3 ${phaseTheme}`}>
+        <div className="text-3xl font-black tracking-wider tabular-nums">{worldClockLabel}</div>
+        <div className={`mt-2 relative h-20 overflow-hidden border ${
+          dayPhase === 'moon'
+            ? 'bg-gradient-to-b from-slate-700/70 to-slate-950/95 border-slate-500/70'
+            : dayPhase === 'sunset'
+              ? 'bg-gradient-to-b from-orange-300/80 to-amber-100/40 border-orange-200/80'
+              : 'bg-gradient-to-b from-sky-300/75 to-yellow-100/45 border-orange-100/90'
+        }`}>
+          <div className="absolute inset-x-2 bottom-2 h-[2px] rounded-full bg-white/35" />
+          <div className="absolute inset-x-2 top-1.5 flex items-center justify-between text-[9px] font-semibold tracking-wide text-white/85">
+            <span>10:00</span>
+            <span>18:00</span>
+            <span>23:00</span>
+          </div>
+          <span
+            className="absolute text-2xl drop-shadow-[0_6px_10px_rgba(15,23,42,0.6)]"
+            style={{
+              left: `${sunX}%`,
+              top: `${sunY}%`,
+              transform: 'translate(-50%, -50%)',
+              opacity: dayPhase === 'moon' ? 0.55 : 1,
+            }}
+          >
+            ☀️
+          </span>
+          <span
+            className="absolute text-2xl drop-shadow-[0_6px_10px_rgba(15,23,42,0.65)]"
+            style={{
+              left: `${moonX}%`,
+              top: `${moonY}%`,
+              transform: 'translate(-50%, -50%)',
+              opacity: clockMinutes >= 18 * 60 ? 1 : 0.25,
+            }}
+          >
+            🌙
+          </span>
+        </div>
+        <div className="mt-2 flex items-center justify-between">
+          {(worldClockSchedule || []).map((step, i) => {
+            const Icon = iconByPhase[step.phase] || Sun
+            const isActive = i <= currentIndex
+            return (
+              <div key={step.phase} className={`flex flex-col items-center gap-1 ${isActive ? 'opacity-100' : 'opacity-45'}`}>
+                <Icon size={14} />
+                <span className="text-[9px] font-semibold uppercase">{step.label}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       {/* ── Home overview button ── */}
       <button
@@ -201,29 +260,6 @@ export default function Sidebar() {
             </div>
           ))}
         </div>
-      </div>
-
-      <Divider />
-
-      {/* ── Time progression ── */}
-      <div className="px-1">
-        <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">Time of Day</h3>
-        <div className="text-[11px] text-slate-500 mb-1.5">
-          Game timer: {formatBlockTimer(blockTimer)} / {formatBlockTimer(endAt)}
-        </div>
-        <div className="space-y-1.5 mb-1.5">
-          {(worldClockSchedule || []).map((row, i) => (
-            <div key={`${row.phase}-${row.atSec}`} className="grid grid-cols-[40px_1fr] gap-1.5 text-[10px] leading-tight">
-              <span className={`${i <= currentScheduleIndex ? 'text-indigo-300 font-semibold' : 'text-slate-500'}`}>
-                {row.atLabel}
-              </span>
-              <span className={`${i === currentScheduleIndex ? 'text-slate-100' : 'text-slate-300'}`}>
-                {row.worldClockLabel} {row.cue}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="text-[11px] text-slate-500 mt-1.5">Now: {worldClockLabel} | {phaseLabel}</div>
       </div>
 
       <Divider />

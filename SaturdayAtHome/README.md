@@ -140,6 +140,13 @@ WHERE id = (
 )
 ```
 
+### Troubleshooting: steak spawn interval becomes too long
+
+`steak_spawn` is timeline-driven and can target a hob that is still busy.  
+If spawns are repeatedly skipped on occupied hobs, perceived intervals become much longer.
+
+Current behavior: `backend/core/ws.py::send_ws` now reroutes `steak_spawn` to any currently empty hob before giving up, reducing long gaps caused by target-hob collisions.
+
 ## Game Components
 
 ### Kitchen
@@ -153,28 +160,28 @@ WHERE id = (
 - Email-style messages from NPCs with two reply options
 - 15s timeout with countdown bar (green → yellow → red)
 - Scoring: +2 correct, +1 wrong, -2 expired
+- Custom `newmail.wav` chime + top-right toast (avatar + one-line preview), auto-hides after ~3.5s, click-to-Inbox shortcut
 
 ### Living Room
 - Plant watering: random intervals, +3 pts fresh, +1 pts wilted
 - TV (idle, no score impact)
 
 ### Balcony
-- In-block day simulation now runs from **10:00 → 23:00** based on block timer progress
-- Sidebar shows strict trigger schedule: **at `mm:ss`, switch to a defined world-time cue**
-- Sky/light palette shifts by phase (morning/noon/afternoon/sunset/evening/night) with non-interruptive transitions
-- Washing machine
+- In-block day simulation runs from **10:00 → 23:00** based on block timer progress
+- Sidebar top shows a moving sun/moon sky track plus a larger current clock (no static phase-only cue text)
+- Clock display advances in **30-minute jumps**
+- Sky/light palette shifts by phase (**sun → sunset → moon**) with non-interruptive transitions
+- Washing machine (cycle range controlled by `timers.laundry_wash_min_ms` / `timers.laundry_wash_max_ms`)
+- Laundry pile pressure: family keeps dropping clothes every ~40-50s; overflow beyond threshold starts periodic score penalty
 
 ### Ambient Audio
 - BGM keeps playing continuously during block
-- Subtle level contour by day phase (morning > noon > afternoon > sunset > evening > night) while preserving robot ducking
+- Subtle level contour by day phase while preserving robot ducking
+- Distinct steak-flip sizzle and laundry-jam warning cues
+- Distinct ash-collapse cue for overcooked steak
 
-Default trigger points when block duration is 510s:
-- `00:00` → `10:00` (Wake-up light)
-- `01:58` → `13:00` (Bright noon light)
-- `03:55` → `16:00` (Warm afternoon light)
-- `05:53` → `19:00` (Sunset amber light)
-- `07:12` → `21:00` (Evening blue light)
-- `08:30` → `23:00` (Night calm ambience)
+### Score Feedback
+- Score changes show large cursor-adjacent floating bursts (green `+x`, red `-x`) for all score deltas
 
 ### TODO Backlog
 - Dedicated window lighting renderer is not yet modeled in current room scene; current build uses balcony/room tint transitions as a proxy.
