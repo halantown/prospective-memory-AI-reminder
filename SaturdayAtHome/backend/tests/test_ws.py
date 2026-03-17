@@ -1,8 +1,7 @@
 import asyncio
 
 from core import ws
-from models.entities import HobStatus
-from services.hob_service import get_session_hobs, clear_session_hobs
+from services import window_service
 
 
 class DummyWebSocket:
@@ -55,26 +54,41 @@ def test_register_unregister_and_clear_ws_clients():
     assert sid not in ws.ws_queues
 
 
-def test_steak_spawn_reroutes_when_target_hob_busy():
+def test_room_transition_updates_runtime_state():
     async def run():
-        sid = "session-steak-reroute"
+        sid = "session-room-state"
         queue = ws.register_ws_client(sid)
-        hobs = get_session_hobs(sid)
-        hobs[0].status = HobStatus.BURNING
-        hobs[1].status = HobStatus.EMPTY
-        hobs[2].status = HobStatus.EMPTY
-
         try:
-            await ws.send_ws(sid, "steak_spawn", {"hob_id": 0, "duration": {"cooking": 9000, "ready": 3000}})
+            await ws.send_ws(
+                sid,
+                "room_transition",
+                {"room": "living_room", "activity": "message_processing", "narrative": "Move"},
+            )
             payload = await asyncio.wait_for(queue.get(), timeout=0.2)
-            assert payload["event"] == "steak_spawn"
-            assert payload["data"]["hob_id"] == 1
-            assert hobs[1].status == HobStatus.COOKING_SIDE1
-            assert hobs[1].cooking_ms == 9000
-            assert hobs[1].ready_ms == 3000
+            assert payload["event"] == "room_transition"
+            state = ws.get_runtime_state(sid)
+            assert state["current_room"] == "living_room"
+            assert state["current_activity"] == "message_processing"
         finally:
             ws.unregister_ws_client(sid, queue)
             ws.clear_session_ws_queues(sid)
-            clear_session_hobs(sid)
+
+    asyncio.run(run())
+
+
+def test_trigger_open_and_close_updates_window_service():
+    async def run():
+        sid = "session-window"
+        task_id = "medicine"
+        window_service.reset_session_windows(sid)
+        await ws.send_ws(sid, "trigger_appear", {"task_id": task_id, "window_ms": 30000})
+        w = window_service.get_window(sid, task_id)
+        assert w is not None
+        assert w.status == "open"
+
+        await ws.send_ws(sid, "window_close", {"task_id": task_id})
+        w2 = window_service.get_window(sid, task_id)
+        assert w2 is not None
+        assert w2.status == "missed"
 
     asyncio.run(run())

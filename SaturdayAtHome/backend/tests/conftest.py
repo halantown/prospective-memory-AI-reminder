@@ -10,82 +10,89 @@ from core.database import init_db
 @pytest.fixture()
 def tmp_config(tmp_path: Path):
     data = {
-        "difficulty": {
-            "default": "medium",
-            "medium": {"cooking_ms": 13000, "ready_ms": 4000},
-        },
-        "steak": {
-            "hob_base_cooking_ms": [11000, 13000, 15000],
-            "ready_ms": 4000,
-            "cooking_jitter_ms": 1000,
-            "ash_countdown_ms": 9000,
-            "respawn_min_ms": 8000,
-            "respawn_max_ms": 15000,
-        },
-        "laundry": {
-            "rules": {},
-            "garment_pool": [],
-        },
-        "scoring": {
-            "steak_serve": 5,
-            "message_correct": 3,
-            "message_wrong": -2,
-            "message_expire_penalty": -2,
-        },
-        "timers": {
-            "block_duration_ms": 510000,
-            "message_timeout_ms": 30000,
-            "pm_window_ms": 30000,
-            "plant_wilt_delay_ms": 30000,
-            "steak_respawn_min_ms": 8000,
-            "steak_respawn_max_ms": 15000,
-        },
         "timeline": {
             "block_duration_s": 510,
             "events": {
                 "reminder_a_s": 120,
-                "reminder_b_s": 300,
                 "trigger_a_appear_s": 210,
                 "trigger_a_close_s": 240,
+                "reminder_b_s": 300,
                 "trigger_b_appear_s": 390,
                 "trigger_b_close_s": 420,
-                "fake_trigger_s": 120,
-                "fake_trigger_jitter_s": 0,
-                "robot_neutral_1_s": 75,
-                "robot_neutral_1_jitter_s": 0,
-                "robot_neutral_2_s": 270,
-                "robot_neutral_2_jitter_s": 0,
-                "force_yellow_1_s": 95,
-                "force_yellow_1_jitter_s": 0,
-                "force_yellow_2_s": 275,
-                "force_yellow_2_jitter_s": 0,
-                "force_yellow_1_hob": 0,
-                "force_yellow_2_hob": 1,
+                "neutral_comment_1_s": 30,
+                "neutral_comment_2_s": 255,
+                "neutral_comment_3_s": 450,
             },
-            "messages": [
-                {"time_s": 60, "from": "A", "subject": "S1", "body": "B1", "options": ["A", "B", "C"], "correct": 1},
-                {"time_s": 180, "from": "B", "subject": "S2", "body": "B2", "options": ["A", "B", "C"], "correct": 2},
-            ],
-            "neutral_comments": ["Hi", "Ok"],
-            "steak_spawn": {"start_s": 3, "end_s": 490, "interval_min_s": 8, "interval_max_s": 15},
-            "plant_water": {"start_s": 45, "start_jitter_s": 0, "interval_min_s": 40, "interval_max_s": 60},
+            "block_room_schedule": {
+                "1": [
+                    {"t": 0, "room": "kitchen", "activity": "recipe_following", "narrative": "Start kitchen"},
+                    {"t": 75, "room": "living_room", "activity": "message_processing", "narrative": "Go living"},
+                    {"t": 270, "room": "kitchen", "activity": "cooking_monitor", "narrative": "Back kitchen"},
+                ]
+            },
+            "neutral_comments": ["Hi", "Keep going", "Almost done"],
         },
         "experiment": {
             "latin_square": {
                 "A": ["LowAF_LowCB", "LowAF_HighCB", "HighAF_LowCB", "HighAF_HighCB"],
             },
-            "task_pairs": {
-                "1": ["medicine_a", "medicine_b"],
-                "2": ["laundry_c", "laundry_d"],
+            "block_task_slots": {
+                "1": {"A": "medicine", "B": "tea"},
+                "2": {"A": "pot", "B": "umbrella"},
             },
-            "reminder_texts": {
-                "LowAF_LowCB": {"A": "Remember A", "B": "Remember B"},
+            "execution_window_ms": 30000,
+            "condition_rules": {
+                "LowAF_LowCB": {
+                    "af_level": "low",
+                    "include_context_preamble": False,
+                    "reminder_word_limit": 15,
+                    "preamble_word_limit": 0,
+                },
+                "HighAF_HighCB": {
+                    "af_level": "high",
+                    "include_context_preamble": True,
+                    "reminder_word_limit": 35,
+                    "preamble_word_limit": 12,
+                },
             },
         },
         "pm_tasks": {
-            "medicine_a": {"correct": {"bottle": "red", "amount": "1"}},
-            "medicine_b": {"correct": {"bottle": "orange", "amount": "1"}},
+            "medicine": {
+                "target": {"id": "red_round"},
+                "distractor": {"id": "red_square"},
+                "steps": [
+                    {"id": "prepare_water", "required": True},
+                    {"id": "take_tablet", "required": True},
+                ],
+                "low_af_text": "Remember your medicine.",
+                "high_af_text": "Find red round bottle and take one tablet.",
+                "encoding_card": {"quiz": {"question": "q", "options": ["a", "b"], "correct_index": 0}},
+                "correct": {"bottle": "red", "amount": "1"},
+            },
+            "tea": {
+                "target": {"id": "longjing"},
+                "distractor": {"id": "biluochun"},
+                "steps": [
+                    {"id": "boil_water", "required": True},
+                    {"id": "steep_tea", "required": True},
+                ],
+                "low_af_text": "Remember tea.",
+                "high_af_text": "Use Longjing, boil water then steep.",
+                "encoding_card": {"quiz": {"question": "q", "options": ["a", "b"], "correct_index": 0}},
+            },
+            "pot": {
+                "target": {"id": "silver_handle"},
+                "distractor": {"id": "black_handle"},
+                "steps": [
+                    {"id": "release_valve", "required": True},
+                    {"id": "open_lid", "required": True},
+                ],
+                "low_af_text": "Remember the pot.",
+                "high_af_text": "Use silver-handle pot. Release valve then open lid.",
+                "encoding_card": {"quiz": {"question": "q", "options": ["a", "b"], "correct_index": 0}},
+            },
         },
+        "audio": {"tts_lang": "en-US", "tts_rate": 0.9, "tts_pitch": 1.0},
     }
     path = tmp_path / "game_config.yaml"
     path.write_text(json.dumps(data), encoding="utf-8")
@@ -98,4 +105,3 @@ def tmp_db_path(tmp_path: Path):
     db_path = tmp_path / "test.db"
     init_db(db_path)
     return db_path
-

@@ -1,315 +1,233 @@
-"""Block event schedule generation.
+"""Block schedule generation for PRD v2.0 state-driven simulation."""
 
-Produces a deterministic, auditable, conflict-checked list of ScheduledEvents
-for one experiment block.  Uses a seeded RNG so every run with the same seed
-yields the same schedule — enabling replay and auditing.
+from __future__ import annotations
 
-Usage:
-    seed = derive_seed(session_id, block_num)
-    events = generate_block_schedule(block_num, condition, seed)
-"""
-
+import hashlib
 import logging
-import random
-from typing import List
+from typing import Any, List
 
-from core.config_loader import get_timeline_config, get_task_pairs, get_reminder_texts, get_config
+from core.config_loader import (
+    get_block_duration_s,
+    get_block_room_schedule,
+    get_block_task_pair,
+    get_execution_window_ms,
+    get_neutral_comments,
+    get_timeline_events,
+)
 from core.event_schedule import EventType, ScheduledEvent
+from services.reminder_service import generate_reminder
 
 logger = logging.getLogger("saturday.block_scheduler")
 
 
-# ── Conflict-detection thresholds ───────────────────────────────────────────
-
-# FORCE_STEAK_READY must not fall within this many seconds before a trigger window
-_FORCE_STEAK_TRIGGER_GUARD_S = 5.0
-# FAKE_TRIGGER must not be within this many seconds of a reminder
-_FAKE_TRIGGER_REMINDER_GUARD_S = 10.0
-# Minimum gap between the two NEUTRAL_COMMENT events
-_NEUTRAL_COMMENT_MIN_GAP_S = 30.0
-
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
 def derive_seed(session_id: str, block_num: int) -> int:
-    """Deterministic seed from session + block, reproducible across restarts."""
-    import hashlib
+    """Deterministic seed from session + block (for auditing/replay metadata)."""
     raw = hashlib.md5(f"{session_id}:{block_num}".encode()).hexdigest()[:8]
     return int(raw, 16)
 
 
-def _jitter(rng: random.Random, base: float, half: float) -> float:
-    """Return base ± uniform(half)."""
-    return base + rng.uniform(-half, half)
+def _normalize_room_schedule(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    schedule = [dict(item) for item in (raw or []) if isinstance(item, dict)]
+    schedule.sort(key=lambda x: float(x.get("t", 0)))
+
+    if not schedule:
+        return [
+            {
+                "t": 0.0,
+                "room": "kitchen",
+                "activity": "recipe_following",
+                "narrative": "Start in the kitchen.",
+            }
+        ]
+
+    first_t = float(schedule[0].get("t", 0))
+    if first_t > 0:
+        # Ensure the block has a known room/activity at t=0.
+        first = dict(schedule[0])
+        first["t"] = 0.0
+        schedule.insert(0, first)
+
+    return schedule
 
 
-# ── Conflict detection ───────────────────────────────────────────────────────
+def _state_at(room_schedule: list[dict[str, Any]], t: float) -> tuple[str, str]:
+    room = "kitchen"
+    activity = "recipe_following"
+    for item in room_schedule:
+        if float(item.get("t", 0)) <= t:
+            room = str(item.get("room", room))
+            activity = str(item.get("activity", activity))
+        else:
+            break
+    return room, activity
 
-def resolve_conflicts(events: List[ScheduledEvent], ev: dict) -> List[ScheduledEvent]:
-    """Shift floating events that violate busy-window rules.
 
-    Rules (only applied to is_fixed=False events):
-    1. FORCE_STEAK_READY must not overlap [trigger_open - guard, trigger_close].
-       If it does, push it to trigger_open - guard - 1s.
-    2. FAKE_TRIGGER must not be within guard seconds of any REMINDER.
-       If it is, push it to reminder_t - guard - 2s.
-    3. The two NEUTRAL_COMMENTs must be at least 30s apart.
-       If not, push the later one forward.
-    """
-    trigger_windows = [
-        (float(ev.get("trigger_a_appear_s", 210)), float(ev.get("trigger_a_close_s", 240))),
-        (float(ev.get("trigger_b_appear_s", 390)), float(ev.get("trigger_b_close_s", 420))),
-    ]
-    reminder_times = [
-        float(ev.get("reminder_a_s", 120)),
-        float(ev.get("reminder_b_s", 300)),
-    ]
-    conflicts = 0
-
-    for e in events:
-        if e.is_fixed:
-            continue
-
-        if e.event_type == EventType.FORCE_STEAK_READY:
-            for w_open, w_close in trigger_windows:
-                if w_open - _FORCE_STEAK_TRIGGER_GUARD_S <= e.t <= w_close:
-                    new_t = w_open - _FORCE_STEAK_TRIGGER_GUARD_S - 1.0
-                    logger.debug(
-                        f"Conflict: FORCE_STEAK_READY at {e.t:.1f}s → rescheduled to {new_t:.1f}s"
-                        f" (trigger window [{w_open}, {w_close}])"
-                    )
-                    e.t = new_t
-                    conflicts += 1
-
-        elif e.event_type == EventType.FAKE_TRIGGER:
-            for rt in reminder_times:
-                if abs(e.t - rt) < _FAKE_TRIGGER_REMINDER_GUARD_S:
-                    new_t = rt - _FAKE_TRIGGER_REMINDER_GUARD_S - 2.0
-                    logger.debug(
-                        f"Conflict: FAKE_TRIGGER at {e.t:.1f}s → rescheduled to {new_t:.1f}s"
-                        f" (reminder at {rt:.1f}s)"
-                    )
-                    e.t = new_t
-                    conflicts += 1
-
-    # Neutral comment minimum gap
-    neutrals = sorted(
-        [e for e in events if e.event_type == EventType.NEUTRAL_COMMENT],
-        key=lambda e: e.t,
+def _build_reminder_event(
+    block_num: int,
+    slot: str,
+    task_id: str,
+    condition: str,
+    t: float,
+    room_schedule: list[dict[str, Any]],
+) -> ScheduledEvent:
+    room, activity = _state_at(room_schedule, t)
+    reminder = generate_reminder(task_id, condition, room, activity)
+    return ScheduledEvent(
+        event_type=EventType.REMINDER,
+        t=t,
+        payload={
+            "block_number": block_num,
+            "slot": slot,
+            "task_id": task_id,
+            "condition": condition,
+            "room": room,
+            "activity": activity,
+            "text": reminder["text"],
+            "preamble": reminder["preamble"],
+            "full_text": reminder["full_text"],
+            "source": reminder["source"],
+        },
     )
-    if len(neutrals) >= 2 and neutrals[1].t - neutrals[0].t < _NEUTRAL_COMMENT_MIN_GAP_S:
-        old_t = neutrals[1].t
-        neutrals[1].t = neutrals[0].t + _NEUTRAL_COMMENT_MIN_GAP_S
-        logger.debug(
-            f"Conflict: NEUTRAL_COMMENT gap too small "
-            f"({old_t:.1f}s → {neutrals[1].t:.1f}s)"
-        )
-        conflicts += 1
-
-    if conflicts:
-        logger.info(f"resolve_conflicts: {conflicts} conflict(s) resolved")
-
-    events.sort(key=lambda e: e.t)
-    return events
 
 
-# ── Main schedule generator ──────────────────────────────────────────────────
+def _build_trigger_event(
+    block_num: int,
+    slot: str,
+    task_id: str,
+    t: float,
+    window_ms: int,
+    room_schedule: list[dict[str, Any]],
+) -> ScheduledEvent:
+    room, activity = _state_at(room_schedule, t)
+    return ScheduledEvent(
+        event_type=EventType.TRIGGER_WINDOW_OPEN,
+        t=t,
+        payload={
+            "block_number": block_num,
+            "slot": slot,
+            "task_id": task_id,
+            "window_ms": window_ms,
+            "room": room,
+            "activity": activity,
+        },
+    )
+
+
+def _build_window_close_event(
+    block_num: int,
+    slot: str,
+    task_id: str,
+    t: float,
+    room_schedule: list[dict[str, Any]],
+) -> ScheduledEvent:
+    room, activity = _state_at(room_schedule, t)
+    return ScheduledEvent(
+        event_type=EventType.TRIGGER_WINDOW_CLOSE,
+        t=t,
+        payload={
+            "block_number": block_num,
+            "slot": slot,
+            "task_id": task_id,
+            "room": room,
+            "activity": activity,
+        },
+    )
+
 
 def generate_block_schedule(block_num: int, condition: str, seed: int) -> List[ScheduledEvent]:
-    """Return a sorted, conflict-resolved list of ScheduledEvents for one block.
+    """Return full sorted event list for one block."""
+    _ = seed  # kept for deterministic audit metadata compatibility
 
-    All floating event times are drawn from a seeded RNG — same seed → same
-    schedule, enabling full replay and audit via the block_events DB table.
+    duration = get_block_duration_s()
+    events_cfg = get_timeline_events()
+    neutral_comments = get_neutral_comments()
+    room_schedule = _normalize_room_schedule(get_block_room_schedule(block_num))
+    task_a, task_b = get_block_task_pair(block_num)
+    window_ms = get_execution_window_ms()
 
-    Steak spawns, message bubbles, and plant events are appended here too so
-    the returned list represents the *complete* block timeline.
-    """
-    rng = random.Random(seed)
-    tc = get_timeline_config()
-    ev = tc.get("events", {})
-    task_pairs = get_task_pairs()
-    reminder_texts = get_reminder_texts()
-    neutrals = tc.get("neutral_comments", ["", ""])
-    duration = float(tc.get("block_duration_s", 510))
-    exec_window_ms = 30000
+    events: List[ScheduledEvent] = [
+        ScheduledEvent(
+            event_type=EventType.BLOCK_START,
+            t=0.0,
+            payload={
+                "block_number": block_num,
+                "condition": condition,
+                "task_a": task_a,
+                "task_b": task_b,
+            },
+        )
+    ]
 
-    pair = task_pairs.get(block_num, ["medicine_a", "medicine_b"])
-    task_a, task_b = pair[0], pair[1]
-    # Support both new per-slot format {A: ..., B: ...} and legacy flat string
-    cond_texts = reminder_texts.get(condition, {})
-    if isinstance(cond_texts, dict):
-        reminder_text_a = cond_texts.get("A", "Remember your task.")
-        reminder_text_b = cond_texts.get("B", "Remember your task.")
-    else:
-        reminder_text_a = reminder_text_b = cond_texts or "Remember your task."
+    # Room transitions
+    for item in room_schedule:
+        events.append(
+            ScheduledEvent(
+                event_type=EventType.ROOM_TRANSITION,
+                t=float(item.get("t", 0.0)),
+                payload={
+                    "block_number": block_num,
+                    "room": str(item.get("room", "kitchen")),
+                    "activity": str(item.get("activity", "recipe_following")),
+                    "narrative": str(item.get("narrative", "")),
+                },
+            )
+        )
 
-    events: List[ScheduledEvent] = []
+    # Neutral comments (robot social presence)
+    neutral_times = [
+        float(events_cfg.get("neutral_comment_1_s", 30)),
+        float(events_cfg.get("neutral_comment_2_s", 255)),
+        float(events_cfg.get("neutral_comment_3_s", 450)),
+    ]
+    for idx, t in enumerate(neutral_times):
+        text = neutral_comments[idx] if idx < len(neutral_comments) else ""
+        if not text:
+            continue
+        room, activity = _state_at(room_schedule, t)
+        events.append(
+            ScheduledEvent(
+                event_type=EventType.ROBOT_SPEAK,
+                t=t,
+                payload={
+                    "block_number": block_num,
+                    "utterance_type": "neutral",
+                    "text": text,
+                    "room": room,
+                    "activity": activity,
+                },
+            )
+        )
 
-    # ── Fixed PM events ──────────────────────────────────────────────────
-    events.append(ScheduledEvent(
-        event_type=EventType.BLOCK_START, t=0.0,
-        payload={"block_number": block_num, "condition": condition},
-    ))
-    events.append(ScheduledEvent(
-        event_type=EventType.REMINDER,
-        t=float(ev.get("reminder_a_s", 120)),
-        payload={"text": reminder_text_a, "slot": "A", "condition": condition},
-    ))
-    events.append(ScheduledEvent(
-        event_type=EventType.TRIGGER_WINDOW_OPEN,
-        t=float(ev.get("trigger_a_appear_s", 210)),
-        payload={"task_id": task_a, "slot": "A", "window_ms": exec_window_ms},
-    ))
-    events.append(ScheduledEvent(
-        event_type=EventType.TRIGGER_WINDOW_CLOSE,
-        t=float(ev.get("trigger_a_close_s", 240)),
-        payload={"task_id": task_a, "slot": "A"},
-    ))
-    events.append(ScheduledEvent(
-        event_type=EventType.REMINDER,
-        t=float(ev.get("reminder_b_s", 300)),
-        payload={"text": reminder_text_b, "slot": "B", "condition": condition},
-    ))
-    events.append(ScheduledEvent(
-        event_type=EventType.TRIGGER_WINDOW_OPEN,
-        t=float(ev.get("trigger_b_appear_s", 390)),
-        payload={"task_id": task_b, "slot": "B", "window_ms": exec_window_ms},
-    ))
-    events.append(ScheduledEvent(
-        event_type=EventType.TRIGGER_WINDOW_CLOSE,
-        t=float(ev.get("trigger_b_close_s", 420)),
-        payload={"task_id": task_b, "slot": "B"},
-    ))
-    events.append(ScheduledEvent(
-        event_type=EventType.BLOCK_END, t=duration,
-        payload={"block_number": block_num},
-    ))
+    reminder_a_t = float(events_cfg.get("reminder_a_s", 120))
+    trigger_a_t = float(events_cfg.get("trigger_a_appear_s", 210))
+    close_a_t = float(events_cfg.get("trigger_a_close_s", 240))
+    reminder_b_t = float(events_cfg.get("reminder_b_s", 300))
+    trigger_b_t = float(events_cfg.get("trigger_b_appear_s", 390))
+    close_b_t = float(events_cfg.get("trigger_b_close_s", 420))
 
-    # ── Floating experiment events (seeded jitter) ───────────────────────
-    ft_base  = float(ev.get("fake_trigger_s", 35))
-    ft_half  = float(ev.get("fake_trigger_jitter_s", 8))
-    events.append(ScheduledEvent(
-        event_type=EventType.FAKE_TRIGGER,
-        t=_jitter(rng, ft_base, ft_half),
-        payload={"type": "delivery"},
-        is_fixed=False,
-    ))
+    events.append(_build_reminder_event(block_num, "A", task_a, condition, reminder_a_t, room_schedule))
+    events.append(_build_trigger_event(block_num, "A", task_a, trigger_a_t, window_ms, room_schedule))
+    events.append(_build_window_close_event(block_num, "A", task_a, close_a_t, room_schedule))
 
-    n1_base = float(ev.get("robot_neutral_1_s", 75))
-    n1_half = float(ev.get("robot_neutral_1_jitter_s", 12))
-    events.append(ScheduledEvent(
-        event_type=EventType.NEUTRAL_COMMENT,
-        t=_jitter(rng, n1_base, n1_half),
-        payload={"text": neutrals[0] if neutrals else "", "idx": 0},
-        is_fixed=False,
-    ))
+    events.append(_build_reminder_event(block_num, "B", task_b, condition, reminder_b_t, room_schedule))
+    events.append(_build_trigger_event(block_num, "B", task_b, trigger_b_t, window_ms, room_schedule))
+    events.append(_build_window_close_event(block_num, "B", task_b, close_b_t, room_schedule))
 
-    fy1_base = float(ev.get("force_yellow_1_s", 95))
-    fy1_half = float(ev.get("force_yellow_1_jitter_s", 8))
-    events.append(ScheduledEvent(
-        event_type=EventType.FORCE_STEAK_READY,
-        t=_jitter(rng, fy1_base, fy1_half),
-        payload={"hob_id": ev.get("force_yellow_1_hob", 0), "idx": 0},
-        is_fixed=False,
-    ))
-
-    n2_base = float(ev.get("robot_neutral_2_s", 270))
-    n2_half = float(ev.get("robot_neutral_2_jitter_s", 12))
-    events.append(ScheduledEvent(
-        event_type=EventType.NEUTRAL_COMMENT,
-        t=_jitter(rng, n2_base, n2_half),
-        payload={"text": neutrals[1] if len(neutrals) > 1 else "", "idx": 1},
-        is_fixed=False,
-    ))
-
-    fy2_base = float(ev.get("force_yellow_2_s", 275))
-    fy2_half = float(ev.get("force_yellow_2_jitter_s", 8))
-    events.append(ScheduledEvent(
-        event_type=EventType.FORCE_STEAK_READY,
-        t=_jitter(rng, fy2_base, fy2_half),
-        payload={"hob_id": ev.get("force_yellow_2_hob", 1), "idx": 1},
-        is_fixed=False,
-    ))
-
-    # ── Conflict detection ───────────────────────────────────────────────
-    events.sort(key=lambda e: e.t)
-    events = resolve_conflicts(events, ev)
-
-    # ── Ongoing-task events (steak spawns, messages, plant) ─────────────
-    # These use the same seeded RNG so the full schedule is reproducible.
-    events.extend(_gen_steak_spawns(rng, tc, duration))
-    events.extend(_gen_messages(tc))
-    events.extend(_gen_plant_water(rng, tc, duration))
+    events.append(
+        ScheduledEvent(
+            event_type=EventType.BLOCK_END,
+            t=float(duration),
+            payload={"block_number": block_num},
+        )
+    )
 
     events.sort(key=lambda e: e.t)
+
     logger.info(
-        f"Block {block_num} schedule generated: {len(events)} events "
-        f"(seed={seed}, condition={condition})"
+        "Block %s schedule generated: %s events (condition=%s, seed=%s)",
+        block_num,
+        len(events),
+        condition,
+        seed,
     )
     return events
-
-
-# ── Sub-generators ───────────────────────────────────────────────────────────
-
-def _gen_steak_spawns(rng: random.Random, tc: dict, end_s: float) -> List[ScheduledEvent]:
-    steak_cfg = get_config().get("steak", {})
-    base_times = steak_cfg.get("hob_base_cooking_ms", [11000, 13000, 15000])
-    jitter = steak_cfg.get("cooking_jitter_ms", 1000)
-    ready_ms = steak_cfg.get("ready_ms", 4000)
-
-    ss = tc.get("steak_spawn", {})
-    t = float(ss.get("start_s", 3))
-    spawn_end = float(ss.get("end_s", 490))
-    imin = int(ss.get("interval_min_s", 8))
-    imax = int(ss.get("interval_max_s", 15))
-
-    out: List[ScheduledEvent] = []
-    hob_cycle = 0
-    while t < spawn_end:
-        hob_id = hob_cycle % 3
-        base = base_times[hob_id] if hob_id < len(base_times) else 13000
-        cooking = base + rng.randint(-jitter, jitter)
-        out.append(ScheduledEvent(
-            event_type=EventType.STEAK_SPAWN, t=t,
-            payload={"hob_id": hob_id, "duration": {"cooking": cooking, "ready": ready_ms}},
-            is_fixed=False,
-        ))
-        hob_cycle += 1
-        t += rng.randint(imin, imax)
-    return out
-
-
-def _gen_messages(tc: dict) -> List[ScheduledEvent]:
-    out: List[ScheduledEvent] = []
-    for msg in tc.get("messages", []):
-        out.append(ScheduledEvent(
-            event_type=EventType.MESSAGE_BUBBLE,
-            t=float(msg["time_s"]),
-            payload={
-                "from":    msg.get("from", "Unknown"),
-                "subject": msg.get("subject", ""),
-                "body":    msg.get("body", ""),
-                "options": msg.get("options", ["OK", "Skip", "Later"]),
-                "correct": msg.get("correct", 0),
-                "avatar":  msg.get("avatar", "?"),
-            },
-        ))
-    return out
-
-
-def _gen_plant_water(rng: random.Random, tc: dict, end_s: float) -> List[ScheduledEvent]:
-    pw = tc.get("plant_water", {})
-    start = float(pw.get("start_s", 45))
-    jitter = float(pw.get("start_jitter_s", 15))
-    pw_min = int(pw.get("interval_min_s", 40))
-    pw_max = int(pw.get("interval_max_s", 60))
-
-    spawn_end = float(tc.get("steak_spawn", {}).get("end_s", 490))
-    t = start + rng.uniform(0, jitter)
-    out: List[ScheduledEvent] = []
-    while t < spawn_end:
-        out.append(ScheduledEvent(
-            event_type=EventType.PLANT_NEEDS_WATER, t=t, payload={}, is_fixed=False,
-        ))
-        t += rng.randint(pw_min, pw_max)
-    return out

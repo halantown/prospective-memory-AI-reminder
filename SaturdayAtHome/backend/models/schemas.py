@@ -1,10 +1,13 @@
 """Pydantic request/response models for the API."""
 
-from typing import Optional
+from __future__ import annotations
+
+from typing import Any, Optional
+
 from pydantic import BaseModel
 
 
-# ── Session ────────────────────────────────────────────────
+# ── Session ───────────────────────────────────────────────────────────────────
 
 class SessionStartRequest(BaseModel):
     participant_id: str
@@ -34,7 +37,7 @@ class SessionResumeResponse(BaseModel):
     condition: Optional[str] = None
 
 
-# ── Experiment data reports ────────────────────────────────
+# ── Experiment data reports ──────────────────────────────────────────────────
 
 class EncodingReport(BaseModel):
     quiz_attempts: int = 1
@@ -42,10 +45,11 @@ class EncodingReport(BaseModel):
 
 class PmActionReport(BaseModel):
     task_id: str
+    task_slot: Optional[str] = None
     action: Optional[str] = None
     selected_target: Optional[str] = None
     selected_detail: Optional[str] = None
-    choice: Optional[dict] = None  # Structured tasks like medicine: {bottle, amount}
+    choice: Optional[dict[str, Any]] = None
     client_ts: Optional[float] = None
 
 
@@ -62,19 +66,21 @@ class FakeTriggerReport(BaseModel):
 
 
 class QuestionnaireReport(BaseModel):
+    block_number: Optional[int] = None
     intrusiveness: Optional[int] = None
     helpfulness: Optional[int] = None
+    ongoing_interaction_count: Optional[int] = None
     comment: Optional[str] = None
 
 
 class SteakActionReport(BaseModel):
     hob_id: int
-    action: str  # "flip", "serve", "clean", "pepper"
+    action: str
 
 
-# ── Admin ──────────────────────────────────────────────────
+# ── Admin ─────────────────────────────────────────────────────────────────────
 
 class FireEventRequest(BaseModel):
     session_id: str
     event: str
-    data: dict = {}
+    data: dict[str, Any] = {}

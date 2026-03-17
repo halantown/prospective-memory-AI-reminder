@@ -1,4 +1,6 @@
-"""Load and expose the game_config.yaml as a global dict."""
+"""Load and expose game_config.yaml as structured accessors."""
+
+from __future__ import annotations
 
 import copy
 import logging
@@ -15,13 +17,14 @@ _config: dict[str, Any] = {}
 
 
 def load_config(path: Path | None = None) -> dict[str, Any]:
-    """Read the YAML config file and cache it globally."""
+    """Read YAML config and cache it globally."""
     global _config
     p = path or CONFIG_PATH
     if not p.exists():
         logger.warning(f"Config file not found at {p}, using empty config")
         _config = {}
         return _config
+
     with open(p, "r", encoding="utf-8") as f:
         _config = yaml.safe_load(f) or {}
     logger.info(f"Loaded config from {p} ({len(_config)} top-level keys)")
@@ -29,7 +32,7 @@ def load_config(path: Path | None = None) -> dict[str, Any]:
 
 
 def save_config(data: dict[str, Any], path: Path | None = None) -> None:
-    """Write config dict back to the YAML file."""
+    """Write config dict to YAML file and refresh cache."""
     global _config
     p = path or CONFIG_PATH
     with open(p, "w", encoding="utf-8") as f:
@@ -39,88 +42,199 @@ def save_config(data: dict[str, Any], path: Path | None = None) -> None:
 
 
 def get_config() -> dict[str, Any]:
-    """Return the current config dict (read-only copy)."""
     if not _config:
         load_config()
     return _config
 
 
 def get_game_config() -> dict[str, Any]:
-    """Return config stripped of sensitive data (correct answers) for the frontend."""
+    """Return config safe for participant-facing frontend."""
     cfg = copy.deepcopy(get_config())
-    # Strip correct answers from pm_tasks
-    for task_id, task in cfg.get("pm_tasks", {}).items():
-        task.pop("correct", None)
-    # Strip correct answers from messages
+
+    # Legacy stripping: remove explicit 'correct' fields if present.
+    for task in cfg.get("pm_tasks", {}).values():
+        if isinstance(task, dict):
+            task.pop("correct", None)
     for msg in cfg.get("timeline", {}).get("messages", []):
-        msg.pop("correct", None)
+        if isinstance(msg, dict):
+            msg.pop("correct", None)
+
+    # Normalize PM task choice presentation so frontend does not rely on
+    # backend-only field names.
+    for task in cfg.get("pm_tasks", {}).values():
+        if not isinstance(task, dict):
+            continue
+        target = task.pop("target", None)
+        distractor = task.pop("distractor", None)
+        if target and distractor:
+            task["options"] = [target, distractor]
+
     return cfg
 
 
-# ── Convenience accessors ─────────────────────────────────────────
+# ── Convenience accessors ─────────────────────────────────────────────────────
 
-def get_difficulty(level: str | None = None) -> dict:
-    cfg = get_config()
-    # Legacy support: if old-format difficulty exists, use it
-    diff = cfg.get("difficulty", {})
-    if diff:
-        level = level or diff.get("default", "medium")
-        return diff.get(level, diff.get("medium", {"cooking_ms": 13000, "ready_ms": 4000}))
-    # New format: read from steak config
-    steak = cfg.get("steak", {})
-    return {
-        "cooking_ms": steak.get("hob_base_cooking_ms", [11000, 13000, 15000])[1],
-        "ready_ms": steak.get("ready_ms", 4000),
-    }
-
-
-def get_scoring() -> dict:
-    return get_config().get("scoring", {})
-
-
-def get_timers() -> dict:
-    return get_config().get("timers", {})
-
-
-def get_timeline_config() -> dict:
+def get_timeline_config() -> dict[str, Any]:
     return get_config().get("timeline", {})
 
 
-def get_experiment() -> dict:
+def get_timeline_events() -> dict[str, Any]:
+    return get_timeline_config().get("events", {})
+
+
+def get_block_duration_s() -> float:
+    duration = get_timeline_config().get("block_duration_s", 510)
+    return float(duration)
+
+
+def get_block_room_schedule(block_num: int) -> list[dict[str, Any]]:
+    raw = get_timeline_config().get("block_room_schedule", {})
+    slot = raw.get(block_num) if isinstance(raw, dict) else None
+    if slot is None and isinstance(raw, dict):
+        slot = raw.get(str(block_num))
+    return list(slot or [])
+
+
+def get_neutral_comments() -> list[str]:
+    comments = get_timeline_config().get("neutral_comments", [])
+    if not isinstance(comments, list):
+        return []
+    return [str(c) for c in comments]
+
+
+def get_experiment() -> dict[str, Any]:
     return get_config().get("experiment", {})
 
 
-def get_pm_tasks() -> dict:
-    return get_config().get("pm_tasks", {})
-
-
-def get_audio_config() -> dict:
-    return get_config().get("audio", {})
-
-
-def get_steak_config() -> dict:
-    return get_config().get("steak", {})
-
-
-def get_laundry_config() -> dict:
-    return get_config().get("laundry", {})
-
-
-def get_latin_square() -> dict:
+def get_latin_square() -> dict[str, list[str]]:
     return get_experiment().get("latin_square", {})
 
 
-def get_task_pairs() -> dict:
-    raw = get_experiment().get("task_pairs", {})
-    # YAML keys may be int or str — normalize to int keys
-    return {int(k): v for k, v in raw.items()}
+def get_block_task_slots() -> dict[int, dict[str, str]]:
+    exp = get_experiment()
+
+    # v2.0 format
+    raw = exp.get("block_task_slots", {})
+    slots: dict[int, dict[str, str]] = {}
+    for k, v in (raw or {}).items():
+        try:
+            block_n = int(k)
+        except Exception:
+            continue
+        if isinstance(v, dict):
+            a = v.get("A")
+            b = v.get("B")
+            if a and b:
+                slots[block_n] = {"A": str(a), "B": str(b)}
+
+    if slots:
+        return slots
+
+    # legacy format fallback: task_pairs: {1: [taskA, taskB], ...}
+    legacy_pairs = exp.get("task_pairs", {})
+    for k, v in (legacy_pairs or {}).items():
+        try:
+            block_n = int(k)
+        except Exception:
+            continue
+        if isinstance(v, list) and len(v) >= 2:
+            slots[block_n] = {"A": str(v[0]), "B": str(v[1])}
+    return slots
 
 
-def get_reminder_texts() -> dict:
+def get_task_pairs() -> dict[int, list[str]]:
+    """Compatibility accessor used by legacy callers/tests."""
+    slots = get_block_task_slots()
+    return {k: [v["A"], v["B"]] for k, v in slots.items()}
+
+
+def get_block_task_pair(block_num: int) -> tuple[str, str]:
+    slots = get_block_task_slots()
+    pair = slots.get(block_num) or slots.get(int(block_num))
+    if pair:
+        return pair["A"], pair["B"]
+    # Safe fallback for malformed configs
+    return "medicine", "tea"
+
+
+def get_condition_rules() -> dict[str, Any]:
+    return get_experiment().get("condition_rules", {})
+
+
+def get_execution_window_ms() -> int:
+    value = get_experiment().get("execution_window_ms", 30000)
+    try:
+        return int(value)
+    except Exception:
+        return 30000
+
+
+def get_reminder_texts() -> dict[str, Any]:
+    """Legacy compatibility (v1.8 static reminders)."""
     return get_experiment().get("reminder_texts", {})
 
 
-def get_correct_answer(task_id: str) -> dict | None:
-    tasks = get_pm_tasks()
-    task = tasks.get(task_id, {})
-    return task.get("correct")
+def get_pm_tasks() -> dict[str, Any]:
+    return get_config().get("pm_tasks", {})
+
+
+def get_pm_task(task_id: str) -> dict[str, Any] | None:
+    task = get_pm_tasks().get(task_id)
+    if isinstance(task, dict):
+        return task
+    return None
+
+
+def get_rooms_config() -> dict[str, Any]:
+    return get_config().get("rooms", {})
+
+
+def get_room_label(room_id: str) -> str:
+    room = get_rooms_config().get(room_id, {})
+    return room.get("label", room_id)
+
+
+def get_room_activity_template(room_id: str, activity_id: str) -> dict[str, Any]:
+    room = get_rooms_config().get(room_id, {})
+    templates = room.get("activity_templates", {}) if isinstance(room, dict) else {}
+    tpl = templates.get(activity_id, {}) if isinstance(templates, dict) else {}
+    return tpl if isinstance(tpl, dict) else {}
+
+
+def get_audio_config() -> dict[str, Any]:
+    return get_config().get("audio", {})
+
+
+def get_correct_answer(task_id: str) -> dict[str, Any] | None:
+    """Legacy compatibility helper (v1.8)."""
+    task = get_pm_task(task_id) or {}
+    value = task.get("correct")
+    return value if isinstance(value, dict) else None
+
+
+# ── Legacy compatibility accessors (v1.8 callers) ───────────────────────────
+
+def get_difficulty(level: str | None = None) -> dict[str, Any]:
+    diff = get_config().get("difficulty", {})
+    if isinstance(diff, dict) and diff:
+        if level and level in diff:
+            return diff[level]
+        default_level = diff.get("default", "medium")
+        return diff.get(default_level, {}) if isinstance(default_level, str) else {}
+    return {}
+
+
+def get_scoring() -> dict[str, Any]:
+    return get_config().get("scoring", {})
+
+
+def get_timers() -> dict[str, Any]:
+    return get_config().get("timers", {})
+
+
+def get_steak_config() -> dict[str, Any]:
+    return get_config().get("steak", {})
+
+
+def get_laundry_config() -> dict[str, Any]:
+    return get_config().get("laundry", {})

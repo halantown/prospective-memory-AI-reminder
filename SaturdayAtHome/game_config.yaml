@@ -1,149 +1,97 @@
-# ═══════════════════════════════════════════════════════════════════════
-# Saturday At Home — Game Configuration
-# ═══════════════════════════════════════════════════════════════════════
-# All tunable experiment parameters in one place.
-# Edit here or via the web UI at /config.
-# Backend reads this on startup; changes via /config API are saved back.
-# ═══════════════════════════════════════════════════════════════════════
+# Saturday At Home — PRD v2.0 State-Driven Configuration
+# Single source of truth for experiment logic, timeline, and PM tasks.
 
-# ── Steak Cooking ─────────────────────────────────────────────────────
-steak:
-  # Per-hob base cooking time (ms) — staggered to prevent sync
-  hob_base_cooking_ms: [11000, 13000, 15000]
-  # Random jitter added to each respawn (ms)
-  cooking_jitter_ms: 1000
-  ready_ms: 4000
-  # Ash mechanic: BURNING countdown before auto-clear
-  ash_countdown_ms: 9000
-  # Respawn delay after serve/clean (ms range)
-  respawn_min_ms: 8000
-  respawn_max_ms: 15000
-
-# ── Scoring ───────────────────────────────────────────────────────────
-scoring:
-  steak_pepper: 2
-  steak_serve: 5
-  steak_burn_penalty: -10
-  steak_ash_penalty: -20
-  message_correct: 3
-  message_wrong: -2
-  message_expire_penalty: -2
-  plant_water_fresh: 3
-  plant_water_wilted: 1
-  laundry_correct: 3
-  laundry_wrong: -2
-  laundry_jam_miss: -5
-  laundry_pile_overflow_penalty: -1
-
-# ── Timers (ms) ──────────────────────────────────────────────────────
-timers:
-  message_timeout_ms: 30000
-  plant_wilt_ms: 30000
-  game_tick_ms: 1000
-  hob_check_ms: 500
-  laundry_wash_min_ms: 25000
-  laundry_wash_max_ms: 45000
-  laundry_jam_fix_ms: 15000
-
-# ── Laundry ──────────────────────────────────────────────────────────
-laundry:
-  jam_probability: 0.4
-  pile_drop_min_s: 40
-  pile_drop_max_s: 50
-  pile_overflow_threshold: 5
-  pile_overflow_penalty_every_s: 10
-  garment_pool:
-    - { color: "red",    category: "warm",  label: "Red T-Shirt" }
-    - { color: "orange", category: "warm",  label: "Orange Scarf" }
-    - { color: "yellow", category: "warm",  label: "Yellow Dress" }
-    - { color: "blue",   category: "cold",  label: "Blue Jeans" }
-    - { color: "green",  category: "cold",  label: "Green Hoodie" }
-    - { color: "purple", category: "cold",  label: "Purple Socks" }
-    - { color: "white",  category: "white", label: "White Shirt" }
-    - { color: "gray",   category: "white", label: "Gray Towel" }
-  rules:
-    warm:  { detergent: "Warm Detergent",  temp: "40°" }
-    cold:  { detergent: "Cold Detergent",  temp: "30°" }
-    white: { detergent: "White Detergent", temp: "60°" }
-
-# ── Timeline (seconds) ──────────────────────────────────────────────
 timeline:
   block_duration_s: 510
-
-  steak_spawn:
-    start_s: 3
-    end_s: 490
-    interval_min_s: 8
-    interval_max_s: 15
-
-  plant_water:
-    start_s: 45
-    start_jitter_s: 15
-    interval_min_s: 40
-    interval_max_s: 60
-
   events:
-    fake_trigger_s: 35
-    fake_trigger_jitter_s: 8         # fires within [27, 43]s
-    robot_neutral_1_s: 75
-    robot_neutral_1_jitter_s: 12     # fires within [63, 87]s
-    force_yellow_1_s: 95
-    force_yellow_1_jitter_s: 8       # fires within [87, 103]s
-    force_yellow_1_hob: 0
     reminder_a_s: 120
     trigger_a_appear_s: 210
     trigger_a_close_s: 240
-    robot_neutral_2_s: 270
-    robot_neutral_2_jitter_s: 12     # fires within [258, 282]s
-    force_yellow_2_s: 275
-    force_yellow_2_jitter_s: 8       # fires within [267, 283]s
-    force_yellow_2_hob: 1
     reminder_b_s: 300
     trigger_b_appear_s: 390
     trigger_b_close_s: 420
+    neutral_comment_1_s: 30
+    neutral_comment_2_s: 255
+    neutral_comment_3_s: 450
+
+  block_room_schedule:
+    1:
+      - t: 0
+        room: kitchen
+        activity: recipe_following
+        narrative: "Start lunch prep in the kitchen."
+      - t: 75
+        room: living_room
+        activity: message_processing
+        narrative: "Move to the living room to handle messages."
+      - t: 270
+        room: kitchen
+        activity: cooking_monitor
+        narrative: "Back to the kitchen for a quick cooking check."
+      - t: 450
+        room: entrance
+        activity: item_management
+        narrative: "Head to the entrance for final house prep."
+
+    2:
+      - t: 0
+        room: living_room
+        activity: sorting
+        narrative: "Start in the living room by organizing items."
+      - t: 75
+        room: balcony
+        activity: household_checks
+        narrative: "Go to the balcony for home checks."
+      - t: 270
+        room: living_room
+        activity: message_processing
+        narrative: "Return to the living room for incoming messages."
+      - t: 450
+        room: entrance
+        activity: item_management
+        narrative: "Wrap up at the entrance area."
+
+    3:
+      - t: 0
+        room: kitchen
+        activity: recipe_following
+        narrative: "Begin in the kitchen with the next recipe sequence."
+      - t: 75
+        room: entrance
+        activity: item_management
+        narrative: "Move to the entrance to prepare outgoing items."
+      - t: 270
+        room: kitchen
+        activity: cooking_monitor
+        narrative: "Return to the kitchen for another cooking check."
+      - t: 450
+        room: balcony
+        activity: household_checks
+        narrative: "Finish with quick balcony checks."
+
+    4:
+      - t: 0
+        room: living_room
+        activity: message_processing
+        narrative: "Start in the living room and catch up on messages."
+      - t: 75
+        room: entrance
+        activity: item_management
+        narrative: "Go to the entrance to organize delivery items."
+      - t: 270
+        room: living_room
+        activity: sorting
+        narrative: "Return to the living room to complete sorting."
+      - t: 450
+        room: kitchen
+        activity: recipe_following
+        narrative: "Wind down in the kitchen."
 
   neutral_comments:
-    - "Smells great in the kitchen!"
-    - "How's everything coming along?"
+    - "Looks like a nice day for getting things done."
+    - "You are keeping a steady pace."
+    - "Everything seems on track so far."
 
-  messages:
-    - time_s: 55
-      from: "Sarah"
-      subject: "Tonight's party"
-      body: "Hey! I'm buying snacks — 3 packs of chips at $4 each. How much should I bring?"
-      options: ["$10", "$12", "$15"]
-      correct: 1
-      avatar: "S"
-    - time_s: 130
-      from: "FoodDash"
-      subject: "Delivery issue"
-      body: "Your building has 3 entrances. You're in unit 7B on the east side. Which entrance is closest?"
-      options: ["North entrance", "East entrance", "South entrance"]
-      correct: 1
-      avatar: "🛵"
-    - time_s: 220
-      from: "David"
-      subject: "Parking question"
-      body: "The parking garage has spots A1-A20 on level 1, B1-B20 on level 2. Your spot is B12. Which level do I go to?"
-      options: ["Level 1", "Level 2", "Level 3"]
-      correct: 1
-      avatar: "D"
-    - time_s: 310
-      from: "Building Mgmt"
-      subject: "Water shutoff notice"
-      body: "Water will be shut off tomorrow from 9am-12pm for maintenance. When does it end?"
-      options: ["11am", "12pm", "1pm"]
-      correct: 1
-      avatar: "📦"
-    - time_s: 400
-      from: "Sarah"
-      subject: "Dessert math"
-      body: "There'll be 8 people at dinner. Each slice of cake serves 1. A cake has 6 slices. How many cakes do we need?"
-      options: ["1 cake", "2 cakes", "3 cakes"]
-      correct: 1
-      avatar: "S"
-
-# ── Experiment Design ────────────────────────────────────────────────
 experiment:
   latin_square:
     A: ["LowAF_LowCB", "HighAF_LowCB", "LowAF_HighCB", "HighAF_HighCB"]
@@ -151,93 +99,304 @@ experiment:
     C: ["LowAF_HighCB", "HighAF_HighCB", "LowAF_LowCB", "HighAF_LowCB"]
     D: ["HighAF_HighCB", "LowAF_LowCB", "HighAF_LowCB", "LowAF_HighCB"]
 
-  task_pairs:
-    1: ["medicine_a", "medicine_b"]
-    2: ["laundry_c", "laundry_d"]
-    3: ["comm_e", "comm_f"]
-    4: ["chores_g", "chores_h"]
+  block_task_slots:
+    1: { A: medicine,  B: tea }
+    2: { A: laundry,   B: book }
+    3: { A: pot,       B: umbrella }
+    4: { A: tv_record, B: coat }
 
-  reminder_texts:
-    LowAF_LowCB:
-      A: "By the way, remember — after dinner today, take your medicine."
-      B: "Don't forget — after dinner, take your medicine."
-    HighAF_LowCB:
-      A: "By the way, remember — after dinner today, take your Doxycycline from the red round bottle, the one your cardiologist prescribed."
-      B: "Don't forget — after dinner, take your Doxycycline, the red round bottle your cardiologist prescribed."
-    LowAF_HighCB:
-      A: "I can see you're keeping an eye on the stove. By the way — after dinner today, remember to take your medicine."
-      B: "You're busy in the kitchen — don't forget, after dinner, take your medicine."
-    HighAF_HighCB:
-      A: "I can see you're keeping an eye on the stove. By the way — after dinner today, take your Doxycycline from the red round bottle, the one your cardiologist prescribed."
-      B: "You're busy in the kitchen — don't forget, after dinner, take your Doxycycline, the red round bottle your cardiologist prescribed."
-
-  fake_trigger_type: "delivery"
   execution_window_ms: 30000
 
-# ── PM Tasks ─────────────────────────────────────────────────────────
+  condition_rules:
+    LowAF_LowCB:
+      af_level: low
+      cb_level: low
+      include_context_preamble: false
+      reminder_word_limit: 15
+      preamble_word_limit: 0
+    HighAF_LowCB:
+      af_level: high
+      cb_level: low
+      include_context_preamble: false
+      reminder_word_limit: 35
+      preamble_word_limit: 0
+    LowAF_HighCB:
+      af_level: low
+      cb_level: high
+      include_context_preamble: true
+      reminder_word_limit: 15
+      preamble_word_limit: 12
+    HighAF_HighCB:
+      af_level: high
+      cb_level: high
+      include_context_preamble: true
+      reminder_word_limit: 35
+      preamble_word_limit: 12
+
+rooms:
+  kitchen:
+    label: Kitchen
+    activity_templates:
+      recipe_following:
+        label: Recipe following
+        prompts:
+          - instruction: "The recipe says to add olive oil first."
+            options: ["Olive oil", "Sesame oil", "Vinegar"]
+            correct_index: 0
+          - instruction: "Choose the ingredient for step 2."
+            options: ["Garlic", "Sugar", "Cinnamon"]
+            correct_index: 0
+      cooking_monitor:
+        label: Cooking monitoring
+        prompts:
+          - instruction: "Give the pan a quick stir."
+            options: ["Stir now", "Skip"]
+            correct_index: 0
+  living_room:
+    label: Living Room
+    activity_templates:
+      message_processing:
+        label: Message processing
+        prompts:
+          - instruction: "Friend asks: wine or dessert?"
+            options: ["Wine", "Dessert"]
+            correct_index: 1
+          - instruction: "Friend asks: 6pm or 7pm?"
+            options: ["6pm", "7pm"]
+            correct_index: 0
+      sorting:
+        label: Sorting and organizing
+        prompts:
+          - instruction: "Sort this photo into the travel album."
+            options: ["Travel", "Bills", "Work"]
+            correct_index: 0
+  balcony:
+    label: Balcony
+    activity_templates:
+      household_checks:
+        label: Household checks
+        prompts:
+          - instruction: "Plant soil looks dry. What do you do?"
+            options: ["Water", "Skip"]
+            correct_index: 0
+          - instruction: "Laundry item feels damp."
+            options: ["Leave it", "Fold now"]
+            correct_index: 0
+  entrance:
+    label: Entrance
+    activity_templates:
+      item_management:
+        label: Item management
+        prompts:
+          - instruction: "Delivery list says 3 items. Which one is missing?"
+            options: ["Milk", "Bread", "Napkins"]
+            correct_index: 2
+          - instruction: "Place shoes by category."
+            options: ["Indoor / Outdoor", "By color"]
+            correct_index: 0
+
 pm_tasks:
-  medicine_a:
-    prompt: "Take your prescribed medicine"
-    bottles:
-      - id: "round_red"
-        label: "Red round bottle"
-        shape: "round"
-        color: "#e57373"
-      - id: "square_red"
-        label: "Red square bottle"
-        shape: "square"
-        color: "#ef5350"
-    amounts: ["1 tablet", "2 tablets", "3 tablets"]
-    correct:
-      bottle: "round_red"
-      amount: "2 tablets"
-
-  medicine_b:
-    prompt: "Take your vitamin supplement"
-    bottles:
-      - id: "round_orange"
-        label: "Orange round bottle"
-        shape: "round"
-        color: "#ffb74d"
-      - id: "square_orange"
-        label: "Orange square bottle"
-        shape: "square"
-        color: "#ffa726"
-    amounts: ["500mg × 1", "500mg × 2", "1000mg × 1"]
-    correct:
-      bottle: "round_orange"
-      amount: "1000mg × 1"
-
-  chores_g:
-    type: "pressure_cooker"
-    prompt: "The pressure cooker is ready — handle it safely"
+  medicine:
+    title: "Take prescription medicine"
+    room: kitchen
+    trigger: "Dinner is ready"
+    preparation_step: "Pour a glass of water first"
+    target:
+      id: doxycycline_red_round_left
+      label: "Red round bottle (Doxycycline), left side"
+      cues: ["red", "round", "left side"]
+    distractor:
+      id: ibuprofen_red_square_right
+      label: "Red square bottle (Ibuprofen), right side"
+      cues: ["red", "square", "right side"]
     steps:
-      - id: "release_steam"
-        label: "Turn valve to release steam"
-        required: false
-      - id: "open_lid"
-        label: "Open the lid"
-        required: true
-    correct:
-      action: "release_steam_open_lid"
+      - { id: prepare_water, label: "Pour water", required: true }
+      - { id: take_tablet, label: "Take one tablet", required: true }
+    low_af_text: "Remember to take your medicine later today."
+    high_af_text: "After dinner, find the red round Doxycycline bottle on the left side. Pour water first, then take one tablet."
+    encoding_card:
+      instruction: "When dinner is ready, go to the kitchen, pick the correct bottle, pour water, then take one tablet."
+      quiz:
+        question: "Which bottle is correct?"
+        options: ["Red round left bottle", "Red square right bottle"]
+        correct_index: 0
 
-# ── Trigger Icons ────────────────────────────────────────────────────
-trigger_icons:
-  medicine_a: { icon: "🍽️", label: "Dinner ready" }
-  medicine_b: { icon: "☕", label: "Coffee done" }
-  laundry_c:  { icon: "👕", label: "Laundry done" }
-  laundry_d:  { icon: "🌅", label: "Getting dark" }
-  comm_e:     { icon: "📱", label: "Friend online" }
-  comm_f:     { icon: "🚪", label: "Doorbell" }
-  chores_g:   { icon: "🍲", label: "Slow cooker" }
-  chores_h:   { icon: "🗑️", label: "Rubbish truck" }
+  tea:
+    title: "Prepare specific tea"
+    room: kitchen
+    trigger: "Friend says they are 10 minutes away"
+    preparation_step: "Boil water first"
+    target:
+      id: longjing_green_tin_top
+      label: "Longjing green tin, top shelf"
+      cues: ["green tin", "top shelf", "Longjing"]
+    distractor:
+      id: biluochun_green_tin_bottom
+      label: "Biluochun green tin, bottom shelf"
+      cues: ["green tin", "bottom shelf", "Biluochun"]
+    steps:
+      - { id: boil_water, label: "Boil water", required: true }
+      - { id: steep_tea, label: "Steep tea", required: true }
+    low_af_text: "Remember to make tea for your friend."
+    high_af_text: "Use the Longjing green tin on the top shelf. Boil water first, then steep the tea."
+    encoding_card:
+      instruction: "When your friend is 10 minutes away, go to the kitchen, choose the right tea tin, boil water, then steep tea."
+      quiz:
+        question: "Which tin is correct?"
+        options: ["Top shelf Longjing", "Bottom shelf Biluochun"]
+        correct_index: 0
 
-# ── Audio ────────────────────────────────────────────────────────────
+  laundry:
+    title: "Collect specific laundry"
+    room: balcony
+    trigger: "Weather app says clouds are coming"
+    preparation_step: "Check if the shirt is dry"
+    target:
+      id: blue_striped_shirt_left
+      label: "Blue striped shirt, left rack"
+      cues: ["blue", "striped", "left rack"]
+    distractor:
+      id: blue_checkered_shirt_right
+      label: "Blue checkered shirt, right rack"
+      cues: ["blue", "checkered", "right rack"]
+    steps:
+      - { id: inspect_dryness, label: "Check if dry", required: true }
+      - { id: fold_into_basket, label: "Fold into basket", required: true }
+    low_af_text: "Remember to collect laundry from the balcony."
+    high_af_text: "Collect the blue striped shirt on the left rack. Check dryness first, then fold it into the basket."
+    encoding_card:
+      instruction: "When the weather turns cloudy, go to the balcony, pick the correct shirt, check dryness, and fold it."
+      quiz:
+        question: "Which shirt is correct?"
+        options: ["Blue striped left shirt", "Blue checkered right shirt"]
+        correct_index: 0
+
+  book:
+    title: "Give specific book to friend"
+    room: living_room
+    trigger: "Friend mentions the trip you discussed"
+    preparation_step: "Open the book to verify title"
+    target:
+      id: red_book_mountain_left
+      label: "Red book with mountain cover, second shelf left"
+      cues: ["red", "mountain cover", "second shelf left"]
+    distractor:
+      id: red_book_volcano_right
+      label: "Red book with volcano cover, second shelf right"
+      cues: ["red", "volcano cover", "second shelf right"]
+    steps:
+      - { id: verify_title, label: "Open and verify title", required: true }
+      - { id: place_on_table, label: "Place on table", required: true }
+    low_af_text: "Remember to find a book for your friend."
+    high_af_text: "Find the red book with the mountain cover on the second shelf left. Verify title first, then place it on the table."
+    encoding_card:
+      instruction: "When your friend mentions the trip, go to the living room, choose the right red book, verify it, and place it on the table."
+      quiz:
+        question: "Which book is correct?"
+        options: ["Mountain cover on left", "Volcano cover on right"]
+        correct_index: 0
+
+  pot:
+    title: "Turn off pressure cooker"
+    room: kitchen
+    trigger: "Kitchen timer beeps"
+    preparation_step: "Release valve first"
+    target:
+      id: silver_handle_left_burner
+      label: "Silver-handle pot on left burner"
+      cues: ["silver handle", "left burner"]
+    distractor:
+      id: black_handle_right_burner
+      label: "Black-handle pot on right burner"
+      cues: ["black handle", "right burner"]
+    steps:
+      - { id: release_valve, label: "Release pressure valve", required: true }
+      - { id: open_lid, label: "Lift lid", required: true }
+    low_af_text: "Remember to deal with the pot on the stove."
+    high_af_text: "Handle the silver-handle pot on the left burner. Release the valve first, then open the lid."
+    encoding_card:
+      instruction: "When the kitchen timer beeps, go to the kitchen, choose the correct pot, release valve, then open lid."
+      quiz:
+        question: "Which pot is correct?"
+        options: ["Silver handle left burner", "Black handle right burner"]
+        correct_index: 0
+
+  umbrella:
+    title: "Put out correct umbrella"
+    room: entrance
+    trigger: "TV weather says rain tomorrow"
+    preparation_step: "Open it to check damage"
+    target:
+      id: blue_folding_umbrella
+      label: "Blue folding umbrella"
+      cues: ["blue", "folding"]
+    distractor:
+      id: blue_long_umbrella
+      label: "Blue long umbrella"
+      cues: ["blue", "long"]
+    steps:
+      - { id: inspect_umbrella, label: "Open and inspect", required: true }
+      - { id: place_by_door, label: "Place by door", required: true }
+    low_af_text: "Remember to put out an umbrella for your friend."
+    high_af_text: "Use the blue folding umbrella. Open it to inspect first, then place it by the door."
+    encoding_card:
+      instruction: "When rain is forecast, go to the entrance, choose the correct umbrella, inspect it, and place it by the door."
+      quiz:
+        question: "Which umbrella is correct?"
+        options: ["Blue folding umbrella", "Blue long umbrella"]
+        correct_index: 0
+
+  tv_record:
+    title: "Set TV recording"
+    room: living_room
+    trigger: "Clock chimes for afternoon shows"
+    preparation_step: "Switch to the correct channel first"
+    target:
+      id: channel5_blue_planet
+      label: "Channel 5 documentary Blue Planet"
+      cues: ["channel 5", "Blue Planet"]
+    distractor:
+      id: channel3_interstellar
+      label: "Channel 3 movie Interstellar"
+      cues: ["channel 3", "Interstellar"]
+    steps:
+      - { id: switch_channel, label: "Switch to Channel 5", required: true }
+      - { id: press_record, label: "Press record", required: true }
+    low_af_text: "Remember to record a TV show for your mum."
+    high_af_text: "Record Blue Planet on Channel 5. Switch to Channel 5 first, then press record."
+    encoding_card:
+      instruction: "When afternoon shows start, go to the living room, select Channel 5 Blue Planet, then record it."
+      quiz:
+        question: "Which channel is correct?"
+        options: ["Channel 5", "Channel 3"]
+        correct_index: 0
+
+  coat:
+    title: "Give correct coat to friend"
+    room: entrance
+    trigger: "Friend says they are leaving"
+    preparation_step: "Check pockets for keys first"
+    target:
+      id: grey_thin_jacket_left_hook
+      label: "Grey thin jacket on left hook"
+      cues: ["grey", "thin", "left hook"]
+    distractor:
+      id: grey_thick_jacket_right_hook
+      label: "Grey thick jacket on right hook"
+      cues: ["grey", "thick", "right hook"]
+    steps:
+      - { id: check_pockets, label: "Check pockets", required: true }
+      - { id: hand_to_friend, label: "Hand to friend", required: true }
+    low_af_text: "Remember to get a coat for your friend."
+    high_af_text: "Use the thin grey jacket on the left hook. Check the pockets first, then hand it over."
+    encoding_card:
+      instruction: "When your friend is leaving, go to the entrance, choose the correct grey coat, check pockets, and hand it over."
+      quiz:
+        question: "Which coat is correct?"
+        options: ["Thin grey coat on left", "Thick grey coat on right"]
+        correct_index: 0
+
 audio:
-  bgm_normal_volume: 0.35
-  bgm_ducked_volume: 0.08
-  duck_in_ms: 300
-  duck_out_ms: 800
   tts_lang: "en-US"
   tts_rate: 0.9
   tts_pitch: 1.0
