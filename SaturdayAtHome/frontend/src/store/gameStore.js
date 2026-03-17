@@ -90,6 +90,8 @@ export const useGameStore = create((set, get) => ({
   handleGameEnd: () => set({
     gameActive: false,
     currentGameType: null,
+    currentSkin: null,
+    gameItems: [],
   }),
 
   handleRoomTransition: (data) => set({
@@ -159,7 +161,7 @@ export const useGameStore = create((set, get) => ({
     const triggers = get().triggers.map(t =>
       t.taskId === data.task_id ? { ...t, state: 'inactive', taskId: null } : t
     )
-    set({ triggers, activeExecutionWindow: null })
+    set({ triggers, activeExecutionWindow: null, mcqVisible: false, mcqData: null, gameDimmed: false })
   },
 
   clickTrigger: (triggerId) => {

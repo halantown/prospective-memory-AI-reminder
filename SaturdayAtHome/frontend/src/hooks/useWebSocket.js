@@ -26,6 +26,9 @@ export default function useWebSocket() {
       block_end: () => useGameStore.getState().handleBlockEnd(),
       mcq_data: (d) => useGameStore.getState().showMCQ(d),
       mcq_result: (d) => console.log('[WS] mcq_result', d),
+      encoding_ack: () => {},
+      questionnaire_ack: () => {},
+      ongoing_ack: () => {},
       keepalive: () => {},
     }
 
