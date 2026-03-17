@@ -31,7 +31,7 @@ export function useAudio() {
     const prev = prevTriggers.current
     if (prev) {
       for (let i = 0; i < triggers.length; i++) {
-        if (prev[i] && triggers[i].state !== prev[i].state && triggers[i].state !== 'inactive') {
+        if (prev[i] && prev[i].state !== 'fired' && triggers[i].state === 'fired') {
           createBeep()
           break
         }

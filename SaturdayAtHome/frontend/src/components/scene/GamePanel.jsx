@@ -32,7 +32,7 @@ export default function GamePanel() {
     <AnimatePresence>
       {gameActive && (
         <motion.div
-          className={`absolute z-30 rounded-2xl shadow-2xl border border-stone-200 overflow-hidden
+          className={`absolute z-30 rounded-2xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col
             ${gameDimmed ? 'opacity-30 pointer-events-none' : ''} transition-opacity`}
           style={{
             left: panelX,
@@ -57,7 +57,7 @@ export default function GamePanel() {
           </div>
 
           {/* Game content area */}
-          <div className="flex-1 overflow-auto" style={{ height: panelH - 44 }}>
+          <div className="flex-1 min-h-0 overflow-auto">
             {gameType === 'semantic_cat' && <SemanticCatGame />}
             {gameType === 'go_nogo' && <GoNoGoGame />}
             {gameType === 'trivia' && <TriviaGame />}

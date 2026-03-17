@@ -4,7 +4,18 @@ import { useGameStore } from '../../store/gameStore'
 export default function SceneTrigger({ trigger, position, furnitureEmoji, label }) {
   const clickTrigger = useGameStore(s => s.clickTrigger)
 
-  if (!trigger) return null
+  // If trigger data not found in store, render as static furniture
+  if (!trigger) {
+    return (
+      <div
+        className="absolute flex flex-col items-center select-none z-10"
+        style={{ left: position.x - 20, top: position.y - 20 }}
+      >
+        <span className="text-2xl leading-none">{furnitureEmoji}</span>
+        <span className="text-[8px] mt-0.5 whitespace-nowrap font-medium text-stone-400">{label}</span>
+      </div>
+    )
+  }
 
   const isFired = trigger.state === 'fired'
   const isAmbient = trigger.state === 'ambient'

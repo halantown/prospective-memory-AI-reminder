@@ -11,7 +11,7 @@ export default function Avatar() {
 
   return (
     <motion.div
-      className="absolute z-30 flex flex-col items-center pointer-events-none select-none"
+      className="absolute z-[25] flex flex-col items-center pointer-events-none select-none"
       animate={{ left: targetX, top: targetY }}
       transition={{ duration: 2.5, ease: 'easeInOut' }}
     >

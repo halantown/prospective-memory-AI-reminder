@@ -14,7 +14,7 @@ export default function PepperCharacter() {
 
   return (
     <motion.div
-      className="absolute z-30 flex flex-col items-center pointer-events-none select-none"
+      className="absolute z-[25] flex flex-col items-center pointer-events-none select-none"
       animate={{ left: targetX, top: targetY }}
       transition={{ duration: 2.8, ease: 'easeInOut', delay: 0.3 }}
     >
@@ -27,7 +27,7 @@ export default function PepperCharacter() {
             exit={{ opacity: 0, y: 8, scale: 0.8 }}
             className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full
                        bg-white border border-stone-300 rounded-lg shadow-lg px-3 py-2
-                       text-xs text-stone-700 leading-relaxed max-w-48 min-w-24 text-center z-40"
+                       text-xs text-stone-700 leading-relaxed max-w-48 min-w-24 text-center z-[45]"
           >
             {robotText}
             {/* Speech bubble arrow */}

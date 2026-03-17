@@ -89,12 +89,24 @@ export const useGameStore = create((set, get) => ({
     })
   },
 
-  handleGameEnd: () => set({
-    gameActive: false,
-    currentGameType: null,
-    currentSkin: null,
-    gameItems: [],
-  }),
+  handleGameEnd: () => {
+    // Flush any remaining responses before clearing
+    const { responseBuffer, wsSend, currentGameType, currentSkin, blockNumber } = get()
+    if (responseBuffer.length > 0 && wsSend) {
+      wsSend({
+        type: 'ongoing_batch',
+        data: { game_type: currentGameType, skin: currentSkin, block_number: blockNumber, responses: responseBuffer },
+      })
+    }
+    set({
+      gameActive: false,
+      currentGameType: null,
+      currentSkin: null,
+      gameItems: [],
+      itemIndex: 0,
+      responseBuffer: [],
+    })
+  },
 
   handleRoomTransition: (data) => set({
     currentRoom: data.to || data.room,

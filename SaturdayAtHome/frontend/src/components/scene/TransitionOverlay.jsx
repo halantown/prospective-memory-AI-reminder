@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 
@@ -7,12 +8,29 @@ export default function TransitionOverlay() {
   const activityLabel = useGameStore(s => s.activityLabel)
   const simulatedTime = useGameStore(s => s.simulatedTime)
 
-  // Show overlay when NOT in a game (transition period)
-  const isTransitioning = !gameActive && currentRoom
+  const [visible, setVisible] = useState(false)
+  const prevRoom = useRef(currentRoom)
+  const hasStarted = useRef(false)
+
+  useEffect(() => {
+    // Track that we've seen at least one game start
+    if (gameActive) hasStarted.current = true
+  }, [gameActive])
+
+  useEffect(() => {
+    // Only show transition when room actually changes (not initial state)
+    if (currentRoom !== prevRoom.current && hasStarted.current) {
+      prevRoom.current = currentRoom
+      setVisible(true)
+      const timer = setTimeout(() => setVisible(false), 3000)
+      return () => clearTimeout(timer)
+    }
+    prevRoom.current = currentRoom
+  }, [currentRoom])
 
   return (
     <AnimatePresence>
-      {isTransitioning && (
+      {visible && !gameActive && (
         <motion.div
           className="absolute inset-0 z-50 flex items-center justify-center bg-black/25 pointer-events-none"
           initial={{ opacity: 0 }}
