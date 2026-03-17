@@ -1,0 +1,205 @@
+═══════════════════════════════════════════════════════════════════════════════
+SATURDAYATHOME FRONTEND - QUICK REFERENCE SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+📁 ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Framework: React 18.3.1 + Vite 5.4
+State: Zustand 5.0 (single gameStore.js)
+UI: Tailwind CSS + Framer Motion
+Audio: Web Speech API (TTS) + Web Audio API (beeps)
+WebSocket: Native browser API for real-time events
+
+🎯 MAIN ENTRY POINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/ (root)       → GameShell → 7-phase state machine
+/dashboard     → Dashboard (event observer)
+/manage        → ManagePage (data management)
+/config        → ConfigPage (game config editor)
+
+🔄 7-PHASE STATE MACHINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. WELCOME     → Token login (startSession)
+2. ONBOARDING  → 6-page tutorial
+3. ENCODING    → Learn 2 PM tasks (cards + quizzes)
+4. PLAYING     → Main games (semantic_cat, go_nogo, trivia) + PM task execution
+5. QUESTIONNAIRE → Block-end survey (2 Likert scales)
+6. BLOCK_END   → 30s rest + next block selector
+7. COMPLETE    → Final survey (2 Likert + feedback) + done
+
+📡 WEBSOCKET COMMUNICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connection Active When:
+  - sessionId && blockNumber && phase in [encoding, playing, questionnaire, complete]
+  - auto_start=true ONLY during 'playing' phase
+
+Key Events (WS → Store):
+  - game_start: Start new game (set items, game type, etc.)
+  - room_transition: Move to new room
+  - reminder_fire: Robot reminder for PM task
+  - trigger_fire: Activate household event trigger (30s window)
+  - ambient_pulse: Ambient pulsing effect (10s auto-revert)
+  - window_close: Close PM task window
+  - block_end: Block finished
+  - mcq_data: Show interruption MCQ
+
+Key Messages (Store → WS):
+  - heartbeat: Every 10s
+  - trigger_click: User clicked fired trigger
+  - mcq_answer: User submitted MCQ answer
+  - ongoing_batch: Batch of game responses (every 5s)
+  - encoding_result: PM task quiz completion
+  - questionnaire: Block-end or final survey
+
+🎮 GAME COMPONENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SemanticCatGame:    Email categorization (Work/Personal/Spam), 4s timeout
+GoNoGoGame:         Grocery shopping (Add to Cart button), 2.5s timeout
+TriviaGame:         True/False podcast quiz, 7s timeout
+
+All games:
+  - Display one item at a time
+  - Record response (selected, correct, skipped, response_time_ms)
+  - Push to responseBuffer[]
+  - Batch send every 5s: {type: 'ongoing_batch', data: {...}}
+
+📋 PM TASK LIFECYCLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. ENCODING Phase:
+   - Load 2 PM tasks via getBlockConfig()
+   - User sees EncodingCard (task learning)
+   - User completes EncodingQuiz (recall test, attempts tracked)
+   - Send: {type: 'encoding_result', data: {task_id, quiz_attempts}}
+
+2. PLAYING Phase (during game):
+   - WS: reminder_fire → Robot speaks reminder
+   - WS: trigger_fire {task_id, sidebar_icon} → Trigger animates
+   - User has 30s to click trigger
+   - WS: mcq_data {question, options} → MCQ overlay (30s timer)
+   - User submits answer OR timeout
+   - Send: {type: 'mcq_answer', data: {task_id, selected, mcq_response_time_ms}}
+   - WS: window_close → Trigger deactivates
+
+🎨 SIDEBAR COMPONENTS (Real-time Display)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Clock:           Simulated time (10:00 AM) + sky gradient (day/night)
+MiniMap:         5-room floor plan (Study, Kitchen, Living, Entrance, Balcony)
+ActivityLabel:   Current room + activity narrative
+RobotStatus:     🤖 Speaking status + speech bubble
+TriggerZone:     8 household event icons (inactive/ambient/fired states)
+
+🔧 ZUSTAND STORE (gameStore.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Central state contains:
+  - sessionId, participantId, group, conditionOrder
+  - phase (current position in 7-phase machine)
+  - blockNumber, currentGameType, gameItems[]
+  - ongoingStats {correct, wrong, missed, total}, responseBuffer[]
+  - currentRoom, simulatedTime, activityLabel
+  - triggers[] with states: inactive, ambient, fired
+  - robotStatus, robotText, utteranceQueue[]
+  - mcqVisible, mcqData, mcqStartTime
+  - wsConnected, wsSend() function
+
+All game/sidebar components use store hooks (no props).
+
+🔴 CRITICAL BUGS (Must Fix)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Response Buffer Race Condition
+   - GameShell AND useWebSocket both flush every 5s
+   - Risk: Double-send or missing batches
+   - Fix: Remove GameShell version
+
+2. MCQ Auto-Submit Timeout Missing
+   - Timer counts to 0 but no auto-submit
+   - User must click to submit
+   - Fix: Add auto-submit on timeLeft === 0
+
+3. Block Config Field Mismatch
+   - Tries: data.pm_tasks fallback: [data.task_a, data.task_b]
+   - Unclear which format backend sends
+   - Risk: 404 or undefined
+
+4. Encoding Quiz UX Bug
+   - Wrong answer: setSelected(null) clears visible choice
+   - User confused (answer disappears)
+   - Fix: Keep selected, disable button instead
+
+5. No MCQ Auto-Submit on Timeout
+   - Timer renders but never calls submitMCQ(-1) when 0
+   - User may ignore MCQ forever
+   - PM data incomplete
+
+🟠 MAJOR BUGS (Should Fix)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. No Error Display for WS Parse Failures
+   - try/catch only logs to console
+   - User unaware of connection issues
+
+7. Heartbeat May Fail Silently
+   - wsSend() called without checking ws.readyState
+
+8. No Phase Validation
+   - setPhase('typo') accepted
+   - Causes broken state
+
+9. Active Execution Window Never Auto-Cleared
+   - expiresAt set but never checked
+   - May cause ghost window if WS delayed
+
+10. Game Dimming Persists on Phase Change
+    - gameDimmed not reset if phase changes before MCQ closes
+
+API ENDPOINTS CALLED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+POST /api/session/start
+  - Body: {token: string}
+  - Returns: {session_id, participant_id, group, condition_order, current_block}
+
+GET /api/session/{sessionId}/block/{blockNum}
+  - Returns: Block config + PM tasks (field name: pm_tasks OR task_a/task_b?)
+
+POST /api/session/{sessionId}/resume
+  - Resume interrupted session (endpoint exists but rarely called)
+
+🎵 AUDIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Robot TTS (useAudio.js):
+  - utteranceQueue stores {text, type}
+  - playNextUtterance() dequeues + speaks via window.speechSynthesis
+  - Language: en-US, Rate: 0.9 (slower)
+  - After speech ends: 500ms delay → play next
+
+Trigger Beeps:
+  - 880 Hz sine wave, 0.3s fade-out
+  - Triggered on trigger state change (idle→ambient or fired)
+
+⚙️ VITE CONFIG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Dev Server:   port 3000
+API Proxy:    /api → http://localhost:5000
+WebSocket:    ws protocol proxy enabled
+
+📊 PERFORMANCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Strengths:
+  ✅ Zustand (lightweight)
+  ✅ Response batching every 5s
+  ✅ Framer Motion (hardware-accelerated)
+
+Weaknesses:
+  ❌ No React.memo() on game components
+  ❌ No lazy loading of screens
+  ❌ No virtual scrolling in logs
+
+🔐 SECURITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Good:
+  ✅ Token-based (no credentials in URL)
+  ✅ WS timestamps
+
+Concerns:
+  ⚠️ Dashboard/ManagePage have NO auth (accessible to anyone)
+  ⚠️ Token never validated client-side
+
+═══════════════════════════════════════════════════════════════════════════════

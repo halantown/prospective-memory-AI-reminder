@@ -1,8 +1,7 @@
 import { useGameStore } from '../store/gameStore'
 import useWebSocket from '../hooks/useWebSocket'
 import { useAudio } from '../hooks/useAudio'
-import Sidebar from './sidebar/Sidebar'
-import MainPanel from './game/MainPanel'
+import HomeScene from './scene/HomeScene'
 import MCQOverlay from './pm/MCQOverlay'
 import WelcomeScreen from './screens/WelcomeScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
@@ -29,24 +28,25 @@ export default function GameShell() {
   if (phase === 'block_end') return <BlockEndScreen />
   if (phase === 'complete') return <CompleteScreen />
 
-  // Playing phase — main layout
+  // Playing phase — 2D home scene layout
   return (
-    <div className="w-full h-screen flex overflow-hidden bg-slate-50">
+    <div className="relative w-full h-screen overflow-hidden">
       {/* WS reconnection indicator */}
       {wsReconnecting && (
         <div className="fixed top-0 inset-x-0 z-[100] bg-amber-500 text-white text-center text-sm py-1 animate-pulse">
           Connection lost — reconnecting…
         </div>
       )}
-      {/* Main Panel — 75% */}
-      <div className="flex-1 relative">
-        <MainPanel />
-        {mcqVisible && <MCQOverlay />}
-      </div>
-      {/* Sidebar — 25% */}
-      <div className="w-80 flex-shrink-0 border-l border-slate-700 bg-slate-900">
-        <Sidebar />
-      </div>
+
+      {/* Home scene replaces old MainPanel + Sidebar layout */}
+      <HomeScene />
+
+      {/* MCQ overlay renders above the entire scene */}
+      {mcqVisible && (
+        <div className="fixed inset-0 z-[60]">
+          <MCQOverlay />
+        </div>
+      )}
     </div>
   )
 }

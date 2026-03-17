@@ -72,10 +72,12 @@ SaturdayAtHome/
 ## Quick Start
 
 ### Prerequisites
+
 - Python 3.10+ with conda environment `thesis_server`
 - Node.js 18+
 
 ### Backend
+
 ```bash
 conda activate thesis_server
 cd SaturdayAtHome/backend
@@ -85,6 +87,7 @@ python main.py
 ```
 
 ### Frontend (Dev)
+
 ```bash
 cd SaturdayAtHome/frontend
 npm install
@@ -93,6 +96,7 @@ npm run dev
 ```
 
 ### Frontend (Production)
+
 ```bash
 cd SaturdayAtHome/frontend
 npm run build
@@ -104,6 +108,7 @@ npm run build
 **All runtime communication uses WebSocket** — both server push and client submissions. No REST endpoints for data submission.
 
 ### Connection Flow
+
 1. Frontend connects to `WS /api/session/{id}/block/{n}/stream?client=participant&auto_start={bool}`
 2. Backend `BlockTimeline` runs 22 scheduled events per block
 3. Events pushed via async Queue to WS connection
@@ -111,48 +116,50 @@ npm run build
 5. Both directions run concurrently on the same WS connection
 
 ### Server → Client Events
-| Event | When | Payload |
-|-------|------|---------|
-| `game_start` | Game A/B/C begins | game_type, skin, items[], room, time, activity |
-| `game_end` | Game segment ends | — |
-| `room_transition` | Between games | next_room, next_time, next_activity |
-| `reminder_fire` | 60s into game A/B | text (condition-specific reminder) |
-| `trigger_fire` | 150s into game A/B | sidebar_icon, task_id |
-| `window_close` | 30s after trigger | task_id |
-| `robot_speak` | Neutral comment | text, type="neutral" |
-| `ambient_pulse` | Decoy icon pulse | sidebar_icon |
-| `block_end` | Block complete | — |
+
+| Event               | When               | Payload                                        |
+| ------------------- | ------------------ | ---------------------------------------------- |
+| `game_start`      | Game A/B/C begins  | game_type, skin, items[], room, time, activity |
+| `game_end`        | Game segment ends  | —                                             |
+| `room_transition` | Between games      | next_room, next_time, next_activity            |
+| `reminder_fire`   | 60s into game A/B  | text (condition-specific reminder)             |
+| `trigger_fire`    | 150s into game A/B | sidebar_icon, task_id                          |
+| `window_close`    | 30s after trigger  | task_id                                        |
+| `robot_speak`     | Neutral comment    | text, type="neutral"                           |
+| `ambient_pulse`   | Decoy icon pulse   | sidebar_icon                                   |
+| `block_end`       | Block complete     | —                                             |
 
 ### Client → Server Messages
-| Type | When |
-|------|------|
-| `trigger_click` | Participant clicks a fired trigger icon |
-| `mcq_answer` | MCQ selection submitted |
-| `encoding_result` | Encoding quiz pass/fail |
-| `ongoing_batch` | Buffered game responses (every 5s) |
-| `questionnaire` | Block or final questionnaire |
-| `heartbeat` | Every 15s keep-alive |
+
+| Type                | When                                    |
+| ------------------- | --------------------------------------- |
+| `trigger_click`   | Participant clicks a fired trigger icon |
+| `mcq_answer`      | MCQ selection submitted                 |
+| `encoding_result` | Encoding quiz pass/fail                 |
+| `ongoing_batch`   | Buffered game responses (every 5s)      |
+| `questionnaire`   | Block or final questionnaire            |
+| `heartbeat`       | Every 15s keep-alive                    |
 
 ## REST Endpoints (read-only + session setup)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/admin/participant/create` | Create participant (returns token) |
-| `POST` | `/api/session/start` | Start session with token |
-| `GET` | `/api/session/{id}/block/{n}` | Block config (strips MCQ correct answers) |
-| `GET` | `/api/game-items/{skin}` | Stimulus items for a game skin |
-| `GET` | `/api/admin/dashboard` | All sessions summary |
-| `GET` | `/api/admin/export/all` | CSV export of all data |
-| `GET` | `/api/config` | Full config (admin) |
-| `GET` | `/api/config/game` | Config stripped of correct answers |
+| Method   | Path                              | Description                               |
+| -------- | --------------------------------- | ----------------------------------------- |
+| `POST` | `/api/admin/participant/create` | Create participant (returns token)        |
+| `POST` | `/api/session/start`            | Start session with token                  |
+| `GET`  | `/api/session/{id}/block/{n}`   | Block config (strips MCQ correct answers) |
+| `GET`  | `/api/game-items/{skin}`        | Stimulus items for a game skin            |
+| `GET`  | `/api/admin/dashboard`          | All sessions summary                      |
+| `GET`  | `/api/admin/export/all`         | CSV export of all data                    |
+| `GET`  | `/api/config`                   | Full config (admin)                       |
+| `GET`  | `/api/config/game`              | Config stripped of correct answers        |
 
 ## Web Routes (Frontend)
 
-| Route | Purpose |
-|-------|---------|
-| `/` | Game (participant-facing) |
+| Route          | Purpose                      |
+| -------------- | ---------------------------- |
+| `/`          | Game (participant-facing)    |
 | `/dashboard` | Experimenter live monitoring |
-| `/config` | YAML config editor |
+| `/config`    | YAML config editor           |
 
 ## Visual Layout
 
@@ -196,32 +203,34 @@ npm run build
 - **Reminders**: pre-generated text from `pm_tasks.json`, condition-specific. Robot delivers during retention interval, NOT at trigger time
 
 ### Block Timeline (8.5 minutes total)
-| Phase | Time (s) | Events |
-|-------|----------|--------|
-| Game A | 0–180 | Reminder at 60s, trigger at 150s, window close at 180s |
-| Transition | 180–210 | Room change animation |
-| Game B | 210–390 | Reminder at 270s, trigger at 360s, window close at 390s |
-| Transition | 390–420 | Room change animation |
-| Game C | 420–480 | Buffer game (no PM tasks) |
-| Block end | 510 | Questionnaire |
+
+| Phase      | Time (s) | Events                                                  |
+| ---------- | -------- | ------------------------------------------------------- |
+| Game A     | 0–180   | Reminder at 60s, trigger at 150s, window close at 180s  |
+| Transition | 180–210 | Room change animation                                   |
+| Game B     | 210–390 | Reminder at 270s, trigger at 360s, window close at 390s |
+| Transition | 390–420 | Room change animation                                   |
+| Game C     | 420–480 | Buffer game (no PM tasks)                               |
+| Block end  | 510      | Questionnaire                                           |
 
 ### Session Flow
+
 `Onboarding → Encoding (2 cards + 2 quizzes) → Block play → Questionnaire → (repeat ×4) → Final questionnaire → Thank you`
 
 ## Data
 
 All experiment data stored in `backend/core/experiment.db` (SQLite, auto-created on startup):
 
-| Table | Purpose |
-|-------|---------|
-| `sessions` | Session metadata, phase, Latin Square group |
-| `pm_trials` | PM scoring (18 columns per PRD §5) |
-| `ongoing_responses` | Cognitive task responses (accuracy, RT) |
-| `encoding_logs` | Encoding quiz attempts |
-| `questionnaire_logs` | Block questionnaires (intrusiveness, helpfulness) |
-| `session_questionnaires` | Final questionnaire (MSE, strategy, feedback) |
-| `block_events` | Timeline event log with actual timestamps |
-| `action_logs` | General action audit trail |
-| `session_events` | WS connection events |
+| Table                      | Purpose                                           |
+| -------------------------- | ------------------------------------------------- |
+| `sessions`               | Session metadata, phase, Latin Square group       |
+| `pm_trials`              | PM scoring (18 columns per PRD §5)               |
+| `ongoing_responses`      | Cognitive task responses (accuracy, RT)           |
+| `encoding_logs`          | Encoding quiz attempts                            |
+| `questionnaire_logs`     | Block questionnaires (intrusiveness, helpfulness) |
+| `session_questionnaires` | Final questionnaire (MSE, strategy, feedback)     |
+| `block_events`           | Timeline event log with actual timestamps         |
+| `action_logs`            | General action audit trail                        |
+| `session_events`         | WS connection events                              |
 
 Export via `/api/admin/export/all` (CSV) or `/dashboard` page.

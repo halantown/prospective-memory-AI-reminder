@@ -1,0 +1,463 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                 SATURDAYATHOME FRONTEND - VISUAL DIAGRAMS                      ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════════════
+COMPONENT HIERARCHY (with data flow)
+═══════════════════════════════════════════════════════════════════════════════════
+
+                            ┌─────────────────────────┐
+                            │   App.jsx               │ ← window.location.pathname
+                            │ (route: /, /dashboard, │
+                            │  /manage, /config)     │
+                            └───────────┬─────────────┘
+                                        │
+                    ┌───────────────────┼───────────────────┐
+                    │                   │                   │
+            ┌───────▼─────────┐ ┌──────▼──────┐     ┌─────▼──────┐
+            │   GameShell     │ │  Dashboard  │     │ ManagePage │
+            │ (orchestrator)  │ │ (observer)  │     │   (admin)  │
+            │ useWebSocket()  │ └─────────────┘     └────────────┘
+            │ useAudio()      │
+            └───────┬─────────┘    (Also: ConfigPage)
+                    │
+        ┌───────────┼───────────┐
+        │           │           │
+    ┌───▼──┐  ┌────▼────┐  ┌──▼──────┐
+    │Phase │  │  Games  │  │ Sidebar │
+    │Logic │  │ (3 types)  │  (5 cmps)  │
+    └──────┘  └────────┘  └──────────┘
+        │
+    (7 screens)
+        │
+    ┌───▼─────────────────────────────┐
+    │ Welcome → Onboarding → Encoding │
+    │ → Playing → Questionnaire       │
+    │ → BlockEnd → Complete           │
+    └─────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+ZUSTAND STORE (Single Source of Truth)
+═══════════════════════════════════════════════════════════════════════════════════
+
+                          ╔════════════════════╗
+                          ║   gameStore.js     ║
+                          ║  (Zustand Store)   ║
+                          ╚════════════════════╝
+                                    △
+                    ┌───────────────┼───────────────┐
+                    │               │               │
+            (Read)  │               │           (Write)
+                    │               │               │
+    ┌───────────────▼────┐  ┌──────▼──────┐  ┌────▼──────────┐
+    │ Game Components    │  │   Store     │  │   Actions     │
+    │ - SemanticCat      │  │   State     │  │ - recordResp. │
+    │ - GoNoGo           │  │   (40+      │  │ - flushBuffer │
+    │ - Trivia           │  │    fields)  │  │ - clickTrig.  │
+    │ - MCQOverlay       │  │             │  │ - submitMCQ   │
+    │ - Sidebar (5)      │  └─────────────┘  │ - submitEnc.  │
+    │ - Screens (6)      │                    └────┬──────────┘
+    └────────────────────┘                         │
+                                          ┌────────▼────────┐
+                                          │   WebSocket     │
+                                          │   (useWebSocket)│
+                                          └─────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+WEBSOCKET EVENT FLOW
+═══════════════════════════════════════════════════════════════════════════════════
+
+    Backend                              Frontend
+    ═══════════════════════════════════════════════════════════════
+    
+    [Timer Starts]
+         │
+         ├─→ game_start
+         │        │
+         │        ├─→ useWebSocket.js (event handler)
+         │        │
+         │        ├─→ store.handleGameStart()
+         │        │        │
+         │        │        ├─→ Set: currentGameType, gameItems[]
+         │        │        ├─→ Set: gameActive = true
+         │        │        └─→ Reset: itemIndex = 0
+         │        │
+         │        └─→ MainPanel renders game component
+         │             (SemanticCat/GoNoGo/Trivia)
+         │
+         ├─→ room_transition
+         │        └─→ store.handleRoomTransition()
+         │             ├─→ Set: currentRoom, simulatedTime
+         │             └─→ Set: gameActive = false
+         │
+         ├─→ reminder_fire ──→ store.handleRobotSpeak()
+         │                          │
+         │                          ├─→ Push utteranceQueue
+         │                          │
+         │                          └─→ useAudio.js
+         │                               │
+         │                               └─→ window.speechSynthesis.speak()
+         │                                   (TTS plays robot message)
+         │
+         ├─→ trigger_fire ──→ store.handleTriggerFire()
+         │   {task_id}              │
+         │                           ├─→ Find trigger by sidebar_icon
+         │                           ├─→ Set: trigger.state = 'fired'
+         │                           ├─→ Set: activeExecutionWindow
+         │                           │   {taskId, expiresAt: now+30s}
+         │                           └─→ Sidebar: TriggerIcon animates
+         │
+         ├─→ mcq_data ──────→ store.showMCQ()
+         │   {question,            │
+         │    options}             ├─→ Set: mcqVisible = true
+         │                         ├─→ Set: mcqData, mcqStartTime
+         │                         ├─→ Set: gameDimmed = true
+         │                         └─→ MCQOverlay renders (30s timer)
+         │
+         ├─→ window_close ──→ store.handleWindowClose()
+         │                     │
+         │                     ├─→ Clear: activeExecutionWindow
+         │                     ├─→ Clear: mcqVisible, gameDimmed
+         │                     └─→ Trigger state → 'inactive'
+         │
+         └─→ block_end ──────→ store.handleBlockEnd()
+                               │
+                               ├─→ Set: phase = 'questionnaire'
+                               └─→ GameShell renders Questionnaire Screen
+
+═══════════════════════════════════════════════════════════════════════════════════
+RESPONSE RECORDING & BATCH SENDING
+═══════════════════════════════════════════════════════════════════════════════════
+
+    Game Component              Zustand Store                WebSocket
+    ══════════════════════════════════════════════════════════════════════════
+    
+    User clicks answer
+         │
+         ├─→ handleSelect()
+         │    │
+         │    ├─→ recordResponse({
+         │    │      item_index,
+         │    │      item_id,
+         │    │      selected,
+         │    │      correct,
+         │    │      skipped,
+         │    │      response_time_ms,
+         │    │      client_ts
+         │    │    })
+         │    │
+         │    └─→ Store Action:
+         │         ├─→ Push response to responseBuffer[]
+         │         ├─→ Update ongoingStats
+         │         │   {correct++, wrong++, or missed++}
+         │         └─→ Increment itemIndex
+         │
+         (every 5 seconds - triggered from GameShell & useWebSocket)
+         │
+         ├─→ flushResponseBuffer()
+         │    │
+         │    └─→ WS Send:
+         │         {
+         │           type: 'ongoing_batch',
+         │           data: {
+         │             game_type: 'semantic_cat',
+         │             skin: 'email',
+         │             block_number: 1,
+         │             responses: [
+         │               {item_index, item_id, selected, correct, ...},
+         │               {item_index, item_id, selected, correct, ...},
+         │               ...
+         │             ]
+         │           }
+         │         }
+         │
+         └─→ Backend receives batch
+              (ACK: ongoing_ack event)
+              │
+              └─→ responseBuffer = [] (cleared)
+
+═══════════════════════════════════════════════════════════════════════════════════
+PM TASK LIFECYCLE
+═══════════════════════════════════════════════════════════════════════════════════
+
+    ENCODING PHASE
+    ══════════════════════════════════════════════════════════════════════════
+    
+    EncodingScreen starts
+         │
+         ├─→ API: getBlockConfig(sessionId, blockNumber)
+         │    └─→ Returns: { pm_tasks: [{task_id, encoding, quiz, ...}] }
+         │
+         └─→ For each task:
+              │
+              ├─→ EncodingCard (task learning)
+              │    └─→ User reads task description & trigger
+              │         User clicks: "I understand — Continue"
+              │
+              └─→ EncodingQuiz (recall test)
+                   │
+                   ├─→ Show question with options
+                   │
+                   ├─→ User selects answer (attempts++)
+                   │
+                   ├─→ If WRONG:
+                   │    └─→ Show error, clear selection (repeat)
+                   │
+                   └─→ If CORRECT:
+                        │
+                        └─→ submitEncoding(taskId, attempts)
+                             │
+                             └─→ WS Send:
+                                  {
+                                    type: 'encoding_result',
+                                    data: {
+                                      task_id: '...',
+                                      quiz_attempts: 2
+                                    }
+                                  }
+
+    PLAYING PHASE
+    ══════════════════════════════════════════════════════════════════════════
+    
+    Game in progress
+         │
+         ├─→ WS: reminder_fire
+         │    └─→ Robot: "Remember to [task description]"
+         │
+         ├─→ (30 seconds pass)
+         │
+         └─→ WS: trigger_fire {sidebar_icon, task_id}
+              │
+              ├─→ Sidebar: Trigger icon animates (30s window)
+              │
+              ├─→ User clicks trigger (or doesn't)
+              │    │
+              │    ├─→ If CLICK:
+              │    │    │
+              │    │    └─→ WS: trigger_click {task_id}
+              │    │         │
+              │    │         └─→ Backend: WS: mcq_data {question, options}
+              │    │              │
+              │    │              └─→ MCQOverlay renders (30s timer)
+              │    │                   │
+              │    │                   ├─→ User selects answer
+              │    │                   │
+              │    │                   └─→ submitMCQ(selected)
+              │    │                        │
+              │    │                        └─→ WS Send:
+              │    │                             {
+              │    │                               type: 'mcq_answer',
+              │    │                               data: {
+              │    │                                 task_id,
+              │    │                                 selected,
+              │    │                                 mcq_response_time_ms,
+              │    │                                 client_ts
+              │    │                               }
+              │    │                             }
+              │    │
+              │    └─→ If TIMEOUT (or wrong):
+              │         └─→ Backend auto-scores as incorrect
+              │
+              └─→ WS: window_close {task_id}
+                   │
+                   ├─→ Trigger deactivates
+                   ├─→ MCQ disappears
+                   └─→ Game continues
+
+═══════════════════════════════════════════════════════════════════════════════════
+PHASE STATE MACHINE
+═══════════════════════════════════════════════════════════════════════════════════
+
+    ┌─────────┐      (token login)      ┌──────────────┐
+    │ WELCOME │─────────────────────────→ ONBOARDING   │
+    └─────────┘                          │ (6 pages)    │
+                                         └──────┬───────┘
+                                                │
+                                         (user: next)
+                                                │
+                                    ┌───────────▼────────────┐
+                                    │ ENCODING               │
+                                    │ Load 2 PM tasks        │
+                                    │ Card A → Quiz A        │
+                                    │ Card B → Quiz B        │
+                                    └───────────┬────────────┘
+                                                │
+                                         (WS: ready)
+                                                │
+                                    ┌───────────▼──────────────┐
+                                    │ PLAYING                  │
+                                    │ 3-4 games + PM exec      │
+                                    │ Room transitions         │
+                                    │ Triggers + MCQs          │
+                                    └───────────┬──────────────┘
+                                                │
+                                         (WS: block_end)
+                                                │
+                                    ┌───────────▼──────────────┐
+                                    │ QUESTIONNAIRE            │
+                                    │ 2 Likert scales:         │
+                                    │ - Intrusiveness?         │
+                                    │ - Helpfulness?           │
+                                    └───────────┬──────────────┘
+                                                │
+                                         (user: submit)
+                                                │
+                                    ┌───────────▼──────────────┐
+                                    │ BLOCK_END                │
+                                    │ 30s rest countdown       │
+                                    │ Next block selector      │
+                                    └───────────┬──────────────┘
+                                                │
+                                 ┌──────────────┴──────────────┐
+                                 │ (if block >= 4)             │
+                                 │ If < 4, loop back           │
+                                 │ to ENCODING                 │
+                                 │                             │
+                        ┌────────▼─────────┐                  │
+                        │ COMPLETE         │                  │
+                        │ 2 Likert scales: │←─────────────────┘
+                        │ - Strategy use?  │
+                        │ - Memory help?   │
+                        │ Open feedback    │
+                        └────────┬─────────┘
+                                 │
+                          (user: submit)
+                                 │
+                        ┌────────▼──────┐
+                        │ DONE           │
+                        │ Completed page │
+                        └────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+SIDEBAR COMPONENTS - REAL-TIME UPDATES
+═══════════════════════════════════════════════════════════════════════════════════
+
+    ┌─────────────────────────────────────┐
+    │         Sidebar (Dark)              │
+    ├─────────────────────────────────────┤
+    │                                     │
+    │  ┌──────────────────────────────┐   │
+    │  │  Clock                       │   │ Updates from:
+    │  │  🌙 10:00 AM  ← simulatedTime  (WS: room_transition)
+    │  │  Saturday    (sky gradient)  │   │ (color changes day/night)
+    │  └──────────────────────────────┘   │
+    │                                     │
+    │  ┌──────────────────────────────┐   │
+    │  │  Activity Label              │   │ Updates from:
+    │  │  STUDY                       │   │ currentRoom,
+    │  │  "Reading a book"            │   │ activityLabel
+    │  └──────────────────────────────┘   │ (WS: room_transition)
+    │                                     │
+    │  ┌──────────────────────────────┐   │
+    │  │  MiniMap (Floor Plan)        │   │ Updates from:
+    │  │  ┌─┬─┐                       │   │ currentRoom
+    │  │  │S│K│  S = Study (active)   │   │ (WS: room_transition)
+    │  │  └─┴─┘  K = Kitchen         │   │ Active room: blue highlight
+    │  │  ┌─┬─┐  L = Living room     │   │
+    │  │  │L│E│  E = Entrance        │   │
+    │  │  └─┴─┘  B = Balcony         │   │
+    │  └──────────────────────────────┘   │
+    │                                     │
+    │  ┌──────────────────────────────┐   │
+    │  │  Robot Status                │   │ Updates from:
+    │  │  🤖 Pepper                   │   │ robotStatus,
+    │  │  Speaking... ▁▂▃            │   │ robotText
+    │  │  ┌────────────────┐          │   │ (WS: reminder_fire,
+    │  │  │ "Don't forget  │          │   │  robot_speak)
+    │  │  │ to water the   │          │   │
+    │  │  │ plant!"        │          │   │
+    │  │  └────────────────┘          │   │
+    │  └──────────────────────────────┘   │
+    │                                     │
+    │  ┌──────────────────────────────┐   │
+    │  │  Household Events            │   │ Updates from:
+    │  │  🍽️ 🔔 📱 🌙 ...            │   │ triggers[]
+    │  │  ⚠️ 🟠 ⚠️ ⚠️ ...            │   │ trigger.state:
+    │  │  • inactive (faded)          │   │ • inactive (faded)
+    │  │  • ambient (pulsing blue)    │   │ • ambient (pulsing)
+    │  │  • fired (bright, clickable) │   │ • fired (bright, animated)
+    │  │                              │   │ (WS: trigger_fire,
+    │  │  User clicks fired trigger:  │   │  ambient_pulse,
+    │  │  → WS: trigger_click         │   │  window_close)
+    │  └──────────────────────────────┘   │
+    │                                     │
+    └─────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+GAME RESPONSE FLOW
+═══════════════════════════════════════════════════════════════════════════════════
+
+    SemanticCatGame (Email Categorization)
+    ─────────────────────────────────────────────────────────────────────────
+
+    Display Item: Email from "boss@work.com"
+    Subject: "Quarterly Review"
+    Timeout: 4 seconds
+         │
+         ├─────────────────────────────────────────────────────┐
+         │                                                     │
+    User clicks "Work" ────→ recordResponse({              Timeout (4s)
+         │                        item_index: 5,               │
+         │                        item_id: 'email_42',         │
+         │                        selected: 'Work',        recordResponse({
+         │                        correct: true,               item_index: 5,
+         │                        skipped: false,              item_id: 'email_42',
+         │                        response_time_ms: 1247,      selected: null,
+         │                        client_ts: 1708...           correct: false,
+         │                      })                             skipped: true,
+         │                        │                            response_time_ms: 4000,
+         │                        ├─→ Update stats:            client_ts: 1708...
+         │                        │   correct++                  })
+         │                        │
+         │                        ├─→ Push to buffer
+         │                        │
+         │                        └─→ itemIndex++  (6)
+         │
+         │  Feedback: Green ✓
+         │  (300ms flash)
+         │
+         └─→ Display Next Item (index 6)
+
+    GoNoGoGame (Grocery Shopping)
+    ─────────────────────────────────────────────────────────────────────────
+
+    Display: 🥕 Carrot (type: 'go')
+    Button: "Add to Cart"
+    Timeout: 2.5 seconds
+         │
+         ├─────────────────────────────────────┐
+         │                                     │
+    User clicks ────→ recordResponse({    Timeout
+    "Add to Cart"         selected: 'add_to_cart',
+         │                correct: true,    recordResponse({
+         │                ...               selected: null,
+         │                })                correct: false,
+         │                 │                ...
+         │                 ├─→ correct++    })
+         │                 │
+         │              Feedback: Green ✓
+         │
+         (Note: If item is 'nogo' type, clicking is WRONG)
+
+    TriviaGame (Podcast Quiz)
+    ─────────────────────────────────────────────────────────────────────────
+
+    Question: "Pluto was reclassified as a dwarf planet in 2006"
+    Options: ✓ True  ✗ False
+    Timeout: 7 seconds
+         │
+         ├─────────────────────────────────────┐
+         │                                     │
+    User clicks ────→ recordResponse({    Timeout
+    "True"                selected: true,     recordResponse({
+         │                correct: true,       selected: null,
+         │                ...                 correct: false,
+         │                })                  ...
+         │                 │                  })
+         │                 ├─→ correct++
+         │                 │
+         │              Feedback: Green ✓
+         │
+         └─→ itemIndex++
+
+═══════════════════════════════════════════════════════════════════════════════════
