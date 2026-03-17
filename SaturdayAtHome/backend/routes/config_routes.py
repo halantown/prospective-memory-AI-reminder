@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Any
 
-from core.config_loader import get_config, get_game_config, save_config, load_config
+from core.config_loader import get_config, get_game_config, save_config, load_config, load_pm_tasks
 
 logger = logging.getLogger("saturday.routes.config")
 
@@ -24,6 +24,19 @@ async def get_frontend_config():
     return get_game_config()
 
 
+@router.get("/pm-tasks")
+async def get_pm_tasks_list():
+    """Return PM tasks (stripped of correct answers) for the encoding phase."""
+    import copy
+    tasks = copy.deepcopy(load_pm_tasks())
+    for t in tasks:
+        if "mcq" in t:
+            t["mcq"].pop("correct", None)
+        if "quiz" in t:
+            t["quiz"].pop("correct", None)
+    return {"tasks": tasks}
+
+
 class ConfigUpdate(BaseModel):
     config: dict[str, Any]
 
@@ -32,6 +45,6 @@ class ConfigUpdate(BaseModel):
 async def update_config(body: ConfigUpdate):
     """Save updated config to game_config.yaml and reload."""
     save_config(body.config)
-    load_config()  # re-read to ensure in-memory state is fresh
+    load_config()
     logger.info("Config updated via API")
     return {"status": "ok"}

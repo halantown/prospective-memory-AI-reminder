@@ -1,21 +1,24 @@
-"""Admin & dashboard endpoints."""
+"""Admin & dashboard endpoints (PRD v2.1).
+
+Simplified: removed hob/steak references, fire-event. Added export/all.
+"""
 
 import asyncio
+import csv
+import io
 import json
 import logging
 import time
 
 from fastapi import APIRouter, HTTPException, WebSocket
+from fastapi.responses import StreamingResponse
 from starlette.websockets import WebSocketDisconnect
 
 from core.config import DB_PATH, assign_group
 from core.config_loader import get_latin_square
 from core.database import get_db
 from utils.helpers import log_action
-from models.entities import HobStatus
-from services.hob_service import get_session_hobs, reconcile_hob, clear_session_hobs, reset_session_hobs
 from services.window_service import clear_session_windows, reset_session_windows
-from models.schemas import FireEventRequest
 from core.ws import send_ws, ws_queues, clear_session_ws_queues
 from core.session_lifecycle import (
     broadcast_admin, register_admin_client, unregister_admin_client,
@@ -29,30 +32,10 @@ _ADMIN_STREAM_IDLE_TIMEOUT_S = 5
 
 router = APIRouter(prefix="/admin")
 
-ALLOWED_ADMIN_EVENTS = {
-    "block_start",
-    "trigger_appear",
-    "window_close",
-    "reminder_fire",
-    "block_end",
-    "force_steak_ready",
-    "force_yellow_steak",
-    "robot_neutral",
-    "steak_spawn",
-    "message_bubble",
-    "fake_trigger_fire",
-    "plant_needs_water",
-}
-
 
 @router.post("/participant/create")
 async def create_participant():
-    """Experimenter creates a pre-registered participant slot.
-
-    Auto-assigns participant_id (P001, P002...), Latin Square group,
-    and a random 6-char token. Returns token for distribution to participant.
-    The session starts in CREATED phase and waits for the participant to enter the token.
-    """
+    """Experimenter creates a pre-registered participant slot."""
     import uuid
 
     db = get_db(DB_PATH)
@@ -112,45 +95,6 @@ async def admin_stream(websocket: WebSocket):
         unregister_admin_client(q)
 
 
-@router.post("/fire-event")
-async def admin_fire_event(req: FireEventRequest):
-    """Manually fire an event to a session (from dashboard)."""
-    if req.event not in ALLOWED_ADMIN_EVENTS:
-        raise HTTPException(400, f"Event '{req.event}' not in allowed list: {sorted(ALLOWED_ADMIN_EVENTS)}")
-
-    logger.info(f"Admin fire [{req.session_id}] → {req.event}: {req.data}")
-    await send_ws(req.session_id, req.event, req.data)
-
-    # Update backend hob state for force_yellow events
-    if req.event == "force_yellow_steak":
-        hobs = get_session_hobs(req.session_id)
-        hob_id = req.data.get("hob_id", 0)
-        if 0 <= hob_id < len(hobs):
-            hobs[hob_id].status = HobStatus.READY_SIDE1
-            hobs[hob_id].started_at = time.time()
-
-    log_action(req.session_id, 0, f"admin_{req.event}", req.data)
-
-    db = get_db(DB_PATH)
-    db.execute(
-        """INSERT INTO session_events
-           (session_id, event_type, from_phase, to_phase, block_idx, payload, ts)
-           VALUES (?, 'admin_fire', NULL, NULL, NULL, ?, ?)""",
-        (req.session_id, json.dumps({"event": req.event, **req.data}), time.time()),
-    )
-    db.commit()
-    db.close()
-
-    broadcast_admin({
-        "event_type": "admin_fire",
-        "session_id": req.session_id,
-        "fired": req.event,
-        "timestamp": time.time(),
-    })
-
-    return {"status": "ok"}
-
-
 @router.post("/force-block/{session_id}/{block_num}")
 async def admin_force_block(session_id: str, block_num: int):
     """Force-start a specific block timeline for a session (admin override)."""
@@ -174,7 +118,6 @@ async def admin_force_block(session_id: str, block_num: int):
         active_timelines[timeline_key].cancel()
         del active_timelines[timeline_key]
 
-    reset_session_hobs(session_id)
     reset_session_windows(session_id)
 
     tl = BlockTimeline(session_id, block_num, condition, send_ws)
@@ -197,12 +140,9 @@ async def admin_list_sessions():
 
 @router.get("/session/{session_id}/state")
 async def admin_session_state(session_id: str):
-    """Get live session state (hobs, WS clients, timelines)."""
+    """Get live session state (active timelines, WS clients, timer)."""
     from routes.session import active_timelines
 
-    hobs = get_session_hobs(session_id)
-    for h in hobs:
-        reconcile_hob(h)
     db = get_db(DB_PATH)
     srow = db.execute(
         "SELECT is_online, timer_started_at, timer_running_since, timer_elapsed_s "
@@ -213,12 +153,6 @@ async def admin_session_state(session_id: str):
     timer_s = compute_session_timer_s(srow, time.time()) if srow else 0.0
 
     return {
-        "hobs": [
-            {"id": h.id, "status": h.status.value, "started_at": h.started_at,
-             "cooking_ms": h.cooking_ms, "ready_ms": h.ready_ms, "ash_ms": h.ash_ms,
-             "peppered": h.peppered}
-            for h in hobs
-        ],
         "active_timelines": [k for k in active_timelines.keys() if k.startswith(session_id)],
         "ws_clients": len(ws_queues.get(session_id, [])),
         "is_online": bool(srow["is_online"]) if srow else False,
@@ -241,14 +175,7 @@ async def admin_get_logs(session_id: str):
 
 @router.get("/active-session")
 async def admin_active_session():
-    """Find the currently active session.
-
-    Returns the session that has live WS clients connected, if any.
-    Falls back to the most recent non-finished, non-interrupted session from the DB
-    so the experimenter can see an in-progress session after a dashboard reload —
-     but marks it as ``live: false`` so the frontend knows not to auto-connect WS.
-    Returns null if no meaningful session exists.
-    """
+    """Find the currently active session."""
     db = get_db(DB_PATH)
     row = db.execute(
         "SELECT * FROM sessions WHERE is_online = 1 ORDER BY created_at DESC LIMIT 1"
@@ -273,14 +200,14 @@ async def admin_delete_session(session_id: str):
     db.execute("DELETE FROM action_logs WHERE session_id = ?", (session_id,))
     db.execute("DELETE FROM pm_trials WHERE session_id = ?", (session_id,))
     db.execute("DELETE FROM encoding_logs WHERE session_id = ?", (session_id,))
-    db.execute("DELETE FROM ongoing_snapshots WHERE session_id = ?", (session_id,))
-    db.execute("DELETE FROM fake_trigger_logs WHERE session_id = ?", (session_id,))
+    db.execute("DELETE FROM ongoing_responses WHERE session_id = ?", (session_id,))
+    db.execute("DELETE FROM questionnaire_logs WHERE session_id = ?", (session_id,))
+    db.execute("DELETE FROM block_events WHERE session_id = ?", (session_id,))
     db.execute("DELETE FROM session_events WHERE session_id = ?", (session_id,))
     db.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
     db.commit()
     db.close()
 
-    clear_session_hobs(session_id)
     clear_session_ws_queues(session_id)
     clear_session_windows(session_id)
     participant_ws_counts.pop(session_id, None)
@@ -294,6 +221,59 @@ async def admin_delete_session(session_id: str):
     return {"status": "ok"}
 
 
+@router.get("/dashboard")
+async def admin_dashboard():
+    """GET /admin/dashboard — overview of all sessions for the dashboard."""
+    db = get_db(DB_PATH)
+    sessions = db.execute(
+        "SELECT session_id, participant_id, latin_square_group, phase, "
+        "current_block, is_online, is_interrupted, created_at "
+        "FROM sessions ORDER BY created_at DESC"
+    ).fetchall()
+
+    result = []
+    for s in sessions:
+        pm_count = db.execute(
+            "SELECT COUNT(*) FROM pm_trials WHERE session_id = ?",
+            (s["session_id"],),
+        ).fetchone()[0]
+        result.append({
+            **dict(s),
+            "pm_trials_count": pm_count,
+        })
+
+    db.close()
+    return {"sessions": result}
+
+
+@router.get("/export/all")
+async def admin_export_all():
+    """GET /admin/export/all — CSV export of all PM trial data across all sessions."""
+    db = get_db(DB_PATH)
+    trials = db.execute("""
+        SELECT
+            s.participant_id, s.latin_square_group,
+            t.*
+        FROM pm_trials t
+        JOIN sessions s ON s.session_id = t.session_id
+        ORDER BY s.participant_id, t.block_number, t.task_slot
+    """).fetchall()
+    db.close()
+
+    output = io.StringIO()
+    if trials:
+        writer = csv.DictWriter(output, fieldnames=trials[0].keys())
+        writer.writeheader()
+        for t in trials:
+            writer.writerow(dict(t))
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=all_sessions_export.csv"},
+    )
+
+
 @router.get("/export/{session_id}")
 async def admin_export_session(session_id: str):
     """Export session data as JSON."""
@@ -301,11 +281,13 @@ async def admin_export_session(session_id: str):
     session = db.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
     actions = db.execute("SELECT * FROM action_logs WHERE session_id = ? ORDER BY ts", (session_id,)).fetchall()
     pm_trials = db.execute("SELECT * FROM pm_trials WHERE session_id = ?", (session_id,)).fetchall()
+    ongoing = db.execute("SELECT * FROM ongoing_responses WHERE session_id = ? ORDER BY ts", (session_id,)).fetchall()
     events = db.execute("SELECT * FROM session_events WHERE session_id = ? ORDER BY ts", (session_id,)).fetchall()
     db.close()
     return {
         "session": dict(session) if session else None,
         "actions": [dict(r) for r in actions],
         "pm_trials": [dict(r) for r in pm_trials],
+        "ongoing_responses": [dict(r) for r in ongoing],
         "session_events": [dict(r) for r in events],
     }

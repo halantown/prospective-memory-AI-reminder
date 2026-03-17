@@ -1,4 +1,4 @@
-"""Saturday At Home — Experiment Server (FastAPI entry point)."""
+"""Saturday At Home — Experiment Server (FastAPI entry point, PRD v2.1)."""
 
 import asyncio
 import logging
@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import DB_PATH
-from core.config_loader import load_config
+from core.config_loader import load_config, load_pm_tasks, load_neutral_comments
 from core.database import init_db
 from core.session_lifecycle import heartbeat_monitor, pause_all_online_sessions
 from routes.session import router as session_router, active_timelines
@@ -32,6 +32,8 @@ logger = logging.getLogger("saturday")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_config()
+    load_pm_tasks()
+    load_neutral_comments()
     init_db(DB_PATH)
     pause_all_online_sessions(DB_PATH)
     monitor_task = asyncio.create_task(heartbeat_monitor(DB_PATH, active_timelines))

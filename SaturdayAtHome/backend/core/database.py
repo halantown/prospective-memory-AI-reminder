@@ -20,7 +20,6 @@ def init_db(db_path: Path):
         latin_square_group TEXT NOT NULL,
         condition_order  TEXT NOT NULL,   -- JSON array of 4 condition strings
         phase            TEXT NOT NULL DEFAULT 'created',
-        difficulty       TEXT DEFAULT 'medium',
         created_at       REAL NOT NULL,
         completed_at     REAL,
         experimenter_notes TEXT,
@@ -38,44 +37,43 @@ def init_db(db_path: Path):
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id      TEXT NOT NULL REFERENCES sessions(session_id),
         block_number    INTEGER NOT NULL,
+        task_id         TEXT,
         quiz_attempts   INTEGER NOT NULL DEFAULT 1,
         confirmed_at    REAL NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS pm_trials (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id      TEXT NOT NULL REFERENCES sessions(session_id),
-        block_number    INTEGER NOT NULL,
-        task_id         TEXT NOT NULL,
-        condition       TEXT,
-        action          TEXT,
-        selected_target TEXT,
-        selected_detail TEXT,
-        pm_score        INTEGER NOT NULL DEFAULT 0,  -- 0=miss, 1=wrong, 2=correct
-        reminder_played_at REAL,
-        target_appeared_at REAL,
-        acted_at        REAL,
-        ongoing_score_baseline REAL,
-        ongoing_score_window   REAL,
-        attention_flag  INTEGER DEFAULT 0
+        id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id                  TEXT NOT NULL REFERENCES sessions(session_id),
+        block_number                INTEGER NOT NULL,
+        task_slot                   TEXT NOT NULL,  -- A or B
+        task_id                     TEXT NOT NULL,
+        condition                   TEXT NOT NULL,
+        participant_group           TEXT,
+        encoding_quiz_attempts      INTEGER DEFAULT 1,
+        reminder_played_at          REAL,
+        reminder_text               TEXT,
+        reminder_activity_context   TEXT,
+        trigger_fired_at            REAL,
+        trigger_clicked_at          REAL,
+        trigger_response_time_ms    INTEGER,
+        mcq_option_selected         INTEGER,  -- 0, 1, 2 or NULL
+        mcq_response_time_ms        INTEGER,
+        pm_score                    INTEGER NOT NULL DEFAULT 0,
+        pm_error_type               TEXT,  -- null, prospective_failure, retrospective_failure
+        ongoing_task_accuracy_retention REAL
     );
 
-    CREATE TABLE IF NOT EXISTS ongoing_snapshots (
+    CREATE TABLE IF NOT EXISTS ongoing_responses (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id      TEXT NOT NULL REFERENCES sessions(session_id),
         block_number    INTEGER NOT NULL,
-        ts              REAL NOT NULL,
-        delta           INTEGER NOT NULL,
-        cumulative      INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS fake_trigger_logs (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id      TEXT NOT NULL REFERENCES sessions(session_id),
-        block_number    INTEGER NOT NULL,
-        trigger_type    TEXT NOT NULL,
+        game_type       TEXT NOT NULL,
+        game_skin       TEXT NOT NULL,
+        item_id         INTEGER,
         response        TEXT,
-        false_alarm     INTEGER DEFAULT 0,
+        correct         INTEGER,
+        response_time_ms INTEGER,
         ts              REAL NOT NULL
     );
 
@@ -108,16 +106,6 @@ def init_db(db_path: Path):
         ts              REAL NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS reminder_room_logs (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id      TEXT NOT NULL REFERENCES sessions(session_id),
-        block_number    INTEGER NOT NULL,
-        slot            TEXT NOT NULL,
-        room            TEXT NOT NULL,
-        client_ts       REAL,
-        server_ts       REAL NOT NULL
-    );
-
     CREATE TABLE IF NOT EXISTS block_events (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id   TEXT    NOT NULL REFERENCES sessions(session_id),
@@ -144,22 +132,4 @@ def init_db(db_path: Path):
     """)
 
     db.commit()
-
-    # Migrate existing DBs — add columns that may not exist yet
-    for col_sql in [
-        "ALTER TABLE sessions ADD COLUMN token TEXT UNIQUE",
-        "ALTER TABLE sessions ADD COLUMN current_block INTEGER DEFAULT -1",
-        "ALTER TABLE sessions ADD COLUMN is_interrupted BOOLEAN DEFAULT 0",
-        "ALTER TABLE sessions ADD COLUMN last_heartbeat REAL",
-        "ALTER TABLE sessions ADD COLUMN timer_started_at REAL",
-        "ALTER TABLE sessions ADD COLUMN timer_running_since REAL",
-        "ALTER TABLE sessions ADD COLUMN timer_elapsed_s REAL DEFAULT 0",
-        "ALTER TABLE sessions ADD COLUMN is_online BOOLEAN DEFAULT 0",
-    ]:
-        try:
-            db.execute(col_sql)
-            db.commit()
-        except Exception:
-            pass  # Column already exists
-
     db.close()

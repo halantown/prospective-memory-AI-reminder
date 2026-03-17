@@ -1,4 +1,9 @@
-"""Session management & WebSocket stream endpoints."""
+"""Session management & bidirectional WebSocket stream (PRD v2.1).
+
+The WebSocket endpoint handles BOTH server→client push (timeline events)
+AND client→server messages (trigger_click, mcq_answer, encoding_result,
+ongoing_batch, questionnaire, heartbeat).
+"""
 
 import json
 import logging
@@ -9,16 +14,14 @@ import asyncio
 from fastapi import APIRouter, HTTPException, WebSocket
 
 from core.config import DB_PATH, assign_group
-from core.config_loader import get_latin_square, get_task_pairs, get_reminder_texts
+from core.config_loader import get_latin_square, get_block_skins, get_block_pm_tasks
 from core.database import get_db
 from utils.helpers import log_action
-from models.schemas import (
-    SessionStartRequest, SessionStartResponse,
-    TokenSessionStartRequest, SessionResumeResponse,
+from models.schemas import TokenSessionStartRequest, SessionStartResponse, SessionResumeResponse
+from core.ws import (
+    send_ws, register_ws_client, websocket_pump, websocket_receiver,
 )
-from core.ws import send_ws, register_ws_client, websocket_pump
 from core.timeline import BlockTimeline
-from services.hob_service import reset_session_hobs
 from services.window_service import reset_session_windows
 from core.session_lifecycle import (
     SessionPhase, transition_phase, broadcast_admin,
@@ -31,17 +34,13 @@ router = APIRouter()
 
 # Active block timelines: "sessionId_blockNum" → BlockTimeline
 active_timelines: dict[str, BlockTimeline] = {}
-# Active participant stream connections per session (dashboard/observer excluded)
+# Active participant stream connections per session
 participant_ws_counts: dict[str, int] = {}
 
 
 @router.post("/session/start", response_model=SessionStartResponse)
 async def start_session(req: TokenSessionStartRequest):
-    """Start a session by presenting the 6-char token issued by the experimenter.
-
-    Looks up the pre-registered session, validates it is in CREATED phase,
-    and transitions it to ENCODING.
-    """
+    """Start a session by presenting the 6-char token issued by the experimenter."""
     db = get_db(DB_PATH)
     row = db.execute(
         "SELECT * FROM sessions WHERE token = ?", (req.token.strip().upper(),)
@@ -53,15 +52,12 @@ async def start_session(req: TokenSessionStartRequest):
 
     if row["phase"] != SessionPhase.CREATED.value:
         logger.info(f"Session re-join via token: {row['session_id']} (phase={row['phase']})")
-        
-        # Reset interruption status on rejoin
         db.execute(
             "UPDATE sessions SET is_interrupted = 0, last_heartbeat = ? WHERE session_id = ?",
-            (time.time(), row["session_id"])
+            (time.time(), row["session_id"]),
         )
         db.commit()
         db.close()
-        
         log_action(row["session_id"], 0, "session_rejoin_token", {"token": req.token, "phase": row["phase"]})
     else:
         try:
@@ -92,6 +88,7 @@ async def start_session(req: TokenSessionStartRequest):
 
 @router.get("/session/{session_id}/block/{block_num}")
 async def get_block_config(session_id: str, block_num: int):
+    """Return block metadata for the frontend (skins, tasks, etc.)."""
     db = get_db(DB_PATH)
     row = db.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
     db.close()
@@ -104,23 +101,33 @@ async def get_block_config(session_id: str, block_num: int):
         raise HTTPException(400, "Block number must be 1-4")
 
     condition = condition_order[block_num - 1]
-    task_pair = get_task_pairs()[block_num]
-    cond_texts = get_reminder_texts().get(condition, {})
-    if isinstance(cond_texts, dict):
-        text_a = cond_texts.get("A", "")
-        text_b = cond_texts.get("B", "")
-    else:
-        text_a = text_b = cond_texts or ""
+    skins = get_block_skins(block_num)
+    pm_tasks = get_block_pm_tasks(block_num)
+    task_a = pm_tasks[0] if len(pm_tasks) > 0 else {}
+    task_b = pm_tasks[1] if len(pm_tasks) > 1 else {}
+
+    # Strip MCQ correct answers before sending to frontend
+    task_a_safe = _strip_correct(task_a)
+    task_b_safe = _strip_correct(task_b)
 
     return {
         "block_number": block_num,
         "condition": condition,
-        "task_pair_id": block_num,
-        "task_a": task_pair[0],
-        "task_b": task_pair[1],
-        "reminder_text_a": text_a,
-        "reminder_text_b": text_b,
+        "skins": skins,
+        "task_a": task_a_safe,
+        "task_b": task_b_safe,
     }
+
+
+def _strip_correct(task: dict) -> dict:
+    """Remove correct answer from task data before sending to client."""
+    import copy
+    safe = copy.deepcopy(task)
+    if "mcq" in safe:
+        safe["mcq"].pop("correct", None)
+    if "quiz" in safe:
+        safe["quiz"].pop("correct", None)
+    return safe
 
 
 @router.websocket("/session/{session_id}/block/{block_num}/stream")
@@ -131,7 +138,12 @@ async def block_stream(
     auto_start: bool = True,
     client: str = "participant",
 ):
-    """WebSocket endpoint — pushes block timeline events to the frontend."""
+    """Bidirectional WebSocket endpoint.
+
+    Server→Client: timeline events pushed via queue
+    Client→Server: trigger_click, mcq_answer, encoding_result, ongoing_batch,
+                   questionnaire, heartbeat
+    """
     await websocket.accept()
     client = (client or "participant").strip().lower()
     is_participant_client = client != "dashboard"
@@ -146,7 +158,7 @@ async def block_stream(
         if prev == 0:
             mark_session_online(session_id)
 
-    # Send an immediate heartbeat frame so the client transitions to OPEN quickly.
+    # Send an immediate keepalive so the client transitions to OPEN quickly
     try:
         queue.put_nowait({"event": "keepalive", "data": {}, "ts": time.time()})
     except asyncio.QueueFull:
@@ -166,15 +178,28 @@ async def block_stream(
                 condition_order = json.loads(row["condition_order"])
                 condition = condition_order[block_num - 1] if block_num <= len(condition_order) else "HighAF_HighCB"
 
-                reset_session_hobs(session_id)
                 reset_session_windows(session_id)
 
                 tl = BlockTimeline(session_id, block_num, condition, send_ws)
                 active_timelines[timeline_key] = tl
                 tl._task = asyncio.create_task(tl.run())
 
+    # Run two concurrent tasks: server push pump + client receiver
+    pump_task = asyncio.create_task(websocket_pump(session_id, queue, websocket))
+    receiver_task = asyncio.create_task(websocket_receiver(session_id, block_num, websocket))
+
     try:
-        await websocket_pump(session_id, queue, websocket)
+        # Wait for either task to complete (usually disconnection)
+        done, pending = await asyncio.wait(
+            {pump_task, receiver_task},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        for task in pending:
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
     finally:
         if is_participant_client:
             count = participant_ws_counts.get(session_id, 0)
@@ -183,22 +208,6 @@ async def block_stream(
                 mark_session_offline(session_id)
             else:
                 participant_ws_counts[session_id] = count - 1
-
-
-@router.post("/session/{session_id}/heartbeat")
-async def session_heartbeat(session_id: str):
-    """Frontend sends this every 10s to signal the participant is still connected."""
-    db = get_db(DB_PATH)
-    row = db.execute(
-        "UPDATE sessions SET last_heartbeat = ?, is_interrupted = 0 "
-        "WHERE session_id = ? RETURNING session_id",
-        (time.time(), session_id),
-    ).fetchone()
-    db.commit()
-    db.close()
-    if not row:
-        raise HTTPException(404, "Session not found")
-    return {"status": "ok"}
 
 
 @router.get("/session/{session_id}/resume", response_model=SessionResumeResponse)

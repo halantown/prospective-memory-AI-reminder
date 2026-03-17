@@ -1,8 +1,9 @@
 """Block timeline engine — sequential async runner over a ScheduledEvent list.
 
-The full schedule is produced by block_scheduler.generate_block_schedule()
-before the block starts.  This module owns the async dispatch loop that fires
-each event at its scheduled wall-clock time and writes audit rows to the DB.
+PRD v2.1: Simplified — no hob busy-window gate. The full schedule is produced
+by block_scheduler.generate_block_schedule() before the block starts.
+This module owns the async dispatch loop that fires each event at its
+scheduled wall-clock time and writes audit rows to the DB.
 """
 
 import asyncio
@@ -14,38 +15,9 @@ from typing import Callable, Coroutine, List
 from core.block_scheduler import derive_seed, generate_block_schedule
 from core.config import DB_PATH
 from core.database import get_db
-from core.event_schedule import AUDITED_EVENT_TYPES, SSE_EVENT_MAP, EventType, ScheduledEvent
+from core.event_schedule import AUDITED_EVENT_TYPES, WS_EVENT_MAP, EventType, ScheduledEvent
 
 logger = logging.getLogger("saturday.timeline")
-
-
-# ── Busy-window check ────────────────────────────────────────────────────────
-
-def _is_busy(session_id: str) -> bool:
-    """Return True when the kitchen is in a high-urgency moment.
-
-    Currently checks whether any hob is BURNING (steak about to be lost).
-    This gate is consulted before opening a PM trigger window so the
-    participant is not overwhelmed.  Max delay is capped in the run loop.
-
-    TODO: also check active laundry jams and unread message bubbles.
-    """
-    try:
-        from models.entities import HobStatus
-        from services.hob_service import get_session_hobs
-        hobs = get_session_hobs(session_id)
-        return any(h.status == HobStatus.BURNING for h in hobs)
-    except Exception:
-        return False
-
-
-async def _wait_for_not_busy(session_id: str, timeout: float = 10.0):
-    """Poll until kitchen is no longer busy, or timeout expires."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if not _is_busy(session_id):
-            return
-        await asyncio.sleep(0.5)
 
 
 # ── DB persistence ───────────────────────────────────────────────────────────
@@ -98,6 +70,45 @@ def _update_actual_t(session_id: str, block_num: int,
     db.close()
 
 
+def _precreate_pm_trial_rows(session_id: str, block_num: int, condition: str,
+                              schedule: List[ScheduledEvent]):
+    """Pre-create pm_trials rows when block starts so later WS handlers can UPDATE them."""
+    db = get_db(DB_PATH)
+    # Find group for this session
+    row = db.execute(
+        "SELECT latin_square_group FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    group = row["latin_square_group"] if row else None
+
+    for ev in schedule:
+        if ev.event_type == EventType.REMINDER_FIRE:
+            task_id = ev.payload.get("task_id", "")
+            slot = ev.payload.get("slot", "?")
+            text = ev.payload.get("text", "")
+            activity = ev.payload.get("activity_context", "")
+
+            # Check if already exists
+            existing = db.execute(
+                "SELECT id FROM pm_trials WHERE session_id = ? AND block_number = ? AND task_slot = ?",
+                (session_id, block_num, slot),
+            ).fetchone()
+            if existing:
+                continue
+
+            db.execute(
+                """INSERT INTO pm_trials
+                   (session_id, block_number, task_slot, task_id, condition,
+                    participant_group, reminder_text, reminder_activity_context)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (session_id, block_num, slot, task_id, condition,
+                 group, text, activity),
+            )
+
+    db.commit()
+    db.close()
+
+
 # ── BlockTimeline ────────────────────────────────────────────────────────────
 
 class BlockTimeline:
@@ -109,7 +120,7 @@ class BlockTimeline:
     """
 
     def __init__(self, session_id: str, block_num: int, condition: str,
-                 send_fn: Callable[..., Coroutine], difficulty: str = "medium"):
+                 send_fn: Callable[..., Coroutine]):
         self.session_id = session_id
         self.block_num = block_num
         self.condition = condition
@@ -123,6 +134,8 @@ class BlockTimeline:
 
         # Persist the audited subset immediately (before run())
         _persist_schedule(session_id, block_num, self.seed, self.schedule)
+        # Pre-create pm_trials rows
+        _precreate_pm_trial_rows(session_id, block_num, condition, self.schedule)
 
     async def run(self):
         block_start = time.monotonic()
@@ -142,18 +155,9 @@ class BlockTimeline:
             if self._cancelled:
                 break
 
-            # Busy-window gate: delay PM trigger opens if kitchen is hectic
-            if event.event_type == EventType.TRIGGER_WINDOW_OPEN:
-                if _is_busy(self.session_id):
-                    logger.info(
-                        f"Timeline [{self.session_id}] t={event.t:.1f}s "
-                        f"TRIGGER_WINDOW_OPEN delayed (busy kitchen)"
-                    )
-                    await _wait_for_not_busy(self.session_id, timeout=10.0)
-
             # Translate to pushed event name
-            sse_name = SSE_EVENT_MAP.get(event.event_type)
-            if sse_name is None:
+            ws_name = WS_EVENT_MAP.get(event.event_type)
+            if ws_name is None:
                 continue  # internal marker, not dispatched
 
             actual_t = time.monotonic() - block_start
@@ -162,13 +166,49 @@ class BlockTimeline:
 
             logger.info(
                 f"Timeline [{self.session_id}] t={event.t:.1f}s "
-                f"(actual={actual_t:.1f}s) → {sse_name}"
+                f"(actual={actual_t:.1f}s) → {ws_name}"
             )
-            await self.send_fn(self.session_id, sse_name, event.payload)
+            await self.send_fn(self.session_id, ws_name, event.payload)
+
+            # Update reminder_played_at in pm_trials
+            if event.event_type == EventType.REMINDER_FIRE:
+                self._update_reminder_time(event)
+            elif event.event_type == EventType.TRIGGER_FIRE:
+                self._update_trigger_time(event)
 
             # Back-fill actual dispatch time for audited events
             if event.event_type in AUDITED_EVENT_TYPES:
                 _update_actual_t(self.session_id, self.block_num, event.event_type, actual_t)
+
+    def _update_reminder_time(self, event: ScheduledEvent):
+        """Update pm_trials with actual reminder fire time."""
+        try:
+            db = get_db(DB_PATH)
+            task_id = event.payload.get("task_id", "")
+            db.execute(
+                "UPDATE pm_trials SET reminder_played_at = ? "
+                "WHERE session_id = ? AND task_id = ? AND reminder_played_at IS NULL",
+                (time.time(), self.session_id, task_id),
+            )
+            db.commit()
+            db.close()
+        except Exception as e:
+            logger.error(f"Failed to update reminder time: {e}")
+
+    def _update_trigger_time(self, event: ScheduledEvent):
+        """Update pm_trials with actual trigger fire time."""
+        try:
+            db = get_db(DB_PATH)
+            task_id = event.payload.get("task_id", "")
+            db.execute(
+                "UPDATE pm_trials SET trigger_fired_at = ? "
+                "WHERE session_id = ? AND task_id = ? AND trigger_fired_at IS NULL",
+                (time.time(), self.session_id, task_id),
+            )
+            db.commit()
+            db.close()
+        except Exception as e:
+            logger.error(f"Failed to update trigger time: {e}")
 
     def cancel(self):
         self._cancelled = True

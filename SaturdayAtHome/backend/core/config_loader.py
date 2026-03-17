@@ -1,6 +1,7 @@
-"""Load and expose the game_config.yaml as a global dict."""
+"""Load and expose the game_config.yaml and data JSON files."""
 
 import copy
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -10,9 +11,14 @@ import yaml
 logger = logging.getLogger("saturday.config_loader")
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "game_config.yaml"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 _config: dict[str, Any] = {}
+_pm_tasks: list[dict] | None = None
+_neutral_comments: dict[str, list[str]] | None = None
 
+
+# ── YAML config ────────────────────────────────────────────
 
 def load_config(path: Path | None = None) -> dict[str, Any]:
     """Read the YAML config file and cache it globally."""
@@ -39,7 +45,7 @@ def save_config(data: dict[str, Any], path: Path | None = None) -> None:
 
 
 def get_config() -> dict[str, Any]:
-    """Return the current config dict (read-only copy)."""
+    """Return the current config dict."""
     if not _config:
         load_config()
     return _config
@@ -48,39 +54,97 @@ def get_config() -> dict[str, Any]:
 def get_game_config() -> dict[str, Any]:
     """Return config stripped of sensitive data (correct answers) for the frontend."""
     cfg = copy.deepcopy(get_config())
-    # Strip correct answers from pm_tasks
+    # Strip PM correct answers from any inline pm_tasks (legacy)
     for task_id, task in cfg.get("pm_tasks", {}).items():
         task.pop("correct", None)
-    # Strip correct answers from messages
-    for msg in cfg.get("timeline", {}).get("messages", []):
-        msg.pop("correct", None)
     return cfg
 
 
-# ── Convenience accessors ─────────────────────────────────────────
+# ── PM task data from JSON ─────────────────────────────────
 
-def get_difficulty(level: str | None = None) -> dict:
+def load_pm_tasks() -> list[dict]:
+    """Load all PM tasks from data/pm_tasks.json."""
+    global _pm_tasks
+    if _pm_tasks is not None:
+        return _pm_tasks
+    p = DATA_DIR / "pm_tasks.json"
+    if not p.exists():
+        logger.warning(f"pm_tasks.json not found at {p}")
+        _pm_tasks = []
+        return _pm_tasks
+    with open(p, "r", encoding="utf-8") as f:
+        _pm_tasks = json.load(f)
+    logger.info(f"Loaded {len(_pm_tasks)} PM tasks from {p}")
+    return _pm_tasks
+
+
+def get_pm_task(task_id: str) -> dict | None:
+    """Get a single PM task by task_id."""
+    tasks = load_pm_tasks()
+    for t in tasks:
+        if t["task_id"] == task_id:
+            return t
+    return None
+
+
+def get_block_pm_tasks(block_num: int) -> list[dict]:
+    """Get the two PM tasks for a specific block number (1-4)."""
+    tasks = load_pm_tasks()
+    return [t for t in tasks if t.get("block") == block_num]
+
+
+# ── Neutral comments ───────────────────────────────────────
+
+def load_neutral_comments() -> dict[str, list[str]]:
+    """Load neutral comments from data/neutral_comments.json."""
+    global _neutral_comments
+    if _neutral_comments is not None:
+        return _neutral_comments
+    p = DATA_DIR / "neutral_comments.json"
+    if not p.exists():
+        logger.warning(f"neutral_comments.json not found at {p}")
+        _neutral_comments = {}
+        return _neutral_comments
+    with open(p, "r", encoding="utf-8") as f:
+        _neutral_comments = json.load(f)
+    return _neutral_comments
+
+
+def get_neutral_comments(skin: str) -> list[str]:
+    """Get neutral comments for a specific game skin."""
+    comments = load_neutral_comments()
+    return comments.get(skin, ["Nice day today.", "Keep it up!"])
+
+
+# ── Game items ─────────────────────────────────────────────
+
+def load_game_items(skin: str) -> list[dict] | None:
+    """Load game items from data/game_items/{skin}.json."""
+    p = DATA_DIR / "game_items" / f"{skin}.json"
+    if not p.exists():
+        logger.warning(f"Game items not found at {p}")
+        return None
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ── Block skin and room helpers ────────────────────────────
+
+def get_block_skins(block_num: int) -> dict:
+    """Get skin assignments for a block: {game_a: ..., game_b: ..., game_c: ...}."""
     cfg = get_config()
-    # Legacy support: if old-format difficulty exists, use it
-    diff = cfg.get("difficulty", {})
-    if diff:
-        level = level or diff.get("default", "medium")
-        return diff.get(level, diff.get("medium", {"cooking_ms": 13000, "ready_ms": 4000}))
-    # New format: read from steak config
-    steak = cfg.get("steak", {})
-    return {
-        "cooking_ms": steak.get("hob_base_cooking_ms", [11000, 13000, 15000])[1],
-        "ready_ms": steak.get("ready_ms", 4000),
-    }
+    skins = cfg.get("block_skins", {})
+    return skins.get(block_num, skins.get(str(block_num), {}))
 
 
-def get_scoring() -> dict:
-    return get_config().get("scoring", {})
+def get_room_label(skin: str) -> dict:
+    """Get room label (room, time, activity) for a skin."""
+    cfg = get_config()
+    labels = cfg.get("room_labels", {})
+    return labels.get(skin, {"room": "home", "time": "", "activity": skin})
 
 
-def get_timers() -> dict:
-    return get_config().get("timers", {})
-
+# ── Convenience accessors ──────────────────────────────────
 
 def get_timeline_config() -> dict:
     return get_config().get("timeline", {})
@@ -90,37 +154,13 @@ def get_experiment() -> dict:
     return get_config().get("experiment", {})
 
 
-def get_pm_tasks() -> dict:
-    return get_config().get("pm_tasks", {})
-
-
 def get_audio_config() -> dict:
     return get_config().get("audio", {})
-
-
-def get_steak_config() -> dict:
-    return get_config().get("steak", {})
-
-
-def get_laundry_config() -> dict:
-    return get_config().get("laundry", {})
 
 
 def get_latin_square() -> dict:
     return get_experiment().get("latin_square", {})
 
 
-def get_task_pairs() -> dict:
-    raw = get_experiment().get("task_pairs", {})
-    # YAML keys may be int or str — normalize to int keys
-    return {int(k): v for k, v in raw.items()}
-
-
-def get_reminder_texts() -> dict:
-    return get_experiment().get("reminder_texts", {})
-
-
-def get_correct_answer(task_id: str) -> dict | None:
-    tasks = get_pm_tasks()
-    task = tasks.get(task_id, {})
-    return task.get("correct")
+def get_game_rates() -> dict:
+    return get_config().get("game_rates", {})
