@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useGameStore } from '../store/gameStore'
 import useWebSocket from '../hooks/useWebSocket'
 import { useAudio } from '../hooks/useAudio'
@@ -17,6 +18,15 @@ export default function GameShell() {
 
   useWebSocket()
   useAudio()
+
+  // Flush ongoing response buffer every 5 seconds during play
+  useEffect(() => {
+    if (phase !== 'playing') return
+    const interval = setInterval(() => {
+      useGameStore.getState().flushResponseBuffer()
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [phase])
 
   if (phase === 'welcome') return <WelcomeScreen />
   if (phase === 'onboarding') return <OnboardingScreen />

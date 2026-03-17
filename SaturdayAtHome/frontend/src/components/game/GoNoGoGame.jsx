@@ -8,8 +8,13 @@ export default function GoNoGoGame() {
   const recordResponse = useGameStore(s => s.recordResponse)
   const [feedback, setFeedback] = useState(null)
   const timerRef = useRef(null)
+  const shownAtRef = useRef(Date.now())
 
   const currentItem = gameItems[itemIndex] || null
+
+  useEffect(() => {
+    shownAtRef.current = Date.now()
+  }, [itemIndex])
 
   // Auto-advance (no-go items pass after timeout)
   useEffect(() => {
@@ -47,7 +52,7 @@ export default function GoNoGoGame() {
       selected: 'add_to_cart',
       correct: isGo,
       skipped: false,
-      response_time_ms: Date.now() - (currentItem._shownAt || Date.now()),
+      response_time_ms: Date.now() - shownAtRef.current,
       client_ts: Date.now(),
     })
 
@@ -61,8 +66,6 @@ export default function GoNoGoGame() {
       </div>
     )
   }
-
-  if (!currentItem._shownAt) currentItem._shownAt = Date.now()
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-8">
@@ -88,9 +91,6 @@ export default function GoNoGoGame() {
           <span className="text-lg font-semibold text-slate-700">
             {currentItem.name || currentItem.text || 'Item'}
           </span>
-          {currentItem.type === 'nogo' && (
-            <span className="text-[10px] text-slate-300 mt-1">(not on list)</span>
-          )}
         </motion.div>
       </AnimatePresence>
 

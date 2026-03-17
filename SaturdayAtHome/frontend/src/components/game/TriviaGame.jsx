@@ -8,8 +8,13 @@ export default function TriviaGame() {
   const recordResponse = useGameStore(s => s.recordResponse)
   const [feedback, setFeedback] = useState(null)
   const timerRef = useRef(null)
+  const shownAtRef = useRef(Date.now())
 
   const currentItem = gameItems[itemIndex] || null
+
+  useEffect(() => {
+    shownAtRef.current = Date.now()
+  }, [itemIndex])
 
   // Auto-advance after timeout
   useEffect(() => {
@@ -45,7 +50,7 @@ export default function TriviaGame() {
       selected: answer,
       correct: isCorrect,
       skipped: false,
-      response_time_ms: Date.now() - (currentItem._shownAt || Date.now()),
+      response_time_ms: Date.now() - shownAtRef.current,
       client_ts: Date.now(),
     })
 
@@ -59,8 +64,6 @@ export default function TriviaGame() {
       </div>
     )
   }
-
-  if (!currentItem._shownAt) currentItem._shownAt = Date.now()
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-8">
