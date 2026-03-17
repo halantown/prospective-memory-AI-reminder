@@ -140,7 +140,7 @@ npm run build
 | `POST` | `/api/admin/participant/create` | Create participant (returns token) |
 | `POST` | `/api/session/start` | Start session with token |
 | `GET` | `/api/session/{id}/block/{n}` | Block config (strips MCQ correct answers) |
-| `GET` | `/api/session/{id}/game-items/{skin}` | Stimulus items for a game skin |
+| `GET` | `/api/game-items/{skin}` | Stimulus items for a game skin |
 | `GET` | `/api/admin/dashboard` | All sessions summary |
 | `GET` | `/api/admin/export/all` | CSV export of all data |
 | `GET` | `/api/config` | Full config (admin) |
