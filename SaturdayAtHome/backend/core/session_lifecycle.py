@@ -230,14 +230,12 @@ def next_participant_id(db) -> str:
 
 async def heartbeat_monitor(db_path, active_timelines: dict):
     """Background task: marks sessions as interrupted if heartbeat lost > 30s."""
-    import sqlite3
-    from pathlib import Path
+    from core.database import get_db
 
     while True:
         await asyncio.sleep(15)
         try:
-            conn = sqlite3.connect(str(db_path))
-            conn.row_factory = sqlite3.Row
+            conn = get_db(db_path)
             now = time.time()
             rows = conn.execute(
                 "SELECT session_id, participant_id, latin_square_group, last_heartbeat, "

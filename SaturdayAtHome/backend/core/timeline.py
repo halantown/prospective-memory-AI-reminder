@@ -58,11 +58,13 @@ def _update_actual_t(session_id: str, block_num: int,
         """UPDATE block_events
            SET actual_t = ?
            WHERE id = (
-               SELECT id FROM block_events
-               WHERE session_id = ? AND block_num = ? AND event_type = ?
-                 AND actual_t IS NULL
-               ORDER BY id
-               LIMIT 1
+               SELECT id FROM (
+                   SELECT id FROM block_events
+                   WHERE session_id = ? AND block_num = ? AND event_type = ?
+                     AND actual_t IS NULL
+                   ORDER BY id
+                   LIMIT 1
+               ) AS tmp
            )""",
         (actual_t, session_id, block_num, event_type.value),
     )
@@ -98,7 +100,7 @@ def _precreate_pm_trial_rows(session_id: str, block_num: int, condition: str,
 
             db.execute(
                 """INSERT INTO pm_trials
-                   (session_id, block_number, task_slot, task_id, condition,
+                   (session_id, block_number, task_slot, task_id, `condition`,
                     participant_group, reminder_text, reminder_activity_context)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (session_id, block_num, slot, task_id, condition,
