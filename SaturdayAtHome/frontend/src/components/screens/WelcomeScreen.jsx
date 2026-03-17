@@ -1,10 +1,7 @@
 import { useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
-import { createSession } from '../../utils/api'
+import { createSession, fetchBlockConfig } from '../../utils/api'
 
-/**
- * Welcome screen — participant enters the 6-char token issued by the experimenter.
- */
 export default function WelcomeScreen() {
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,24 +18,17 @@ export default function WelcomeScreen() {
     setError(null)
 
     try {
-      const data = await createSession(t)
-      console.log('[Welcome] Session started:', data)
-
+      const session = await createSession(t)
       setSession({
-        sessionId: data.session_id,
-        participantId: data.participant_id,
-        group: data.group,
-        conditionOrder: data.condition_order,
+        sessionId: session.session_id,
+        participantId: session.participant_id,
+        group: session.group,
+        conditionOrder: session.condition_order,
       })
 
-      const conditions = data.condition_order
-      startBlockEncoding({
-        blockNumber: 1,
-        condition: conditions[0],
-        taskPairId: 1,
-      })
+      const blockConfig = await fetchBlockConfig(session.session_id, 1)
+      startBlockEncoding(blockConfig)
     } catch (err) {
-      console.error('[Welcome] Failed to start session:', err)
       setError(`Failed: ${err.message}`)
     } finally {
       setLoading(false)
@@ -47,19 +37,15 @@ export default function WelcomeScreen() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-xl w-[480px] overflow-hidden">
-        {/* Header */}
+      <div className="bg-white rounded-2xl shadow-xl w-[520px] overflow-hidden">
         <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-6 text-white">
           <h1 className="text-2xl font-bold">Saturday At Home</h1>
-          <p className="text-amber-100 text-sm mt-1">Prospective Memory Experiment</p>
+          <p className="text-amber-100 text-sm mt-1">State-driven day simulation experiment</p>
         </div>
 
-        {/* Form */}
         <div className="px-8 py-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Session Token
-            </label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Session Token</label>
             <input
               type="text"
               value={token}
@@ -85,7 +71,7 @@ export default function WelcomeScreen() {
             disabled={loading || token.trim().length !== 6}
             className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-200 text-white font-bold text-lg rounded-xl transition-colors"
           >
-            {loading ? 'Starting…' : 'Start Experiment'}
+            {loading ? 'Starting…' : 'Start Session'}
           </button>
         </div>
       </div>

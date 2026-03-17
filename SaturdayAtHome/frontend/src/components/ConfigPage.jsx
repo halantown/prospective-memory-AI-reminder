@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 const API = import.meta.env.VITE_API_URL || '/api'
 
-/* ── Editable JSON textarea ─────────────────────────────── */
-function JsonEditor({ label, value, onChange, rows = 8 }) {
+function JsonEditor({ label, value, onChange, rows = 12 }) {
   const [text, setText] = useState('')
   const [error, setError] = useState(null)
 
@@ -25,10 +24,10 @@ function JsonEditor({ label, value, onChange, rows = 8 }) {
   }
 
   return (
-    <div className="mb-4">
-      <label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
       <textarea
-        className={`w-full font-mono text-xs p-2 border rounded ${error ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+        className={`w-full font-mono text-xs p-3 border rounded-xl ${error ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white'}`}
         rows={rows}
         value={text}
         onChange={handleChange}
@@ -38,206 +37,40 @@ function JsonEditor({ label, value, onChange, rows = 8 }) {
   )
 }
 
-/* ── Number/text inline editor ──────────────────────────── */
-function Field({ label, value, onChange, type = 'number' }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <label className="text-sm text-gray-700 w-48 shrink-0">{label}</label>
-      <input
-        type={type}
-        className="border rounded px-2 py-1 text-sm w-32"
-        value={value ?? ''}
-        onChange={(e) => onChange(type === 'number' ? Number(e.target.value) : e.target.value)}
-      />
-    </div>
-  )
-}
-
-/* ── Tab button ─────────────────────────────────────────── */
 function Tab({ active, label, onClick }) {
   return (
     <button
-      className={`px-4 py-2 text-sm font-medium rounded-t border-b-2 transition ${
+      onClick={onClick}
+      className={`px-4 py-2 text-sm font-medium border-b-2 ${
         active ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:text-gray-700'
       }`}
-      onClick={onClick}
     >
       {label}
     </button>
   )
 }
 
-/* ── Section renderers ──────────────────────────────────── */
-
-function DifficultySection({ config, setConfig }) {
-  const diff = config.difficulty || {}
-  const update = (preset, key, val) => {
-    setConfig({
-      ...config,
-      difficulty: { ...diff, [preset]: { ...diff[preset], [key]: val } },
-    })
-  }
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-500 mb-2">
-        Default preset: <strong>{diff.default || 'medium'}</strong>
-        <button className="ml-2 text-blue-600 text-xs" onClick={() => setConfig({
-          ...config, difficulty: { ...diff, default: diff.default === 'medium' ? 'fast' : diff.default === 'fast' ? 'slow' : 'medium' },
-        })}>[cycle]</button>
-      </p>
-      {['slow', 'medium', 'fast'].map((preset) => (
-        <div key={preset} className="bg-gray-50 p-3 rounded border">
-          <h4 className="font-semibold text-sm mb-2 capitalize">{preset}</h4>
-          <Field label="Cooking (ms)" value={diff[preset]?.cooking_ms} onChange={(v) => update(preset, 'cooking_ms', v)} />
-          <Field label="Ready (ms)" value={diff[preset]?.ready_ms} onChange={(v) => update(preset, 'ready_ms', v)} />
-          <Field label="Max Steaks" value={diff[preset]?.max_steaks} onChange={(v) => update(preset, 'max_steaks', v)} />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ScoringSection({ config, setConfig }) {
-  const sc = config.scoring || {}
-  const update = (key, val) => setConfig({ ...config, scoring: { ...sc, [key]: val } })
-  return (
-    <div className="space-y-2">
-      <Field label="Steak Flip / Serve" value={sc.steak_flip} onChange={(v) => update('steak_flip', v)} />
-      <Field label="Steak Serve" value={sc.steak_serve} onChange={(v) => update('steak_serve', v)} />
-      <Field label="Steak Burn Penalty" value={sc.steak_burn} onChange={(v) => update('steak_burn', v)} />
-      <Field label="Message Correct" value={sc.message_correct} onChange={(v) => update('message_correct', v)} />
-      <Field label="Message Wrong" value={sc.message_wrong} onChange={(v) => update('message_wrong', v)} />
-      <Field label="Message Expire" value={sc.message_expire} onChange={(v) => update('message_expire', v)} />
-      <Field label="Plant Water (fresh)" value={sc.plant_water_fresh} onChange={(v) => update('plant_water_fresh', v)} />
-      <Field label="Plant Water (wilted)" value={sc.plant_water_wilted} onChange={(v) => update('plant_water_wilted', v)} />
-    </div>
-  )
-}
-
-function TimersSection({ config, setConfig }) {
-  const tm = config.timers || {}
-  const update = (key, val) => setConfig({ ...config, timers: { ...tm, [key]: val } })
-  return (
-    <div className="space-y-2">
-      <Field label="Block Duration (ms)" value={tm.block_duration_ms} onChange={(v) => update('block_duration_ms', v)} />
-      <Field label="Message Timeout (ms)" value={tm.message_timeout_ms} onChange={(v) => update('message_timeout_ms', v)} />
-      <Field label="PM Window (ms)" value={tm.pm_window_ms} onChange={(v) => update('pm_window_ms', v)} />
-      <Field label="Plant Wilt Delay (ms)" value={tm.plant_wilt_delay_ms} onChange={(v) => update('plant_wilt_delay_ms', v)} />
-      <Field label="Respawn Min (ms)" value={tm.steak_respawn_min_ms} onChange={(v) => update('steak_respawn_min_ms', v)} />
-      <Field label="Respawn Max (ms)" value={tm.steak_respawn_max_ms} onChange={(v) => update('steak_respawn_max_ms', v)} />
-    </div>
-  )
-}
-
-function TimelineSection({ config, setConfig }) {
-  return (
-    <JsonEditor
-      label="Timeline (events, steak_spawn, messages, plant_water, neutral_comments)"
-      value={config.timeline || {}}
-      onChange={(val) => setConfig({ ...config, timeline: val })}
-      rows={20}
-    />
-  )
-}
-
-function ExperimentSection({ config, setConfig }) {
-  return (
-    <div className="space-y-4">
-      <JsonEditor
-        label="Latin Square"
-        value={config.experiment?.latin_square || {}}
-        onChange={(val) => setConfig({
-          ...config,
-          experiment: { ...config.experiment, latin_square: val },
-        })}
-        rows={8}
-      />
-      <JsonEditor
-        label="Task Pairs"
-        value={config.experiment?.task_pairs || {}}
-        onChange={(val) => setConfig({
-          ...config,
-          experiment: { ...config.experiment, task_pairs: val },
-        })}
-        rows={8}
-      />
-      <JsonEditor
-        label="Reminder Texts"
-        value={config.experiment?.reminder_texts || {}}
-        onChange={(val) => setConfig({
-          ...config,
-          experiment: { ...config.experiment, reminder_texts: val },
-        })}
-        rows={8}
-      />
-    </div>
-  )
-}
-
-function PmTasksSection({ config, setConfig }) {
-  return (
-    <JsonEditor
-      label="PM Tasks (including correct answers — admin only)"
-      value={config.pm_tasks || {}}
-      onChange={(val) => setConfig({ ...config, pm_tasks: val })}
-      rows={24}
-    />
-  )
-}
-
-function TriggerIconsSection({ config, setConfig }) {
-  return (
-    <JsonEditor
-      label="Trigger Icons"
-      value={config.trigger_icons || {}}
-      onChange={(val) => setConfig({ ...config, trigger_icons: val })}
-      rows={12}
-    />
-  )
-}
-
-function AudioSection({ config, setConfig }) {
-  const au = config.audio || {}
-  const update = (key, val) => setConfig({ ...config, audio: { ...au, [key]: val } })
-  return (
-    <div className="space-y-2">
-      <Field label="BGM Normal Volume" value={au.bgm_normal} onChange={(v) => update('bgm_normal', v)} type="number" />
-      <Field label="BGM Ducked Volume" value={au.bgm_ducked} onChange={(v) => update('bgm_ducked', v)} type="number" />
-      <Field label="BGM Fade In (ms)" value={au.bgm_fade_in_ms} onChange={(v) => update('bgm_fade_in_ms', v)} />
-      <Field label="Duck Fade Down (ms)" value={au.duck_fade_down_ms} onChange={(v) => update('duck_fade_down_ms', v)} />
-      <Field label="Duck Fade Up (ms)" value={au.duck_fade_up_ms} onChange={(v) => update('duck_fade_up_ms', v)} />
-      <Field label="TTS Language" value={au.tts_lang} onChange={(v) => update('tts_lang', v)} type="text" />
-      <Field label="TTS Rate" value={au.tts_rate} onChange={(v) => update('tts_rate', v)} type="number" />
-    </div>
-  )
-}
-
-/* ── Main ConfigPage ────────────────────────────────────── */
 const TABS = [
-  { key: 'difficulty', label: 'Difficulty', Component: DifficultySection },
-  { key: 'scoring', label: 'Scoring', Component: ScoringSection },
-  { key: 'timers', label: 'Timers', Component: TimersSection },
-  { key: 'timeline', label: 'Timeline', Component: TimelineSection },
-  { key: 'experiment', label: 'Experiment', Component: ExperimentSection },
-  { key: 'pm_tasks', label: 'PM Tasks', Component: PmTasksSection },
-  { key: 'triggers', label: 'Triggers', Component: TriggerIconsSection },
-  { key: 'audio', label: 'Audio', Component: AudioSection },
+  { key: 'timeline', label: 'Timeline' },
+  { key: 'experiment', label: 'Experiment' },
+  { key: 'rooms', label: 'Rooms' },
+  { key: 'pm_tasks', label: 'PM Tasks' },
+  { key: 'audio', label: 'Audio' },
 ]
 
 export default function ConfigPage() {
   const [config, setConfig] = useState(null)
-  const [tab, setTab] = useState('difficulty')
+  const [tab, setTab] = useState('timeline')
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState(null)
-  const [loading, setLoading] = useState(true)
 
   const fetchConfig = useCallback(async () => {
     try {
       setLoading(true)
       const res = await fetch(`${API}/config`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      setConfig(data)
+      setConfig(await res.json())
       setStatus(null)
     } catch (err) {
       setStatus({ type: 'error', text: `Failed to load config: ${err.message}` })
@@ -246,9 +79,12 @@ export default function ConfigPage() {
     }
   }, [])
 
-  useEffect(() => { fetchConfig() }, [fetchConfig])
+  useEffect(() => {
+    fetchConfig()
+  }, [fetchConfig])
 
   const saveConfig = async () => {
+    if (!config) return
     try {
       setSaving(true)
       const res = await fetch(`${API}/config`, {
@@ -257,8 +93,8 @@ export default function ConfigPage() {
         body: JSON.stringify({ config }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setStatus({ type: 'success', text: 'Config saved ✓' })
-      setTimeout(() => setStatus(null), 3000)
+      setStatus({ type: 'success', text: 'Config saved' })
+      setTimeout(() => setStatus(null), 2500)
     } catch (err) {
       setStatus({ type: 'error', text: `Save failed: ${err.message}` })
     } finally {
@@ -266,51 +102,60 @@ export default function ConfigPage() {
     }
   }
 
-  if (loading) return <div className="flex items-center justify-center h-screen text-gray-500">Loading config…</div>
-  if (!config) return <div className="flex items-center justify-center h-screen text-red-500">Failed to load config</div>
+  if (loading) return <div className="h-screen flex items-center justify-center text-gray-500">Loading config…</div>
+  if (!config) return <div className="h-screen flex items-center justify-center text-red-600">Unable to load config.</div>
 
-  const ActiveTab = TABS.find((t) => t.key === tab)
+  const setSection = (key, value) => {
+    setConfig((prev) => ({ ...prev, [key]: value }))
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header */}
       <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">⚙️ Game Configuration</h1>
-          <p className="text-sm text-gray-500">Edit game_config.yaml via web UI</p>
+          <h1 className="text-xl font-bold text-gray-800">Config Editor (PRD v2.0)</h1>
+          <p className="text-sm text-gray-500">Edits `SaturdayAtHome/game_config.yaml` directly.</p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2">
           {status && (
-            <span className={`text-sm ${status.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+            <span className={`text-sm ${status.type === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
               {status.text}
             </span>
           )}
+          <button onClick={fetchConfig} className="px-3 py-2 text-sm rounded bg-slate-200 hover:bg-slate-300">Reload</button>
           <button
-            className="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded"
-            onClick={fetchConfig}
-          >
-            Reload
-          </button>
-          <button
-            className={`px-4 py-2 text-sm text-white rounded ${saving ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
             onClick={saveConfig}
             disabled={saving}
+            className={`px-3 py-2 text-sm rounded text-white ${saving ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'}`}
           >
-            {saving ? 'Saving…' : 'Save Config'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white border-b px-6 flex gap-1 overflow-x-auto">
+      <div className="bg-white border-b px-6 flex gap-1">
         {TABS.map((t) => (
           <Tab key={t.key} label={t.label} active={tab === t.key} onClick={() => setTab(t.key)} />
         ))}
       </div>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto p-6">
-        {ActiveTab && <ActiveTab.Component config={config} setConfig={setConfig} />}
+      <div className="max-w-5xl mx-auto p-6">
+        {tab === 'timeline' && (
+          <JsonEditor label="timeline" value={config.timeline || {}} onChange={(v) => setSection('timeline', v)} rows={20} />
+        )}
+        {tab === 'experiment' && (
+          <JsonEditor label="experiment" value={config.experiment || {}} onChange={(v) => setSection('experiment', v)} rows={20} />
+        )}
+        {tab === 'rooms' && (
+          <JsonEditor label="rooms" value={config.rooms || {}} onChange={(v) => setSection('rooms', v)} rows={20} />
+        )}
+        {tab === 'pm_tasks' && (
+          <JsonEditor label="pm_tasks (admin-only full schema)" value={config.pm_tasks || {}} onChange={(v) => setSection('pm_tasks', v)} rows={26} />
+        )}
+        {tab === 'audio' && (
+          <JsonEditor label="audio" value={config.audio || {}} onChange={(v) => setSection('audio', v)} rows={10} />
+        )}
       </div>
     </div>
   )

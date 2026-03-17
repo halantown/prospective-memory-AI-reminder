@@ -16,6 +16,7 @@ export default function RobotAvatar() {
   const robotSpeaking = useGameStore((s) => s.robotSpeaking)
   const robotText = useGameStore((s) => s.robotText)
   const clearRobotText = useGameStore((s) => s.clearRobotText)
+  const setRobotSpeaking = useGameStore((s) => s.setRobotSpeaking)
 
   const [displayText, setDisplayText] = useState('')
   const [showBubble, setShowBubble] = useState(false)
@@ -56,6 +57,23 @@ export default function RobotAvatar() {
       clearTimeout(lingerRef.current)
     }
   }, [robotText, clearRobotText])
+
+  // Speak text via browser TTS (best effort).
+  useEffect(() => {
+    if (!robotText || !window.speechSynthesis) return
+    const utter = new SpeechSynthesisUtterance(robotText)
+    utter.lang = 'en-US'
+    utter.rate = 0.9
+    utter.pitch = 1.0
+    utter.onstart = () => setRobotSpeaking(true)
+    utter.onend = () => setRobotSpeaking(false)
+    utter.onerror = () => setRobotSpeaking(false)
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(utter)
+    return () => {
+      window.speechSynthesis.cancel()
+    }
+  }, [robotText, setRobotSpeaking])
 
   return (
     <div className="absolute bottom-6 right-6 z-30 flex flex-col items-end pointer-events-none">
