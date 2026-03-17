@@ -15,6 +15,7 @@ class SessionStartResponse(BaseModel):
     participant_id: str
     group: str
     condition_order: list[str]
+    current_block: int = 1
 
 
 class SessionResumeResponse(BaseModel):

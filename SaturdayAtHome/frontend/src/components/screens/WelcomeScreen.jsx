@@ -21,7 +21,7 @@ export default function WelcomeScreen() {
     try {
       const data = await startSession(token.trim())
       setSession(data)
-      setBlockNumber(data.current_block || 1)
+      setBlockNumber(data.current_block > 0 ? data.current_block : 1)
       setPhase('onboarding')
     } catch (err) {
       setError(err.message || 'Failed to start session')

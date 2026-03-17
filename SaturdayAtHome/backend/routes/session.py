@@ -78,11 +78,13 @@ async def start_session(req: TokenSessionStartRequest):
         log_action(row["session_id"], 0, "session_start_token", {"token": req.token})
 
     condition_order = json.loads(row["condition_order"])
+    current_block = row["current_block"] if row["current_block"] and row["current_block"] > 0 else 1
     return SessionStartResponse(
         session_id=row["session_id"],
         participant_id=row["participant_id"],
         group=row["latin_square_group"],
         condition_order=condition_order,
+        current_block=current_block,
     )
 
 
