@@ -6,12 +6,12 @@ export default function RobotStatus() {
   const robotText = useGameStore(s => s.robotText)
 
   return (
-    <div className="bg-slate-50 rounded-lg p-2">
+    <div className="bg-slate-800/60 rounded-lg p-2">
       <div className="flex items-center gap-2">
         <span className="text-2xl" role="img" aria-label="robot">🤖</span>
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-medium text-slate-500">Pepper</div>
-          <div className={`text-[11px] ${robotStatus === 'speaking' ? 'text-blue-600' : 'text-slate-400'}`}>
+          <div className="text-xs font-medium text-slate-400">Pepper</div>
+          <div className={`text-[11px] ${robotStatus === 'speaking' ? 'text-blue-400' : 'text-slate-500'}`}>
             {robotStatus === 'speaking' ? 'Speaking…' : 'Idle'}
           </div>
         </div>
@@ -36,7 +36,7 @@ export default function RobotStatus() {
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="mt-2 bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-700 leading-relaxed shadow-sm"
+            className="mt-2 bg-slate-700/80 border border-slate-600 rounded-lg p-2 text-xs text-slate-200 leading-relaxed"
           >
             {robotText}
           </motion.div>

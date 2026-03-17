@@ -6,11 +6,11 @@ export default function ActivityLabel() {
 
   return (
     <div className="text-center px-2 py-1.5">
-      <div className="text-xs text-slate-400 uppercase tracking-wider font-medium">
+      <div className="text-xs text-slate-500 uppercase tracking-wider font-medium">
         {currentRoom}
       </div>
       {activityLabel && (
-        <div className="text-sm text-slate-600 mt-0.5 leading-snug">
+        <div className="text-sm text-slate-300 mt-0.5 leading-snug">
           {activityLabel}
         </div>
       )}

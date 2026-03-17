@@ -85,9 +85,22 @@ block_skins:
 
 # Room/location narrative per game segment
 room_labels:
+  # Block 1 — Morning
   email_v1: { room: study, time: "10:30 AM", activity: "Sorting emails" }
-  grocery_v1: { room: living_room, time: "11:15 AM", activity: "Grocery shopping" }
+  grocery_v1: { room: kitchen, time: "11:15 AM", activity: "Checking groceries" }
   podcast_v1: { room: balcony, time: "12:00 PM", activity: "Listening to podcast" }
+  # Block 2 — Early afternoon
+  photo_v2: { room: living, time: "1:30 PM", activity: "Organizing photos" }
+  laundry_v2: { room: entrance, time: "2:15 PM", activity: "Sorting laundry" }
+  news_v2: { room: study, time: "3:00 PM", activity: "Reading the news" }
+  # Block 3 — Late afternoon
+  books_v3: { room: study, time: "4:00 PM", activity: "Shelving books" }
+  recycling_v3: { room: kitchen, time: "4:45 PM", activity: "Sorting recycling" }
+  spot_diff_v3: { room: living, time: "5:30 PM", activity: "Playing spot the difference" }
+  # Block 4 — Evening
+  fridge_v4: { room: kitchen, time: "6:30 PM", activity: "Checking the fridge" }
+  wardrobe_v4: { room: entrance, time: "7:15 PM", activity: "Organizing wardrobe" }
+  headlines_v4: { room: balcony, time: "8:00 PM", activity: "Browsing headlines" }
 
 # Latin Square
 experiment:

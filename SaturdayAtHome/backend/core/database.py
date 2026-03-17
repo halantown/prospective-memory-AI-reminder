@@ -1,8 +1,11 @@
 import sqlite3
 from pathlib import Path
 
+_db_initialized = False
 
-def get_db(db_path: Path) -> sqlite3.Connection:
+
+def _raw_connect(db_path: Path) -> sqlite3.Connection:
+    """Open a raw SQLite connection with standard pragmas."""
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -10,8 +13,25 @@ def get_db(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def get_db(db_path: Path) -> sqlite3.Connection:
+    global _db_initialized
+    conn = _raw_connect(db_path)
+    # Auto-initialize if tables are missing (e.g. DB file deleted while running)
+    if not _db_initialized:
+        tables = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'"
+        ).fetchone()
+        if not tables:
+            conn.close()
+            init_db(db_path)
+            conn = _raw_connect(db_path)
+        _db_initialized = True
+    return conn
+
+
 def init_db(db_path: Path):
-    db = get_db(db_path)
+    global _db_initialized
+    db = _raw_connect(db_path)
 
     db.executescript("""
     CREATE TABLE IF NOT EXISTS sessions (
@@ -133,3 +153,4 @@ def init_db(db_path: Path):
 
     db.commit()
     db.close()
+    _db_initialized = True

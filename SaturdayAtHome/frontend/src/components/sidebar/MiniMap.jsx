@@ -12,8 +12,10 @@ export default function MiniMap() {
   const currentRoom = useGameStore(s => s.currentRoom)
 
   return (
-    <div className="bg-slate-100 rounded-lg p-2">
-      <div className="text-[10px] text-slate-400 font-medium mb-1 text-center">Floor Plan</div>
+    <div className="bg-slate-800/60 rounded-lg p-2">
+      <div className="text-[10px] text-slate-500 font-medium mb-1 text-center uppercase tracking-wider">
+        Floor Plan
+      </div>
       <svg viewBox="0 0 100 100" className="w-full h-auto" style={{ maxHeight: 120 }}>
         {ROOMS.map(room => {
           const active = currentRoom === room.id
@@ -23,8 +25,8 @@ export default function MiniMap() {
                 x={room.x} y={room.y}
                 width={room.w} height={room.h}
                 rx={3}
-                fill={active ? '#dbeafe' : '#f1f5f9'}
-                stroke={active ? '#3b82f6' : '#cbd5e1'}
+                fill={active ? '#1e3a5f' : '#1e293b'}
+                stroke={active ? '#60a5fa' : '#334155'}
                 strokeWidth={active ? 1.5 : 0.5}
               />
               <text
@@ -33,7 +35,7 @@ export default function MiniMap() {
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize={6}
-                fill={active ? '#1e40af' : '#94a3b8'}
+                fill={active ? '#93c5fd' : '#64748b'}
                 fontWeight={active ? 'bold' : 'normal'}
               >
                 {room.label}
@@ -43,7 +45,7 @@ export default function MiniMap() {
                   cx={room.x + room.w / 2}
                   cy={room.y + room.h / 2 + 8}
                   r={2.5}
-                  fill="#3b82f6"
+                  fill="#60a5fa"
                 >
                   <animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite" />
                 </circle>

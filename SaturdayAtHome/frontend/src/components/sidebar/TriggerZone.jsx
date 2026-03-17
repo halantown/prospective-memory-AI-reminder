@@ -7,7 +7,7 @@ export default function TriggerZone() {
 
   return (
     <div className="flex-1">
-      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-2 px-1">
+      <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-2 px-1">
         Household Events
       </div>
       <div className="grid grid-cols-2 gap-1.5">
@@ -32,17 +32,17 @@ function TriggerIcon({ trigger, onClick }) {
       className={`
         relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-colors
         ${isFired
-          ? 'border-amber-400 bg-amber-50 cursor-pointer hover:bg-amber-100 shadow-md'
+          ? 'border-amber-500 bg-amber-500/20 cursor-pointer hover:bg-amber-500/30 shadow-lg shadow-amber-500/20'
           : isAmbient
-            ? 'border-blue-200 bg-blue-50/50 cursor-default'
-            : 'border-slate-100 bg-slate-50 cursor-default opacity-50'
+            ? 'border-blue-500/40 bg-blue-500/10 cursor-default'
+            : 'border-slate-700 bg-slate-800/60 cursor-default opacity-40'
         }
       `}
       animate={
         isFired
           ? { scale: [1, 1.04, 1] }
           : isAmbient
-            ? { opacity: [0.6, 1, 0.6] }
+            ? { opacity: [0.5, 1, 0.5] }
             : {}
       }
       transition={
@@ -55,7 +55,7 @@ function TriggerIcon({ trigger, onClick }) {
     >
       <span className="text-xl leading-none">{emoji}</span>
       <span className={`text-[10px] mt-1 text-center leading-tight ${
-        isInactive ? 'text-slate-400' : isFired ? 'text-amber-700 font-semibold' : 'text-blue-500'
+        isInactive ? 'text-slate-500' : isFired ? 'text-amber-300 font-semibold' : 'text-blue-400'
       }`}>
         {label}
       </span>

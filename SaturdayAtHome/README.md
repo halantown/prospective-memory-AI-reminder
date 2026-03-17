@@ -1,34 +1,79 @@
 # Saturday At Home
 
-A browser-based experimental game for a 2×2 within-subjects **Prospective Memory (PM)** psychology study. Participants manage household tasks (cooking steaks, replying to messages, watering plants) while remembering to perform prospective memory tasks embedded in the game world.
+A browser-based experimental platform for a **2×2 within-subjects Prospective Memory (PM)** study. Participants perform literature-validated cognitive tasks (Semantic Categorization, Go/No-Go, Trivia) with daily-life visual skins while remembering to self-initiate PM actions via a sidebar trigger system.
+
+**Design document**: `docs/PRD_v2_1_MCQ_CogTask.md`
 
 ## Architecture
 
 ```
 SaturdayAtHome/
-├── game_config.yaml          # ← Single source of truth for ALL game parameters
-├── backend/                  # Python FastAPI + SQLite (port 5000)
-│   ├── main.py               # Entry point
-│   ├── core/                 # Config loader, database, WebSocket hub, timeline engine
-│   ├── models/               # Pydantic schemas, dataclass entities
-│   ├── routes/               # HTTP endpoints (session, experiment, admin, config)
-│   ├── services/             # Business logic (scoring, hob state, PM windows)
-│   └── utils/                # Helpers, action logging
-├── frontend/                 # React + Vite + Tailwind + Zustand (port 3000)
-│   ├── src/components/       # Game UI, rooms, screens, dashboard, config page
-│   ├── src/store/            # Zustand global state
-│   ├── src/hooks/            # WebSocket client, audio engine, animation hooks
-│   ├── src/config/           # Task configs (populated from backend)
-│   └── src/utils/            # API helpers
-└── docs/                     # GDD, addendum, design documents
+├── game_config.yaml            # Single source of truth for ALL game parameters
+├── backend/                    # Python FastAPI + SQLite (port 5000)
+│   ├── main.py                 # Entry point (uvicorn, lifespan init)
+│   ├── core/
+│   │   ├── config_loader.py    # Loads YAML, pm_tasks.json, game_items
+│   │   ├── database.py         # SQLite schema (10 tables), auto-init
+│   │   ├── block_scheduler.py  # Generates 22-event block schedule
+│   │   ├── timeline.py         # Async timeline runner, pm_trial pre-creation
+│   │   ├── ws.py               # Bidirectional WebSocket hub (6 client msg types)
+│   │   └── event_schedule.py   # EventType enum + WS_EVENT_MAP
+│   ├── data/
+│   │   ├── pm_tasks.json       # 8 PM tasks (encoding, quiz, trigger, MCQ, reminders)
+│   │   ├── neutral_comments.json
+│   │   └── game_items/         # Stimulus sets per skin (email_v1, grocery_v1, podcast_v1)
+│   ├── models/schemas.py       # Pydantic request/response models
+│   ├── routes/
+│   │   ├── session.py          # Token-based start, block config, WS stream
+│   │   ├── admin.py            # Participant create, admin WS, CSV export
+│   │   ├── experiment.py       # GET endpoints (game items, config)
+│   │   └── config_routes.py    # YAML editor endpoints
+│   ├── services/scoring.py     # MCQ scoring (0/1/2)
+│   └── utils/                  # Action logging helpers
+├── frontend/                   # React 18 + Vite + Tailwind + Zustand (port 3000)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── GameShell.jsx         # Phase router + 75/25 layout
+│   │   │   ├── game/
+│   │   │   │   ├── MainPanel.jsx     # Game type router, dim-on-MCQ
+│   │   │   │   ├── SemanticCatGame.jsx  # Email sorting (3-4s/item)
+│   │   │   │   ├── GoNoGoGame.jsx       # Grocery shopping (2-3s/item)
+│   │   │   │   ├── TriviaGame.jsx       # Podcast quiz (5-8s/item)
+│   │   │   │   └── TransitionScreen.jsx # Room transition display
+│   │   │   ├── sidebar/
+│   │   │   │   ├── Sidebar.jsx       # Container (dark theme)
+│   │   │   │   ├── Clock.jsx         # Day/night gradient status bar
+│   │   │   │   ├── MiniMap.jsx       # 5-room floor plan
+│   │   │   │   ├── ActivityLabel.jsx  # Current activity text
+│   │   │   │   ├── RobotStatus.jsx   # Pepper status + speech bubble
+│   │   │   │   └── TriggerZone.jsx   # 8 trigger icons (3 states)
+│   │   │   ├── pm/
+│   │   │   │   ├── EncodingCard.jsx  # PM task instruction display
+│   │   │   │   ├── EncodingQuiz.jsx  # Verification question
+│   │   │   │   └── MCQOverlay.jsx    # 3-option modal + 30s timer
+│   │   │   ├── screens/
+│   │   │   │   ├── WelcomeScreen.jsx
+│   │   │   │   ├── OnboardingScreen.jsx
+│   │   │   │   ├── EncodingScreen.jsx
+│   │   │   │   ├── QuestionnaireScreen.jsx
+│   │   │   │   ├── BlockEndScreen.jsx
+│   │   │   │   └── CompleteScreen.jsx
+│   │   │   └── Dashboard.jsx    # Experimenter live monitoring
+│   │   ├── store/gameStore.js   # Zustand state (session/game/sidebar/robot/MCQ)
+│   │   ├── hooks/
+│   │   │   ├── useWebSocket.js  # Bidirectional WS + reconnect + heartbeat
+│   │   │   └── useAudio.js      # Web Audio beep + Web Speech TTS
+│   │   └── utils/api.js         # GET-only + session start POST
+│   └── dist/                    # Production build (served by FastAPI at /)
+└── docs/
+    └── PRD_v2_1_MCQ_CogTask.md  # Design specification (source of truth)
 ```
 
 ## Quick Start
 
 ### Prerequisites
-- Python 3.10+ with `pyyaml` and `fastapi`
+- Python 3.10+ with conda environment `thesis_server`
 - Node.js 18+
-- Conda environment `thesis_server` (or any venv)
 
 ### Backend
 ```bash
@@ -54,154 +99,129 @@ npm run build
 # Output in dist/ — served by FastAPI at /
 ```
 
-## Web Routes
+## Communication: WebSocket Only
+
+**All runtime communication uses WebSocket** — both server push and client submissions. No REST endpoints for data submission.
+
+### Connection Flow
+1. Frontend connects to `WS /api/session/{id}/block/{n}/stream?client=participant&auto_start={bool}`
+2. Backend `BlockTimeline` runs 22 scheduled events per block
+3. Events pushed via async Queue to WS connection
+4. Client sends messages (trigger_click, mcq_answer, encoding_result, ongoing_batch, questionnaire, heartbeat)
+5. Both directions run concurrently on the same WS connection
+
+### Server → Client Events
+| Event | When | Payload |
+|-------|------|---------|
+| `game_start` | Game A/B/C begins | game_type, skin, items[], room, time, activity |
+| `game_end` | Game segment ends | — |
+| `room_transition` | Between games | next_room, next_time, next_activity |
+| `reminder_fire` | 60s into game A/B | text (condition-specific reminder) |
+| `trigger_fire` | 150s into game A/B | sidebar_icon, task_id |
+| `window_close` | 30s after trigger | task_id |
+| `robot_speak` | Neutral comment | text, type="neutral" |
+| `ambient_pulse` | Decoy icon pulse | sidebar_icon |
+| `block_end` | Block complete | — |
+
+### Client → Server Messages
+| Type | When |
+|------|------|
+| `trigger_click` | Participant clicks a fired trigger icon |
+| `mcq_answer` | MCQ selection submitted |
+| `encoding_result` | Encoding quiz pass/fail |
+| `ongoing_batch` | Buffered game responses (every 5s) |
+| `questionnaire` | Block or final questionnaire |
+| `heartbeat` | Every 15s keep-alive |
+
+## REST Endpoints (read-only + session setup)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/admin/participant/create` | Create participant (returns token) |
+| `POST` | `/api/session/start` | Start session with token |
+| `GET` | `/api/session/{id}/block/{n}` | Block config (strips MCQ correct answers) |
+| `GET` | `/api/session/{id}/game-items/{skin}` | Stimulus items for a game skin |
+| `GET` | `/api/admin/dashboard` | All sessions summary |
+| `GET` | `/api/admin/export/all` | CSV export of all data |
+| `GET` | `/api/config` | Full config (admin) |
+| `GET` | `/api/config/game` | Config stripped of correct answers |
+
+## Web Routes (Frontend)
 
 | Route | Purpose |
 |-------|---------|
 | `/` | Game (participant-facing) |
-| `/dashboard` | Experimenter monitoring (live WebSocket events, scores) |
-| `/manage` | Database management (sessions, raw data) |
-| `/config` | Game configuration editor (reads/writes `game_config.yaml`) |
+| `/dashboard` | Experimenter live monitoring |
+| `/config` | YAML config editor |
 
-## Configuration System
+## Visual Layout
 
-All tunable parameters are in `game_config.yaml` at the project root. **No hardcoded values in code.** The file is loaded by the backend at startup and served to the frontend via API.
-
-### Editing Config
-
-**Option A: Web UI** — visit `http://localhost:3000/config` (or `:5000/config` in production). Edit values in the tabbed editor and click Save. Changes are written back to the YAML file.
-
-**Option B: Edit YAML directly** — edit `game_config.yaml` and restart the backend.
-
-### Config Sections
-
-| Section | What it controls |
-|---------|-----------------|
-| `difficulty` | Steak cooking/ready timings per preset (slow/medium/fast) |
-| `scoring` | Points for each action (flip, serve, burn, message reply, plant water) |
-| `timers` | Block duration, message timeout, PM window, respawn delays |
-| `timeline` | All block events with timestamps (steak spawns, messages, triggers, reminders) |
-| `experiment` | Latin Square groups, task pair assignments, reminder texts per condition |
-| `pm_tasks` | Medicine task definitions (bottles, amounts, **correct answers**) |
-| `trigger_icons` | Icon/label mapping for each PM trigger type |
-| `audio` | BGM volume, ducking parameters, TTS settings |
-
-### Security Note
-Correct PM answers are stored in the YAML (under `pm_tasks.*.correct`) but are **never** sent to the game frontend. The `GET /config/game` endpoint strips them. Only the `/config` admin page sees correct answers.
-
-### API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/config` | Full config (including correct answers — admin only) |
-| `GET` | `/config/game` | Config stripped of correct answers (safe for game frontend) |
-| `PUT` | `/config` | Save updated config to YAML and reload |
-
-### Admin API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/admin/sessions` | List all sessions |
-| `GET` | `/admin/active-session` | Find currently connected session (used by dashboard) |
-| `GET` | `/admin/session/{id}/state` | Live hob state, WS clients, active timelines |
-| `GET` | `/admin/logs/{id}` | Action log for a session (most recent first) |
-| `POST` | `/admin/fire-event` | Manually push an event to a session |
-| `POST` | `/admin/force-block/{id}/{n}` | Force-start block N's full timeline (admin override) |
-| `DELETE` | `/admin/session/{id}` | Delete a session and all its data |
-| `GET` | `/admin/export/{id}` | Export session data as JSON |
-
-## Communication: WebSocket
-
-The backend pushes events to the frontend via **WebSocket**:
-
-1. Frontend connects to `WS /session/{id}/block/{n}/stream`
-2. Backend `BlockTimeline` runs scheduled events on a thread
-3. Events are pushed to per-session WS queues
-4. Frontend `useWebSocket.js` maps event types to Zustand store actions
-
-Key WS events: `steak_spawn`, `message_bubble`, `trigger_appear`, `window_close`, `reminder_fire`, `robot_neutral`, `force_yellow`, `plant_needs_water`, `block_end`
-
-### Troubleshooting: heartbeat-only but no timeline events
-
-If the frontend only sends heartbeat and receives no scheduled events, check `backend/core/timeline.py::_update_actual_t`.
-
-Root cause (fixed): using `UPDATE ... ORDER BY ... LIMIT` can fail on SQLite builds without `SQLITE_ENABLE_UPDATE_DELETE_LIMIT`, causing `BlockTimeline.run()` to terminate at the first event.
-
-Resolution: use a SQLite-compatible subquery update:
-
-```sql
-UPDATE block_events
-SET actual_t = ?
-WHERE id = (
-  SELECT id FROM block_events
-  WHERE session_id = ? AND block_num = ? AND event_type = ? AND actual_t IS NULL
-  ORDER BY id
-  LIMIT 1
-)
+```
+┌──────────────────────────────┬──────────────┐
+│                              │ ☀️  11:15 AM  │  ← Day/night gradient clock
+│                              │   Saturday   │
+│   Main Panel (75%)           ├──────────────┤
+│                              │   Kitchen    │  ← Activity label
+│   Cognitive task game:       │   Checking   │
+│   - Semantic Categorization  │   groceries  │
+│   - Go/No-Go                 ├──────────────┤
+│   - Trivia                   │ ┌────┬────┐  │
+│                              │ │Study│Kitch│ │  ← Mini-map
+│   Items presented at fixed   │ ├────┴────┤  │
+│   intervals (2-8s by type)   │ │Liv │Entr│  │
+│                              │ └────┴────┘  │
+│                              ├──────────────┤
+│                              │ 🤖 Pepper    │  ← Robot status
+│                              │  Idle        │
+│                              ├──────────────┤
+│                              │ 🍽️ 📱 🧺 🔔  │
+│                              │ ⏲️ 📺 🕐 🧥  │  ← 8 trigger icons
+│                              │ Household    │     (always visible)
+│                              │ Events       │
+└──────────────────────────────┴──────────────┘
 ```
 
-### Troubleshooting: steak spawn interval becomes too long
+**Sidebar theme**: Dark (slate-900) for visual separation from the light game area.
 
-`steak_spawn` is timeline-driven and can target a hob that is still busy.  
-If spawns are repeatedly skipped on occupied hobs, perceived intervals become much longer.
-
-Current behavior: `backend/core/ws.py::send_ws` now reroutes `steak_spawn` to any currently empty hob before giving up, reducing long gaps caused by target-hob collisions.
-
-## Game Components
-
-### Kitchen
-- **3 hobs** with steak state machine: EMPTY → COOKING → READY → BURNING
-- **Kitchen table** with **medicine cabinet** always visible
-  - Clickable anytime (browse mode when no PM trigger)
-  - Two-step selection flow (bottle → amount) when PM trigger is active
-- Sidebar status dot: green (ok) → orange (steak ready) → red (steak burning)
-
-### Inbox (Messages)
-- Email-style messages from NPCs with two reply options
-- 15s timeout with countdown bar (green → yellow → red)
-- Scoring: +2 correct, +1 wrong, -2 expired
-- Custom `newmail.wav` chime + top-right toast (avatar + one-line preview), auto-hides after ~3.5s, click-to-Inbox shortcut
-
-### Living Room
-- Plant watering: random intervals, +3 pts fresh, +1 pts wilted
-- TV (idle, no score impact)
-
-### Balcony
-- In-block day simulation runs from **10:00 → 23:00** based on block timer progress
-- Sidebar top shows a moving sun/moon sky track plus a larger current clock (no static phase-only cue text)
-- Clock display advances in **30-minute jumps**
-- Sky/light palette shifts by phase (**sun → sunset → moon**) with non-interruptive transitions
-- Washing machine (cycle range controlled by `timers.laundry_wash_min_ms` / `timers.laundry_wash_max_ms`)
-- Laundry pile pressure: family keeps dropping clothes every ~40-50s; overflow beyond threshold starts periodic score penalty
-
-### Ambient Audio
-- BGM keeps playing continuously during block
-- Subtle level contour by day phase while preserving robot ducking
-- Distinct steak-flip sizzle and laundry-jam warning cues
-- Distinct ash-collapse cue for overcooked steak
-
-### Score Feedback
-- Score changes show large cursor-adjacent floating bursts (green `+x`, red `-x`) for all score deltas
-
-### TODO Backlog
-- Dedicated window lighting renderer is not yet modeled in current room scene; current build uses balcony/room tint transitions as a proxy.
-
-### Robot Avatar
-- Fixed bottom-right, always visible
-- Speaks via Web Speech API with BGM ducking
-- Delivers reminders and neutral comments on schedule
+**Trigger icon states**: inactive (grey) → ambient (subtle pulse) → fired (highlight + red dot). Same "ding" for all state changes. Some icons pulse ambiently without PM association (anti-meta-strategy).
 
 ## Experiment Design
 
-- **2×2 within-subjects**: Aftereffects (Low/High) × Cue Busyness (Low/High)
-- **4 blocks** per participant, one condition each
-- **Latin Square** counterbalancing (4 groups A/B/C/D): group assigned by `COUNT(sessions) % 4` — restart-safe, DB-backed
-- **Per-slot reminder texts**: each condition has distinct text for Slot A (t=120s) and Slot B (t=300s), configured in `game_config.yaml` under `experiment.reminder_texts.<condition>.{A,B}`
-- **8 PM task types** in 4 pairs (medicine, laundry, communication, chores)
-- PM scoring: 0 (miss) / 1 (partial) / 2 (correct) — **not shown to participant**
+- **2×2 within-subjects**: Associative Fidelity (Low/High) × Contextual Bridging (Low/High)
+- **4 blocks** per participant, one condition each (Latin Square counterbalancing: groups A/B/C/D)
+- **3 games per block**: Game A (3 min) → Game B (3 min) → Game C buffer (1 min)
+- **2 PM tasks per block**: one in Game A slot, one in Game B slot
+- **PM execution**: self-initiated MCQ — trigger fires in sidebar, participant must notice and click within 30s
+- **PM scoring**: 0 (no click) / 1 (click + wrong MCQ) / 2 (click + correct MCQ) — **never shown to participant**
+- **Reminders**: pre-generated text from `pm_tasks.json`, condition-specific. Robot delivers during retention interval, NOT at trigger time
+
+### Block Timeline (8.5 minutes total)
+| Phase | Time (s) | Events |
+|-------|----------|--------|
+| Game A | 0–180 | Reminder at 60s, trigger at 150s, window close at 180s |
+| Transition | 180–210 | Room change animation |
+| Game B | 210–390 | Reminder at 270s, trigger at 360s, window close at 390s |
+| Transition | 390–420 | Room change animation |
+| Game C | 420–480 | Buffer game (no PM tasks) |
+| Block end | 510 | Questionnaire |
+
+### Session Flow
+`Onboarding → Encoding (2 cards + 2 quizzes) → Block play → Questionnaire → (repeat ×4) → Final questionnaire → Thank you`
 
 ## Data
 
-All experiment data stored in `backend/core/experiment.db` (SQLite):
-- Sessions, PM trials, action logs, ongoing score snapshots
-- Export via `/manage` page or API endpoints
+All experiment data stored in `backend/core/experiment.db` (SQLite, auto-created on startup):
+
+| Table | Purpose |
+|-------|---------|
+| `sessions` | Session metadata, phase, Latin Square group |
+| `pm_trials` | PM scoring (18 columns per PRD §5) |
+| `ongoing_responses` | Cognitive task responses (accuracy, RT) |
+| `encoding_logs` | Encoding quiz attempts |
+| `questionnaire_logs` | Block questionnaires (intrusiveness, helpfulness) |
+| `session_questionnaires` | Final questionnaire (MSE, strategy, feedback) |
+| `block_events` | Timeline event log with actual timestamps |
+| `action_logs` | General action audit trail |
+| `session_events` | WS connection events |
+
+Export via `/api/admin/export/all` (CSV) or `/dashboard` page.

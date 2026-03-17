@@ -44,7 +44,7 @@ export default function GameShell() {
         {mcqVisible && <MCQOverlay />}
       </div>
       {/* Sidebar — 25% */}
-      <div className="w-80 flex-shrink-0 border-l border-slate-200 bg-white">
+      <div className="w-80 flex-shrink-0 border-l border-slate-700 bg-slate-900">
         <Sidebar />
       </div>
     </div>
