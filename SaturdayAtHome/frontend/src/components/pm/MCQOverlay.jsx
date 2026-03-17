@@ -4,6 +4,7 @@ import { useGameStore } from '../../store/gameStore'
 export default function MCQOverlay() {
   const mcqData = useGameStore(s => s.mcqData)
   const submitMCQ = useGameStore(s => s.submitMCQ)
+  const handleWindowClose = useGameStore(s => s.handleWindowClose)
   const [timeLeft, setTimeLeft] = useState(30)
   const intervalRef = useRef(null)
 
@@ -14,13 +15,15 @@ export default function MCQOverlay() {
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(intervalRef.current)
+          // Auto-dismiss MCQ when timer expires (PM miss)
+          handleWindowClose({ task_id: mcqData.task_id })
           return 0
         }
         return prev - 1
       })
     }, 1000)
     return () => clearInterval(intervalRef.current)
-  }, [mcqData])
+  }, [mcqData, handleWindowClose])
 
   if (!mcqData) return null
 

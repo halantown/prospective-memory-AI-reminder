@@ -55,6 +55,7 @@ export const useGameStore = create((set, get) => ({
 
   // WebSocket
   wsConnected: false,
+  wsReconnecting: false,
   wsSend: null,
 
   // ── Actions ──
@@ -68,7 +69,8 @@ export const useGameStore = create((set, get) => ({
   setPhase: (phase) => set({ phase }),
   setBlockNumber: (n) => set({ blockNumber: n }),
 
-  setWsConnected: (connected) => set({ wsConnected: connected }),
+  setWsConnected: (connected) => set({ wsConnected: connected, wsReconnecting: !connected && get().wsReconnecting }),
+  setWsReconnecting: (reconnecting) => set({ wsReconnecting: reconnecting }),
   setWsSend: (fn) => set({ wsSend: fn }),
 
   handleGameStart: (data) => {

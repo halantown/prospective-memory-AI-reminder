@@ -6,12 +6,19 @@ export default function useWebSocket() {
   const blockNumber = useGameStore(s => s.blockNumber)
   const phase = useGameStore(s => s.phase)
   const setWsConnected = useGameStore(s => s.setWsConnected)
+  const setWsReconnecting = useGameStore(s => s.setWsReconnecting)
   const setWsSend = useGameStore(s => s.setWsSend)
   const wsRef = useRef(null)
   const reconnectRef = useRef(null)
 
   useEffect(() => {
     if (!sessionId || !blockNumber || !['encoding', 'playing', 'questionnaire', 'complete'].includes(phase)) return
+
+    // Validate block number range
+    if (blockNumber < 1 || blockNumber > 4) {
+      console.error(`[WS] Invalid block number: ${blockNumber}`)
+      return
+    }
 
     const eventHandlers = {
       game_start: (d) => useGameStore.getState().handleGameStart(d),
@@ -37,10 +44,10 @@ export default function useWebSocket() {
 
     const connect = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      // Only auto-start the block timeline when in playing phase;
-      // during encoding/questionnaire we just need the WS for sending messages
       const autoStart = phase === 'playing'
-      const url = `${protocol}://${window.location.host}/api/session/${sessionId}/block/${blockNumber}/stream?client=participant&auto_start=${autoStart}`
+      // Build WS URL from current location (works behind reverse proxies)
+      const baseUrl = `${protocol}://${window.location.host}`
+      const url = `${baseUrl}/api/session/${sessionId}/block/${blockNumber}/stream?client=participant&auto_start=${autoStart}`
 
       const ws = new WebSocket(url)
       wsRef.current = ws
@@ -48,6 +55,7 @@ export default function useWebSocket() {
       ws.onopen = () => {
         retryCount = 0
         setWsConnected(true)
+        setWsReconnecting(false)
         setWsSend((msg) => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(msg))
@@ -74,6 +82,7 @@ export default function useWebSocket() {
         setWsConnected(false)
         setWsSend(null)
         if (closedByUser) return
+        setWsReconnecting(true)
         const delay = Math.min(5000, 500 * (2 ** retryCount))
         retryCount++
         reconnectRef.current = setTimeout(connect, delay)
@@ -88,9 +97,10 @@ export default function useWebSocket() {
       if (wsRef.current) wsRef.current.close()
       wsRef.current = null
       setWsConnected(false)
+      setWsReconnecting(false)
       setWsSend(null)
     }
-  }, [sessionId, blockNumber, phase, setWsConnected, setWsSend])
+  }, [sessionId, blockNumber, phase, setWsConnected, setWsReconnecting, setWsSend])
 
   // Heartbeat every 10s
   useEffect(() => {
@@ -102,7 +112,7 @@ export default function useWebSocket() {
     return () => clearInterval(timer)
   }, [sessionId])
 
-  // Flush ongoing responses every 5s
+  // Flush ongoing responses every 5s (single timer — no duplicate in GameShell)
   useEffect(() => {
     const timer = setInterval(() => {
       useGameStore.getState().flushResponseBuffer()
