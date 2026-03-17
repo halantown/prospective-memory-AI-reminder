@@ -34,7 +34,10 @@ export default function useWebSocket() {
 
     const connect = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      const url = `${protocol}://${window.location.host}/api/session/${sessionId}/block/${blockNumber}/stream?client=participant`
+      // Only auto-start the block timeline when in playing phase;
+      // during encoding/questionnaire we just need the WS for sending messages
+      const autoStart = phase === 'playing'
+      const url = `${protocol}://${window.location.host}/api/session/${sessionId}/block/${blockNumber}/stream?client=participant&auto_start=${autoStart}`
 
       const ws = new WebSocket(url)
       wsRef.current = ws
