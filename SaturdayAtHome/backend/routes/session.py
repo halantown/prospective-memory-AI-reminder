@@ -114,19 +114,21 @@ async def get_block_config(session_id: str, block_num: int):
         "block_number": block_num,
         "condition": condition,
         "skins": skins,
-        "task_a": task_a_safe,
-        "task_b": task_b_safe,
+        "pm_tasks": [task_a_safe, task_b_safe],
     }
 
 
 def _strip_correct(task: dict) -> dict:
-    """Remove correct answer from task data before sending to client."""
+    """Remove MCQ correct answer before sending to client.
+
+    Quiz correct is intentionally kept — the frontend needs it
+    for the encoding verification step.
+    """
     import copy
     safe = copy.deepcopy(task)
     if "mcq" in safe:
         safe["mcq"].pop("correct", None)
-    if "quiz" in safe:
-        safe["quiz"].pop("correct", None)
+    # Intentionally keep quiz.correct — needed for encoding quiz check
     return safe
 
 
@@ -179,6 +181,20 @@ async def block_stream(
                 condition = condition_order[block_num - 1] if block_num <= len(condition_order) else "HighAF_HighCB"
 
                 reset_session_windows(session_id)
+
+                # Transition session phase to BLOCK
+                try:
+                    db2 = get_db(DB_PATH)
+                    current_phase = db2.execute(
+                        "SELECT phase FROM sessions WHERE session_id = ?",
+                        (session_id,),
+                    ).fetchone()
+                    if current_phase and current_phase["phase"] != SessionPhase.BLOCK.value:
+                        transition_phase(db2, session_id, SessionPhase.BLOCK, block_idx=block_num)
+                    else:
+                        db2.close()
+                except Exception as phase_err:
+                    logger.warning(f"Phase transition to BLOCK failed: {phase_err}")
 
                 tl = BlockTimeline(session_id, block_num, condition, send_ws)
                 active_timelines[timeline_key] = tl

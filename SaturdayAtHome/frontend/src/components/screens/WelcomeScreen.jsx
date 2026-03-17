@@ -1,94 +1,85 @@
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
-import { createSession } from '../../utils/api'
+import { startSession } from '../../utils/api'
 
-/**
- * Welcome screen — participant enters the 6-char token issued by the experimenter.
- */
 export default function WelcomeScreen() {
+  const setSession = useGameStore(s => s.setSession)
+  const setPhase = useGameStore(s => s.setPhase)
+  const setBlockNumber = useGameStore(s => s.setBlockNumber)
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const setSession = useGameStore((s) => s.setSession)
-  const startBlockEncoding = useGameStore((s) => s.startBlockEncoding)
-
-  const handleStart = async () => {
-    const t = token.trim().toUpperCase()
-    if (t.length !== 6) return setError('Enter the 6-character session token')
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!token.trim()) return
 
     setLoading(true)
     setError(null)
 
     try {
-      const data = await createSession(t)
-      console.log('[Welcome] Session started:', data)
-
-      setSession({
-        sessionId: data.session_id,
-        participantId: data.participant_id,
-        group: data.group,
-        conditionOrder: data.condition_order,
-      })
-
-      const conditions = data.condition_order
-      startBlockEncoding({
-        blockNumber: 1,
-        condition: conditions[0],
-        taskPairId: 1,
-      })
+      const data = await startSession(token.trim())
+      setSession(data)
+      setBlockNumber(data.current_block || 1)
+      setPhase('onboarding')
     } catch (err) {
-      console.error('[Welcome] Failed to start session:', err)
-      setError(`Failed: ${err.message}`)
+      setError(err.message || 'Failed to start session')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-xl w-[480px] overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-6 text-white">
-          <h1 className="text-2xl font-bold">Saturday At Home</h1>
-          <p className="text-amber-100 text-sm mt-1">Prospective Memory Experiment</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="max-w-md w-full"
+      >
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Saturday at Home</h1>
+          <p className="text-slate-500">Welcome to the experiment</p>
         </div>
 
-        {/* Form */}
-        <div className="px-8 py-6 space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Session Token
-            </label>
-            <input
-              type="text"
-              value={token}
-              onChange={(e) => setToken(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === 'Enter' && !loading && handleStart()}
-              placeholder="e.g. AMBER7"
-              maxLength={6}
-              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 text-lg tracking-widest font-mono text-center"
-              autoFocus
-              disabled={loading}
-            />
-            <p className="text-xs text-slate-400 mt-1">Ask the experimenter for your 6-character token</p>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
-              {error}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Participant Token
+              </label>
+              <input
+                type="text"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Enter your token…"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-blue-400 focus:outline-none text-lg text-center tracking-widest"
+                autoFocus
+                disabled={loading}
+              />
             </div>
-          )}
 
-          <button
-            onClick={handleStart}
-            disabled={loading || token.trim().length !== 6}
-            className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-200 text-white font-bold text-lg rounded-xl transition-colors"
-          >
-            {loading ? 'Starting…' : 'Start Experiment'}
-          </button>
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 text-center">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || !token.trim()}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold rounded-lg transition-colors"
+            >
+              {loading ? 'Starting…' : 'Begin'}
+            </button>
+          </form>
         </div>
-      </div>
+
+        <p className="text-center text-xs text-slate-400 mt-4">
+          Ask the experimenter if you need a token.
+        </p>
+      </motion.div>
     </div>
   )
 }

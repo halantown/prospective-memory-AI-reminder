@@ -1,0 +1,44 @@
+{
+  "email_v1": [
+    "Lot of emails this week!",
+    "Some of these look important.",
+    "Your inbox is getting full."
+  ],
+  "grocery_v1": [
+    "Those vegetables look fresh!",
+    "Making a big grocery run today.",
+    "Don't forget to check the deals."
+  ],
+  "podcast_v1": [
+    "Nice weather today.",
+    "That was an interesting one."
+  ],
+  "photo_v2": [
+    "Some great memories in there!",
+    "That trip looks like it was fun."
+  ],
+  "laundry_v2": [
+    "Laundry day, always busy.",
+    "Make sure to separate the colors."
+  ],
+  "books_v3": [
+    "You've got quite a collection!",
+    "Some of these look like good reads."
+  ],
+  "recycling_v3": [
+    "Good for the environment!",
+    "That's a lot of recycling."
+  ],
+  "fridge_v4": [
+    "Time for a fridge clear-out.",
+    "Some of those look past their date."
+  ],
+  "wardrobe_v4": [
+    "That wardrobe could use some organizing.",
+    "Some nice finds in there."
+  ],
+  "news_v4": [
+    "Quite a lot happening in the world.",
+    "That's an interesting headline."
+  ]
+}

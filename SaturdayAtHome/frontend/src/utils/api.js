@@ -1,100 +1,29 @@
-/**
- * Shared API helper for backend communication.
- */
+const API_BASE = '/api'
 
-const BASE = '/api'
-
-export async function apiPost(path, body = {}) {
-  const url = `${BASE}${path}`
-  const payload = { ...body, client_ts: Date.now() }
-  console.log(`[API] POST ${url}`, payload)
-  const res = await fetch(url, {
+export async function startSession(token) {
+  const res = await fetch(`${API_BASE}/session/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ token }),
   })
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    console.error(`[API] ${res.status} ${url}: ${text}`)
-    throw new Error(`API ${res.status}: ${text}`)
-  }
-  const data = await res.json()
-  console.log(`[API] ← ${url}`, data)
-  return data
-}
-
-export async function apiGet(path) {
-  const url = `${BASE}${path}`
-  const res = await fetch(url)
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`API ${res.status}: ${text}`)
-  }
+  if (!res.ok) throw new Error((await res.json()).detail || 'Failed to start session')
   return res.json()
 }
 
-/**
- * Start an experiment session by presenting the 6-char token.
- * Returns { session_id, participant_id, group, condition_order }
- */
-export async function createSession(token) {
-  return apiPost('/session/start', { token })
+export async function getBlockConfig(sessionId, blockNum) {
+  const res = await fetch(`${API_BASE}/session/${sessionId}/block/${blockNum}`)
+  if (!res.ok) throw new Error('Failed to get block config')
+  return res.json()
 }
 
-/**
- * Send a heartbeat to keep the session alive.
- * Should be called every 10s while in the block phase.
- */
-export async function sendHeartbeat(sessionId) {
-  return apiPost(`/session/${sessionId}/heartbeat`, {})
+export async function getGameItems(skin) {
+  const res = await fetch(`${API_BASE}/game-items/${skin}`)
+  if (!res.ok) throw new Error('Failed to get game items')
+  return res.json()
 }
 
-/**
- * Fetch session state for recovery after page refresh.
- */
 export async function resumeSession(sessionId) {
-  return apiGet(`/session/${sessionId}/resume`)
-}
-
-/**
- * Report a steak action (flip/serve/clean) to the backend.
- */
-export async function reportSteakAction(sessionId, blockNum, hobId, action) {
-  return apiPost(`/session/${sessionId}/block/${blockNum}/steak-action`, {
-    hob_id: hobId,
-    action,
-  })
-}
-
-/**
- * Report encoding quiz confirmation.
- */
-export async function reportEncoding(sessionId, blockNum, quizAttempts) {
-  return apiPost(`/session/${sessionId}/block/${blockNum}/encoding`, {
-    quiz_attempts: quizAttempts,
-  })
-}
-
-/**
- * Report a PM task action.
- */
-export async function reportPmAction(sessionId, blockNum, taskId, actionData) {
-  return apiPost(`/session/${sessionId}/block/${blockNum}/action`, {
-    task_id: taskId,
-    ...actionData,
-  })
-}
-
-/**
- * Fetch game config (stripped of correct answers) from backend.
- */
-export async function fetchGameConfig() {
-  try {
-    const res = await fetch(`${BASE}/config/game`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    console.warn('[API] Failed to fetch game config:', err.message)
-    return null
-  }
+  const res = await fetch(`${API_BASE}/session/${sessionId}/resume`)
+  if (!res.ok) throw new Error('Failed to resume session')
+  return res.json()
 }

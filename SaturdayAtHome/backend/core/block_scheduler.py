@@ -21,6 +21,7 @@ from core.config_loader import (
     get_timeline_config, get_config,
     get_block_skins, get_room_label,
     get_block_pm_tasks, get_neutral_comments,
+    load_game_items,
 )
 from core.event_schedule import EventType, ScheduledEvent
 
@@ -122,6 +123,7 @@ def generate_block_schedule(
             "game_type": game_a.get("type", "semantic_cat"),
             "skin": skin_a,
             "room": room_a,
+            "items": load_game_items(skin_a) or [],
         },
     ))
     events.append(ScheduledEvent(
@@ -149,6 +151,7 @@ def generate_block_schedule(
             "game_type": game_b.get("type", "go_nogo"),
             "skin": skin_b,
             "room": room_b,
+            "items": load_game_items(skin_b) or [],
         },
     ))
     events.append(ScheduledEvent(
@@ -176,6 +179,7 @@ def generate_block_schedule(
             "game_type": game_c.get("type", "trivia"),
             "skin": skin_c,
             "room": room_c,
+            "items": load_game_items(skin_c) or [],
         },
     ))
     events.append(ScheduledEvent(
@@ -201,6 +205,7 @@ def generate_block_schedule(
             "task_id": task_a_id, "slot": "A",
             "window_ms": exec_window_ms,
             "trigger": task_a.get("trigger", {}) if task_a else {},
+            "sidebar_icon": task_a.get("trigger", {}).get("sidebar_icon", "") if task_a else "",
             "block_number": block_num, "condition": condition,
         },
     ))
@@ -230,6 +235,7 @@ def generate_block_schedule(
             "task_id": task_b_id, "slot": "B",
             "window_ms": exec_window_ms,
             "trigger": task_b.get("trigger", {}) if task_b else {},
+            "sidebar_icon": task_b.get("trigger", {}).get("sidebar_icon", "") if task_b else "",
             "block_number": block_num, "condition": condition,
         },
     ))

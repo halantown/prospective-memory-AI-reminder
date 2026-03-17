@@ -119,13 +119,21 @@ def get_neutral_comments(skin: str) -> list[str]:
 # ── Game items ─────────────────────────────────────────────
 
 def load_game_items(skin: str) -> list[dict] | None:
-    """Load game items from data/game_items/{skin}.json."""
+    """Load game items from data/game_items/{skin}.json.
+
+    The JSON files are wrapper objects with metadata + an 'items' (or 'questions')
+    array. This returns just the item list.
+    """
     p = DATA_DIR / "game_items" / f"{skin}.json"
     if not p.exists():
         logger.warning(f"Game items not found at {p}")
         return None
     with open(p, "r", encoding="utf-8") as f:
-        return json.load(f)
+        raw = json.load(f)
+    if isinstance(raw, list):
+        return raw
+    # Unwrap: prefer 'items', then 'questions', then the whole dict
+    return raw.get("items", raw.get("questions", []))
 
 
 # ── Block skin and room helpers ────────────────────────────

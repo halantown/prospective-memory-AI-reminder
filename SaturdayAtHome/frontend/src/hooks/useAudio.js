@@ -1,124 +1,66 @@
-/**
- * useAudio hook — integrates audio engine with game events.
- *
- * Listens to Zustand store changes and triggers appropriate sounds.
- * Must be mounted once in GameShell (after user interaction to unlock audio).
- */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../store/gameStore'
-import {
-  initBGM, stopBGM, unlockAudio,
-  setBGMNormalVolume,
-  sfxSteakReady, sfxSteakFlip, sfxSteakBurning, sfxSteakAsh,
-  sfxMessageNotify,
-  sfxLaundryJam,
-  sfxScorePlus, sfxScoreMinus,
-  robotSpeak,
-} from '../utils/audio'
+
+// Web Audio API beep as placeholder — replace with new Audio('/ding.mp3') when a real sound file is available
+function createBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.frequency.value = 880
+    osc.type = 'sine'
+    gain.gain.setValueAtTime(0.3, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.3)
+  } catch {
+    // Audio not available
+  }
+}
 
 export function useAudio() {
-  const phase = useGameStore((s) => s.phase)
-  const score = useGameStore((s) => s.score)
-  const hobs = useGameStore((s) => s.hobs)
-  const messageBubbles = useGameStore((s) => s.messageBubbles)
-  const washStatus = useGameStore((s) => s.laundry?.washStatus)
-  const dayPhase = useGameStore((s) => s.dayPhase)
-  const robotText = useGameStore((s) => s.robotText)
-  const robotSpeaking = useGameStore((s) => s.robotSpeaking)
-  const setRobotSpeaking = useGameStore((s) => s.setRobotSpeaking)
+  const robotText = useGameStore(s => s.robotText)
+  const finishSpeaking = useGameStore(s => s.finishSpeaking)
+  const prevRobotText = useRef(null)
+  const prevTriggers = useRef(null)
 
-  const prevScore = useRef(score)
-  const prevHobStatuses = useRef(hobs.map(h => h.status))
-  const prevMsgCount = useRef(messageBubbles.length)
-  const prevWashStatus = useRef(washStatus)
-  const prevRobotText = useRef(robotText)
-  const audioUnlocked = useRef(false)
-
-  // Unlock audio on first user click (browser requirement)
-  useEffect(() => {
-    const handler = () => {
-      if (!audioUnlocked.current) {
-        unlockAudio()
-        audioUnlocked.current = true
+  const handleTriggerChange = useCallback(() => {
+    const triggers = useGameStore.getState().triggers
+    const prev = prevTriggers.current
+    if (prev) {
+      for (let i = 0; i < triggers.length; i++) {
+        if (prev[i] && triggers[i].state !== prev[i].state && triggers[i].state !== 'inactive') {
+          createBeep()
+          break
+        }
       }
     }
-    document.addEventListener('click', handler, { once: false })
-    return () => document.removeEventListener('click', handler)
+    prevTriggers.current = triggers.map(t => ({ ...t }))
   }, [])
 
-  // Start BGM when block starts, stop on block end
   useEffect(() => {
-    if (phase === 'block_running') {
-      initBGM()
-    } else if (phase === 'block_end' || phase === 'welcome') {
-      stopBGM()
-    }
-  }, [phase])
+    prevTriggers.current = useGameStore.getState().triggers.map(t => ({ ...t }))
+    const unsub = useGameStore.subscribe(handleTriggerChange)
+    return unsub
+  }, [handleTriggerChange])
 
-  // Day phase ambience → subtle BGM contour changes
-  useEffect(() => {
-    if (phase !== 'block_running') return
-    const targetVolume =
-      dayPhase === 'sunset' ? 0.30 :
-      dayPhase === 'moon' ? 0.26 :
-      0.35
-    setBGMNormalVolume(targetVolume, 1800)
-  }, [dayPhase, phase])
-
-  // Score change → ding / thud
-  useEffect(() => {
-    const delta = score - prevScore.current
-    if (delta > 0) sfxScorePlus()
-    else if (delta < 0) sfxScoreMinus()
-    prevScore.current = score
-  }, [score])
-
-  // Hob status transitions → sizzle / alarm
-  useEffect(() => {
-    hobs.forEach((hob, i) => {
-      const prev = prevHobStatuses.current[i]
-      if (prev !== hob.status) {
-        if (prev === 'ready_side1' && hob.status === 'cooking_side2') sfxSteakFlip()
-        if (hob.status === 'ready_side1' || hob.status === 'ready_side2') sfxSteakReady()
-        else if (hob.status === 'burning') sfxSteakBurning()
-        else if (hob.status === 'ash') sfxSteakAsh()
-      }
-    })
-    prevHobStatuses.current = hobs.map(h => h.status)
-  }, [hobs])
-
-  // New message → notification chime
-  useEffect(() => {
-    if (messageBubbles.length > prevMsgCount.current) {
-      sfxMessageNotify()
-    }
-    prevMsgCount.current = messageBubbles.length
-  }, [messageBubbles.length])
-
-  // Laundry jam state → warning cue
-  useEffect(() => {
-    if (prevWashStatus.current !== washStatus && washStatus === 'jammed') {
-      sfxLaundryJam()
-    }
-    prevWashStatus.current = washStatus
-  }, [washStatus])
-
-  // Message expired → check last expired
-  useEffect(() => {
-    const lastExpired = messageBubbles.filter(m => m.expired).length
-    // We track this via score decrease rather than separately
-  }, [messageBubbles])
-
-  // Robot speech via Web Speech API
+  // Robot TTS via Web Speech API
   useEffect(() => {
     if (robotText && robotText !== prevRobotText.current) {
-      robotSpeak(robotText, {
-        lang: 'en-US',
-        rate: 0.9,
-        onStart: () => setRobotSpeaking?.(true),
-        onEnd: () => setRobotSpeaking?.(false),
-      })
+      prevRobotText.current = robotText
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel()
+        const utterance = new SpeechSynthesisUtterance(robotText)
+        utterance.lang = 'en-US'
+        utterance.rate = 0.9
+        utterance.onend = () => finishSpeaking()
+        utterance.onerror = () => finishSpeaking()
+        window.speechSynthesis.speak(utterance)
+      } else {
+        setTimeout(() => finishSpeaking(), 3000)
+      }
     }
-    prevRobotText.current = robotText
-  }, [robotText, setRobotSpeaking])
+  }, [robotText, finishSpeaking])
 }

@@ -1,0 +1,282 @@
+[
+  {
+    "task_id": "medicine",
+    "block": 1,
+    "slot": "A",
+    "encoding": {
+      "text": "After dinner, take your Doxycycline — the red round bottle on the LEFT side of the medicine cabinet. Pour a glass of water first, then take one tablet.",
+      "image_description": "Two medicine bottles side by side — one round (left), one square (right)"
+    },
+    "quiz": {
+      "question": "Which bottle should you take?",
+      "options": ["The round one from the left", "The square one from the right"],
+      "correct": 0
+    },
+    "trigger": {
+      "sidebar_icon": "dinner_table",
+      "icon_emoji": "🍽️",
+      "label": "Dinner ready",
+      "description": "Dinner table icon appears in sidebar"
+    },
+    "mcq": {
+      "question": "What should you do now?",
+      "options": [
+        "Take the red square bottle from the right side → pour water → take one tablet",
+        "Take the red round bottle from the left side → pour water → take one tablet",
+        "Take the red round bottle from the left side → take one tablet directly (no water)"
+      ],
+      "correct": 1
+    },
+    "reminders": {
+      "LowAF_LowCB": "Remember, you need to take your medicine later today.",
+      "HighAF_LowCB": "Remember, after dinner take the Doxycycline — the red round bottle on the left side of the cabinet. Glass of water first, then one tablet.",
+      "LowAF_HighCB": "Quick pause from those emails — remember, you need to take your medicine later today.",
+      "HighAF_HighCB": "Quick pause from those emails — after dinner, take the Doxycycline from the red round bottle on the left of the cabinet. Water first, one tablet."
+    }
+  },
+  {
+    "task_id": "tea",
+    "block": 1,
+    "slot": "B",
+    "encoding": {
+      "text": "Your friend is coming over. Prepare Longjing tea — it's in the green tin on the TOP shelf. Boil water first, then steep for 3 minutes.",
+      "image_description": "Two tea tins on shelves — one on top shelf (Longjing), one on bottom shelf (Biluochun)"
+    },
+    "quiz": {
+      "question": "Which tea should you prepare and where is it?",
+      "options": ["Longjing from the top shelf", "Biluochun from the bottom shelf"],
+      "correct": 0
+    },
+    "trigger": {
+      "sidebar_icon": "phone_notification",
+      "icon_emoji": "📱",
+      "label": "Friend arriving",
+      "description": "Phone notification icon pulses — Friend: I'm 10 min away"
+    },
+    "mcq": {
+      "question": "Your friend is almost here. What should you do?",
+      "options": [
+        "Get the green tin from the bottom shelf (Biluochun) → boil water → steep 3 min",
+        "Get the green tin from the top shelf (Longjing) → steep with room-temp water for 5 min",
+        "Get the green tin from the top shelf (Longjing) → boil water → steep 3 min"
+      ],
+      "correct": 2
+    },
+    "reminders": {
+      "LowAF_LowCB": "Remember to make tea for your friend.",
+      "HighAF_LowCB": "Remember, your friend is coming — prepare Longjing tea from the green tin on the top shelf. Boil water first, then steep for 3 minutes.",
+      "LowAF_HighCB": "Quick pause from that grocery list — remember to make tea for your friend.",
+      "HighAF_HighCB": "Quick pause from that grocery list — prepare Longjing tea from the green tin, top shelf. Boil water first, steep 3 minutes."
+    }
+  },
+  {
+    "task_id": "laundry",
+    "block": 2,
+    "slot": "A",
+    "encoding": {
+      "text": "When the washing machine finishes, take out the DARK clothes and hang them to dry SEPARATELY. Leave the whites in for an extra rinse cycle.",
+      "image_description": "Mixed laundry — dark clothes and white clothes in a washing machine"
+    },
+    "quiz": {
+      "question": "What should you do with the dark clothes?",
+      "options": ["Take them out and hang separately", "Leave them in for extra rinse"],
+      "correct": 0
+    },
+    "trigger": {
+      "sidebar_icon": "washing_machine",
+      "icon_emoji": "🫧",
+      "label": "Laundry done",
+      "description": "Washing machine icon stops spinning"
+    },
+    "mcq": {
+      "question": "The washing machine has finished. What should you do?",
+      "options": [
+        "Take out all clothes → hang everything together",
+        "Take out the dark clothes → hang separately; leave whites for extra rinse",
+        "Take out the whites → hang to dry; leave darks for extra rinse"
+      ],
+      "correct": 1
+    },
+    "reminders": {
+      "LowAF_LowCB": "Remember to deal with the laundry when it's done.",
+      "HighAF_LowCB": "Remember, when the washing machine finishes — take out the dark clothes, hang them separately. Leave the whites in for an extra rinse.",
+      "LowAF_HighCB": "Quick pause from organizing those photos — remember to deal with the laundry when it's done.",
+      "HighAF_HighCB": "Quick pause from organizing those photos — take out the dark clothes, hang them separately, and leave the whites for an extra rinse."
+    }
+  },
+  {
+    "task_id": "book",
+    "block": 2,
+    "slot": "B",
+    "encoding": {
+      "text": "Neighbor Chen is stopping by today. Return '三体' (The Three-Body Problem) — it has a DARK BLUE cover with a planet on it. Put it in a gift bag first, then hand it to him.",
+      "image_description": "Two books — one dark blue with planet (三体), one light blue with rocket (人类简史)"
+    },
+    "quiz": {
+      "question": "Which book should you return to your neighbor?",
+      "options": ["三体 — dark blue cover with a planet", "人类简史 — light blue cover with a rocket"],
+      "correct": 0
+    },
+    "trigger": {
+      "sidebar_icon": "doorbell",
+      "icon_emoji": "🔔",
+      "label": "Doorbell",
+      "description": "Doorbell icon pulses"
+    },
+    "mcq": {
+      "question": "The doorbell rang — your neighbor is here. What should you do?",
+      "options": [
+        "Grab the dark blue book with the planet (三体) → hand directly to neighbor",
+        "Grab the light blue book with the rocket (人类简史) → put in gift bag → hand to neighbor",
+        "Grab the dark blue book with the planet (三体) → put in gift bag → hand to neighbor"
+      ],
+      "correct": 2
+    },
+    "reminders": {
+      "LowAF_LowCB": "Remember, your neighbor is coming to pick something up.",
+      "HighAF_LowCB": "Remember, neighbor Chen is coming — return 三体, the dark blue cover with the planet. Put it in a gift bag first.",
+      "LowAF_HighCB": "Quick pause from sorting that laundry — remember, your neighbor is coming to pick something up.",
+      "HighAF_HighCB": "Quick pause from sorting that laundry — return 三体 to neighbor Chen, the dark blue cover with the planet. Gift bag first."
+    }
+  },
+  {
+    "task_id": "pot",
+    "block": 3,
+    "slot": "A",
+    "encoding": {
+      "text": "The pressure cooker is making stew. When the timer goes off, first RELEASE THE VALVE to let out steam, then open the lid. It's the pot with the SILVER handle on the LEFT burner.",
+      "image_description": "Two pots on stove — one with silver handle (left), one with black handle (right)"
+    },
+    "quiz": {
+      "question": "What should you do first when the timer goes off?",
+      "options": ["Release the valve to let out steam", "Open the lid directly"],
+      "correct": 0
+    },
+    "trigger": {
+      "sidebar_icon": "kitchen_timer",
+      "icon_emoji": "⏲️",
+      "label": "Timer done",
+      "description": "Kitchen timer icon flashes"
+    },
+    "mcq": {
+      "question": "The kitchen timer went off. What should you do?",
+      "options": [
+        "Open the lid of the silver-handle pot (left) directly",
+        "Release valve on the black-handle pot (right) → open lid",
+        "Release valve on the silver-handle pot (left) → open lid"
+      ],
+      "correct": 2
+    },
+    "reminders": {
+      "LowAF_LowCB": "Remember to deal with the pot on the stove.",
+      "HighAF_LowCB": "Remember, the pressure cooker — silver handle, left burner. Release the valve first to let out steam, then open the lid.",
+      "LowAF_HighCB": "Quick pause from sorting those books — remember to deal with the pot on the stove.",
+      "HighAF_HighCB": "Quick pause from sorting those books — the pressure cooker with the silver handle, left burner. Release valve first, then open lid."
+    }
+  },
+  {
+    "task_id": "umbrella",
+    "block": 3,
+    "slot": "B",
+    "encoding": {
+      "text": "Rain is forecast for tomorrow. Get the BLUE FOLDING umbrella from the hallway closet — open it to CHECK FOR DAMAGE first, then leave it by the front door.",
+      "image_description": "Two umbrellas — one blue folding, one blue long"
+    },
+    "quiz": {
+      "question": "What should you do with the umbrella before placing it by the door?",
+      "options": ["Open it to check for damage", "Just place it by the door directly"],
+      "correct": 0
+    },
+    "trigger": {
+      "sidebar_icon": "tv_weather",
+      "icon_emoji": "📺",
+      "label": "Weather alert",
+      "description": "TV icon flashes weather symbol — Rain expected"
+    },
+    "mcq": {
+      "question": "The weather forecast shows rain tomorrow. What should you do?",
+      "options": [
+        "Get the blue long umbrella → place by front door",
+        "Get the blue folding umbrella → place by front door directly",
+        "Get the blue folding umbrella → open to check for damage → place by front door"
+      ],
+      "correct": 2
+    },
+    "reminders": {
+      "LowAF_LowCB": "Remember to get an umbrella ready for your friend.",
+      "HighAF_LowCB": "Remember, the umbrella — the blue folding one in the hallway closet. Open it to check for damage first, then leave it by the front door.",
+      "LowAF_HighCB": "Quick pause from that recycling — remember to get an umbrella ready for your friend.",
+      "HighAF_HighCB": "Quick pause from that recycling — the blue folding umbrella in the hallway closet. Open it to check for damage first, then by the door."
+    }
+  },
+  {
+    "task_id": "tv",
+    "block": 4,
+    "slot": "A",
+    "encoding": {
+      "text": "Your mum asked you to record a show. It's on CHANNEL 5 — the documentary 'Blue Planet.' Switch to Channel 5 FIRST, then press record.",
+      "image_description": "TV guide showing two shows — Channel 5: Blue Planet, Channel 3: Interstellar"
+    },
+    "quiz": {
+      "question": "Which channel and show should you record?",
+      "options": ["Channel 5 — Blue Planet", "Channel 3 — Interstellar"],
+      "correct": 0
+    },
+    "trigger": {
+      "sidebar_icon": "clock_3pm",
+      "icon_emoji": "🕐",
+      "label": "3:00 PM",
+      "description": "Clock in sidebar shows 3:00 PM"
+    },
+    "mcq": {
+      "question": "It's 3:00 PM — time to record the show. What should you do?",
+      "options": [
+        "Switch to Channel 3 (Interstellar movie) → press record",
+        "Switch to Channel 5 (Blue Planet) → press record",
+        "Stay on current channel → press record (wrong show)"
+      ],
+      "correct": 1
+    },
+    "reminders": {
+      "LowAF_LowCB": "Remember to record a TV show for your mum.",
+      "HighAF_LowCB": "Remember, your mum's show — Channel 5, Blue Planet documentary. Switch to Channel 5 first, then press record.",
+      "LowAF_HighCB": "Quick pause from clearing out that wardrobe — remember to record a TV show for your mum.",
+      "HighAF_HighCB": "Quick pause from clearing out that wardrobe — Channel 5, Blue Planet documentary. Switch to channel first, then record."
+    }
+  },
+  {
+    "task_id": "coat",
+    "block": 4,
+    "slot": "B",
+    "encoding": {
+      "text": "When your friend leaves, give them the THIN grey jacket on the LEFT hook. Check the pockets for your KEYS first — you left them in there yesterday.",
+      "image_description": "Two jackets on hooks — thin grey on left hook, thick grey on right hook"
+    },
+    "quiz": {
+      "question": "Which jacket and what should you check first?",
+      "options": ["Thin grey jacket, left hook — check pockets for keys", "Thick grey jacket, right hook — check pockets for keys"],
+      "correct": 0
+    },
+    "trigger": {
+      "sidebar_icon": "friend_leaving",
+      "icon_emoji": "💬",
+      "label": "Friend leaving",
+      "description": "Friend chat bubble appears — I should head out soon"
+    },
+    "mcq": {
+      "question": "Your friend says they're heading out. What should you do?",
+      "options": [
+        "Grab the thick grey jacket (right hook) → check pockets → hand to friend",
+        "Grab the thin grey jacket (left hook) → hand to friend directly",
+        "Grab the thin grey jacket (left hook) → check pockets for keys → hand to friend"
+      ],
+      "correct": 2
+    },
+    "reminders": {
+      "LowAF_LowCB": "Remember to get a coat for your friend before they leave.",
+      "HighAF_LowCB": "Remember, your friend's coat — the thin grey jacket on the left hook. Check the pockets for your keys first.",
+      "LowAF_HighCB": "Quick pause from that news quiz — remember to get a coat for your friend before they leave.",
+      "HighAF_HighCB": "Quick pause from that news quiz — the thin grey jacket, left hook. Check pockets for your keys first, then hand it over."
+    }
+  }
+]

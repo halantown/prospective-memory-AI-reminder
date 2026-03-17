@@ -76,23 +76,14 @@ def _record_pm_miss(session_id: str, data: dict):
             from core.config import DB_PATH
             from core.database import get_db
             db = get_db(DB_PATH)
-            # Only insert if no trial exists yet for this task in this block
-            existing = db.execute(
-                "SELECT id FROM pm_trials WHERE session_id = ? AND task_id = ?",
+            db.execute(
+                """UPDATE pm_trials SET
+                    pm_score = 0,
+                    pm_error_type = 'prospective_failure'
+                   WHERE session_id = ? AND task_id = ? AND pm_score IS NULL""",
                 (session_id, task_id),
-            ).fetchone()
-            if not existing:
-                block_num = data.get("block_number", 0)
-                slot = data.get("slot", "?")
-                condition = data.get("condition", "")
-                db.execute(
-                    """INSERT INTO pm_trials
-                       (session_id, block_number, task_slot, task_id, condition,
-                        pm_score, pm_error_type, trigger_fired_at)
-                       VALUES (?, ?, ?, ?, ?, 0, 'prospective_failure', ?)""",
-                    (session_id, block_num, slot, task_id, condition, w.opened_at),
-                )
-                db.commit()
+            )
+            db.commit()
             db.close()
         except Exception as e:
             logger.error(f"Failed to record PM miss: {e}")
@@ -174,7 +165,7 @@ def _handle_trigger_click(session_id: str, data: dict) -> dict | None:
         "event": "mcq_data",
         "data": {
             "task_id": task_id,
-            "question": mcq.get("question", ""),
+            "question": mcq.get("question", "") or f"What should you do for the '{task_id}' task?",
             "options": mcq.get("options", []),
         },
     }
@@ -254,7 +245,7 @@ def _handle_encoding_result(session_id: str, data: dict, block_num: int) -> dict
 def _handle_ongoing_batch(session_id: str, data: dict, block_num: int) -> dict:
     """Record a batch of ongoing task responses."""
     game_type = data.get("game_type", "")
-    game_skin = data.get("game_skin", "")
+    game_skin = data.get("skin", data.get("game_skin", ""))
     responses = data.get("responses", [])
 
     if responses:
