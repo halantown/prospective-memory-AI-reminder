@@ -80,7 +80,7 @@ def _record_pm_miss(session_id: str, data: dict):
                 """UPDATE pm_trials SET
                     pm_score = 0,
                     pm_error_type = 'prospective_failure'
-                   WHERE session_id = ? AND task_id = ? AND pm_score IS NULL""",
+                   WHERE session_id = ? AND task_id = ? AND pm_error_type IS NULL AND trigger_clicked_at IS NULL""",
                 (session_id, task_id),
             )
             db.commit()

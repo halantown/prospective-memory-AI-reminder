@@ -6,18 +6,36 @@ const btnSecondary = `${btn} bg-gray-700 hover:bg-gray-600 text-gray-200`
 const btnGreen = `${btn} bg-emerald-600 hover:bg-emerald-700 text-white`
 const btnRed = `${btn} bg-red-600 hover:bg-red-700 text-white`
 const btnOrange = `${btn} bg-orange-600 hover:bg-orange-700 text-white`
-const btnYellow = `${btn} bg-amber-500 hover:bg-amber-600 text-black`
 const btnBlue = `${btn} bg-blue-600 hover:bg-blue-700 text-white`
 const btnPurple = `${btn} bg-purple-600 hover:bg-purple-700 text-white`
 
-const HOB_COLORS = { empty: 'bg-gray-600', cooking: 'bg-pink-500', ready: 'bg-amber-400 animate-pulse', burning: 'bg-red-600 animate-ping' }
-const HOB_TEXT = { empty: 'text-gray-500', cooking: 'text-pink-300', ready: 'text-amber-300', burning: 'text-red-300' }
+const PM_TASKS = {
+  1: [{ id: 'medicine', slot: 'A' }, { id: 'tea', slot: 'B' }],
+  2: [{ id: 'laundry', slot: 'A' }, { id: 'book', slot: 'B' }],
+  3: [{ id: 'pot', slot: 'A' }, { id: 'umbrella', slot: 'B' }],
+  4: [{ id: 'tv', slot: 'A' }, { id: 'coat', slot: 'B' }],
+}
+
 const fmtDuration = (seconds = 0) => {
   const total = Math.max(0, Math.floor(seconds))
-  const h = String(Math.floor(total / 3600)).padStart(2, '0')
-  const m = String(Math.floor((total % 3600) / 60)).padStart(2, '0')
+  const m = String(Math.floor(total / 60)).padStart(2, '0')
   const s = String(total % 60).padStart(2, '0')
-  return `${h}:${m}:${s}`
+  return `${m}:${s}`
+}
+
+const EVENT_COLORS = {
+  game_start: 'text-emerald-400',
+  game_end: 'text-emerald-400',
+  block_start: 'text-emerald-400',
+  block_end: 'text-emerald-400',
+  trigger_fire: 'text-orange-400',
+  window_close: 'text-orange-400',
+  reminder_fire: 'text-blue-400',
+  robot_speak: 'text-blue-400',
+  ambient_pulse: 'text-yellow-400',
+  room_transition: 'text-purple-400',
+  mcq_data: 'text-orange-300',
+  mcq_result: 'text-orange-300',
 }
 
 function Panel({ title, children, className = '' }) {
@@ -38,32 +56,6 @@ function Toast({ message, type = 'info' }) {
   return (
     <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded border text-xs font-mono ${colors[type] || colors.info}`}>
       {message}
-    </div>
-  )
-}
-
-function HobIndicator({ hob }) {
-  const progress = hob.status === 'cooking' && hob.started_at > 0
-    ? Math.min(100, ((Date.now() / 1000 - hob.started_at) / (hob.cooking_ms / 1000)) * 100)
-    : hob.status === 'ready' && hob.started_at > 0
-    ? Math.min(100, ((Date.now() / 1000 - hob.started_at) / (hob.ready_ms / 1000)) * 100)
-    : 0
-
-  return (
-    <div className="bg-gray-900 rounded-lg p-2 text-center">
-      <div className="flex items-center justify-center gap-2 mb-1">
-        <span className={`w-3 h-3 rounded-full ${HOB_COLORS[hob.status] || 'bg-gray-600'}`} />
-        <span className={`text-xs font-bold ${HOB_TEXT[hob.status] || 'text-gray-500'}`}>
-          Hob {hob.id}
-        </span>
-      </div>
-      <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{hob.status}</div>
-      {(hob.status === 'cooking' || hob.status === 'ready') && (
-        <div className="w-full h-1 bg-gray-700 rounded mt-1">
-          <div className={`h-full rounded transition-all ${hob.status === 'cooking' ? 'bg-pink-500' : 'bg-amber-400'}`}
-            style={{ width: `${progress}%` }} />
-        </div>
-      )}
     </div>
   )
 }
@@ -102,7 +94,6 @@ export default function Dashboard() {
     }
   }, [showToast])
 
-  // Auto-detect active session on load
   useEffect(() => {
     api('/admin/active-session').then((s) => {
       if (s) {
@@ -113,7 +104,6 @@ export default function Dashboard() {
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Refresh state & logs every 2s
   useEffect(() => {
     if (!session) return
     const refresh = async () => {
@@ -129,7 +119,6 @@ export default function Dashboard() {
     return () => clearInterval(timer)
   }, [session, api])
 
-  // WS connection
   const connectWS = useCallback(() => {
     if (!sessionRef.current) return
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null }
@@ -156,38 +145,20 @@ export default function Dashboard() {
       setEvents(prev => [{ ts: new Date().toLocaleTimeString(), type, data }, ...prev].slice(0, 200))
     }
 
-    ws.onerror = () => {
-      setWsStatus('reconnecting')
-    }
-
-    ws.onclose = () => {
-      setWsStatus('disconnected')
-    }
+    ws.onerror = () => { setWsStatus('reconnecting') }
+    ws.onclose = () => { setWsStatus('disconnected') }
   }, [blockNum, showToast])
 
   useEffect(() => { return () => { if (wsRef.current) wsRef.current.close() } }, [])
 
-  // Auto-connect WS only when a live participant is detected
   useEffect(() => {
     if (session && session.live && wsStatus === 'disconnected') connectWS()
   }, [session, wsStatus, connectWS])
-
-  const fireEvent = useCallback(async (event, data = {}) => {
-    if (!sessionRef.current) return showToast('No session', 'error')
-    const result = await api('/admin/fire-event', {
-      method: 'POST',
-      body: JSON.stringify({ session_id: sessionRef.current.session_id, event, data }),
-    })
-    if (result) showToast(`✓ ${event}`, 'ok', 1200)
-  }, [api, showToast])
-
-  const hobs = sessionState?.hobs || []
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-mono text-sm">
       {toast && <Toast message={toast.message} type={toast.type} />}
 
-      {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center gap-4">
         <h1 className="text-lg font-bold text-cyan-400">🔬 Experiment Observer</h1>
         <span className={`text-xs px-2 py-0.5 rounded ${
@@ -199,7 +170,8 @@ export default function Dashboard() {
           <span className="text-xs text-gray-400">
             Participant: <b className="text-cyan-300">{session.participant_id}</b> ·
             Session: <b className="text-cyan-300">{session.session_id}</b> ·
-            Group: <b className="text-cyan-300">{session.latin_square_group || session.group}</b>
+            Group: <b className="text-cyan-300">{session.latin_square_group || session.group}</b> ·
+            Phase: <b className="text-cyan-300">{session.phase || '—'}</b>
             {!session.live && <span className="ml-2 text-amber-400">(no live client)</span>}
           </span>
         )}
@@ -220,27 +192,19 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="p-3 grid grid-cols-12 gap-3">
-          {/* Left: Live Status */}
+          {/* Left: Session + Controls */}
           <div className="col-span-3 space-y-3">
-            {/* Hob Monitor */}
-            <Panel title="🍳 Kitchen Monitor">
-              <div className="grid grid-cols-3 gap-2">
-                {hobs.map(h => <HobIndicator key={h.id} hob={h} />)}
-              </div>
-            </Panel>
-
-            {/* Session Info */}
             <Panel title="📋 Session">
               <div className="text-xs space-y-1 text-gray-400">
                 <div>WS clients: <b className="text-cyan-400">{sessionState?.ws_clients || 0}</b></div>
                 <div>Participant: <b className={sessionState?.is_online ? 'text-emerald-400' : 'text-gray-500'}>{sessionState?.is_online ? 'online' : 'offline'}</b></div>
                 <div>Timer: <b className="text-cyan-300">{fmtDuration(sessionState?.session_timer_s || 0)}</b></div>
+                <div>Block: <b className="text-cyan-400">{session.current_block ?? '—'}</b></div>
                 <div>Active timelines: <b className="text-cyan-400">{sessionState?.active_timelines?.length || 0}</b></div>
               </div>
             </Panel>
 
-            {/* Controls */}
-            <Panel title="🎛️ Controls">
+            <Panel title="🎛️ Block Controls">
               <div className="space-y-2">
                 <div className="flex gap-1 items-center">
                   <select value={blockNum} onChange={e => setBlockNum(Number(e.target.value))}
@@ -248,49 +212,49 @@ export default function Dashboard() {
                     {[1,2,3,4].map(n => <option key={n} value={n}>Block {n}</option>)}
                   </select>
                   <button onClick={connectWS} className={btnPrimary}>📡 WS</button>
-                  <button onClick={() => fireEvent('block_start', { block_number: blockNum, condition: 'HighAF_HighCB' })}
-                    className={btnGreen}>▶</button>
-                  <button onClick={() => fireEvent('block_end', { block_number: blockNum })}
-                    className={btnRed}>⏹</button>
                 </div>
-                {/* Super-admin: force-start the full timeline for this block */}
-                <div className="border-t border-gray-700 pt-2">
-                  <button
-                    onClick={async () => {
-                      if (!sessionRef.current) return showToast('No session', 'error')
-                      const ok = window.confirm(`Force-start Block ${blockNum} timeline?\nThis resets hobs/windows and launches the scheduler.`)
-                      if (!ok) return
-                      const res = await api(`/admin/force-block/${sessionRef.current.session_id}/${blockNum}`, { method: 'POST' })
-                      if (res) showToast(`⚡ Block ${blockNum} started (${res.condition})`, 'ok', 3000)
-                    }}
-                    className={`${btnOrange} w-full text-xs`}
-                  >
-                    ⚡ Force-Start Block {blockNum}
-                  </button>
-                </div>
-                <div className="text-[10px] text-gray-600">Steak:</div>
-                <div className="grid grid-cols-3 gap-1">
-                  {[0,1,2].map(id => (
-                    <div key={id} className="space-y-1">
-                      <button onClick={() => fireEvent('steak_spawn', { hob_id: id, duration: { cooking: 18000, ready: 6000 } })}
-                        className={`${btnPrimary} w-full text-[10px]`}>🥩{id}</button>
-                      <button onClick={() => fireEvent('force_yellow_steak', { hob_id: id })}
-                        className={`${btnYellow} w-full text-[10px]`}>⚡{id}</button>
-                    </div>
-                  ))}
-                </div>
-                <div className="text-[10px] text-gray-600">PM Tasks:</div>
-                <PMControls fireEvent={fireEvent} activeBlock={blockNum} />
-                <div className="text-[10px] text-gray-600">Robot/Messages:</div>
-                <RobotMessageControls fireEvent={fireEvent} />
-                <div className="flex gap-1 flex-wrap">
-                  <button onClick={() => fireEvent('fake_trigger_fire', { type: 'delivery' })}
-                    className={`${btnOrange} text-[10px]`}>🔔</button>
-                  <button onClick={() => fireEvent('fake_trigger_fire', { type: 'dishwasher' })}
-                    className={`${btnOrange} text-[10px]`}>🫧</button>
-                  <button onClick={() => fireEvent('fake_trigger_fire', { type: 'friend_online' })}
-                    className={`${btnOrange} text-[10px]`}>👤</button>
-                </div>
+                <button
+                  onClick={async () => {
+                    if (!sessionRef.current) return showToast('No session', 'error')
+                    const ok = window.confirm(`Force-start Block ${blockNum} timeline?`)
+                    if (!ok) return
+                    const res = await api(`/admin/force-block/${sessionRef.current.session_id}/${blockNum}`, { method: 'POST' })
+                    if (res) showToast(`⚡ Block ${blockNum} started (${res.condition})`, 'ok', 3000)
+                  }}
+                  className={`${btnOrange} w-full text-xs`}
+                >
+                  ⚡ Force-Start Block {blockNum}
+                </button>
+              </div>
+            </Panel>
+
+            <Panel title="🧠 PM Tasks (Block)">
+              <div className="space-y-1">
+                {(PM_TASKS[blockNum] || []).map(t => (
+                  <div key={t.id} className="flex gap-1 items-center">
+                    <span className="text-[10px] text-gray-500 w-16 font-mono truncate">{t.id}</span>
+                    <span className="text-[10px] text-gray-600">slot {t.slot}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-[10px] text-gray-600">
+                Timeline: reminder → trigger (30s window) → auto-score
+              </div>
+            </Panel>
+
+            <Panel title="🤖 Block Timeline">
+              <div className="text-[10px] text-gray-500 space-y-0.5">
+                <div>0:00 — Game A start (semantic cat)</div>
+                <div className="text-blue-400">1:00 — Reminder A</div>
+                <div className="text-orange-400">2:30 — Trigger A (30s window)</div>
+                <div>3:00 — Game A end → Transition</div>
+                <div>3:30 — Game B start (go/no-go)</div>
+                <div className="text-blue-400">4:30 — Reminder B</div>
+                <div className="text-orange-400">6:00 — Trigger B (30s window)</div>
+                <div>6:30 — Game B end → Transition</div>
+                <div>7:00 — Game C start (trivia buffer)</div>
+                <div>8:00 — Game C end</div>
+                <div className="text-emerald-400">8:30 — Block end</div>
               </div>
             </Panel>
           </div>
@@ -305,14 +269,9 @@ export default function Dashboard() {
                   <span className="text-gray-600">{e.ts}</span>
                   <span className={`ml-2 font-bold ${
                     e.type.includes('CONNECT') ? 'text-green-400' :
-                    e.type.includes('steak') || e.type.includes('yellow') ? 'text-pink-400' :
-                    e.type.includes('trigger') || e.type.includes('window') ? 'text-orange-400' :
-                    e.type.includes('robot') || e.type.includes('reminder') ? 'text-blue-400' :
-                    e.type.includes('block') ? 'text-emerald-400' :
-                    e.type.includes('message') ? 'text-purple-400' :
-                    'text-gray-300'
+                    EVENT_COLORS[e.type] || 'text-gray-300'
                   }`}>{e.type}</span>
-                  <span className="text-gray-500 ml-1">{JSON.stringify(e.data)}</span>
+                  <span className="text-gray-500 ml-1">{JSON.stringify(e.data).slice(0, 120)}</span>
                 </div>
               ))}
             </Panel>
@@ -324,8 +283,7 @@ export default function Dashboard() {
               {logs.length === 0 ? (
                 <p className="text-gray-600 text-xs">No logged actions yet</p>
               ) : logs.map((l, i) => {
-                const isPm = l.action_type === 'pm_action'
-                const isSteak = l.action_type === 'steak_action'
+                const isPm = ['trigger_click', 'mcq_answer', 'encoding_confirm'].includes(l.action_type)
                 let scoreInfo = null
                 if (l.payload) {
                   try {
@@ -336,9 +294,7 @@ export default function Dashboard() {
                 return (
                   <div key={i} className="text-xs border-b border-gray-800/50 py-1 font-mono">
                     <span className="text-gray-600">{new Date(l.ts * 1000).toLocaleTimeString()}</span>
-                    <span className={`ml-2 font-bold ${
-                      isPm ? 'text-orange-400' : isSteak ? 'text-pink-400' : 'text-cyan-400'
-                    }`}>{l.action_type}</span>
+                    <span className={`ml-2 font-bold ${isPm ? 'text-orange-400' : 'text-cyan-400'}`}>{l.action_type}</span>
                     {scoreInfo !== null && (
                       <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
                         scoreInfo === 2 ? 'bg-green-900 text-green-300' :
@@ -354,55 +310,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-function PMControls({ fireEvent, activeBlock }) {
-  const taskMap = {
-    1: ['medicine_a', 'medicine_b'],
-    2: ['laundry_c', 'laundry_d'],
-    3: ['comm_e', 'comm_f'],
-    4: ['chores_g', 'chores_h'],
-  }
-  const tasks = taskMap[activeBlock] || taskMap[1]
-  return (
-    <div className="space-y-1">
-      {tasks.map(taskId => {
-        const slot = /[aceg]$/.test(taskId) ? 'A' : 'B'
-        return (
-          <div key={taskId} className="flex gap-1 items-center">
-            <span className="text-[10px] text-gray-500 w-20 font-mono truncate">{taskId}</span>
-            <button onClick={() => fireEvent('trigger_appear', { task_id: taskId, slot, window_ms: 30000 })}
-              className={`${btnOrange} text-[10px]`}>👁</button>
-            <button onClick={() => fireEvent('window_close', { task_id: taskId, slot })}
-              className={`${btnRed} text-[10px]`}>✕</button>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function RobotMessageControls({ fireEvent }) {
-  const [text, setText] = useState('')
-  return (
-    <div className="space-y-1">
-      <div className="flex gap-1">
-        <input value={text} onChange={e => setText(e.target.value)} placeholder="Say…"
-          className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-0.5 text-[10px]"
-          onKeyDown={e => { if (e.key === 'Enter') { fireEvent('robot_neutral', { text: text || 'Hello!' }); setText('') } }} />
-        <button onClick={() => { fireEvent('robot_neutral', { text: text || 'Hello!' }); setText('') }}
-          className={`${btnBlue} text-[10px]`}>🤖</button>
-      </div>
-      <div className="flex gap-1 flex-wrap">
-        <button onClick={() => fireEvent('reminder_fire', { text: 'Remember your medicine!', slot: 'A', condition: 'HighAF_HighCB' })}
-          className={`${btnPurple} text-[10px]`}>💬A</button>
-        <button onClick={() => fireEvent('reminder_fire', { text: "Don't forget vitamins!", slot: 'B', condition: 'HighAF_HighCB' })}
-          className={`${btnPurple} text-[10px]`}>💬B</button>
-        <button onClick={() => fireEvent('message_bubble', { from: 'Sarah', subject: 'Test', body: 'Test email!', option_a: 'Yes!', option_b: 'No', avatar: 'S' })}
-          className={`${btnGreen} text-[10px]`}>📬</button>
-      </div>
     </div>
   )
 }

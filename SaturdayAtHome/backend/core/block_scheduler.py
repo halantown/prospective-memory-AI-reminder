@@ -174,7 +174,6 @@ def generate_block_schedule(
             "time": room_c.get("time", ""),
             "activity": room_c.get("activity", ""),
         },
-        },
     ))
 
     # ── Game C ───────────────────────────────────────────────────────────
