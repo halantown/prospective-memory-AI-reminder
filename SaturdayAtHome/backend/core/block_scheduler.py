@@ -139,6 +139,9 @@ def generate_block_schedule(
         payload={
             "from_room": room_a.get("room", ""),
             "to_room": room_b.get("room", ""),
+            "to": room_b.get("room", ""),
+            "time": room_b.get("time", ""),
+            "activity": room_b.get("activity", ""),
         },
     ))
 
@@ -167,6 +170,10 @@ def generate_block_schedule(
         payload={
             "from_room": room_b.get("room", ""),
             "to_room": room_c.get("room", ""),
+            "to": room_c.get("room", ""),
+            "time": room_c.get("time", ""),
+            "activity": room_c.get("activity", ""),
+        },
         },
     ))
 

@@ -71,15 +71,21 @@ export const useGameStore = create((set, get) => ({
   setWsConnected: (connected) => set({ wsConnected: connected }),
   setWsSend: (fn) => set({ wsSend: fn }),
 
-  handleGameStart: (data) => set({
-    currentGameType: data.game_type,
-    currentSkin: data.skin,
-    gameItems: data.items || [],
-    itemIndex: 0,
-    gameActive: true,
-    gameDimmed: false,
-    ongoingStats: { correct: 0, wrong: 0, missed: 0, total: 0 },
-  }),
+  handleGameStart: (data) => {
+    const room = data.room || {}
+    set({
+      currentGameType: data.game_type,
+      currentSkin: data.skin,
+      gameItems: data.items || [],
+      itemIndex: 0,
+      gameActive: true,
+      gameDimmed: false,
+      ongoingStats: { correct: 0, wrong: 0, missed: 0, total: 0 },
+      currentRoom: room.room || get().currentRoom,
+      simulatedTime: room.time || get().simulatedTime,
+      activityLabel: room.activity || get().activityLabel,
+    })
+  },
 
   handleGameEnd: () => set({
     gameActive: false,
