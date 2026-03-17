@@ -276,7 +276,7 @@ def _handle_ongoing_batch(session_id: str, data: dict, block_num: int) -> dict:
 
 
 def _handle_questionnaire(session_id: str, data: dict) -> dict:
-    """Record post-block questionnaire."""
+    """Record post-block or final questionnaire."""
     try:
         from core.config import DB_PATH
         from core.database import get_db
@@ -285,9 +285,22 @@ def _handle_questionnaire(session_id: str, data: dict) -> dict:
             """INSERT INTO questionnaire_logs
                (session_id, block_number, intrusiveness, helpfulness, comment, ts)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            (session_id, data.get("block"), data.get("intrusiveness"),
-             data.get("helpfulness"), data.get("comment"), time.time()),
+            (session_id, str(data.get("block")), data.get("intrusiveness"),
+             data.get("helpfulness"),
+             data.get("comment") or data.get("open_feedback"),
+             time.time()),
         )
+        # Store extra final questionnaire fields if present
+        if data.get("mse_score") is not None:
+            db.execute(
+                """INSERT INTO questionnaire_logs
+                   (session_id, block_number, intrusiveness, helpfulness, comment, ts)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (session_id, "final_mse", data.get("mse_score"),
+                 data.get("strategy_use"),
+                 data.get("open_feedback"),
+                 time.time()),
+            )
         db.commit()
         db.close()
     except Exception as e:

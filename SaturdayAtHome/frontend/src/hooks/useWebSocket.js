@@ -11,7 +11,7 @@ export default function useWebSocket() {
   const reconnectRef = useRef(null)
 
   useEffect(() => {
-    if (!sessionId || !blockNumber || !['encoding', 'playing', 'questionnaire'].includes(phase)) return
+    if (!sessionId || !blockNumber || !['encoding', 'playing', 'questionnaire', 'complete'].includes(phase)) return
 
     const eventHandlers = {
       game_start: (d) => useGameStore.getState().handleGameStart(d),
