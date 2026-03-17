@@ -1,207 +1,121 @@
-# Saturday At Home
+# Saturday At Home (PRD v2.0 State-Driven)
 
-A browser-based experimental game for a 2×2 within-subjects **Prospective Memory (PM)** psychology study. Participants manage household tasks (cooking steaks, replying to messages, watering plants) while remembering to perform prospective memory tasks embedded in the game world.
+A browser-based experimental platform for a 2×2 within-subjects Prospective Memory study.
 
-## Architecture
+The v2.0 build uses a **state-driven day simulation**:
 
-```
+- System-controlled room transitions (participant cannot freely switch rooms)
+- Moderate-engagement ongoing activities (no urgency penalties)
+- Robot co-presence with neutral comments + PM reminders
+- PM scoring remains backend-only (0/1/2), never shown to participants
+
+## Project Structure
+
+```text
 SaturdayAtHome/
-├── game_config.yaml          # ← Single source of truth for ALL game parameters
-├── backend/                  # Python FastAPI + SQLite (port 5000)
-│   ├── main.py               # Entry point
-│   ├── core/                 # Config loader, database, WebSocket hub, timeline engine
-│   ├── models/               # Pydantic schemas, dataclass entities
-│   ├── routes/               # HTTP endpoints (session, experiment, admin, config)
-│   ├── services/             # Business logic (scoring, hob state, PM windows)
-│   └── utils/                # Helpers, action logging
-├── frontend/                 # React + Vite + Tailwind + Zustand (port 3000)
-│   ├── src/components/       # Game UI, rooms, screens, dashboard, config page
-│   ├── src/store/            # Zustand global state
-│   ├── src/hooks/            # WebSocket client, audio engine, animation hooks
-│   ├── src/config/           # Task configs (populated from backend)
-│   └── src/utils/            # API helpers
-└── docs/                     # GDD, addendum, design documents
+├── game_config.yaml
+├── backend/
+│   ├── main.py
+│   ├── core/            # config loader, DB init, ws hub, timeline scheduler/runtime
+│   ├── routes/          # session, experiment, admin, config APIs
+│   ├── services/        # reminder generation/cache, scoring, window management
+│   └── tests/
+├── frontend/
+│   └── src/
+│       ├── store/       # Zustand state machine for block flow
+│       ├── hooks/       # websocket timeline client
+│       ├── components/  # screens, room view, PM panel, dashboard
+│       └── utils/       # API wrappers
+└── docs/
 ```
 
-## Quick Start
+## Run
 
-### Prerequisites
-- Python 3.10+ with `pyyaml` and `fastapi`
-- Node.js 18+
-- Conda environment `thesis_server` (or any venv)
+Backend:
 
-### Backend
 ```bash
 conda activate thesis_server
 cd SaturdayAtHome/backend
 pip install -r requirements.txt
 python main.py
-# → http://localhost:5000
 ```
 
-### Frontend (Dev)
+Frontend:
+
 ```bash
 cd SaturdayAtHome/frontend
 npm install
 npm run dev
-# → http://localhost:3000 (proxies /api → :5000)
 ```
 
-### Frontend (Production)
+Production bundle:
+
 ```bash
 cd SaturdayAtHome/frontend
 npm run build
-# Output in dist/ — served by FastAPI at /
 ```
 
-## Web Routes
+## Core Runtime Flow
 
-| Route | Purpose |
-|-------|---------|
-| `/` | Game (participant-facing) |
-| `/dashboard` | Experimenter monitoring (live WebSocket events, scores) |
-| `/manage` | Database management (sessions, raw data) |
-| `/config` | Game configuration editor (reads/writes `game_config.yaml`) |
+1. Participant enters token (`POST /api/session/start`)
+2. Frontend fetches block config (`GET /api/session/{id}/block/{n}`)
+3. After encoding confirmation, frontend opens block stream (`WS /api/session/{id}/block/{n}/stream`)
+4. Backend timeline pushes events by schedule
+5. Frontend reacts to room transitions, robot speech, reminders, trigger windows
+6. PM actions logged and scored on backend only
 
-## Configuration System
+## WebSocket Events
 
-All tunable parameters are in `game_config.yaml` at the project root. **No hardcoded values in code.** The file is loaded by the backend at startup and served to the frontend via API.
+State-driven main events:
 
-### Editing Config
+- `room_transition`
+- `robot_speak`
+- `reminder_fire`
+- `trigger_appear`
+- `window_close`
+- `block_end`
 
-**Option A: Web UI** — visit `http://localhost:3000/config` (or `:5000/config` in production). Edit values in the tabbed editor and click Save. Changes are written back to the YAML file.
+## API Highlights
 
-**Option B: Edit YAML directly** — edit `game_config.yaml` and restart the backend.
+- `POST /api/session/start`
+- `GET /api/session/{id}/block/{n}`
+- `POST /api/session/{id}/block/{n}/encoding`
+- `POST /api/session/{id}/block/{n}/action`
+- `POST /api/session/{id}/questionnaire`
+- `POST /api/session/{id}/heartbeat`
 
-### Config Sections
+Admin:
 
-| Section | What it controls |
-|---------|-----------------|
-| `difficulty` | Steak cooking/ready timings per preset (slow/medium/fast) |
-| `scoring` | Points for each action (flip, serve, burn, message reply, plant water) |
-| `timers` | Block duration, message timeout, PM window, respawn delays |
-| `timeline` | All block events with timestamps (steak spawns, messages, triggers, reminders) |
-| `experiment` | Latin Square groups, task pair assignments, reminder texts per condition |
-| `pm_tasks` | Medicine task definitions (bottles, amounts, **correct answers**) |
-| `trigger_icons` | Icon/label mapping for each PM trigger type |
-| `audio` | BGM volume, ducking parameters, TTS settings |
+- `POST /api/admin/participant/create`
+- `POST /api/admin/force-block/{id}/{n}`
+- `POST /api/admin/generate-reminder`
+- `GET /api/admin/session/{id}/state`
+- `GET /api/admin/export/{id}`
 
-### Security Note
-Correct PM answers are stored in the YAML (under `pm_tasks.*.correct`) but are **never** sent to the game frontend. The `GET /config/game` endpoint strips them. Only the `/config` admin page sees correct answers.
+## Configuration
 
-### API Endpoints
+`game_config.yaml` is the single source of truth. Key sections:
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/config` | Full config (including correct answers — admin only) |
-| `GET` | `/config/game` | Config stripped of correct answers (safe for game frontend) |
-| `PUT` | `/config` | Save updated config to YAML and reload |
+- `timeline` (event times + room schedules)
+- `experiment` (Latin square, block task slots, AF/CB condition rules)
+- `rooms` (ongoing activity prompt templates)
+- `pm_tasks` (8 isomorphic PM tasks)
+- `audio` (TTS settings)
 
-### Admin API Endpoints
+`GET /api/config/game` returns a participant-safe config snapshot.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/admin/sessions` | List all sessions |
-| `GET` | `/admin/active-session` | Find currently connected session (used by dashboard) |
-| `GET` | `/admin/session/{id}/state` | Live hob state, WS clients, active timelines |
-| `GET` | `/admin/logs/{id}` | Action log for a session (most recent first) |
-| `POST` | `/admin/fire-event` | Manually push an event to a session |
-| `POST` | `/admin/force-block/{id}/{n}` | Force-start block N's full timeline (admin override) |
-| `DELETE` | `/admin/session/{id}` | Delete a session and all its data |
-| `GET` | `/admin/export/{id}` | Export session data as JSON |
+## Validation
 
-## Communication: WebSocket
+Backend tests:
 
-The backend pushes events to the frontend via **WebSocket**:
-
-1. Frontend connects to `WS /session/{id}/block/{n}/stream`
-2. Backend `BlockTimeline` runs scheduled events on a thread
-3. Events are pushed to per-session WS queues
-4. Frontend `useWebSocket.js` maps event types to Zustand store actions
-
-Key WS events: `steak_spawn`, `message_bubble`, `trigger_appear`, `window_close`, `reminder_fire`, `robot_neutral`, `force_yellow`, `plant_needs_water`, `block_end`
-
-### Troubleshooting: heartbeat-only but no timeline events
-
-If the frontend only sends heartbeat and receives no scheduled events, check `backend/core/timeline.py::_update_actual_t`.
-
-Root cause (fixed): using `UPDATE ... ORDER BY ... LIMIT` can fail on SQLite builds without `SQLITE_ENABLE_UPDATE_DELETE_LIMIT`, causing `BlockTimeline.run()` to terminate at the first event.
-
-Resolution: use a SQLite-compatible subquery update:
-
-```sql
-UPDATE block_events
-SET actual_t = ?
-WHERE id = (
-  SELECT id FROM block_events
-  WHERE session_id = ? AND block_num = ? AND event_type = ? AND actual_t IS NULL
-  ORDER BY id
-  LIMIT 1
-)
+```bash
+cd SaturdayAtHome/backend
+PYTHONPATH=. pytest -q
 ```
 
-### Troubleshooting: steak spawn interval becomes too long
+Frontend build:
 
-`steak_spawn` is timeline-driven and can target a hob that is still busy.  
-If spawns are repeatedly skipped on occupied hobs, perceived intervals become much longer.
-
-Current behavior: `backend/core/ws.py::send_ws` now reroutes `steak_spawn` to any currently empty hob before giving up, reducing long gaps caused by target-hob collisions.
-
-## Game Components
-
-### Kitchen
-- **3 hobs** with steak state machine: EMPTY → COOKING → READY → BURNING
-- **Kitchen table** with **medicine cabinet** always visible
-  - Clickable anytime (browse mode when no PM trigger)
-  - Two-step selection flow (bottle → amount) when PM trigger is active
-- Sidebar status dot: green (ok) → orange (steak ready) → red (steak burning)
-
-### Inbox (Messages)
-- Email-style messages from NPCs with two reply options
-- 15s timeout with countdown bar (green → yellow → red)
-- Scoring: +2 correct, +1 wrong, -2 expired
-- Custom `newmail.wav` chime + top-right toast (avatar + one-line preview), auto-hides after ~3.5s, click-to-Inbox shortcut
-
-### Living Room
-- Plant watering: random intervals, +3 pts fresh, +1 pts wilted
-- TV (idle, no score impact)
-
-### Balcony
-- In-block day simulation runs from **10:00 → 23:00** based on block timer progress
-- Sidebar top shows a moving sun/moon sky track plus a larger current clock (no static phase-only cue text)
-- Clock display advances in **30-minute jumps**
-- Sky/light palette shifts by phase (**sun → sunset → moon**) with non-interruptive transitions
-- Washing machine (cycle range controlled by `timers.laundry_wash_min_ms` / `timers.laundry_wash_max_ms`)
-- Laundry pile pressure: family keeps dropping clothes every ~40-50s; overflow beyond threshold starts periodic score penalty
-
-### Ambient Audio
-- BGM keeps playing continuously during block
-- Subtle level contour by day phase while preserving robot ducking
-- Distinct steak-flip sizzle and laundry-jam warning cues
-- Distinct ash-collapse cue for overcooked steak
-
-### Score Feedback
-- Score changes show large cursor-adjacent floating bursts (green `+x`, red `-x`) for all score deltas
-
-### TODO Backlog
-- Dedicated window lighting renderer is not yet modeled in current room scene; current build uses balcony/room tint transitions as a proxy.
-
-### Robot Avatar
-- Fixed bottom-right, always visible
-- Speaks via Web Speech API with BGM ducking
-- Delivers reminders and neutral comments on schedule
-
-## Experiment Design
-
-- **2×2 within-subjects**: Aftereffects (Low/High) × Cue Busyness (Low/High)
-- **4 blocks** per participant, one condition each
-- **Latin Square** counterbalancing (4 groups A/B/C/D): group assigned by `COUNT(sessions) % 4` — restart-safe, DB-backed
-- **Per-slot reminder texts**: each condition has distinct text for Slot A (t=120s) and Slot B (t=300s), configured in `game_config.yaml` under `experiment.reminder_texts.<condition>.{A,B}`
-- **8 PM task types** in 4 pairs (medicine, laundry, communication, chores)
-- PM scoring: 0 (miss) / 1 (partial) / 2 (correct) — **not shown to participant**
-
-## Data
-
-All experiment data stored in `backend/core/experiment.db` (SQLite):
-- Sessions, PM trials, action logs, ongoing score snapshots
-- Export via `/manage` page or API endpoints
+```bash
+cd SaturdayAtHome/frontend
+npm run build
+```
