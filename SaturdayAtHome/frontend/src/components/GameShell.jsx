@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../store/gameStore'
 import useWebSocket from '../hooks/useWebSocket'
@@ -26,6 +27,18 @@ export default function GameShell() {
 
   useWebSocket()
   useAudio()
+
+  // Global "T" key → respond to fired trigger
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key.toLowerCase() === 't' && !useGameStore.getState().mcqVisible) {
+        e.preventDefault()
+        useGameStore.getState().clickActiveTrigger()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Full-screen phases (no sidebar)
   if (phase === 'welcome') return <WelcomeScreen />

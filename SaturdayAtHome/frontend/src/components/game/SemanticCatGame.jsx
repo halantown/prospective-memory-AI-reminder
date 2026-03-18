@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 
 const CATEGORIES = ['Work', 'Personal', 'Spam']
+const KEY_LABELS = { Work: '1', Personal: '2', Spam: '3' }
 const CATEGORY_COLORS = {
   Work: 'bg-blue-500 hover:bg-blue-600',
   Personal: 'bg-emerald-500 hover:bg-emerald-600',
@@ -13,21 +14,30 @@ export default function SemanticCatGame() {
   const gameItems = useGameStore(s => s.gameItems)
   const itemIndex = useGameStore(s => s.itemIndex)
   const recordResponse = useGameStore(s => s.recordResponse)
+  const gamePaused = useGameStore(s => s.gamePaused)
   const [feedback, setFeedback] = useState(null)
   const timerRef = useRef(null)
   const shownAtRef = useRef(Date.now())
+  const pauseRemainingRef = useRef(null)
 
   const currentItem = gameItems[itemIndex] || null
 
   // Track when each new item appears
   useEffect(() => {
     shownAtRef.current = Date.now()
+    pauseRemainingRef.current = null
   }, [itemIndex])
 
-  // Auto-advance after timeout
+  // Auto-advance after timeout (pausable)
   useEffect(() => {
-    if (!currentItem) return
+    if (!currentItem || gamePaused) return
     const timeout = currentItem.timeout_ms || 4000
+    const remaining = pauseRemainingRef.current ?? timeout
+
+    if (pauseRemainingRef.current !== null) {
+      shownAtRef.current = Date.now() - (timeout - remaining)
+      pauseRemainingRef.current = null
+    }
 
     timerRef.current = setTimeout(() => {
       recordResponse({
@@ -40,13 +50,25 @@ export default function SemanticCatGame() {
         client_ts: Date.now(),
       })
       setFeedback(null)
-    }, timeout)
+    }, remaining)
 
-    return () => clearTimeout(timerRef.current)
-  }, [itemIndex, currentItem, recordResponse])
+    return () => {
+      if (timerRef.current) {
+        const isPausing = useGameStore.getState().gamePaused
+        if (isPausing) {
+          const elapsed = Date.now() - shownAtRef.current
+          pauseRemainingRef.current = Math.max(100, (currentItem?.timeout_ms || 4000) - elapsed)
+        } else {
+          pauseRemainingRef.current = null
+        }
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [itemIndex, currentItem, recordResponse, gamePaused])
 
   const handleSelect = useCallback((category) => {
-    if (!currentItem) return
+    if (!currentItem || gamePaused) return
     clearTimeout(timerRef.current)
 
     const isCorrect = category === (currentItem.category || currentItem.correct_category)
@@ -63,7 +85,22 @@ export default function SemanticCatGame() {
     })
 
     setTimeout(() => setFeedback(null), 300)
-  }, [currentItem, itemIndex, recordResponse])
+  }, [currentItem, itemIndex, recordResponse, gamePaused])
+
+  // Keyboard: 1/A=Work, 2/S=Personal, 3/D=Spam
+  useEffect(() => {
+    const onKey = (e) => {
+      if (gamePaused) return
+      const map = { '1': 0, '2': 1, '3': 2, 'a': 0, 's': 1, 'd': 2 }
+      const idx = map[e.key.toLowerCase()]
+      if (idx !== undefined && CATEGORIES[idx]) {
+        e.preventDefault()
+        handleSelect(CATEGORIES[idx])
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [handleSelect, gamePaused])
 
   if (!currentItem) {
     return (
@@ -75,12 +112,10 @@ export default function SemanticCatGame() {
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-8">
-      {/* Email skin header */}
       <div className="text-xs text-slate-400 uppercase tracking-wider mb-4 font-medium">
         📧 Sort this email
       </div>
 
-      {/* Email card */}
       <AnimatePresence mode="wait">
         <motion.div
           key={itemIndex}
@@ -108,9 +143,8 @@ export default function SemanticCatGame() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Category buttons */}
-      <div className="flex gap-3 mt-6">
-        {CATEGORIES.map(cat => (
+      <div className={`flex gap-3 mt-6 ${gamePaused ? 'opacity-50 pointer-events-none' : ''}`}>
+        {CATEGORIES.map((cat, i) => (
           <button
             key={cat}
             onClick={() => handleSelect(cat)}
@@ -120,12 +154,12 @@ export default function SemanticCatGame() {
               ${CATEGORY_COLORS[cat]}
             `}
           >
+            <kbd className="bg-white/20 px-1.5 py-0.5 rounded text-xs font-mono mr-1.5">{KEY_LABELS[cat]}</kbd>
             {cat}
           </button>
         ))}
       </div>
 
-      {/* Progress indicator */}
       <div className="mt-4 text-xs text-slate-400">
         {itemIndex + 1} / {gameItems.length}
       </div>

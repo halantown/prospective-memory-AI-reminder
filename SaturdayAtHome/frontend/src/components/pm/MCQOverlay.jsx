@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../../store/gameStore'
 
 export default function MCQOverlay() {
@@ -15,7 +15,6 @@ export default function MCQOverlay() {
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(intervalRef.current)
-          // Auto-dismiss MCQ when timer expires (PM miss)
           handleWindowClose({ task_id: mcqData.task_id })
           return 0
         }
@@ -24,6 +23,22 @@ export default function MCQOverlay() {
     }, 1000)
     return () => clearInterval(intervalRef.current)
   }, [mcqData, handleWindowClose])
+
+  // Keyboard: 1/2/3 to select MCQ options
+  const handleKey = useCallback((e) => {
+    if (!mcqData) return
+    const map = { '1': 0, '2': 1, '3': 2 }
+    const idx = map[e.key]
+    if (idx !== undefined && idx < mcqData.options.length) {
+      e.preventDefault()
+      submitMCQ(idx)
+    }
+  }, [mcqData, submitMCQ])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [handleKey])
 
   if (!mcqData) return null
 
@@ -43,6 +58,7 @@ export default function MCQOverlay() {
               onClick={() => submitMCQ(i)}
               className="w-full text-left p-3 rounded-lg border-2 border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
             >
+              <kbd className="bg-slate-100 border border-slate-300 px-1.5 py-0.5 rounded text-xs font-mono mr-2">{i + 1}</kbd>
               <span className="font-medium text-slate-500 mr-2">{String.fromCharCode(65 + i)}.</span>
               {option}
             </button>

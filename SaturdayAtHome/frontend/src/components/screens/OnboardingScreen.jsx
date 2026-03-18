@@ -10,17 +10,23 @@ const PAGES = [
   },
   {
     title: 'Main Tasks',
-    body: 'Your main activity will be simple cognitive games — sorting emails, shopping for groceries, or answering quiz questions. These change as you move between rooms. Try your best, but don\'t worry about being perfect.',
+    body: 'Your main activity will be simple cognitive games — sorting emails, quick-reflex tasks, or answering quiz questions. These change as you move between rooms. Try your best, but don\'t worry about being perfect.',
     emoji: '🎮',
   },
   {
+    title: 'Keyboard Controls',
+    body: null,
+    emoji: '⌨️',
+    custom: true,
+  },
+  {
     title: 'Things to Remember',
-    body: 'Before each block, you will learn two important tasks to remember. When the right moment comes during gameplay, you need to act on them by clicking the correct icon in the sidebar.',
+    body: 'Before each block, you will learn two important tasks to remember. When the right moment comes during gameplay, you need to act on them by pressing the T key (or clicking the notification banner).',
     emoji: '📝',
   },
   {
     title: 'The Sidebar',
-    body: 'On the right side of the screen, you will see a clock, a floor plan, and a set of household event icons. When an icon lights up, it means that event is happening. If it\'s related to your remembered task, click it!',
+    body: 'On the right side of the screen, you will see a clock, a floor plan, and a set of household event icons. When an icon lights up and a banner appears, press T to respond if it\'s related to your remembered task.',
     emoji: '📋',
   },
   {
@@ -63,7 +69,24 @@ export default function OnboardingScreen() {
           >
             <div className="text-5xl mb-4">{current.emoji}</div>
             <h2 className="text-2xl font-bold text-slate-800 mb-3">{current.title}</h2>
-            <p className="text-slate-600 leading-relaxed mb-6">{current.body}</p>
+
+            {current.custom ? (
+              <div className="text-left text-sm text-slate-600 leading-relaxed mb-6 space-y-2">
+                <p className="mb-3">All gameplay uses keyboard controls:</p>
+                <table className="w-full text-left border-collapse">
+                  <tbody className="divide-y divide-slate-100">
+                    <tr><td className="py-1.5 font-medium text-slate-700">Email Sorting</td><td><kbd className="bg-slate-100 border px-1.5 rounded font-mono text-xs">1</kbd> Work · <kbd className="bg-slate-100 border px-1.5 rounded font-mono text-xs">2</kbd> Personal · <kbd className="bg-slate-100 border px-1.5 rounded font-mono text-xs">3</kbd> Spam</td></tr>
+                    <tr><td className="py-1.5 font-medium text-slate-700">Quick Sort</td><td><kbd className="bg-slate-100 border px-1.5 rounded font-mono text-xs">SPACE</kbd> for green circle · skip red</td></tr>
+                    <tr><td className="py-1.5 font-medium text-slate-700">Trivia</td><td><kbd className="bg-slate-100 border px-1.5 rounded font-mono text-xs">1</kbd> True · <kbd className="bg-slate-100 border px-1.5 rounded font-mono text-xs">2</kbd> False</td></tr>
+                    <tr><td className="py-1.5 font-medium text-slate-700">Trigger alert</td><td><kbd className="bg-slate-100 border px-1.5 rounded font-mono text-xs">T</kbd> to respond</td></tr>
+                    <tr><td className="py-1.5 font-medium text-slate-700">MCQ</td><td><kbd className="bg-slate-100 border px-1.5 rounded font-mono text-xs">1</kbd> / <kbd className="bg-slate-100 border px-1.5 rounded font-mono text-xs">2</kbd> / <kbd className="bg-slate-100 border px-1.5 rounded font-mono text-xs">3</kbd> to pick an answer</td></tr>
+                  </tbody>
+                </table>
+                <p className="mt-3 text-xs text-slate-400">Mouse clicking still works as a fallback.</p>
+              </div>
+            ) : (
+              <p className="text-slate-600 leading-relaxed mb-6">{current.body}</p>
+            )}
 
             <div className="flex items-center justify-between">
               <div className="flex gap-1">

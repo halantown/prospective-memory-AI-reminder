@@ -6,20 +6,29 @@ export default function TriviaGame() {
   const gameItems = useGameStore(s => s.gameItems)
   const itemIndex = useGameStore(s => s.itemIndex)
   const recordResponse = useGameStore(s => s.recordResponse)
+  const gamePaused = useGameStore(s => s.gamePaused)
   const [feedback, setFeedback] = useState(null)
   const timerRef = useRef(null)
   const shownAtRef = useRef(Date.now())
+  const pauseRemainingRef = useRef(null)
 
   const currentItem = gameItems[itemIndex] || null
 
   useEffect(() => {
     shownAtRef.current = Date.now()
+    pauseRemainingRef.current = null
   }, [itemIndex])
 
-  // Auto-advance after timeout
+  // Auto-advance after timeout (pausable)
   useEffect(() => {
-    if (!currentItem) return
+    if (!currentItem || gamePaused) return
     const timeout = currentItem.timeout_ms || 7000
+    const remaining = pauseRemainingRef.current ?? timeout
+
+    if (pauseRemainingRef.current !== null) {
+      shownAtRef.current = Date.now() - (timeout - remaining)
+      pauseRemainingRef.current = null
+    }
 
     timerRef.current = setTimeout(() => {
       recordResponse({
@@ -32,13 +41,25 @@ export default function TriviaGame() {
         client_ts: Date.now(),
       })
       setFeedback(null)
-    }, timeout)
+    }, remaining)
 
-    return () => clearTimeout(timerRef.current)
-  }, [itemIndex, currentItem, recordResponse])
+    return () => {
+      if (timerRef.current) {
+        const isPausing = useGameStore.getState().gamePaused
+        if (isPausing) {
+          const elapsed = Date.now() - shownAtRef.current
+          pauseRemainingRef.current = Math.max(100, (currentItem?.timeout_ms || 7000) - elapsed)
+        } else {
+          pauseRemainingRef.current = null
+        }
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [itemIndex, currentItem, recordResponse, gamePaused])
 
   const handleAnswer = useCallback((answer) => {
-    if (!currentItem) return
+    if (!currentItem || gamePaused) return
     clearTimeout(timerRef.current)
 
     const isCorrect = answer === (currentItem.answer !== undefined ? currentItem.answer : currentItem.correct_answer)
@@ -55,7 +76,19 @@ export default function TriviaGame() {
     })
 
     setTimeout(() => setFeedback(null), 300)
-  }, [currentItem, itemIndex, recordResponse])
+  }, [currentItem, itemIndex, recordResponse, gamePaused])
+
+  // Keyboard: 1/A=True, 2/S=False
+  useEffect(() => {
+    const onKey = (e) => {
+      if (gamePaused) return
+      const key = e.key.toLowerCase()
+      if (key === '1' || key === 'a') { e.preventDefault(); handleAnswer(true) }
+      else if (key === '2' || key === 's') { e.preventDefault(); handleAnswer(false) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [handleAnswer, gamePaused])
 
   if (!currentItem) {
     return (
@@ -71,7 +104,6 @@ export default function TriviaGame() {
         🎧 Podcast Quiz
       </div>
 
-      {/* Statement card */}
       <AnimatePresence mode="wait">
         <motion.div
           key={itemIndex}
@@ -91,18 +123,19 @@ export default function TriviaGame() {
         </motion.div>
       </AnimatePresence>
 
-      {/* True / False */}
-      <div className="flex gap-4 mt-6">
+      <div className={`flex gap-4 mt-6 ${gamePaused ? 'opacity-50 pointer-events-none' : ''}`}>
         <button
           onClick={() => handleAnswer(true)}
           className="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg shadow transition-transform active:scale-95"
         >
+          <kbd className="bg-white/20 px-1.5 py-0.5 rounded text-xs font-mono mr-1.5">1</kbd>
           ✓ True
         </button>
         <button
           onClick={() => handleAnswer(false)}
           className="px-8 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg shadow transition-transform active:scale-95"
         >
+          <kbd className="bg-white/20 px-1.5 py-0.5 rounded text-xs font-mono mr-1.5">2</kbd>
           ✗ False
         </button>
       </div>
