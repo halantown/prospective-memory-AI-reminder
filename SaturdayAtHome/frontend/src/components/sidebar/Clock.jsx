@@ -71,7 +71,7 @@ export default function Clock() {
 
   return (
     <div
-      className="flex items-center justify-between px-4 py-2.5 rounded-t-lg"
+      className="flex items-center justify-between px-4 py-2.5"
       style={{ background: gradient }}
     >
       <div>
