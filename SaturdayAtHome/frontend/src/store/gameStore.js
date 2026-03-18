@@ -31,6 +31,7 @@ export const useGameStore = create((set, get) => ({
   itemIndex: 0,
   gameActive: false,
   gameDimmed: false,
+  gamePaused: false,
 
   // Ongoing task stats
   ongoingStats: { correct: 0, wrong: 0, missed: 0, total: 0 },
@@ -52,6 +53,9 @@ export const useGameStore = create((set, get) => ({
   mcqVisible: false,
   mcqData: null,
   mcqStartTime: null,
+
+  // Trigger banner
+  triggerBannerVisible: false,
 
   // WebSocket
   wsConnected: false,
@@ -82,6 +86,7 @@ export const useGameStore = create((set, get) => ({
       itemIndex: 0,
       gameActive: true,
       gameDimmed: false,
+      gamePaused: false,
       ongoingStats: { correct: 0, wrong: 0, missed: 0, total: 0 },
       currentRoom: room.room || get().currentRoom,
       simulatedTime: room.time || get().simulatedTime,
@@ -100,6 +105,7 @@ export const useGameStore = create((set, get) => ({
     }
     set({
       gameActive: false,
+      gamePaused: false,
       currentGameType: null,
       currentSkin: null,
       gameItems: [],
@@ -148,13 +154,17 @@ export const useGameStore = create((set, get) => ({
         ? { ...t, state: 'fired', taskId: data.task_id }
         : t
     )
+    const trigger = triggers.find(t => t.id === data.sidebar_icon)
     set({
       triggers,
       activeExecutionWindow: {
         taskId: data.task_id,
         sidebarIcon: data.sidebar_icon,
-        expiresAt: Date.now() + 30000,
+        triggerLabel: trigger?.label || data.sidebar_icon,
+        triggerEmoji: trigger?.emoji || '❗',
+        expiresAt: Date.now() + (data.window_ms || 30000),
       },
+      triggerBannerVisible: true,
     })
   },
 
@@ -175,12 +185,17 @@ export const useGameStore = create((set, get) => ({
     const triggers = get().triggers.map(t =>
       t.taskId === data.task_id ? { ...t, state: 'inactive', taskId: null } : t
     )
-    set({ triggers, activeExecutionWindow: null, mcqVisible: false, mcqData: null, gameDimmed: false })
+    set({ triggers, activeExecutionWindow: null, triggerBannerVisible: false, mcqVisible: false, mcqData: null, gameDimmed: false, gamePaused: false })
   },
 
   clickTrigger: (triggerId) => {
     const trigger = get().triggers.find(t => t.id === triggerId)
     if (!trigger || trigger.state !== 'fired') return
+
+    // Pause game immediately on trigger click
+    if (get().gameActive) {
+      set({ gamePaused: true, triggerBannerVisible: false })
+    }
 
     const send = get().wsSend
     if (send) {
@@ -188,11 +203,20 @@ export const useGameStore = create((set, get) => ({
     }
   },
 
+  // Click the currently active trigger (keyboard shortcut)
+  clickActiveTrigger: () => {
+    const ew = get().activeExecutionWindow
+    if (!ew) return
+    const trigger = get().triggers.find(t => t.taskId === ew.taskId && t.state === 'fired')
+    if (trigger) get().clickTrigger(trigger.id)
+  },
+
   showMCQ: (data) => set({
     mcqVisible: true,
     mcqData: data,
     mcqStartTime: Date.now(),
     gameDimmed: true,
+    gamePaused: true,
   }),
 
   submitMCQ: (selected) => {
@@ -217,8 +241,10 @@ export const useGameStore = create((set, get) => ({
       mcqData: null,
       mcqStartTime: null,
       gameDimmed: false,
+      gamePaused: false,
       triggers,
       activeExecutionWindow: null,
+      triggerBannerVisible: false,
     })
   },
 
@@ -252,6 +278,7 @@ export const useGameStore = create((set, get) => ({
   handleBlockEnd: () => set({
     phase: 'questionnaire',
     gameActive: false,
+    gamePaused: false,
     currentGameType: null,
   }),
 
@@ -277,10 +304,12 @@ export const useGameStore = create((set, get) => ({
     itemIndex: 0,
     gameActive: false,
     gameDimmed: false,
+    gamePaused: false,
     ongoingStats: { correct: 0, wrong: 0, missed: 0, total: 0 },
     responseBuffer: [],
     triggers: [...INITIAL_TRIGGERS],
     activeExecutionWindow: null,
+    triggerBannerVisible: false,
     mcqVisible: false,
     mcqData: null,
     robotText: null,

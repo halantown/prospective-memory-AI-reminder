@@ -198,8 +198,8 @@ def _handle_mcq_answer(session_id: str, data: dict, block_num: int) -> dict:
                 pm_score = ?,
                 pm_error_type = ?
                WHERE session_id = ? AND task_id = ? AND mcq_option_selected IS NULL""",
-            (selected, int(data.get("response_time_ms", 0)), score, error_type,
-             session_id, task_id),
+            (selected, int(data.get("mcq_response_time_ms", data.get("response_time_ms", 0))),
+             score, error_type, session_id, task_id),
         )
         db.commit()
         db.close()

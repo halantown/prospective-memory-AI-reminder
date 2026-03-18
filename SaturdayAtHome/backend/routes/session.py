@@ -193,8 +193,7 @@ async def block_stream(
                     ).fetchone()
                     if current_phase and current_phase["phase"] != SessionPhase.BLOCK.value:
                         transition_phase(db2, session_id, SessionPhase.BLOCK, block_idx=block_num)
-                    else:
-                        db2.close()
+                    db2.close()
                 except Exception as phase_err:
                     logger.warning(f"Phase transition to BLOCK failed: {phase_err}")
 
