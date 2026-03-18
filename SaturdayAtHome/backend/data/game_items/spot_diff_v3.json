@@ -1,0 +1,97 @@
+{
+  "skin": "spot_diff_v3",
+  "game_type": "trivia",
+  "instruction": "Answer each observation trivia question \u2014 True or False?",
+  "items": [
+    {
+      "id": 1,
+      "question": "A standard deck of cards has 52 cards.",
+      "answer": true,
+      "explanation": "4 suits \u00d7 13 ranks = 52 cards."
+    },
+    {
+      "id": 2,
+      "question": "The Statue of Liberty holds her torch in her left hand.",
+      "answer": false,
+      "explanation": "She holds the torch in her right hand."
+    },
+    {
+      "id": 3,
+      "question": "A rainbow always appears as a semicircle from the ground.",
+      "answer": true,
+      "explanation": "The ground blocks the bottom half; from a plane you can see a full circle."
+    },
+    {
+      "id": 4,
+      "question": "On a standard clock, the number 4 is written as 'IV'.",
+      "answer": false,
+      "explanation": "Most clock faces use 'IIII' instead of 'IV'."
+    },
+    {
+      "id": 5,
+      "question": "The Mona Lisa has no eyebrows.",
+      "answer": true,
+      "explanation": "High-resolution scans confirm no visible eyebrows in the current painting."
+    },
+    {
+      "id": 6,
+      "question": "A stop sign has 6 sides.",
+      "answer": false,
+      "explanation": "A stop sign is an octagon with 8 sides."
+    },
+    {
+      "id": 7,
+      "question": "The Google logo uses four different colors.",
+      "answer": true,
+      "explanation": "Blue, red, yellow, and green."
+    },
+    {
+      "id": 8,
+      "question": "On a QWERTY keyboard, the top letter row spells a word.",
+      "answer": true,
+      "explanation": "'TYPEWRITER' can be spelled using only the top row."
+    },
+    {
+      "id": 9,
+      "question": "A chess board has 64 squares.",
+      "answer": true,
+      "explanation": "8 \u00d7 8 = 64 squares."
+    },
+    {
+      "id": 10,
+      "question": "The Olympic rings have 6 colors including the background.",
+      "answer": true,
+      "explanation": "Blue, yellow, black, green, red rings on white background."
+    },
+    {
+      "id": 11,
+      "question": "A standard Rubik's Cube has 6 faces.",
+      "answer": true,
+      "explanation": "Each face has a different color: white, yellow, blue, green, red, orange."
+    },
+    {
+      "id": 12,
+      "question": "The stripes on the American flag are all the same width.",
+      "answer": true,
+      "explanation": "All 13 stripes have equal width."
+    },
+    {
+      "id": 13,
+      "question": "A regular soccer ball has more white patches than black.",
+      "answer": true,
+      "explanation": "Classic design: 20 white hexagons, 12 black pentagons."
+    },
+    {
+      "id": 14,
+      "question": "The Eiffel Tower has 3 levels open to the public.",
+      "answer": true,
+      "explanation": "Three levels: first floor, second floor, and summit."
+    },
+    {
+      "id": 15,
+      "question": "A bowling game consists of 12 frames.",
+      "answer": false,
+      "explanation": "A standard bowling game has 10 frames."
+    }
+  ]
+}

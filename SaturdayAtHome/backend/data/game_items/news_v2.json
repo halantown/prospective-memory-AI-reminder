@@ -1,0 +1,97 @@
+{
+  "skin": "news_v2",
+  "game_type": "trivia",
+  "instruction": "Answer each trivia question \u2014 True or False?",
+  "items": [
+    {
+      "id": 1,
+      "question": "The Sahara Desert is the largest desert in the world.",
+      "answer": false,
+      "explanation": "Antarctica is the largest desert by area."
+    },
+    {
+      "id": 2,
+      "question": "Honey never spoils if stored properly.",
+      "answer": true,
+      "explanation": "Archaeologists found 3000-year-old honey still edible in Egyptian tombs."
+    },
+    {
+      "id": 3,
+      "question": "The human body has 206 bones.",
+      "answer": true,
+      "explanation": "Adults have 206 bones; babies are born with about 270."
+    },
+    {
+      "id": 4,
+      "question": "Lightning never strikes the same place twice.",
+      "answer": false,
+      "explanation": "Tall structures like the Empire State Building are struck dozens of times per year."
+    },
+    {
+      "id": 5,
+      "question": "Venus is the hottest planet in our solar system.",
+      "answer": true,
+      "explanation": "Venus has a thick atmosphere causing extreme greenhouse effect (~465\u00b0C)."
+    },
+    {
+      "id": 6,
+      "question": "Goldfish have a 3-second memory.",
+      "answer": false,
+      "explanation": "Goldfish can remember things for months."
+    },
+    {
+      "id": 7,
+      "question": "The Great Wall of China is visible from space with the naked eye.",
+      "answer": false,
+      "explanation": "It is too narrow to be seen without aid from orbit."
+    },
+    {
+      "id": 8,
+      "question": "Octopuses have three hearts.",
+      "answer": true,
+      "explanation": "Two pump blood to the gills; one pumps to the rest of the body."
+    },
+    {
+      "id": 9,
+      "question": "Bananas are technically berries.",
+      "answer": true,
+      "explanation": "Botanically, bananas qualify as berries while strawberries don't."
+    },
+    {
+      "id": 10,
+      "question": "Mount Everest is the tallest mountain measured from base to peak.",
+      "answer": false,
+      "explanation": "Mauna Kea in Hawaii is taller measured from its base on the ocean floor."
+    },
+    {
+      "id": 11,
+      "question": "Water can boil and freeze at the same time under the right conditions.",
+      "answer": true,
+      "explanation": "This happens at the triple point of water."
+    },
+    {
+      "id": 12,
+      "question": "Bats are blind.",
+      "answer": false,
+      "explanation": "Bats can see; many species have excellent night vision."
+    },
+    {
+      "id": 13,
+      "question": "A day on Venus is longer than a year on Venus.",
+      "answer": true,
+      "explanation": "Venus rotates so slowly that one day is about 243 Earth days, while its year is 225."
+    },
+    {
+      "id": 14,
+      "question": "Humans use only 10% of their brains.",
+      "answer": false,
+      "explanation": "Brain scans show activity across the entire brain for various tasks."
+    },
+    {
+      "id": 15,
+      "question": "Sharks are older than trees.",
+      "answer": true,
+      "explanation": "Sharks appeared about 400 million years ago; trees about 350 million years ago."
+    }
+  ]
+}

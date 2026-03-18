@@ -1,15 +1,15 @@
 {
-  "skin": "grocery_v1",
+  "skin": "wardrobe_v4",
   "game_type": "go_nogo",
   "paradigm": "visual_gonogo",
   "stimulus_ms": 500,
   "isi_min_ms": 800,
   "isi_max_ms": 1200,
-  "go_label": "Green price tag - add to cart",
-  "nogo_label": "Red out-of-stock tag - skip",
-  "go_category": "In stock (green tag)",
-  "nogo_category": "Out of stock (red tag)",
-  "instruction": "Press SPACEBAR when you see a GREEN circle (in stock). Do NOT press for RED circles (out of stock).",
+  "go_label": "Keep - sort it",
+  "nogo_label": "Donate - skip",
+  "go_category": "Keep (sort into closet)",
+  "nogo_category": "Donate (skip)",
+  "instruction": "Press SPACEBAR when you see a GREEN circle (keep). Do NOT press for RED circles (donate).",
   "go_count": 113,
   "nogo_count": 37,
   "items": [
@@ -50,8 +50,8 @@
     },
     {
       "id": 8,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 9,
@@ -60,8 +60,8 @@
     },
     {
       "id": 10,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 11,
@@ -90,8 +90,8 @@
     },
     {
       "id": 16,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 17,
@@ -100,13 +100,13 @@
     },
     {
       "id": 18,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 19,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 20,
@@ -140,13 +140,13 @@
     },
     {
       "id": 26,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 27,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 28,
@@ -155,13 +155,13 @@
     },
     {
       "id": 29,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 30,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 31,
@@ -175,8 +175,8 @@
     },
     {
       "id": 33,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 34,
@@ -185,13 +185,13 @@
     },
     {
       "id": 35,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 36,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 37,
@@ -205,13 +205,13 @@
     },
     {
       "id": 39,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 40,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 41,
@@ -220,8 +220,8 @@
     },
     {
       "id": 42,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 43,
@@ -255,13 +255,13 @@
     },
     {
       "id": 49,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 50,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 51,
@@ -325,13 +325,13 @@
     },
     {
       "id": 63,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 64,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 65,
@@ -345,13 +345,13 @@
     },
     {
       "id": 67,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 68,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 69,
@@ -445,13 +445,13 @@
     },
     {
       "id": 87,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 88,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 89,
@@ -485,13 +485,13 @@
     },
     {
       "id": 95,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 96,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 97,
@@ -525,13 +525,13 @@
     },
     {
       "id": 103,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 104,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 105,
@@ -540,8 +540,8 @@
     },
     {
       "id": 106,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 107,
@@ -550,8 +550,8 @@
     },
     {
       "id": 108,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 109,
@@ -585,13 +585,13 @@
     },
     {
       "id": 115,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 116,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 117,
@@ -600,8 +600,8 @@
     },
     {
       "id": 118,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 119,
@@ -615,13 +615,13 @@
     },
     {
       "id": 121,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 122,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 123,
@@ -630,8 +630,8 @@
     },
     {
       "id": 124,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 125,
@@ -640,8 +640,8 @@
     },
     {
       "id": 126,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 127,
@@ -655,8 +655,8 @@
     },
     {
       "id": 129,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 130,
@@ -665,8 +665,8 @@
     },
     {
       "id": 131,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 132,
@@ -680,8 +680,8 @@
     },
     {
       "id": 134,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 135,
@@ -690,8 +690,8 @@
     },
     {
       "id": 136,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 137,
@@ -720,13 +720,13 @@
     },
     {
       "id": 142,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     },
     {
       "id": 143,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 144,
@@ -755,13 +755,13 @@
     },
     {
       "id": 149,
-      "type": "nogo",
-      "display": "red_circle"
+      "type": "go",
+      "display": "green_circle"
     },
     {
       "id": 150,
-      "type": "go",
-      "display": "green_circle"
+      "type": "nogo",
+      "display": "red_circle"
     }
   ]
 }

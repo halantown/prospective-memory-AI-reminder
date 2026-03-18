@@ -1,0 +1,330 @@
+{
+  "skin": "photo_v2",
+  "game_type": "semantic_cat",
+  "categories": [
+    "Family",
+    "Travel",
+    "Work Event"
+  ],
+  "instruction": "Sort each photo into the correct album.",
+  "items": [
+    {
+      "id": 1,
+      "stimulus": "Birthday Party \ud83c\udf82",
+      "preview": "Candles on a cake, everyone singing",
+      "category": "Family"
+    },
+    {
+      "id": 2,
+      "stimulus": "Beach Sunset \ud83c\udf05",
+      "preview": "Golden hour at the Mediterranean coast",
+      "category": "Travel"
+    },
+    {
+      "id": 3,
+      "stimulus": "Team Meeting \ud83d\udcca",
+      "preview": "Quarterly review with the marketing team",
+      "category": "Work Event"
+    },
+    {
+      "id": 4,
+      "stimulus": "Grandma's Garden \ud83c\udf3b",
+      "preview": "Sunflowers and tomato vines in August",
+      "category": "Family"
+    },
+    {
+      "id": 5,
+      "stimulus": "Eiffel Tower \ud83d\uddfc",
+      "preview": "Snapped from the Champs-\u00c9lys\u00e9es",
+      "category": "Travel"
+    },
+    {
+      "id": 6,
+      "stimulus": "Office Christmas Party \ud83c\udf84",
+      "preview": "Ugly sweater contest at the office",
+      "category": "Work Event"
+    },
+    {
+      "id": 7,
+      "stimulus": "Baby's First Steps \ud83d\udc76",
+      "preview": "Little Mia walking across the living room",
+      "category": "Family"
+    },
+    {
+      "id": 8,
+      "stimulus": "Safari Jeep \ud83e\udd81",
+      "preview": "A lion spotted in the Serengeti",
+      "category": "Travel"
+    },
+    {
+      "id": 9,
+      "stimulus": "Conference Badge \ud83c\udff7\ufe0f",
+      "preview": "Tech Summit 2024 attendee badge",
+      "category": "Work Event"
+    },
+    {
+      "id": 10,
+      "stimulus": "Thanksgiving Dinner \ud83e\udd83",
+      "preview": "The whole family around the big table",
+      "category": "Family"
+    },
+    {
+      "id": 11,
+      "stimulus": "Northern Lights \ud83c\udf0c",
+      "preview": "Aurora borealis in Iceland",
+      "category": "Travel"
+    },
+    {
+      "id": 12,
+      "stimulus": "Product Launch \ud83d\ude80",
+      "preview": "Ribbon cutting at the new store",
+      "category": "Work Event"
+    },
+    {
+      "id": 13,
+      "stimulus": "Dog at the Park \ud83d\udc15",
+      "preview": "Buddy playing fetch with the kids",
+      "category": "Family"
+    },
+    {
+      "id": 14,
+      "stimulus": "Venice Canal \ud83d\udea4",
+      "preview": "Gondola ride at sunset",
+      "category": "Travel"
+    },
+    {
+      "id": 15,
+      "stimulus": "Award Ceremony \ud83c\udfc6",
+      "preview": "Receiving the employee of the quarter award",
+      "category": "Work Event"
+    },
+    {
+      "id": 16,
+      "stimulus": "Wedding Anniversary \ud83d\udc8d",
+      "preview": "Mom and Dad's 40th celebration",
+      "category": "Family"
+    },
+    {
+      "id": 17,
+      "stimulus": "Great Wall \ud83e\uddf1",
+      "preview": "Hiking the Jiankou section in fog",
+      "category": "Travel"
+    },
+    {
+      "id": 18,
+      "stimulus": "Hackathon Team \ud83d\udcbb",
+      "preview": "Our team after 48 hours of coding",
+      "category": "Work Event"
+    },
+    {
+      "id": 19,
+      "stimulus": "Cousin's Graduation \ud83c\udf93",
+      "preview": "Throwing caps in the air",
+      "category": "Family"
+    },
+    {
+      "id": 20,
+      "stimulus": "Santorini View \ud83c\udfdd\ufe0f",
+      "preview": "Blue domes and white houses",
+      "category": "Travel"
+    },
+    {
+      "id": 21,
+      "stimulus": "Trade Show Booth \ud83c\udfaa",
+      "preview": "Our company booth at CES",
+      "category": "Work Event"
+    },
+    {
+      "id": 22,
+      "stimulus": "Kitchen Chaos \ud83c\udf73",
+      "preview": "Kids helping make pancakes Saturday morning",
+      "category": "Family"
+    },
+    {
+      "id": 23,
+      "stimulus": "Cherry Blossoms \ud83c\udf38",
+      "preview": "Kyoto temple in spring",
+      "category": "Travel"
+    },
+    {
+      "id": 24,
+      "stimulus": "Boardroom Presentation \ud83d\udcc8",
+      "preview": "Slides about Q2 revenue growth",
+      "category": "Work Event"
+    },
+    {
+      "id": 25,
+      "stimulus": "Cat Napping \ud83d\udc31",
+      "preview": "Whiskers asleep on the couch",
+      "category": "Family"
+    },
+    {
+      "id": 26,
+      "stimulus": "Machu Picchu \u26f0\ufe0f",
+      "preview": "Misty morning at the Inca ruins",
+      "category": "Travel"
+    },
+    {
+      "id": 27,
+      "stimulus": "Company Retreat \ud83c\udfd5\ufe0f",
+      "preview": "Team building exercises in the mountains",
+      "category": "Work Event"
+    },
+    {
+      "id": 28,
+      "stimulus": "Backyard BBQ \ud83c\udf56",
+      "preview": "Dad grilling burgers for the neighborhood",
+      "category": "Family"
+    },
+    {
+      "id": 29,
+      "stimulus": "Amsterdam Canal \ud83d\udeb2",
+      "preview": "Bikes lined up along the water",
+      "category": "Travel"
+    },
+    {
+      "id": 30,
+      "stimulus": "Webinar Screenshot \ud83d\udda5\ufe0f",
+      "preview": "500 attendees for the product demo",
+      "category": "Work Event"
+    },
+    {
+      "id": 31,
+      "stimulus": "Family Road Trip \ud83d\ude97",
+      "preview": "Everyone packed in the minivan",
+      "category": "Family"
+    },
+    {
+      "id": 32,
+      "stimulus": "Taj Mahal \ud83d\udd4c",
+      "preview": "Sunrise photo at the iconic monument",
+      "category": "Travel"
+    },
+    {
+      "id": 33,
+      "stimulus": "Networking Event \ud83e\udd1d",
+      "preview": "Exchanging cards at the industry mixer",
+      "category": "Work Event"
+    },
+    {
+      "id": 34,
+      "stimulus": "Sister's Birthday \ud83c\udf88",
+      "preview": "Surprise party in the living room",
+      "category": "Family"
+    },
+    {
+      "id": 35,
+      "stimulus": "Norwegian Fjord \u26f5",
+      "preview": "Kayaking through emerald waters",
+      "category": "Travel"
+    },
+    {
+      "id": 36,
+      "stimulus": "New Office Tour \ud83c\udfe2",
+      "preview": "Walking through the renovated workspace",
+      "category": "Work Event"
+    },
+    {
+      "id": 37,
+      "stimulus": "Niece's Drawing \ud83c\udfa8",
+      "preview": "A crayon masterpiece on the fridge",
+      "category": "Family"
+    },
+    {
+      "id": 38,
+      "stimulus": "Colosseum at Night \ud83c\udfdf\ufe0f",
+      "preview": "Rome lit up beautifully",
+      "category": "Travel"
+    },
+    {
+      "id": 39,
+      "stimulus": "Investor Pitch \ud83d\udcbc",
+      "preview": "Presenting to venture capitalists",
+      "category": "Work Event"
+    },
+    {
+      "id": 40,
+      "stimulus": "Movie Night \ud83c\udf7f",
+      "preview": "Family huddled on the sofa with blankets",
+      "category": "Family"
+    },
+    {
+      "id": 41,
+      "stimulus": "Banff Lake \ud83c\udfd4\ufe0f",
+      "preview": "Turquoise water reflecting snow peaks",
+      "category": "Travel"
+    },
+    {
+      "id": 42,
+      "stimulus": "Team Lunch \ud83c\udf55",
+      "preview": "Pizza Friday with the dev team",
+      "category": "Work Event"
+    },
+    {
+      "id": 43,
+      "stimulus": "Brother's Wedding \ud83d\udc92",
+      "preview": "The ceremony in the garden",
+      "category": "Family"
+    },
+    {
+      "id": 44,
+      "stimulus": "Tokyo Crossing \ud83d\udeb6",
+      "preview": "Shibuya scramble from above",
+      "category": "Travel"
+    },
+    {
+      "id": 45,
+      "stimulus": "Client Dinner \ud83c\udf77",
+      "preview": "Business dinner at the Italian restaurant",
+      "category": "Work Event"
+    },
+    {
+      "id": 46,
+      "stimulus": "Grandpa Fishing \ud83c\udfa3",
+      "preview": "Sunday morning at the lake",
+      "category": "Family"
+    },
+    {
+      "id": 47,
+      "stimulus": "Petra Treasury \ud83c\udfdb\ufe0f",
+      "preview": "The famous carved facade in Jordan",
+      "category": "Travel"
+    },
+    {
+      "id": 48,
+      "stimulus": "Whiteboard Session \u270d\ufe0f",
+      "preview": "Brainstorming the new feature roadmap",
+      "category": "Work Event"
+    },
+    {
+      "id": 49,
+      "stimulus": "New Year's Eve \ud83c\udf86",
+      "preview": "Fireworks over the city from our balcony",
+      "category": "Family"
+    },
+    {
+      "id": 50,
+      "stimulus": "Bali Rice Terraces \ud83c\udf3e",
+      "preview": "Tegallalang stepped paddies",
+      "category": "Travel"
+    },
+    {
+      "id": 51,
+      "stimulus": "Charity Gala \ud83c\udfad",
+      "preview": "Company-sponsored fundraiser event",
+      "category": "Work Event"
+    },
+    {
+      "id": 52,
+      "stimulus": "Kids at the Zoo \ud83e\udd92",
+      "preview": "Everyone excited about the giraffes",
+      "category": "Family"
+    },
+    {
+      "id": 53,
+      "stimulus": "Swiss Alps Train \ud83d\ude82",
+      "preview": "The Glacier Express winding through",
+      "category": "Travel"
+    }
+  ]
+}
