@@ -291,3 +291,59 @@ async def admin_export_session(session_id: str):
         "ongoing_responses": [dict(r) for r in ongoing],
         "session_events": [dict(r) for r in events],
     }
+
+
+@router.get("/session/{session_id}/game-stats")
+async def admin_game_stats(session_id: str):
+    """Compute per-game-type aggregated stats from ongoing_responses."""
+    db = get_db(DB_PATH)
+    rows = db.execute(
+        "SELECT * FROM ongoing_responses WHERE session_id = ? ORDER BY ts",
+        (session_id,),
+    ).fetchall()
+    db.close()
+
+    # Group by game_type
+    from collections import defaultdict
+    stats: dict[str, dict] = defaultdict(lambda: {
+        "total": 0, "correct": 0, "skipped": 0, "rts": [],
+    })
+    for r in rows:
+        d = dict(r)
+        gt = d.get("game_type", "unknown")
+        s = stats[gt]
+        s["total"] += 1
+        if d.get("correct"):
+            s["correct"] += 1
+        if d.get("skipped"):
+            s["skipped"] += 1
+        rt = d.get("response_time_ms")
+        if rt and not d.get("skipped"):
+            s["rts"].append(rt)
+
+    result = {}
+    for gt, s in stats.items():
+        rts = s["rts"]
+        avg_rt = sum(rts) / len(rts) if rts else 0
+        result[gt] = {
+            "total": s["total"],
+            "correct": s["correct"],
+            "accuracy": round(s["correct"] / s["total"] * 100, 1) if s["total"] else 0,
+            "skipped": s["skipped"],
+            "avg_rt_ms": round(avg_rt, 0),
+            "min_rt_ms": min(rts) if rts else 0,
+            "max_rt_ms": max(rts) if rts else 0,
+        }
+    return result
+
+
+@router.get("/session/{session_id}/pm-trials")
+async def admin_pm_trials(session_id: str):
+    """Get PM trial status for all blocks."""
+    db = get_db(DB_PATH)
+    rows = db.execute(
+        "SELECT * FROM pm_trials WHERE session_id = ? ORDER BY block_number, task_slot",
+        (session_id,),
+    ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]

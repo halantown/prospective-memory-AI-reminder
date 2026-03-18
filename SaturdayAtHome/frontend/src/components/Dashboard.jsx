@@ -65,6 +65,8 @@ export default function Dashboard() {
   const [sessionState, setSessionState] = useState(null)
   const [events, setEvents] = useState([])
   const [logs, setLogs] = useState([])
+  const [gameStats, setGameStats] = useState(null)
+  const [pmTrials, setPmTrials] = useState([])
   const [wsStatus, setWsStatus] = useState('disconnected')
   const [toast, setToast] = useState(null)
   const [blockNum, setBlockNum] = useState(1)
@@ -107,12 +109,16 @@ export default function Dashboard() {
   useEffect(() => {
     if (!session) return
     const refresh = async () => {
-      const [state, logData] = await Promise.all([
+      const [state, logData, stats, trials] = await Promise.all([
         api(`/admin/session/${session.session_id}/state`),
         api(`/admin/logs/${session.session_id}`),
+        api(`/admin/session/${session.session_id}/game-stats`),
+        api(`/admin/session/${session.session_id}/pm-trials`),
       ])
       if (state) setSessionState(state)
       if (logData) setLogs(logData)
+      if (stats) setGameStats(stats)
+      if (trials) setPmTrials(trials)
     }
     refresh()
     const timer = setInterval(refresh, 2000)
@@ -260,7 +266,7 @@ export default function Dashboard() {
           </div>
 
           {/* Center: Live Events */}
-          <div className="col-span-5">
+          <div className="col-span-4">
             <Panel title={`📡 Live Events (${events.filter(e => !e.type.includes('CONNECT')).length})`} className="h-[calc(100vh-80px)] overflow-y-auto">
               {events.length === 0 ? (
                 <p className="text-gray-600 text-xs">Waiting for events…</p>
@@ -277,9 +283,63 @@ export default function Dashboard() {
             </Panel>
           </div>
 
-          {/* Right: Action Logs */}
-          <div className="col-span-4">
-            <Panel title="📊 Action Logs (DB)" className="h-[calc(100vh-80px)] overflow-y-auto">
+          {/* Right: Game Stats + PM Trials + Logs */}
+          <div className="col-span-5 space-y-3">
+            {/* Minigame Results */}
+            <Panel title="🎮 Minigame Results">
+              {!gameStats || Object.keys(gameStats).length === 0 ? (
+                <p className="text-gray-600 text-xs">No game data yet</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {Object.entries(gameStats).map(([gt, s]) => (
+                    <div key={gt} className="bg-gray-900 rounded p-2">
+                      <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">{gt.replace('_', ' ')}</div>
+                      <div className="text-xs space-y-0.5">
+                        <div>Accuracy: <b className={s.accuracy >= 80 ? 'text-emerald-400' : s.accuracy >= 50 ? 'text-yellow-400' : 'text-red-400'}>{s.accuracy}%</b></div>
+                        <div>Trials: <b className="text-cyan-400">{s.total}</b></div>
+                        <div>Avg RT: <b className="text-cyan-400">{s.avg_rt_ms}ms</b></div>
+                        <div>Skipped: <b className="text-gray-400">{s.skipped}</b></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            {/* PM Trial Status */}
+            <Panel title="🧪 PM Trial Status">
+              {pmTrials.length === 0 ? (
+                <p className="text-gray-600 text-xs">No PM trials recorded yet</p>
+              ) : (
+                <div className="space-y-1">
+                  {pmTrials.map((t, i) => {
+                    const scoreColor = t.score === 2 ? 'text-emerald-400' : t.score === 1 ? 'text-yellow-400' : t.score === 0 ? 'text-red-400' : 'text-gray-500'
+                    const hasResponse = t.trigger_clicked !== undefined && t.trigger_clicked !== null
+                    return (
+                      <div key={i} className="flex items-center gap-2 text-xs font-mono bg-gray-900 rounded px-2 py-1">
+                        <span className="text-gray-500 w-8">B{t.block_number}</span>
+                        <span className="text-gray-400 w-6">{t.task_slot}</span>
+                        <span className="text-cyan-400 w-20 truncate">{t.task_id}</span>
+                        <span className={`font-bold ${scoreColor}`}>
+                          {t.score !== null && t.score !== undefined ? `Score: ${t.score}` : 'pending'}
+                        </span>
+                        {hasResponse && (
+                          <span className={t.trigger_clicked ? 'text-emerald-600' : 'text-red-600'}>
+                            {t.trigger_clicked ? '✓ clicked' : '✗ missed'}
+                          </span>
+                        )}
+                        {t.mcq_response_time_ms > 0 && (
+                          <span className="text-gray-500">{t.mcq_response_time_ms}ms</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Panel>
+
+            {/* Action Logs */}
+            <Panel title="📊 Action Logs (DB)" className="max-h-[40vh] overflow-y-auto">
               {logs.length === 0 ? (
                 <p className="text-gray-600 text-xs">No logged actions yet</p>
               ) : logs.map((l, i) => {
