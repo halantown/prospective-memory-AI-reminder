@@ -9,7 +9,7 @@ const INITIAL_TRIGGERS = [
   { id: 'doorbell', emoji: '🔔', label: 'Doorbell', state: 'inactive', taskId: null },
   { id: 'kitchen_timer', emoji: '⏲️', label: 'Timer done', state: 'inactive', taskId: null },
   { id: 'tv_weather', emoji: '📺', label: 'Weather alert', state: 'inactive', taskId: null },
-  { id: 'clock_3pm', emoji: '🕐', label: '3:00 PM', state: 'inactive', taskId: null },
+  { id: 'clock_7pm', emoji: '🕐', label: '7:00 PM Show', state: 'inactive', taskId: null },
   { id: 'friend_leaving', emoji: '💬', label: 'Friend leaving', state: 'inactive', taskId: null },
 ]
 
