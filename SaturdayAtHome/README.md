@@ -2,6 +2,8 @@
 
 A browser-based experimental platform for a **2×2 within-subjects Prospective Memory (PM)** study. Participants perform literature-validated cognitive tasks (Semantic Categorization, Go/No-Go, Trivia) with daily-life visual skins while remembering to self-initiate PM actions via trigger objects embedded in a minimap sidebar.
 
+**Keyboard-first interaction**: All gameplay uses keyboard shortcuts (1/2/3 for categorization, SPACEBAR for Go/No-Go, T for trigger response). Mouse click remains as a fallback.
+
 **Design document**: `docs/PRD_v2_1_MCQ_CogTask.md`
 
 ## Architecture
@@ -24,7 +26,7 @@ SaturdayAtHome/
 │   ├── data/
 │   │   ├── pm_tasks.json       # 8 PM tasks (encoding, quiz, trigger, MCQ, reminders)
 │   │   ├── neutral_comments.json
-│   │   └── game_items/         # Stimulus sets per skin (email_v1, grocery_v1, podcast_v1)
+│   │   └── game_items/         # Stimulus sets per skin (12 files for 4 blocks)
 │   ├── models/schemas.py       # Pydantic request/response models
 │   ├── routes/
 │   │   ├── session.py          # Token-based start, block config, WS stream
@@ -36,18 +38,17 @@ SaturdayAtHome/
 ├── frontend/                   # React 18 + Vite + Tailwind + Zustand (port 3000)
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── GameShell.jsx         # Phase router + MainPanel+Sidebar layout
+│   │   │   ├── GameShell.jsx         # Phase router + HomeScene+FloatingPanel+Sidebar layout
 │   │   │   ├── scene/
+│   │   │   │   ├── HomeScene.jsx     # Top-down floor plan (6 rooms, triggers, avatar, Pepper)
 │   │   │   │   └── sceneConstants.js # Room data (colors, furniture, triggers)
 │   │   │   ├── game/
-│   │   │   │   ├── MainPanel.jsx        # Game type router (active/transition)
-│   │   │   │   ├── RoomBackground.jsx   # Faded room illustration (z:0, opacity 0.07)
-│   │   │   │   ├── RobotSpeechToast.jsx # Robot speech toast (z:2, bottom)
+│   │   │   │   ├── MainPanel.jsx        # Game type router + pause indicator
 │   │   │   │   ├── HomeMapSidebar.jsx   # Sidebar: clock, minimap, robot, activity
-│   │   │   │   ├── SemanticCatGame.jsx  # Email sorting (3-4s/item)
-│   │   │   │   ├── GoNoGoGame.jsx       # Grocery shopping (2-3s/item)
-│   │   │   │   ├── TriviaGame.jsx       # Podcast quiz (5-8s/item)
-│   │   │   │   └── TransitionScreen.jsx # Between-game transition display
+│   │   │   │   ├── SemanticCatGame.jsx  # Email sorting (3-4s/item, pausable)
+│   │   │   │   ├── GoNoGoGame.jsx       # Visual Go/No-Go (SPACEBAR, 500ms stimulus, 75:25 ratio)
+│   │   │   │   ├── TriviaGame.jsx       # Podcast quiz (1=True/2=False, 5-8s/item)
+│   │   │   │   └── TransitionScreen.jsx # Narrative overlay between games
 │   │   │   ├── sidebar/              # Reusable sidebar sub-components
 │   │   │   │   └── Clock.jsx         # Sky-gradient time display
 │   │   │   ├── pm/
@@ -62,7 +63,7 @@ SaturdayAtHome/
 │   │   │   │   ├── BlockEndScreen.jsx
 │   │   │   │   └── CompleteScreen.jsx
 │   │   │   └── Dashboard.jsx    # Experimenter live monitoring
-│   │   ├── store/gameStore.js   # Zustand state (session/game/scene/robot/MCQ)
+│   │   ├── store/gameStore.js   # Zustand state (session/game/scene/robot/MCQ/pause)
 │   │   ├── hooks/
 │   │   │   ├── useWebSocket.js  # Bidirectional WS + reconnect + heartbeat
 │   │   │   └── useAudio.js      # Web Audio beep + Web Speech TTS
@@ -163,6 +164,8 @@ npm run build
 | `GET`  | `/api/game-items/{skin}`        | Stimulus items for a game skin            |
 | `GET`  | `/api/admin/dashboard`          | All sessions summary                      |
 | `GET`  | `/api/admin/export/all`         | CSV export of all data                    |
+| `GET`  | `/api/admin/session/{id}/game-stats` | Per-game-type accuracy, RT stats   |
+| `GET`  | `/api/admin/session/{id}/pm-trials`  | PM trial status for all blocks     |
 | `GET`  | `/api/config`                   | Full config (admin)                       |
 | `GET`  | `/api/config/game`              | Config stripped of correct answers        |
 
@@ -171,48 +174,90 @@ npm run build
 | Route          | Purpose                      |
 | -------------- | ---------------------------- |
 | `/`          | Game (participant-facing)    |
-| `/dashboard` | Experimenter live monitoring |
+| `/dashboard` | Experimenter live monitoring (game stats, PM trials, event log) |
+| `/manage`    | Database management          |
 | `/config`    | YAML config editor           |
 
 ## Visual Layout
 
 ```
-┌─────────────────────────────────────────────┬─────────────┐
-│  MAIN PANEL (~75%)                          │ SIDEBAR     │
-│                                             │ (~25%)      │
-│  ┌─ Room background layer (z:0) ──────────┐ │             │
-│  │  Faded illustration of current room     │ │  10:30 AM  │
-│  │  (emoji silhouettes, opacity ~0.07)     │ │  Saturday   │
-│  │                                         │ │             │
-│  │  ┌─ Game layer (z:1) ────────────────┐  │ │ ┌─────────┐│
-│  │  │  Semi-transparent white panel      │  │ │ │ MINIMAP ││
-│  │  │  (~92% of main area)               │  │ │ │         ││
-│  │  │   📧 Sorting emails                │  │ │ │ Study•  ││
-│  │  │   [email card]                     │  │ │ │ Kitchen ││
-│  │  │   [Work] [Personal] [Spam]         │  │ │ │ Living  ││
-│  │  └───────────────────────────────────┘  │ │ │ Laundry ││
-│  └─────────────────────────────────────────┘ │ │ Entry   ││
-│                                             │ │ Balcony ││
-│  ┌─ Robot toast (z:2) ─────────────────┐    │ │         ││
-│  │ 🤖 "Lot of emails this week!"      │    │ └─────────┘│
-│  └─────────────────────────────────────┘    │  🤖 Pepper  │
-│                                             │    idle     │
-└─────────────────────────────────────────────┴─────────────┘
+┌──────────────────────────────────────────┬──────────────┐
+│  MAIN VIEW (~75%)                        │  SIDEBAR     │
+│  = Top-down home floor plan              │  (~25%)      │
+│                                          │              │
+│  ┌────────┬────────┬──────────────┐      │  10:30 AM    │
+│  │ Study  │Kitchen │              │      │  Saturday    │
+│  │ 💻📚  │ 🍳☕  │ Living Room  │      │              │
+│  │   •You │ ⏲️🍽️  │  🛋️📺☕     │      │ ┌──────────┐ │
+│  │  🤖   │        │  🕐💬       │      │ │ MINIMAP  │ │
+│  ├────────┼────────┤              │      │ │ (compact │ │
+│  │Laundry │Entry   ├──────────────┤      │ │ floor    │ │
+│  │ 🫧🧺  │ 🚪📱  │  Balcony     │      │ │ plan)    │ │
+│  │ 🧴    │ 👟🧥  │  🪑🌱🌤️🌸  │      │ └──────────┘ │
+│  └────────┴────────┴──────────────┘      │              │
+│                                          │  🤖 Pepper   │
+│  ┌── Floating game panel (z:10) ───────┐ │    idle      │
+│  │  58%×70% white panel, 92% opacity   │ │              │
+│  │  📧 [email card]                    │ │  📍 Study    │
+│  │  [Work] [Personal] [Spam]           │ │              │
+│  └─────────────────────────────────────┘ │              │
+└──────────────────────────────────────────┴──────────────┘
 ```
 
-**Layout**: `flex` with `flex-1` main panel + `280px` fixed-width sidebar.
+**Layout**: `flex` with `flex-1` main panel + `280px` fixed-width sidebar. Home scene is always visible underneath the floating game panel.
 
-**Room background**: CSS-only emoji at 0.07 opacity, grayscale 60%, crossfades on room change (500ms).
+**Home scene** (`HomeScene.jsx`): Top-down floor plan with 6 rooms as CSS-positioned colored divs. Slate-400 background visible in gaps between rooms as "walls". Rooms contain emoji furniture and interactive trigger objects. Avatar (blue circle, 20px) and Pepper (🤖) positioned in the current room.
 
-**Game panel**: `rgba(255,255,255,0.88)` background, 92% of main area, rounded corners. Game components render inside unchanged.
+**Floating game panel**: `rgba(255,255,255,0.92)` background, 58%×70% of main view, centered with rounded corners and shadow. Game components render inside unchanged. A `bg-black/10` dim overlay sits behind the panel (z:5) while the rest of the home scene remains visible around it.
 
-**Minimap**: SVG-based top-down floor plan in sidebar. Rooms as colored rectangles with furniture emoji. Avatar (blue dot) and Pepper (🤖) animate between rooms. Trigger emoji have 3 states: inactive, ambient (pulse), fired (glow + red dot, clickable).
+**Avatar & Pepper**: Avatar (blue dot with "You" label) moves between rooms on `room_transition` with Framer Motion CSS transitions (2s ease-in-out). Pepper follows with 0.4s delay and slight positional offset. Pepper pulses when speaking.
 
-**Trigger states**: inactive (static) → ambient (subtle pulse) → fired (glow + bounce + red dot). "Ding" sound only on transitions to fired state. Ambient pulses occur without PM association (anti-meta-strategy).
+**Minimap** (sidebar): SVG-based compact version of the floor plan. Same room layout but small (~50-60px per room). Avatar dot (8px blue circle) mirrors current room. Trigger icons inside rooms match main scene states. Triggers are clickable in both main scene and sidebar minimap.
 
-**Robot speech**: Toast at bottom of main panel with 🤖 icon. Identical style for neutral comments and PM reminders. Sidebar shows Pepper status (idle/speaking) simultaneously.
+**Trigger states**: inactive (50% opacity, non-interactive) → ambient (subtle pulse animation, non-interactive) → fired (glow animation + red notification dot, clickable). Clicking a fired trigger pauses the active game and sends `trigger_click` via WS.
 
-**Encoding & questionnaire**: Render inside the main panel area with sidebar still visible (participant can see the minimap while learning PM tasks).
+**Game pause on trigger click**: When participant clicks a fired trigger (main scene or minimap), `gamePaused` becomes true in the store. All three game components (SemanticCat, GoNoGo, Trivia) save remaining timeout, suspend timers, and disable buttons. After MCQ answer or window timeout, the game resumes from where it was paused.
+
+**Robot speech**: Speech bubble appears near Pepper's position in the main scene (not the sidebar). White bubble with subtle shadow, auto-dismisses after TTS. Same style for neutral comments and PM reminders.
+
+**Transitions**: On `room_transition`: game panel fades out (300ms) → narrative overlay ("11:15 AM — Time to order groceries") with walking dots → avatar animates to new room (2s) → new game panel fades in.
+
+**Encoding & questionnaire**: Render as centered overlays (62% width) on top of the home scene with `bg-black/20` backdrop. Home scene visible behind, providing spatial context.
+
+**Z-ordering**: z:0 = HomeScene, z:5 = dim overlay, z:10 = floating game panel / transition, z:15 = encoding/questionnaire overlays, z:50 = MCQ overlay, z:100 = WS reconnection banner.
+
+### Go/No-Go Paradigm
+
+The Go/No-Go task uses a **visual response inhibition** paradigm (not semantic categorization):
+
+- **Go stimulus**: Green circle → press SPACEBAR within 500ms
+- **No-Go stimulus**: Red circle → withhold response (don't press)
+- **Ratio**: 75:25 (Go:No-Go) to build prepotent response
+- **Timing**: Stimulus 500ms, ISI 800-1200ms (randomized)
+- **Sequence**: No-Go appears after 2-6 consecutive Go trials; never two No-Go in a row
+- **~150 trials** per 3-min segment
+- **Metrics logged**: hit rate, false alarm rate, reaction time, miss rate
+
+### Keyboard Controls
+
+| Game | Keys | Description |
+|------|------|-------------|
+| Email Sorting | `1`/`2`/`3` | Work / Personal / Spam |
+| Go/No-Go | `SPACE` | Press for green circle |
+| Trivia | `1`/`2` | True / False |
+| Trigger alert | `T` | Respond to fired trigger |
+| MCQ | `1`/`2`/`3` | Select answer option |
+
+### Day Structure
+
+The 4 blocks represent segments of **one Saturday**:
+
+| Block | Time range | Narrative |
+|-------|-----------|-----------|
+| Block 1 | 10:00 AM – 12:30 PM | Morning |
+| Block 2 | 12:30 PM – 3:00 PM | Early afternoon |
+| Block 3 | 3:00 PM – 5:30 PM | Late afternoon |
+| Block 4 | 5:30 PM – 8:00 PM | Evening |
 
 ## Experiment Design
 
