@@ -1,22 +1,26 @@
 # Saturday At Home
 
-A browser-based experimental platform for a **2×2 within-subjects Prospective Memory (PM)** study. Participants perform literature-validated cognitive tasks (Semantic Categorization, Go/No-Go, Trivia) with daily-life visual skins while remembering to self-initiate PM actions via a sidebar trigger system.
+A browser-based experimental platform for a **2×2 within-subjects Prospective Memory (PM)** study. Participants perform literature-validated cognitive tasks (Semantic Categorization, Go/No-Go, Trivia) with daily-life visual skins while remembering to self-initiate PM actions via trigger objects embedded in a 2D home floor plan scene.
 
-**Design document**: `docs/PRD_v2_1_MCQ_CogTask.md`
+**Design document**: `docs/PRD_v2_1_MCQ_CogTask.md`  
+**Visual overhaul spec**: `docs/PRD_ADDENDUM_visual_overhaul.md`
 
 ## Architecture
 
 ```
 SaturdayAtHome/
 ├── game_config.yaml            # Single source of truth for ALL game parameters
-├── backend/                    # Python FastAPI + SQLite (port 5000)
+├── docker-compose.yml          # MySQL 8.0 Docker service
+├── .env                        # MySQL credentials (local dev)
+├── backend/                    # Python FastAPI + MySQL (port 5000)
 │   ├── main.py                 # Entry point (uvicorn, lifespan init)
 │   ├── core/
 │   │   ├── config_loader.py    # Loads YAML, pm_tasks.json, game_items
-│   │   ├── database.py         # SQLite schema (10 tables), auto-init
+│   │   ├── database.py         # PyMySQL wrapper (sqlite3-compatible API)
 │   │   ├── block_scheduler.py  # Generates 22-event block schedule
 │   │   ├── timeline.py         # Async timeline runner, pm_trial pre-creation
 │   │   ├── ws.py               # Bidirectional WebSocket hub (6 client msg types)
+│   │   ├── session_lifecycle.py # Session phase machine + heartbeat monitor
 │   │   └── event_schedule.py   # EventType enum + WS_EVENT_MAP
 │   ├── data/
 │   │   ├── pm_tasks.json       # 8 PM tasks (encoding, quiz, trigger, MCQ, reminders)
@@ -33,20 +37,24 @@ SaturdayAtHome/
 ├── frontend/                   # React 18 + Vite + Tailwind + Zustand (port 3000)
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── GameShell.jsx         # Phase router + 75/25 layout
+│   │   │   ├── GameShell.jsx         # Phase router + HomeScene layout
+│   │   │   ├── scene/                # 2D home floor plan (visual overhaul)
+│   │   │   │   ├── sceneConstants.js # Room positions, furniture, trigger mappings
+│   │   │   │   ├── HomeScene.jsx     # Top-level scene container (1400×800)
+│   │   │   │   ├── Room.jsx          # Individual room with furniture
+│   │   │   │   ├── SceneTrigger.jsx  # 3-state trigger objects (inactive/ambient/fired)
+│   │   │   │   ├── Avatar.jsx        # Player character with walking animation
+│   │   │   │   ├── PepperCharacter.jsx # Robot companion + speech bubble
+│   │   │   │   ├── GamePanel.jsx     # Floating game overlay (~60% scene)
+│   │   │   │   ├── SceneClock.jsx    # HUD time display
+│   │   │   │   ├── TransitionOverlay.jsx # Room transition narrative
+│   │   │   │   └── EdgeNotification.jsx  # Off-screen trigger indicators
 │   │   │   ├── game/
-│   │   │   │   ├── MainPanel.jsx     # Game type router, dim-on-MCQ
 │   │   │   │   ├── SemanticCatGame.jsx  # Email sorting (3-4s/item)
 │   │   │   │   ├── GoNoGoGame.jsx       # Grocery shopping (2-3s/item)
 │   │   │   │   ├── TriviaGame.jsx       # Podcast quiz (5-8s/item)
-│   │   │   │   └── TransitionScreen.jsx # Room transition display
-│   │   │   ├── sidebar/
-│   │   │   │   ├── Sidebar.jsx       # Container (dark theme)
-│   │   │   │   ├── Clock.jsx         # Day/night gradient status bar
-│   │   │   │   ├── MiniMap.jsx       # 5-room floor plan
-│   │   │   │   ├── ActivityLabel.jsx  # Current activity text
-│   │   │   │   ├── RobotStatus.jsx   # Pepper status + speech bubble
-│   │   │   │   └── TriggerZone.jsx   # 8 trigger icons (3 states)
+│   │   │   │   └── TransitionScreen.jsx # Legacy transition display
+│   │   │   ├── sidebar/              # Legacy sidebar (archived)
 │   │   │   ├── pm/
 │   │   │   │   ├── EncodingCard.jsx  # PM task instruction display
 │   │   │   │   ├── EncodingQuiz.jsx  # Verification question
@@ -59,14 +67,15 @@ SaturdayAtHome/
 │   │   │   │   ├── BlockEndScreen.jsx
 │   │   │   │   └── CompleteScreen.jsx
 │   │   │   └── Dashboard.jsx    # Experimenter live monitoring
-│   │   ├── store/gameStore.js   # Zustand state (session/game/sidebar/robot/MCQ)
+│   │   ├── store/gameStore.js   # Zustand state (session/game/scene/robot/MCQ)
 │   │   ├── hooks/
 │   │   │   ├── useWebSocket.js  # Bidirectional WS + reconnect + heartbeat
 │   │   │   └── useAudio.js      # Web Audio beep + Web Speech TTS
 │   │   └── utils/api.js         # GET-only + session start POST
 │   └── dist/                    # Production build (served by FastAPI at /)
 └── docs/
-    └── PRD_v2_1_MCQ_CogTask.md  # Design specification (source of truth)
+    ├── PRD_v2_1_MCQ_CogTask.md  # Design specification (source of truth)
+    └── PRD_ADDENDUM_visual_overhaul.md  # Visual overhaul specification
 ```
 
 ## Quick Start
@@ -75,6 +84,15 @@ SaturdayAtHome/
 
 - Python 3.10+ with conda environment `thesis_server`
 - Node.js 18+
+- Docker (for MySQL)
+
+### Database (MySQL via Docker)
+
+```bash
+cd SaturdayAtHome
+docker compose up -d
+# → MySQL 8.0 on localhost:3306 (user: saturday, db: experiment)
+```
 
 ### Backend
 
@@ -164,33 +182,37 @@ npm run build
 ## Visual Layout
 
 ```
-┌──────────────────────────────┬──────────────┐
-│                              │ ☀️  11:15 AM  │  ← Day/night gradient clock
-│                              │   Saturday   │
-│   Main Panel (75%)           ├──────────────┤
-│                              │   Kitchen    │  ← Activity label
-│   Cognitive task game:       │   Checking   │
-│   - Semantic Categorization  │   groceries  │
-│   - Go/No-Go                 ├──────────────┤
-│   - Trivia                   │ ┌────┬────┐  │
-│                              │ │Study│Kitch│ │  ← Mini-map
-│   Items presented at fixed   │ ├────┴────┤  │
-│   intervals (2-8s by type)   │ │Liv │Entr│  │
-│                              │ └────┴────┘  │
-│                              ├──────────────┤
-│                              │ 🤖 Pepper    │  ← Robot status
-│                              │  Idle        │
-│                              ├──────────────┤
-│                              │ 🍽️ 📱 🧺 🔔  │
-│                              │ ⏲️ 📺 🕐 🧥  │  ← 8 trigger icons
-│                              │ Household    │     (always visible)
-│                              │ Events       │
-└──────────────────────────────┴──────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ 🏠 Saturday at Home                              🕐 11:15  │
+│                                                    Saturday │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────────────────┐ │
+│  │  Study    │  │ Kitchen  │  │  Living Room              │ │
+│  │ 💻📚🪑   │  │ 🍳🍽️⏲️  │  │ 🕐🛋️📺☕💬              │ │
+│  │          │  │          │  │                           │ │
+│  │ 🧑🤖     │  │          │  │                           │ │
+│  └──────────┘  └──────────┘  └───────────────────────────┘ │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────────────────┐ │
+│  │ Laundry  │  │ Entrance │  │  Balcony                  │ │
+│  │ 🫧🧺     │  │ 🚪📱👟   │  │ 🪑🌱🌤️                  │ │
+│  └──────────┘  └──────────┘  └───────────────────────────┘ │
+│                                                             │
+│  ┌──────────── GamePanel (floating) ──────────────┐        │
+│  │ 📧 Sorting emails              Study           │        │
+│  │ ┌─────────────────────────────────────────────┐│        │
+│  │ │     Game content (SemanticCat/GoNoGo/       ││        │
+│  │ │     Trivia) renders here                    ││        │
+│  │ └─────────────────────────────────────────────┘│        │
+│  └────────────────────────────────────────────────┘        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**Sidebar theme**: Dark (slate-900) for visual separation from the light game area.
+**Scene layout**: 1400×800px container with 6 rooms, responsive scaling on resize.
 
-**Trigger icon states**: inactive (grey) → ambient (subtle pulse) → fired (highlight + red dot). Same "ding" for all state changes. Some icons pulse ambiently without PM association (anti-meta-strategy).
+**Trigger states**: inactive (static) → ambient (subtle pulse) → fired (glow + bounce + red dot). "Ding" sound only on transitions to fired state. Ambient pulses occur without PM association (anti-meta-strategy).
+
+**Game panel**: ~60% of scene, floating overlay anchored to current room. Background rooms visible around edges. Surrounding scene dims slightly (10% black overlay).
+
+**Characters**: Avatar (🧑) walks between rooms on `room_transition` events (2.5s Framer Motion animation). Pepper (🤖) follows with 0.3s delay. Speech bubble style identical for neutral comments and PM reminders.
 
 ## Experiment Design
 
@@ -219,7 +241,7 @@ npm run build
 
 ## Data
 
-All experiment data stored in `backend/core/experiment.db` (SQLite, auto-created on startup):
+All experiment data stored in MySQL (`experiment` database, Docker container `saturday_mysql`):
 
 | Table                      | Purpose                                           |
 | -------------------------- | ------------------------------------------------- |
@@ -234,3 +256,5 @@ All experiment data stored in `backend/core/experiment.db` (SQLite, auto-created
 | `session_events`         | WS connection events                              |
 
 Export via `/api/admin/export/all` (CSV) or `/dashboard` page.
+
+Connection: `MYSQL_HOST=127.0.0.1`, `MYSQL_PORT=3306`, `MYSQL_USER=saturday`, `MYSQL_DATABASE=experiment` (configured in `.env`).
