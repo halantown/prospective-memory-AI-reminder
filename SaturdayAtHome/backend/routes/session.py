@@ -77,7 +77,7 @@ async def start_session(req: TokenSessionStartRequest):
         logger.info(f"Session started via token: {row['session_id']} (participant={row['participant_id']})")
         log_action(row["session_id"], 0, "session_start_token", {"token": req.token})
 
-    condition_order = json.loads(row["condition_order"])
+    condition_order = [str(c) for c in json.loads(row["condition_order"])]
     current_block = row["current_block"] if row["current_block"] and row["current_block"] > 0 else 1
     return SessionStartResponse(
         session_id=row["session_id"],
