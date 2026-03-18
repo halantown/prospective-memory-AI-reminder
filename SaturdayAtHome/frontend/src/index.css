@@ -16,3 +16,28 @@
   transform-origin: center;
   box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25), 0 16px 28px rgba(220, 38, 38, 0.2);
 }
+
+/* Minimap trigger animations */
+@keyframes minimap-fired-pulse {
+  0%, 100% { r: 5; opacity: 0.8; }
+  50% { r: 7; opacity: 0.4; }
+}
+.minimap-trigger-fired {
+  animation: minimap-fired-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes minimap-ambient-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+.minimap-trigger-ambient {
+  animation: minimap-ambient-pulse 2s ease-in-out infinite;
+}
+
+@keyframes minimap-dot-pulse {
+  0%, 100% { r: 1.5; }
+  50% { r: 2.2; }
+}
+.minimap-trigger-dot {
+  animation: minimap-dot-pulse 0.8s ease-in-out infinite;
+}

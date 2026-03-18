@@ -32,7 +32,7 @@ function LikertScale({ label, value, onChange }) {
   )
 }
 
-export default function QuestionnaireScreen() {
+export default function QuestionnaireScreen({ embedded = false }) {
   const submitQuestionnaire = useGameStore(s => s.submitQuestionnaire)
   const blockNumber = useGameStore(s => s.blockNumber)
   const [intrusiveness, setIntrusiveness] = useState(null)
@@ -49,8 +49,12 @@ export default function QuestionnaireScreen() {
     })
   }
 
+  const wrapperClass = embedded
+    ? 'h-full flex items-center justify-center p-4 overflow-auto'
+    : 'min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4'
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+    <div className={wrapperClass}>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

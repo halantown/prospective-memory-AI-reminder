@@ -8,7 +8,7 @@ import EncodingQuiz from '../pm/EncodingQuiz'
 // Steps: card_a → quiz_a → card_b → quiz_b → done
 const STEPS = ['card_a', 'quiz_a', 'card_b', 'quiz_b']
 
-export default function EncodingScreen() {
+export default function EncodingScreen({ embedded = false }) {
   const sessionId = useGameStore(s => s.sessionId)
   const blockNumber = useGameStore(s => s.blockNumber)
   const setPhase = useGameStore(s => s.setPhase)
@@ -42,9 +42,13 @@ export default function EncodingScreen() {
     }
   }
 
+  const wrapperClass = embedded
+    ? 'h-full flex flex-col items-center justify-center p-4 overflow-auto'
+    : 'min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 flex flex-col items-center justify-center p-4'
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 flex items-center justify-center">
+      <div className={wrapperClass}>
         <p className="text-slate-400 text-lg">Loading tasks…</p>
       </div>
     )
@@ -52,7 +56,7 @@ export default function EncodingScreen() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 flex items-center justify-center">
+      <div className={wrapperClass}>
         <div className="text-center">
           <p className="text-red-500 mb-2">{error}</p>
           <button
@@ -67,7 +71,7 @@ export default function EncodingScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 flex flex-col items-center justify-center p-4">
+    <div className={wrapperClass}>
       <div className="mb-4 text-center">
         <div className="text-xs text-slate-400 uppercase tracking-wider font-medium">
           Block {blockNumber} — Task {currentStep.includes('a') ? 'A' : 'B'}
