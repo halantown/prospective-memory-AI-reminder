@@ -188,7 +188,13 @@ export const useGameStore = create((set, get) => ({
     const triggers = get().triggers.map(t =>
       t.taskId === data.task_id ? { ...t, state: 'inactive', taskId: null } : t
     )
-    set({ triggers, activeExecutionWindow: null, triggerBannerVisible: false, mcqVisible: false, mcqData: null, gameDimmed: false, gamePaused: false })
+    const updates = { triggers, activeExecutionWindow: null, triggerBannerVisible: false }
+    // Only unpause/undim if the game was paused due to this trigger (not MCQ)
+    if (!get().mcqVisible) {
+      updates.gameDimmed = false
+      updates.gamePaused = false
+    }
+    set(updates)
   },
 
   clickTrigger: (triggerId) => {

@@ -303,10 +303,13 @@ async def admin_game_stats(session_id: str):
     ).fetchall()
     db.close()
 
+    if not rows:
+        return {}
+
     # Group by game_type
     from collections import defaultdict
     stats: dict[str, dict] = defaultdict(lambda: {
-        "total": 0, "correct": 0, "skipped": 0, "rts": [],
+        "total": 0, "correct": 0, "no_response": 0, "rts": [],
     })
     for r in rows:
         d = dict(r)
@@ -315,10 +318,10 @@ async def admin_game_stats(session_id: str):
         s["total"] += 1
         if d.get("correct"):
             s["correct"] += 1
-        if d.get("skipped"):
-            s["skipped"] += 1
+        if d.get("response") is None:
+            s["no_response"] += 1
         rt = d.get("response_time_ms")
-        if rt and not d.get("skipped"):
+        if rt and d.get("response") is not None:
             s["rts"].append(rt)
 
     result = {}
@@ -329,7 +332,7 @@ async def admin_game_stats(session_id: str):
             "total": s["total"],
             "correct": s["correct"],
             "accuracy": round(s["correct"] / s["total"] * 100, 1) if s["total"] else 0,
-            "skipped": s["skipped"],
+            "no_response": s["no_response"],
             "avg_rt_ms": round(avg_rt, 0),
             "min_rt_ms": min(rts) if rts else 0,
             "max_rt_ms": max(rts) if rts else 0,

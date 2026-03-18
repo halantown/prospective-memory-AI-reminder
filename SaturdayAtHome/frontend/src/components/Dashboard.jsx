@@ -298,7 +298,7 @@ export default function Dashboard() {
                         <div>Accuracy: <b className={s.accuracy >= 80 ? 'text-emerald-400' : s.accuracy >= 50 ? 'text-yellow-400' : 'text-red-400'}>{s.accuracy}%</b></div>
                         <div>Trials: <b className="text-cyan-400">{s.total}</b></div>
                         <div>Avg RT: <b className="text-cyan-400">{s.avg_rt_ms}ms</b></div>
-                        <div>Skipped: <b className="text-gray-400">{s.skipped}</b></div>
+                        <div>No response: <b className="text-gray-400">{s.no_response}</b></div>
                       </div>
                     </div>
                   ))}

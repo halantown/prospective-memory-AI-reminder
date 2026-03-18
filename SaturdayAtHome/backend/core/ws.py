@@ -256,7 +256,7 @@ def _handle_ongoing_batch(session_id: str, data: dict, block_num: int) -> dict:
             now = time.time()
             rows = [
                 (session_id, block_num, game_type, game_skin,
-                 r.get("item_id"), r.get("response"), r.get("correct"),
+                 r.get("item_id"), r.get("selected", r.get("response")), r.get("correct"),
                  r.get("response_time_ms"), r.get("ts", now))
                 for r in responses
             ]

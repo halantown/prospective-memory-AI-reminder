@@ -28,13 +28,16 @@ export default function GameShell() {
   useWebSocket()
   useAudio()
 
-  // Global "T" key → respond to fired trigger
+  // Global "T" key → respond to fired trigger (only during gameplay)
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key.toLowerCase() === 't' && !useGameStore.getState().mcqVisible) {
-        e.preventDefault()
-        useGameStore.getState().clickActiveTrigger()
-      }
+      if (e.key.toLowerCase() !== 't') return
+      const s = useGameStore.getState()
+      if (s.mcqVisible) return
+      if (!s.gameActive) return
+      if (!s.activeExecutionWindow) return
+      e.preventDefault()
+      s.clickActiveTrigger()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

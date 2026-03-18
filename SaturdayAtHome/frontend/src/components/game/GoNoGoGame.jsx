@@ -73,6 +73,7 @@ export default function GoNoGoGame() {
       // Auto-expire stimulus after STIMULUS_MS
       timerRef.current = setTimeout(() => {
         if (respondedRef.current) return
+        respondedRef.current = true
         const outcome = isGo ? 'miss' : 'correct_reject'
         setFeedback(outcome)
         setTrialPhase('feedback')
