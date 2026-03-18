@@ -21,7 +21,7 @@ from core.config_loader import (
     get_timeline_config, get_config,
     get_block_skins, get_room_label,
     get_block_pm_tasks, get_neutral_comments,
-    load_game_items,
+    load_game_items, load_game_meta,
 )
 from core.event_schedule import EventType, ScheduledEvent
 
@@ -124,6 +124,7 @@ def generate_block_schedule(
             "skin": skin_a,
             "room": room_a,
             "items": load_game_items(skin_a) or [],
+            "meta": load_game_meta(skin_a),
         },
     ))
     events.append(ScheduledEvent(
@@ -155,6 +156,7 @@ def generate_block_schedule(
             "skin": skin_b,
             "room": room_b,
             "items": load_game_items(skin_b) or [],
+            "meta": load_game_meta(skin_b),
         },
     ))
     events.append(ScheduledEvent(
@@ -186,6 +188,7 @@ def generate_block_schedule(
             "skin": skin_c,
             "room": room_c,
             "items": load_game_items(skin_c) or [],
+            "meta": load_game_meta(skin_c),
         },
     ))
     events.append(ScheduledEvent(

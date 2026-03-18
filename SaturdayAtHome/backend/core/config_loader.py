@@ -136,6 +136,19 @@ def load_game_items(skin: str) -> list[dict] | None:
     return raw.get("items", raw.get("questions", []))
 
 
+def load_game_meta(skin: str) -> dict:
+    """Load game metadata (categories, instruction, labels) from data/game_items/{skin}.json."""
+    p = DATA_DIR / "game_items" / f"{skin}.json"
+    if not p.exists():
+        return {}
+    with open(p, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    if isinstance(raw, list):
+        return {}
+    meta = {k: v for k, v in raw.items() if k not in ("items", "questions")}
+    return meta
+
+
 # ── Block skin and room helpers ────────────────────────────
 
 def get_block_skins(block_num: int) -> dict:
