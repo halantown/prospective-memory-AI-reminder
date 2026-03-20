@@ -29,6 +29,11 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Cooking for Friends backend...")
     await init_db()
     logger.info("Database initialized")
+
+    # Set db factory for timeline execution window callbacks
+    from engine.timeline import set_db_factory
+    set_db_factory(async_session)
+
     yield
     logger.info("Shutting down...")
     cancel_all()

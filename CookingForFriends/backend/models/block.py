@@ -1,4 +1,4 @@
-"""Block, PMTrial, and ReminderMessage models."""
+"""Block, PMTrial, PMAttemptRecord, EncodingQuizAttempt, and ReminderMessage models."""
 
 import enum
 from datetime import datetime
@@ -68,8 +68,68 @@ class PMTrial(Base):
     user_actions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-6
     response_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resumption_lag_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     block: Mapped["Block"] = relationship("Block", back_populates="pm_trials")
+    attempt: Mapped["PMAttemptRecord | None"] = relationship(
+        "PMAttemptRecord", back_populates="trial", uselist=False,
+    )
+    quiz_attempts: Mapped[list["EncodingQuizAttempt"]] = relationship(
+        "EncodingQuizAttempt", back_populates="trial",
+    )
+
+
+class PMAttemptRecord(Base):
+    """Granular record of a single PM attempt with all timing data."""
+    __tablename__ = "pm_attempt_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    trial_id: Mapped[int] = mapped_column(Integer, ForeignKey("pm_trials.id"), nullable=False)
+    participant_id: Mapped[str] = mapped_column(String(36), ForeignKey("participants.id"), nullable=False)
+    block_id: Mapped[int] = mapped_column(Integer, ForeignKey("blocks.id"), nullable=False)
+
+    # Timing — all in epoch seconds
+    trigger_fired_at: Mapped[float] = mapped_column(Float, nullable=False)
+    trigger_received_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    first_action_time: Mapped[float | None] = mapped_column(Float, nullable=True)
+    first_room_switch_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    first_pm_room_entered_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_selected_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    action_completed_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Navigation
+    room_sequence: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    room: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Execution
+    target_selected: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    action_performed: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    action_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    # Computed
+    total_elapsed_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-6
+
+    trial: Mapped["PMTrial"] = relationship("PMTrial", back_populates="attempt")
+
+
+class EncodingQuizAttempt(Base):
+    """Records each quiz attempt during encoding phase."""
+    __tablename__ = "encoding_quiz_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    trial_id: Mapped[int] = mapped_column(Integer, ForeignKey("pm_trials.id"), nullable=False)
+    participant_id: Mapped[str] = mapped_column(String(36), ForeignKey("participants.id"), nullable=False)
+
+    question_type: Mapped[str] = mapped_column(String(20), nullable=False)  # trigger / target / action
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 1, 2, ...
+    selected_answer: Mapped[str] = mapped_column(String(200), nullable=False)
+    correct_answer: Mapped[str] = mapped_column(String(200), nullable=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    response_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    trial: Mapped["PMTrial"] = relationship("PMTrial", back_populates="quiz_attempts")
 
 
 class ReminderMessage(Base):
@@ -85,6 +145,4 @@ class ReminderMessage(Base):
     extra_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     is_placeholder: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-
 

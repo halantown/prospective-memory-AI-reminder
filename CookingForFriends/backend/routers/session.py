@@ -1,4 +1,4 @@
-"""Session router — token login, block config, status, WebSocket."""
+"""Session router — token login, block config, quiz, status, WebSocket."""
 
 import uuid
 import time
@@ -10,10 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db, async_session
 from models.experiment import Participant, ParticipantStatus
-from models.block import Block, BlockStatus, PMTrial
+from models.block import Block, BlockStatus, PMTrial, EncodingQuizAttempt
 from models.schemas import (
     TokenStartRequest, SessionStartResponse, BlockEncodingResponse,
     NasaTLXRequest, DebriefRequest, StatusResponse,
+    QuizSubmitRequest, QuizSubmitResponse, QuizResultItem,
 )
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
@@ -137,6 +138,98 @@ async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = 
         day_story=block.day_story,
         pm_tasks=pm_tasks,
     )
+
+
+@router.post("/session/{session_id}/block/{block_num}/quiz", response_model=QuizSubmitResponse)
+async def submit_quiz(
+    session_id: str, block_num: int, req: QuizSubmitRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit encoding quiz answers — validates and records attempts."""
+    result = await db.execute(
+        select(Block).where(
+            Block.participant_id == session_id,
+            Block.block_number == block_num,
+        )
+    )
+    block = result.scalar_one_or_none()
+    if not block:
+        raise HTTPException(404, "Block not found")
+
+    # Load trials for this block
+    result = await db.execute(
+        select(PMTrial).where(PMTrial.block_id == block.id).order_by(PMTrial.trial_number)
+    )
+    trials = result.scalars().all()
+    trial_map = {t.trial_number: t for t in trials}
+
+    results = []
+    failed_trials = set()
+
+    for answer in req.answers:
+        trial = trial_map.get(answer.trial_number)
+        if not trial:
+            continue
+
+        task_cfg = trial.task_config or {}
+        encoding = trial.encoding_card or {}
+        correct = _get_correct_answer(answer.question_type, task_cfg, encoding)
+
+        is_correct = answer.selected_answer.strip().lower() == correct.strip().lower()
+
+        # Count previous attempts for this question
+        prev_result = await db.execute(
+            select(EncodingQuizAttempt).where(
+                EncodingQuizAttempt.trial_id == trial.id,
+                EncodingQuizAttempt.participant_id == session_id,
+                EncodingQuizAttempt.question_type == answer.question_type,
+            )
+        )
+        prev_attempts = len(prev_result.scalars().all())
+        attempt_num = prev_attempts + 1
+
+        # Record attempt
+        quiz_attempt = EncodingQuizAttempt(
+            trial_id=trial.id,
+            participant_id=session_id,
+            question_type=answer.question_type,
+            attempt_number=attempt_num,
+            selected_answer=answer.selected_answer,
+            correct_answer=correct,
+            is_correct=is_correct,
+            response_time_ms=answer.response_time_ms,
+        )
+        db.add(quiz_attempt)
+
+        results.append(QuizResultItem(
+            trial_number=answer.trial_number,
+            question_type=answer.question_type,
+            is_correct=is_correct,
+            correct_answer=correct,
+            attempt_number=attempt_num,
+        ))
+
+        if not is_correct:
+            failed_trials.add(answer.trial_number)
+
+    await db.commit()
+
+    return QuizSubmitResponse(
+        results=results,
+        all_correct=len(failed_trials) == 0,
+        failed_trials=sorted(failed_trials),
+    )
+
+
+def _get_correct_answer(question_type: str, task_config: dict, encoding_card: dict) -> str:
+    """Get the correct answer for a quiz question type."""
+    if question_type == "trigger":
+        return task_config.get("trigger_event", "")
+    elif question_type == "target":
+        return task_config.get("target_object", "")
+    elif question_type == "action":
+        return task_config.get("target_action", "")
+    return ""
 
 
 @router.post("/session/{session_id}/block/{block_num}/nasa-tlx")

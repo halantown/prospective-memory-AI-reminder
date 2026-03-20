@@ -50,7 +50,33 @@ class PMAttemptMessage(BaseModel):
     timestamp: float
 
 
+class QuizAnswerItem(BaseModel):
+    trial_number: int
+    question_type: str  # "trigger" | "target" | "action"
+    selected_answer: str
+    response_time_ms: Optional[int] = None
+
+
+class QuizSubmitRequest(BaseModel):
+    answers: list[QuizAnswerItem]
+
+
+class QuizResultItem(BaseModel):
+    trial_number: int
+    question_type: str
+    is_correct: bool
+    correct_answer: str
+    attempt_number: int
+
+
+class QuizSubmitResponse(BaseModel):
+    results: list[QuizResultItem]
+    all_correct: bool
+    failed_trials: list[int]  # trial numbers that had wrong answers
+
+
 class StatusResponse(BaseModel):
     status: str
     current_block: Optional[int] = None
     phase: Optional[str] = None
+
