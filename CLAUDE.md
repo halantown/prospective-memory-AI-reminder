@@ -37,7 +37,7 @@ npm run build
 
 - **`game_config.yaml`** (project root of SaturdayAtHome) is the single source of truth for all game parameters — timings, scoring, events, PM tasks, reminder texts. Never hardcode values that belong here.
 - **Backend** (`backend/`): FastAPI + SQLite. Entry point is `main.py`. Modules: `core/` (config loader, DB, SSE, timeline engine), `models/`, `routes/`, `services/`, `utils/`.
-- **Frontend** (`frontend/src/`): React 18 + Vite + Tailwind + Zustand. Game rooms are components; global state is in `src/store/`. SSE client in `src/hooks/useSSE.js` maps backend events to store actions.
+- **Frontend** (`frontend/src/`): React 18 + Vite + Tailwind + Zustand. Main view is a top-down home floor plan (`HomeScene.jsx`) with floating game panels. Global state is in `src/store/`. WS communication in `src/hooks/useWebSocket.js` maps backend events to store actions.
 - **SSE communication**: Backend pushes timeline events to the frontend via `GET /session/{id}/block/{n}/stream`. Key events: `steak_spawn`, `message_bubble`, `trigger_appear`, `reminder_fire`, `block_end`.
 - **Security**: `GET /config/game` strips PM correct answers before sending to frontend. Only `/config` admin page receives the full config.
 

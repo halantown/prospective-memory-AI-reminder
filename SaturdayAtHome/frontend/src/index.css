@@ -41,3 +41,28 @@
 .minimap-trigger-dot {
   animation: minimap-dot-pulse 0.8s ease-in-out infinite;
 }
+
+/* Scene trigger animations (main home scene) */
+@keyframes scene-fired-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px #f59e0b) drop-shadow(0 0 8px #f59e0b44); }
+  50% { filter: drop-shadow(0 0 8px #f59e0b) drop-shadow(0 0 16px #f59e0b66); }
+}
+.scene-trigger-fired {
+  animation: scene-fired-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes scene-ambient-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+.scene-trigger-ambient {
+  animation: scene-ambient-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes scene-dot-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
+.scene-trigger-dot {
+  animation: scene-dot-pulse 0.8s ease-in-out infinite;
+}

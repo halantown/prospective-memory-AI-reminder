@@ -10,321 +10,363 @@
   "items": [
     {
       "id": 1,
-      "stimulus": "Birthday Party \ud83c\udf82",
+      "stimulus": "Birthday Party 🎂",
       "preview": "Candles on a cake, everyone singing",
       "category": "Family"
     },
     {
       "id": 2,
-      "stimulus": "Beach Sunset \ud83c\udf05",
+      "stimulus": "Beach Sunset 🌅",
       "preview": "Golden hour at the Mediterranean coast",
       "category": "Travel"
     },
     {
       "id": 3,
-      "stimulus": "Team Meeting \ud83d\udcca",
+      "stimulus": "Team Meeting 📊",
       "preview": "Quarterly review with the marketing team",
       "category": "Work Event"
     },
     {
       "id": 4,
-      "stimulus": "Grandma's Garden \ud83c\udf3b",
+      "stimulus": "Grandma's Garden 🌻",
       "preview": "Sunflowers and tomato vines in August",
       "category": "Family"
     },
     {
       "id": 5,
-      "stimulus": "Eiffel Tower \ud83d\uddfc",
-      "preview": "Snapped from the Champs-\u00c9lys\u00e9es",
+      "stimulus": "Eiffel Tower 🗼",
+      "preview": "Snapped from the Champs-Élysées",
       "category": "Travel"
     },
     {
       "id": 6,
-      "stimulus": "Office Christmas Party \ud83c\udf84",
+      "stimulus": "Office Christmas Party 🎄",
       "preview": "Ugly sweater contest at the office",
       "category": "Work Event"
     },
     {
       "id": 7,
-      "stimulus": "Baby's First Steps \ud83d\udc76",
+      "stimulus": "Baby's First Steps 👶",
       "preview": "Little Mia walking across the living room",
       "category": "Family"
     },
     {
       "id": 8,
-      "stimulus": "Safari Jeep \ud83e\udd81",
+      "stimulus": "Safari Jeep 🦁",
       "preview": "A lion spotted in the Serengeti",
       "category": "Travel"
     },
     {
       "id": 9,
-      "stimulus": "Conference Badge \ud83c\udff7\ufe0f",
+      "stimulus": "Conference Badge 🏷️",
       "preview": "Tech Summit 2024 attendee badge",
       "category": "Work Event"
     },
     {
       "id": 10,
-      "stimulus": "Thanksgiving Dinner \ud83e\udd83",
+      "stimulus": "Thanksgiving Dinner 🦃",
       "preview": "The whole family around the big table",
       "category": "Family"
     },
     {
       "id": 11,
-      "stimulus": "Northern Lights \ud83c\udf0c",
+      "stimulus": "Northern Lights 🌌",
       "preview": "Aurora borealis in Iceland",
       "category": "Travel"
     },
     {
       "id": 12,
-      "stimulus": "Product Launch \ud83d\ude80",
+      "stimulus": "Product Launch 🚀",
       "preview": "Ribbon cutting at the new store",
       "category": "Work Event"
     },
     {
       "id": 13,
-      "stimulus": "Dog at the Park \ud83d\udc15",
+      "stimulus": "Dog at the Park 🐕",
       "preview": "Buddy playing fetch with the kids",
       "category": "Family"
     },
     {
       "id": 14,
-      "stimulus": "Venice Canal \ud83d\udea4",
+      "stimulus": "Venice Canal 🚤",
       "preview": "Gondola ride at sunset",
       "category": "Travel"
     },
     {
       "id": 15,
-      "stimulus": "Award Ceremony \ud83c\udfc6",
+      "stimulus": "Award Ceremony 🏆",
       "preview": "Receiving the employee of the quarter award",
       "category": "Work Event"
     },
     {
       "id": 16,
-      "stimulus": "Wedding Anniversary \ud83d\udc8d",
+      "stimulus": "Wedding Anniversary 💍",
       "preview": "Mom and Dad's 40th celebration",
       "category": "Family"
     },
     {
       "id": 17,
-      "stimulus": "Great Wall \ud83e\uddf1",
+      "stimulus": "Great Wall 🧱",
       "preview": "Hiking the Jiankou section in fog",
       "category": "Travel"
     },
     {
       "id": 18,
-      "stimulus": "Hackathon Team \ud83d\udcbb",
+      "stimulus": "Hackathon Team 💻",
       "preview": "Our team after 48 hours of coding",
       "category": "Work Event"
     },
     {
       "id": 19,
-      "stimulus": "Cousin's Graduation \ud83c\udf93",
+      "stimulus": "Cousin's Graduation 🎓",
       "preview": "Throwing caps in the air",
       "category": "Family"
     },
     {
       "id": 20,
-      "stimulus": "Santorini View \ud83c\udfdd\ufe0f",
+      "stimulus": "Santorini View 🏝️",
       "preview": "Blue domes and white houses",
       "category": "Travel"
     },
     {
       "id": 21,
-      "stimulus": "Trade Show Booth \ud83c\udfaa",
+      "stimulus": "Trade Show Booth 🎪",
       "preview": "Our company booth at CES",
       "category": "Work Event"
     },
     {
       "id": 22,
-      "stimulus": "Kitchen Chaos \ud83c\udf73",
+      "stimulus": "Kitchen Chaos 🍳",
       "preview": "Kids helping make pancakes Saturday morning",
       "category": "Family"
     },
     {
       "id": 23,
-      "stimulus": "Cherry Blossoms \ud83c\udf38",
+      "stimulus": "Cherry Blossoms 🌸",
       "preview": "Kyoto temple in spring",
       "category": "Travel"
     },
     {
       "id": 24,
-      "stimulus": "Boardroom Presentation \ud83d\udcc8",
+      "stimulus": "Boardroom Presentation 📈",
       "preview": "Slides about Q2 revenue growth",
       "category": "Work Event"
     },
     {
       "id": 25,
-      "stimulus": "Cat Napping \ud83d\udc31",
+      "stimulus": "Cat Napping 🐱",
       "preview": "Whiskers asleep on the couch",
       "category": "Family"
     },
     {
       "id": 26,
-      "stimulus": "Machu Picchu \u26f0\ufe0f",
+      "stimulus": "Machu Picchu ⛰️",
       "preview": "Misty morning at the Inca ruins",
       "category": "Travel"
     },
     {
       "id": 27,
-      "stimulus": "Company Retreat \ud83c\udfd5\ufe0f",
+      "stimulus": "Company Retreat 🏕️",
       "preview": "Team building exercises in the mountains",
       "category": "Work Event"
     },
     {
       "id": 28,
-      "stimulus": "Backyard BBQ \ud83c\udf56",
+      "stimulus": "Backyard BBQ 🍖",
       "preview": "Dad grilling burgers for the neighborhood",
       "category": "Family"
     },
     {
       "id": 29,
-      "stimulus": "Amsterdam Canal \ud83d\udeb2",
+      "stimulus": "Amsterdam Canal 🚲",
       "preview": "Bikes lined up along the water",
       "category": "Travel"
     },
     {
       "id": 30,
-      "stimulus": "Webinar Screenshot \ud83d\udda5\ufe0f",
+      "stimulus": "Webinar Screenshot 🖥️",
       "preview": "500 attendees for the product demo",
       "category": "Work Event"
     },
     {
       "id": 31,
-      "stimulus": "Family Road Trip \ud83d\ude97",
+      "stimulus": "Family Road Trip 🚗",
       "preview": "Everyone packed in the minivan",
       "category": "Family"
     },
     {
       "id": 32,
-      "stimulus": "Taj Mahal \ud83d\udd4c",
+      "stimulus": "Taj Mahal 🕌",
       "preview": "Sunrise photo at the iconic monument",
       "category": "Travel"
     },
     {
       "id": 33,
-      "stimulus": "Networking Event \ud83e\udd1d",
+      "stimulus": "Networking Event 🤝",
       "preview": "Exchanging cards at the industry mixer",
       "category": "Work Event"
     },
     {
       "id": 34,
-      "stimulus": "Sister's Birthday \ud83c\udf88",
+      "stimulus": "Sister's Birthday 🎈",
       "preview": "Surprise party in the living room",
       "category": "Family"
     },
     {
       "id": 35,
-      "stimulus": "Norwegian Fjord \u26f5",
+      "stimulus": "Norwegian Fjord ⛵",
       "preview": "Kayaking through emerald waters",
       "category": "Travel"
     },
     {
       "id": 36,
-      "stimulus": "New Office Tour \ud83c\udfe2",
+      "stimulus": "New Office Tour 🏢",
       "preview": "Walking through the renovated workspace",
       "category": "Work Event"
     },
     {
       "id": 37,
-      "stimulus": "Niece's Drawing \ud83c\udfa8",
+      "stimulus": "Niece's Drawing 🎨",
       "preview": "A crayon masterpiece on the fridge",
       "category": "Family"
     },
     {
       "id": 38,
-      "stimulus": "Colosseum at Night \ud83c\udfdf\ufe0f",
+      "stimulus": "Colosseum at Night 🏟️",
       "preview": "Rome lit up beautifully",
       "category": "Travel"
     },
     {
       "id": 39,
-      "stimulus": "Investor Pitch \ud83d\udcbc",
+      "stimulus": "Investor Pitch 💼",
       "preview": "Presenting to venture capitalists",
       "category": "Work Event"
     },
     {
       "id": 40,
-      "stimulus": "Movie Night \ud83c\udf7f",
+      "stimulus": "Movie Night 🍿",
       "preview": "Family huddled on the sofa with blankets",
       "category": "Family"
     },
     {
       "id": 41,
-      "stimulus": "Banff Lake \ud83c\udfd4\ufe0f",
+      "stimulus": "Banff Lake 🏔️",
       "preview": "Turquoise water reflecting snow peaks",
       "category": "Travel"
     },
     {
       "id": 42,
-      "stimulus": "Team Lunch \ud83c\udf55",
+      "stimulus": "Team Lunch 🍕",
       "preview": "Pizza Friday with the dev team",
       "category": "Work Event"
     },
     {
       "id": 43,
-      "stimulus": "Brother's Wedding \ud83d\udc92",
+      "stimulus": "Brother's Wedding 💒",
       "preview": "The ceremony in the garden",
       "category": "Family"
     },
     {
       "id": 44,
-      "stimulus": "Tokyo Crossing \ud83d\udeb6",
+      "stimulus": "Tokyo Crossing 🚶",
       "preview": "Shibuya scramble from above",
       "category": "Travel"
     },
     {
       "id": 45,
-      "stimulus": "Client Dinner \ud83c\udf77",
+      "stimulus": "Client Dinner 🍷",
       "preview": "Business dinner at the Italian restaurant",
       "category": "Work Event"
     },
     {
       "id": 46,
-      "stimulus": "Grandpa Fishing \ud83c\udfa3",
+      "stimulus": "Grandpa Fishing 🎣",
       "preview": "Sunday morning at the lake",
       "category": "Family"
     },
     {
       "id": 47,
-      "stimulus": "Petra Treasury \ud83c\udfdb\ufe0f",
+      "stimulus": "Petra Treasury 🏛️",
       "preview": "The famous carved facade in Jordan",
       "category": "Travel"
     },
     {
       "id": 48,
-      "stimulus": "Whiteboard Session \u270d\ufe0f",
+      "stimulus": "Whiteboard Session ✍️",
       "preview": "Brainstorming the new feature roadmap",
       "category": "Work Event"
     },
     {
       "id": 49,
-      "stimulus": "New Year's Eve \ud83c\udf86",
+      "stimulus": "New Year's Eve 🎆",
       "preview": "Fireworks over the city from our balcony",
       "category": "Family"
     },
     {
       "id": 50,
-      "stimulus": "Bali Rice Terraces \ud83c\udf3e",
+      "stimulus": "Bali Rice Terraces 🌾",
       "preview": "Tegallalang stepped paddies",
       "category": "Travel"
     },
     {
       "id": 51,
-      "stimulus": "Charity Gala \ud83c\udfad",
+      "stimulus": "Charity Gala 🎭",
       "preview": "Company-sponsored fundraiser event",
       "category": "Work Event"
     },
     {
       "id": 52,
-      "stimulus": "Kids at the Zoo \ud83e\udd92",
+      "stimulus": "Kids at the Zoo 🦒",
       "preview": "Everyone excited about the giraffes",
       "category": "Family"
     },
     {
       "id": 53,
-      "stimulus": "Swiss Alps Train \ud83d\ude82",
+      "stimulus": "Swiss Alps Train 🚂",
       "preview": "The Glacier Express winding through",
       "category": "Travel"
+    },
+    {
+      "id": 54,
+      "stimulus": "Volunteering day — sorting donated goods",
+      "preview": "The team sorting boxes of clothes and supplies at the shelter...",
+      "category": "Work Event"
+    },
+    {
+      "id": 55,
+      "stimulus": "Brother's engagement party",
+      "preview": "Clinking champagne glasses in the decorated garden...",
+      "category": "Family"
+    },
+    {
+      "id": 56,
+      "stimulus": "Sunset kayaking in New Zealand",
+      "preview": "Paddling across a glassy lake with mountains in the distance...",
+      "category": "Travel"
+    },
+    {
+      "id": 57,
+      "stimulus": "End-of-year all-hands meeting",
+      "preview": "The CEO summarising the year's achievements on the big screen...",
+      "category": "Work Event"
+    },
+    {
+      "id": 58,
+      "stimulus": "Baby shower brunch at home",
+      "preview": "Pastel decorations, cupcakes, and tiny gift boxes on the table...",
+      "category": "Family"
+    },
+    {
+      "id": 59,
+      "stimulus": "Camels at the Sahara dunes",
+      "preview": "A caravan crossing golden dunes at sunrise in Morocco...",
+      "category": "Travel"
+    },
+    {
+      "id": 60,
+      "stimulus": "New office ribbon-cutting ceremony",
+      "preview": "Executives cutting the red ribbon at the new headquarters...",
+      "category": "Work Event"
     }
   ]
 }

@@ -10,315 +10,363 @@
   "items": [
     {
       "id": 1,
-      "stimulus": "Whole Milk \ud83e\udd5b",
+      "stimulus": "Whole Milk 🥛",
       "preview": "1 gallon, expires next Tuesday",
       "category": "Dairy"
     },
     {
       "id": 2,
-      "stimulus": "Fresh Spinach \ud83e\udd6c",
+      "stimulus": "Fresh Spinach 🥬",
       "preview": "Organic baby spinach, 5oz bag",
       "category": "Produce"
     },
     {
       "id": 3,
-      "stimulus": "Leftover Pasta \ud83c\udf5d",
+      "stimulus": "Leftover Pasta 🍝",
       "preview": "Spaghetti bolognese from last night",
       "category": "Leftover"
     },
     {
       "id": 4,
-      "stimulus": "Greek Yogurt \ud83e\uded9",
+      "stimulus": "Greek Yogurt 🫙",
       "preview": "Vanilla Chobani, 32oz tub",
       "category": "Dairy"
     },
     {
       "id": 5,
-      "stimulus": "Red Apples \ud83c\udf4e",
+      "stimulus": "Red Apples 🍎",
       "preview": "Honeycrisp, bag of 6",
       "category": "Produce"
     },
     {
       "id": 6,
-      "stimulus": "Pizza Slices \ud83c\udf55",
+      "stimulus": "Pizza Slices 🍕",
       "preview": "Two slices from Friday's pizza night",
       "category": "Leftover"
     },
     {
       "id": 7,
-      "stimulus": "Cheddar Cheese \ud83e\uddc0",
+      "stimulus": "Cheddar Cheese 🧀",
       "preview": "Sharp cheddar block, 8oz",
       "category": "Dairy"
     },
     {
       "id": 8,
-      "stimulus": "Baby Carrots \ud83e\udd55",
+      "stimulus": "Baby Carrots 🥕",
       "preview": "Pre-washed, 1lb bag",
       "category": "Produce"
     },
     {
       "id": 9,
-      "stimulus": "Chicken Soup \ud83c\udf72",
+      "stimulus": "Chicken Soup 🍲",
       "preview": "Homemade from Sunday dinner",
       "category": "Leftover"
     },
     {
       "id": 10,
-      "stimulus": "Butter \ud83e\uddc8",
+      "stimulus": "Butter 🧈",
       "preview": "Unsalted, one stick left",
       "category": "Dairy"
     },
     {
       "id": 11,
-      "stimulus": "Avocados \ud83e\udd51",
+      "stimulus": "Avocados 🥑",
       "preview": "Three ripe Hass avocados",
       "category": "Produce"
     },
     {
       "id": 12,
-      "stimulus": "Fried Rice \ud83c\udf5a",
+      "stimulus": "Fried Rice 🍚",
       "preview": "Chinese takeout from Wednesday",
       "category": "Leftover"
     },
     {
       "id": 13,
-      "stimulus": "Cream Cheese \ud83e\uded9",
+      "stimulus": "Cream Cheese 🫙",
       "preview": "Philadelphia original, 8oz",
       "category": "Dairy"
     },
     {
       "id": 14,
-      "stimulus": "Tomatoes \ud83c\udf45",
+      "stimulus": "Tomatoes 🍅",
       "preview": "Vine-ripened, cluster of 5",
       "category": "Produce"
     },
     {
       "id": 15,
-      "stimulus": "Lasagna Pan \ud83e\uded5",
+      "stimulus": "Lasagna Pan 🫕",
       "preview": "Half a pan from the potluck",
       "category": "Leftover"
     },
     {
       "id": 16,
-      "stimulus": "Sour Cream \ud83e\udd44",
+      "stimulus": "Sour Cream 🥄",
       "preview": "Daisy brand, 16oz",
       "category": "Dairy"
     },
     {
       "id": 17,
-      "stimulus": "Cucumber \ud83e\udd52",
+      "stimulus": "Cucumber 🥒",
       "preview": "English cucumber, wrapped",
       "category": "Produce"
     },
     {
       "id": 18,
-      "stimulus": "Beef Stew \ud83e\udd69",
+      "stimulus": "Beef Stew 🥩",
       "preview": "Slow cooker batch from Tuesday",
       "category": "Leftover"
     },
     {
       "id": 19,
-      "stimulus": "Mozzarella \ud83e\uddc0",
+      "stimulus": "Mozzarella 🧀",
       "preview": "Fresh ball in water, 8oz",
       "category": "Dairy"
     },
     {
       "id": 20,
-      "stimulus": "Strawberries \ud83c\udf53",
+      "stimulus": "Strawberries 🍓",
       "preview": "Pint of fresh berries",
       "category": "Produce"
     },
     {
       "id": 21,
-      "stimulus": "Curry in Tupperware \ud83c\udf5b",
+      "stimulus": "Curry in Tupperware 🍛",
       "preview": "Thai green curry from the weekend",
       "category": "Leftover"
     },
     {
       "id": 22,
-      "stimulus": "Half & Half \u2615",
+      "stimulus": "Half & Half ☕",
       "preview": "For the morning coffee",
       "category": "Dairy"
     },
     {
       "id": 23,
-      "stimulus": "Bell Peppers \ud83e\uded1",
+      "stimulus": "Bell Peppers 🫑",
       "preview": "One red, one yellow, one green",
       "category": "Produce"
     },
     {
       "id": 24,
-      "stimulus": "Grilled Chicken \ud83c\udf57",
+      "stimulus": "Grilled Chicken 🍗",
       "preview": "Meal prep from Monday",
       "category": "Leftover"
     },
     {
       "id": 25,
-      "stimulus": "Cottage Cheese \ud83e\udd5b",
+      "stimulus": "Cottage Cheese 🥛",
       "preview": "Low-fat, 16oz container",
       "category": "Dairy"
     },
     {
       "id": 26,
-      "stimulus": "Broccoli Florets \ud83e\udd66",
+      "stimulus": "Broccoli Florets 🥦",
       "preview": "Pre-cut, in a plastic bag",
       "category": "Produce"
     },
     {
       "id": 27,
-      "stimulus": "Mac & Cheese \ud83e\uddc0",
+      "stimulus": "Mac & Cheese 🧀",
       "preview": "Kids' favorite, half a pot left",
       "category": "Leftover"
     },
     {
       "id": 28,
-      "stimulus": "Parmesan Wedge \ud83e\uddc0",
+      "stimulus": "Parmesan Wedge 🧀",
       "preview": "Parmigiano-Reggiano, grated side",
       "category": "Dairy"
     },
     {
       "id": 29,
-      "stimulus": "Grapes \ud83c\udf47",
+      "stimulus": "Grapes 🍇",
       "preview": "Seedless red grapes, 2lb bag",
       "category": "Produce"
     },
     {
       "id": 30,
-      "stimulus": "Taco Filling \ud83c\udf2e",
+      "stimulus": "Taco Filling 🌮",
       "preview": "Ground beef mixture from taco Tuesday",
       "category": "Leftover"
     },
     {
       "id": 31,
-      "stimulus": "Whipped Cream \ud83c\udf68",
+      "stimulus": "Whipped Cream 🍨",
       "preview": "Reddi-wip can, half full",
       "category": "Dairy"
     },
     {
       "id": 32,
-      "stimulus": "Celery Stalks \ud83e\udd6c",
+      "stimulus": "Celery Stalks 🥬",
       "preview": "Organic celery bunch",
       "category": "Produce"
     },
     {
       "id": 33,
-      "stimulus": "Shepherd's Pie \ud83e\udd67",
+      "stimulus": "Shepherd's Pie 🥧",
       "preview": "Quarter pan from dinner party",
       "category": "Leftover"
     },
     {
       "id": 34,
-      "stimulus": "Brie Wheel \ud83e\uddc0",
+      "stimulus": "Brie Wheel 🧀",
       "preview": "Small wheel, partially eaten",
       "category": "Dairy"
     },
     {
       "id": 35,
-      "stimulus": "Lemons \ud83c\udf4b",
+      "stimulus": "Lemons 🍋",
       "preview": "Bag of 6 Meyer lemons",
       "category": "Produce"
     },
     {
       "id": 36,
-      "stimulus": "Pulled Pork \ud83d\udc37",
+      "stimulus": "Pulled Pork 🐷",
       "preview": "BBQ pulled pork in container",
       "category": "Leftover"
     },
     {
       "id": 37,
-      "stimulus": "Ricotta \ud83e\uded9",
+      "stimulus": "Ricotta 🫙",
       "preview": "Part-skim, 15oz tub",
       "category": "Dairy"
     },
     {
       "id": 38,
-      "stimulus": "Mushrooms \ud83c\udf44",
+      "stimulus": "Mushrooms 🍄",
       "preview": "White button, 8oz package",
       "category": "Produce"
     },
     {
       "id": 39,
-      "stimulus": "Fish Tacos \ud83d\udc1f",
+      "stimulus": "Fish Tacos 🐟",
       "preview": "Two wrapped in foil from lunch",
       "category": "Leftover"
     },
     {
       "id": 40,
-      "stimulus": "String Cheese \ud83e\uddc0",
+      "stimulus": "String Cheese 🧀",
       "preview": "Pack of 12, kids' snack",
       "category": "Dairy"
     },
     {
       "id": 41,
-      "stimulus": "Kale Bunch \ud83e\udd6c",
+      "stimulus": "Kale Bunch 🥬",
       "preview": "Lacinato kale, fresh from market",
       "category": "Produce"
     },
     {
       "id": 42,
-      "stimulus": "Risotto \ud83c\udf5a",
+      "stimulus": "Risotto 🍚",
       "preview": "Mushroom risotto, one serving",
       "category": "Leftover"
     },
     {
       "id": 43,
-      "stimulus": "Goat Cheese \ud83e\uddc0",
-      "preview": "Herbed ch\u00e8vre log",
+      "stimulus": "Goat Cheese 🧀",
+      "preview": "Herbed chèvre log",
       "category": "Dairy"
     },
     {
       "id": 44,
-      "stimulus": "Zucchini \ud83e\udd52",
+      "stimulus": "Zucchini 🥒",
       "preview": "Two medium zucchinis",
       "category": "Produce"
     },
     {
       "id": 45,
-      "stimulus": "Chili con Carne \ud83c\udf36\ufe0f",
+      "stimulus": "Chili con Carne 🌶️",
       "preview": "Big batch from the weekend",
       "category": "Leftover"
     },
     {
       "id": 46,
-      "stimulus": "Kefir \ud83e\udd5b",
+      "stimulus": "Kefir 🥛",
       "preview": "Plain, 32oz bottle",
       "category": "Dairy"
     },
     {
       "id": 47,
-      "stimulus": "Mixed Salad \ud83e\udd57",
+      "stimulus": "Mixed Salad 🥗",
       "preview": "Spring mix, 5oz clamshell",
       "category": "Produce"
     },
     {
       "id": 48,
-      "stimulus": "Meatloaf Slice \ud83c\udf56",
+      "stimulus": "Meatloaf Slice 🍖",
       "preview": "Two slices from Thursday dinner",
       "category": "Leftover"
     },
     {
       "id": 49,
-      "stimulus": "Mascarpone \ud83c\udf70",
+      "stimulus": "Mascarpone 🍰",
       "preview": "For the tiramisu project",
       "category": "Dairy"
     },
     {
       "id": 50,
-      "stimulus": "Blueberries \ud83e\uded0",
+      "stimulus": "Blueberries 🫐",
       "preview": "Fresh pint, organic",
       "category": "Produce"
     },
     {
       "id": 51,
-      "stimulus": "Quiche Lorraine \ud83e\udd67",
+      "stimulus": "Quiche Lorraine 🥧",
       "preview": "Half a quiche from brunch",
       "category": "Leftover"
     },
     {
       "id": 52,
-      "stimulus": "Provolone Slices \ud83e\uddc0",
+      "stimulus": "Provolone Slices 🧀",
       "preview": "Deli-sliced, 8oz",
       "category": "Dairy"
+    },
+    {
+      "id": 53,
+      "stimulus": "Mascarpone Cheese",
+      "preview": "Soft Italian cheese used for tiramisu and cream sauces...",
+      "category": "Dairy"
+    },
+    {
+      "id": 54,
+      "stimulus": "Snow Peas",
+      "preview": "Flat crunchy pods, great for stir-fries and salads...",
+      "category": "Produce"
+    },
+    {
+      "id": 55,
+      "stimulus": "Fish Tacos (leftover)",
+      "preview": "Battered fish with cabbage slaw in flour tortillas...",
+      "category": "Leftover"
+    },
+    {
+      "id": 56,
+      "stimulus": "Crème Fraîche",
+      "preview": "Rich cultured cream, thicker than sour cream, 200ml tub...",
+      "category": "Dairy"
+    },
+    {
+      "id": 57,
+      "stimulus": "Fresh Corn on the Cob",
+      "preview": "Two ears of sweet corn, husks still partially on...",
+      "category": "Produce"
+    },
+    {
+      "id": 58,
+      "stimulus": "Minestrone Soup",
+      "preview": "Hearty Italian vegetable soup with pasta in a large jar...",
+      "category": "Leftover"
+    },
+    {
+      "id": 59,
+      "stimulus": "Spring Onions (bunch)",
+      "preview": "Slender green and white stalks with roots still attached...",
+      "category": "Produce"
+    },
+    {
+      "id": 60,
+      "stimulus": "Lamb Kofta (Wednesday)",
+      "preview": "Spiced lamb meatballs with yogurt sauce in a sealed container...",
+      "category": "Leftover"
     }
   ]
 }
