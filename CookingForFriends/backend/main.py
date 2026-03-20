@@ -56,15 +56,41 @@ from routers.admin import router as admin_router
 app.include_router(session_router)
 app.include_router(admin_router)
 
-# Serve frontend static files if built
-FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
-if FRONTEND_DIST.exists():
-    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
+# --- WebSocket endpoints (at /ws/*, no /api prefix) ---
+from fastapi import WebSocket as _WebSocket
+from database import async_session
+from websocket.game_handler import handle_game_ws
+from websocket.connection_manager import manager, ws_pump
 
+
+@app.websocket("/ws/game/{session_id}/{block_num}")
+async def websocket_game(ws: _WebSocket, session_id: str, block_num: int):
+    """WebSocket endpoint for game communication."""
+    await handle_game_ws(ws, session_id, block_num, async_session)
+
+
+@app.websocket("/ws/monitor")
+async def admin_monitor_ws(ws: _WebSocket):
+    """Admin real-time monitoring WebSocket."""
+    queue = await manager.connect_admin(ws)
+    try:
+        pump_task = asyncio.create_task(ws_pump(queue, ws))
+        while True:
+            await ws.receive_text()
+    except Exception:
+        pass
+    finally:
+        manager.disconnect_admin(ws)
 
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "cooking-for-friends"}
+
+
+# Serve frontend static files if built (MUST be last — catch-all route)
+FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+if FRONTEND_DIST.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
 
 
 if __name__ == "__main__":

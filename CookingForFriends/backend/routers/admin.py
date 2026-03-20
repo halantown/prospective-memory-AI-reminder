@@ -301,21 +301,4 @@ async def list_reminders(db: AsyncSession = Depends(get_db)):
     ]
 
 
-@router.websocket("/ws/monitor")
-async def admin_monitor_ws(ws: WebSocket):
-    """Admin real-time monitoring WebSocket."""
-    queue = await manager.connect_admin(ws)
-    try:
-        pump_task = asyncio.create_task(ws_pump(queue, ws))
-        # Keep alive until disconnect
-        while True:
-            await ws.receive_text()
-    except Exception:
-        pass
-    finally:
-        manager.disconnect_admin(ws)
-
-
-# Need asyncio import for the ws endpoint
-import asyncio
-from websocket.connection_manager import ws_pump
+# WebSocket endpoint moved to main.py (no /api prefix needed)

@@ -194,7 +194,4 @@ async def submit_debrief(
     return {"status": "completed"}
 
 
-@router.websocket("/ws/game/{session_id}/{block_num}")
-async def websocket_game(ws: WebSocket, session_id: str, block_num: int):
-    """WebSocket endpoint for game communication."""
-    await handle_game_ws(ws, session_id, block_num, async_session)
+# WebSocket endpoint moved to main.py (no /api prefix needed)
