@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Steak sizzle animation */
+@keyframes sizzle {
+  0%, 100% { opacity: 0.6; transform: translateY(0) scale(1); }
+  50% { opacity: 1; transform: translateY(-2px) scale(1.05); }
+}
+
+/* Room dimming overlay */
+.room-dimmed {
+  filter: brightness(0.4);
+  transition: filter 0.4s ease;
+}
+.room-active {
+  filter: brightness(1);
+  transition: filter 0.4s ease;
+}
+
+/* Robot speech bubble animation */
+@keyframes bubble-appear {
+  0% { opacity: 0; transform: translateY(8px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.speech-bubble {
+  animation: bubble-appear 0.3s ease-out;
+}
+
+/* PM trigger glow */
+@keyframes trigger-glow {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(234, 179, 8, 0.3); }
+  50% { box-shadow: 0 0 16px 6px rgba(234, 179, 8, 0.6); }
+}
+.trigger-active {
+  animation: trigger-glow 1.5s ease-in-out infinite;
+}
+
+/* Phone lock screen */
+.phone-locked {
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+}
