@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
+import type { ActivePMTrial, PMTaskConfig } from '../types'
 
 const HEARTBEAT_INTERVAL = 10_000
 const RECONNECT_BASE_MS = 500
@@ -23,13 +24,14 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
     setRobotRoom,
     addPhoneNotification,
     setPhoneLocked,
-    triggerPM,
+    addPMTrial,
+    addTriggerEffect,
     setPhase,
     phase,
   } = useGameStore()
 
   const handleMessage = useCallback((event: MessageEvent) => {
-    let msg: { event: string; data: Record<string, unknown> }
+    let msg: { event: string; data: Record<string, unknown>; server_ts?: number }
     try {
       msg = JSON.parse(event.data)
     } catch {
@@ -49,7 +51,6 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         break
 
       case 'robot_speak':
-        // No is_reminder field — treat all robot speech identically
         setRobotSpeaking(data.text as string)
         setTimeout(() => clearRobotSpeech(), 5000)
         break
@@ -58,9 +59,41 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         setRobotRoom(data.to_room as any)
         break
 
-      case 'pm_trigger':
-        triggerPM(data.trigger_id as string, data.trigger_event as string)
+      case 'pm_trigger': {
+        const receivedAt = Date.now() / 1000
+        const triggerId = data.trigger_id as string
+        const triggerEvent = data.trigger_event as string
+        const serverTs = (data.server_trigger_ts as number) || msg.server_ts || receivedAt
+        const taskConfig = (data.task_config as PMTaskConfig) || {
+          task_id: triggerId,
+          trigger_event: triggerEvent,
+          target_room: (data.target_room as string) || '',
+          target_object: (data.target_object as string) || '',
+          target_action: (data.target_action as string) || '',
+          distractor_object: (data.distractor_object as string) || '',
+        }
+
+        addPMTrial({
+          triggerId,
+          triggerEvent,
+          serverTriggerTs: serverTs,
+          receivedAt,
+          taskConfig,
+        })
+
+        // Fire trigger effect (audio/visual)
+        addTriggerEffect(triggerEvent)
+
+        // Send trigger acknowledgment to backend
+        const send = useGameStore.getState().wsSend
+        if (send) {
+          send({
+            type: 'trigger_ack',
+            data: { trigger_id: triggerId, received_at: receivedAt },
+          })
+        }
         break
+      }
 
       case 'phone_notification':
         addPhoneNotification({
@@ -82,11 +115,9 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         break
 
       case 'pm_received':
-        // Ack — no score info
         break
 
       case 'ongoing_task_event':
-        // Dispatch to kitchen/dining task handlers
         console.log('[WS] Ongoing task event:', data)
         break
 
@@ -101,7 +132,8 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         console.log('[WS] Unknown event:', eventType, data)
     }
   }, [setGameClock, setElapsedSeconds, setRobotSpeaking, clearRobotSpeech,
-      setRobotRoom, addPhoneNotification, setPhoneLocked, triggerPM, setPhase])
+      setRobotRoom, addPhoneNotification, setPhoneLocked, addPMTrial,
+      addTriggerEffect, setPhase])
 
   const connect = useCallback(() => {
     if (!sessionId || blockNumber < 1) return
@@ -127,7 +159,6 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
       }
       setWsSend(sendFn)
 
-      // Start heartbeat
       heartbeatRef.current = setInterval(() => {
         sendFn({ type: 'heartbeat', data: { timestamp: Date.now() / 1000 } })
       }, HEARTBEAT_INTERVAL)

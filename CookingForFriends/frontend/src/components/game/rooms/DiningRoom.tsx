@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useGameStore } from '../../../stores/gameStore'
+import PMTargetItems from '../PMTargetItems'
 
 const REQUIRED_ITEMS = ['plate', 'fork', 'knife', 'glass', 'napkin']
 
@@ -50,6 +51,7 @@ export default function DiningRoom() {
       {allPlaced && (
         <p className="text-green-400 text-xs font-medium mt-1">✓ Table is set!</p>
       )}
+      <PMTargetItems room="dining" />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
 import type { SteakState } from '../../../types'
+import PMTargetItems from '../PMTargetItems'
 
 const COOK_TIME = 8000
 const FLIP_WINDOW = 4000
@@ -89,6 +90,7 @@ export default function KitchenRoom() {
           <PanComponent key={pan.id} pan={pan} onClick={() => handlePanClick(pan.id)} />
         ))}
       </div>
+      <PMTargetItems room="kitchen" />
     </div>
   )
 }

@@ -6,6 +6,9 @@ import { useGameStore } from '../../stores/gameStore'
 import KitchenRoom from './rooms/KitchenRoom'
 import DiningRoom from './rooms/DiningRoom'
 import LivingRoom from './rooms/LivingRoom'
+import StudyRoom from './rooms/StudyRoom'
+import BalconyRoom from './rooms/BalconyRoom'
+import { TriggerRoomGlow } from './TriggerEffects'
 import type { RoomId } from '../../types'
 
 interface RoomDef {
@@ -91,8 +94,13 @@ export default function WorldView() {
                   {room.id === 'kitchen' && isActive && <KitchenRoom />}
                   {room.id === 'dining' && isActive && <DiningRoom />}
                   {room.id === 'living_room' && isActive && <LivingRoom />}
+                  {room.id === 'study' && isActive && <StudyRoom />}
+                  {room.id === 'balcony' && isActive && <BalconyRoom />}
                 </div>
               </div>
+
+              {/* Trigger room glow effect */}
+              <TriggerRoomGlow room={room.id} />
 
               {/* Avatar indicator */}
               {isActive && !avatarMoving && (

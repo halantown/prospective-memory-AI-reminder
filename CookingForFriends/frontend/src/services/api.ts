@@ -77,6 +77,30 @@ export async function submitDebrief(sessionId: string, data: {
   })
 }
 
+// ── Quiz endpoints ──
+
+export async function submitQuiz(sessionId: string, blockNum: number, answers: Array<{
+  trial_number: number
+  question_type: string
+  selected_answer: string
+  response_time_ms?: number
+}>) {
+  return request<{
+    results: Array<{
+      trial_number: number
+      question_type: string
+      is_correct: boolean
+      correct_answer: string
+      attempt_number: number
+    }>
+    all_correct: boolean
+    failed_trials: number[]
+  }>(`/session/${sessionId}/block/${blockNum}/quiz`, {
+    method: 'POST',
+    body: JSON.stringify({ answers }),
+  })
+}
+
 // ── Admin endpoints ──
 
 export async function createParticipant() {

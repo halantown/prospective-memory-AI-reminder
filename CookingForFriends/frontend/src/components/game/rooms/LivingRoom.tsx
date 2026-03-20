@@ -1,4 +1,6 @@
-/** Living room — minimal interactive content. */
+/** Living room — cozy room with PM target items. */
+
+import PMTargetItems from '../PMTargetItems'
 
 export default function LivingRoom() {
   return (
@@ -9,6 +11,7 @@ export default function LivingRoom() {
         <span className="text-2xl">📚</span>
         <span className="text-2xl">📺</span>
       </div>
+      <PMTargetItems room="living_room" />
     </div>
   )
 }

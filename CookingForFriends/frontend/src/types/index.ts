@@ -53,6 +53,31 @@ export interface BlockEncoding {
   pm_tasks: PMEncodingCard[]
 }
 
+export interface PMTaskConfig {
+  task_id: string
+  trigger_event: string
+  target_room: string
+  target_object: string
+  target_action: string
+  distractor_object: string
+}
+
+export interface ActivePMTrial {
+  triggerId: string
+  triggerEvent: string
+  serverTriggerTs: number
+  receivedAt: number
+  taskConfig: PMTaskConfig
+}
+
+export interface PMTargetItem {
+  id: string
+  label: string
+  emoji: string
+  description: string
+  position: { x: string; y: string }
+}
+
 // ── WebSocket Messages ──
 
 export interface ServerMessage {
@@ -104,3 +129,14 @@ export interface NasaTLX {
   effort: number
   frustration: number
 }
+
+// ── Quiz ──
+
+export interface QuizQuestion {
+  trialNumber: number
+  questionType: 'trigger' | 'target' | 'action'
+  question: string
+  options: string[]
+  correctAnswer: string
+}
+

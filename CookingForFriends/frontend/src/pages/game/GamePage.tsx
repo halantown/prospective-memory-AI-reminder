@@ -9,6 +9,7 @@ import PhoneSidebar from '../../components/game/PhoneSidebar'
 import HUD from '../../components/game/HUD'
 import RobotAvatar from '../../components/game/RobotAvatar'
 import PMInteraction from '../../components/game/PMInteraction'
+import TriggerEffects from '../../components/game/TriggerEffects'
 
 export default function GamePage() {
   const sessionId = useGameStore((s) => s.sessionId)
@@ -29,6 +30,7 @@ export default function GamePage() {
         <HUD />
         <RobotAvatar />
         <PMInteraction />
+        <TriggerEffects />
 
         {/* WS status indicator */}
         {!wsConnected && (

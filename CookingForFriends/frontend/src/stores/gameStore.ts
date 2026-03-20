@@ -3,6 +3,7 @@
 import { create } from 'zustand'
 import type {
   Phase, Condition, RoomId, Pan, PhoneNotification, RobotState, SessionData,
+  ActivePMTrial, PMTaskConfig,
 } from '../types'
 
 interface GameState {
@@ -32,9 +33,13 @@ interface GameState {
   robot: RobotState
 
   // ── PM ──
-  pmTriggered: string | null  // trigger_id of active PM trigger
-  pmTriggerEvent: string | null
-  executionWindowActive: boolean
+  activePMTrials: ActivePMTrial[]
+  completedPMTrialIds: Set<string>
+  pmTargetSelected: string | null
+  pmActionPhase: 'idle' | 'target_select' | 'action_confirm' | 'completed'
+
+  // ── Trigger Effects ──
+  activeTriggerEffects: Array<{ triggerEvent: string; timestamp: number }>
 
   // ── Game Clock ──
   gameClock: string
@@ -67,8 +72,14 @@ interface GameState {
   setRobotRoom: (room: RoomId) => void
 
   // PM actions
-  triggerPM: (triggerId: string, triggerEvent: string) => void
-  clearPMTrigger: () => void
+  addPMTrial: (trial: ActivePMTrial) => void
+  completePMTrial: (triggerId: string) => void
+  setPMTargetSelected: (target: string | null) => void
+  setPMActionPhase: (phase: 'idle' | 'target_select' | 'action_confirm' | 'completed') => void
+
+  // Trigger effects
+  addTriggerEffect: (triggerEvent: string) => void
+  clearTriggerEffect: (triggerEvent: string) => void
 
   // Game clock
   setGameClock: (clock: string) => void
@@ -77,6 +88,10 @@ interface GameState {
   // WS
   setWsConnected: (connected: boolean) => void
   setWsSend: (fn: (msg: Record<string, unknown>) => void) => void
+
+  // Helpers
+  getActivePMForRoom: (room: RoomId) => ActivePMTrial | undefined
+  hasActivePMTrigger: () => boolean
 
   // Reset
   resetBlock: () => void
@@ -115,9 +130,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   robot: { room: 'kitchen', speaking: false, text: '', visible: true },
 
   // ── PM ──
-  pmTriggered: null,
-  pmTriggerEvent: null,
-  executionWindowActive: false,
+  activePMTrials: [],
+  completedPMTrialIds: new Set(),
+  pmTargetSelected: null,
+  pmActionPhase: 'idle',
+
+  // ── Trigger Effects ──
+  activeTriggerEffects: [],
 
   // ── Game Clock ──
   gameClock: '17:00',
@@ -142,7 +161,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   setCurrentRoom: (room) => {
     const prev = get().currentRoom
     set({ currentRoom: room, previousRoom: prev })
-    // Report room switch to backend
     const send = get().wsSend
     if (send) {
       send({
@@ -184,16 +202,39 @@ export const useGameStore = create<GameState>((set, get) => ({
   })),
 
   // PM
-  triggerPM: (triggerId, triggerEvent) => set({
-    pmTriggered: triggerId,
-    pmTriggerEvent: triggerEvent,
-    executionWindowActive: true,
+  addPMTrial: (trial) => set((s) => {
+    if (s.completedPMTrialIds.has(trial.triggerId)) return s
+    const exists = s.activePMTrials.some(t => t.triggerId === trial.triggerId)
+    if (exists) return s
+    return { activePMTrials: [...s.activePMTrials, trial] }
   }),
-  clearPMTrigger: () => set({
-    pmTriggered: null,
-    pmTriggerEvent: null,
-    executionWindowActive: false,
+
+  completePMTrial: (triggerId) => set((s) => {
+    const newCompleted = new Set(s.completedPMTrialIds)
+    newCompleted.add(triggerId)
+    return {
+      activePMTrials: s.activePMTrials.filter(t => t.triggerId !== triggerId),
+      completedPMTrialIds: newCompleted,
+      pmTargetSelected: null,
+      pmActionPhase: 'idle',
+    }
   }),
+
+  setPMTargetSelected: (target) => set({ pmTargetSelected: target }),
+  setPMActionPhase: (phase) => set({ pmActionPhase: phase }),
+
+  // Trigger effects
+  addTriggerEffect: (triggerEvent) => set((s) => ({
+    activeTriggerEffects: [
+      ...s.activeTriggerEffects,
+      { triggerEvent, timestamp: Date.now() },
+    ],
+  })),
+  clearTriggerEffect: (triggerEvent) => set((s) => ({
+    activeTriggerEffects: s.activeTriggerEffects.filter(
+      e => e.triggerEvent !== triggerEvent
+    ),
+  })),
 
   // Game clock
   setGameClock: (clock) => set({ gameClock: clock }),
@@ -202,6 +243,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   // WS
   setWsConnected: (connected) => set({ wsConnected: connected }),
   setWsSend: (fn) => set({ wsSend: fn }),
+
+  // Helpers
+  getActivePMForRoom: (room) => {
+    return get().activePMTrials.find(
+      t => t.taskConfig.target_room.toLowerCase() === room.toLowerCase()
+    )
+  },
+
+  hasActivePMTrigger: () => get().activePMTrials.length > 0,
 
   // Reset for new block
   resetBlock: () => set({
@@ -213,9 +263,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     phoneNotifications: [],
     phoneLocked: true,
     robot: { room: 'kitchen', speaking: false, text: '', visible: true },
-    pmTriggered: null,
-    pmTriggerEvent: null,
-    executionWindowActive: false,
+    activePMTrials: [],
+    completedPMTrialIds: new Set(),
+    pmTargetSelected: null,
+    pmActionPhase: 'idle',
+    activeTriggerEffects: [],
     gameClock: '17:00',
     elapsedSeconds: 0,
   }),
