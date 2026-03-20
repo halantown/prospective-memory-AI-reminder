@@ -15,6 +15,8 @@ export default function KitchenRoom() {
   const addKitchenScore = useGameStore((s) => s.addKitchenScore)
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
 
+  const mountedRef = useRef(true)
+
   const reportAction = (panId: number, action: string) => {
     const send = useGameStore.getState().wsSend
     if (send) {
@@ -29,9 +31,11 @@ export default function KitchenRoom() {
     updatePan(panId, { state: 'cooking', placedAt: Date.now() })
 
     const t1 = setTimeout(() => {
+      if (!mountedRef.current) return
       updatePan(panId, { state: 'ready_to_flip' })
 
       const t2 = setTimeout(() => {
+        if (!mountedRef.current) return
         const pan = useGameStore.getState().pans.find(p => p.id === panId)
         if (pan && pan.state === 'ready_to_flip') {
           updatePan(panId, { state: 'burnt' })
@@ -58,6 +62,7 @@ export default function KitchenRoom() {
         addKitchenScore(10)
         reportAction(panId, 'flip')
         const t = setTimeout(() => {
+          if (!mountedRef.current) return
           updatePan(panId, { state: 'done' })
           addKitchenScore(10)
           reportAction(panId, 'done')
@@ -79,7 +84,12 @@ export default function KitchenRoom() {
   }, [pans, updatePan, addKitchenScore, startCooking])
 
   useEffect(() => {
-    return () => { timersRef.current.forEach(t => clearTimeout(t)) }
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      timersRef.current.forEach(t => clearTimeout(t))
+      timersRef.current.clear()
+    }
   }, [])
 
   return (

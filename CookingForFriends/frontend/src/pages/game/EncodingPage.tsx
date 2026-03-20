@@ -104,11 +104,21 @@ export default function EncodingPage() {
 
   const card = cards[currentCard]
 
-  // Build quiz options for current question type
+  // Build quiz options for current question type (shuffled to prevent position bias)
   const getOptions = (type: string) => {
-    if (type === 'trigger') return TRIGGER_OPTIONS
-    if (type === 'target') return TARGET_OPTIONS
-    return ACTION_OPTIONS
+    const opts = type === 'trigger' ? TRIGGER_OPTIONS
+      : type === 'target' ? TARGET_OPTIONS
+      : ACTION_OPTIONS
+    // Fisher-Yates shuffle with deterministic seed from card trial number + question type
+    const shuffled = [...opts]
+    const seed = (card?.trial_number ?? 0) * 7 + type.charCodeAt(0)
+    let s = seed
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      s = (s * 1103515245 + 12345) & 0x7fffffff
+      const j = s % (i + 1);
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    return shuffled
   }
 
   const getQuestionText = (type: string) => {

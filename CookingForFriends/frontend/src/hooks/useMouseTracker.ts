@@ -14,19 +14,6 @@ export function useMouseTracker() {
   useEffect(() => {
     if (phase !== 'playing') return
 
-    // Sample mouse position
-    const sampleInterval = setInterval(() => {
-      // We track the last known position
-    }, SAMPLE_INTERVAL)
-
-    const handleMove = (e: MouseEvent) => {
-      bufferRef.current.push({
-        x: e.clientX,
-        y: e.clientY,
-        t: Date.now(),
-      })
-    }
-
     // Batch upload
     const batchInterval = setInterval(() => {
       if (bufferRef.current.length > 0 && wsSend) {
@@ -44,14 +31,13 @@ export function useMouseTracker() {
       const now = Date.now()
       if (now - lastSample >= SAMPLE_INTERVAL) {
         lastSample = now
-        handleMove(e)
+        bufferRef.current.push({ x: e.clientX, y: e.clientY, t: now })
       }
     }
 
     document.addEventListener('mousemove', throttledMove)
 
     return () => {
-      clearInterval(sampleInterval)
       clearInterval(batchInterval)
       document.removeEventListener('mousemove', throttledMove)
       // Flush remaining

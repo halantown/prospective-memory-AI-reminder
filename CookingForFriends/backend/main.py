@@ -78,13 +78,14 @@ async def websocket_game(ws: _WebSocket, session_id: str, block_num: int):
 async def admin_monitor_ws(ws: _WebSocket):
     """Admin real-time monitoring WebSocket."""
     queue = await manager.connect_admin(ws)
+    pump_task = asyncio.create_task(ws_pump(queue, ws))
     try:
-        pump_task = asyncio.create_task(ws_pump(queue, ws))
         while True:
             await ws.receive_text()
     except Exception:
         pass
     finally:
+        pump_task.cancel()
         manager.disconnect_admin(ws)
 
 @app.get("/api/health")

@@ -24,6 +24,9 @@ interface GameState {
   pans: Pan[]
   kitchenScore: number
 
+  // ── Dining ──
+  diningPlacedItems: string[]
+
   // ── Phone ──
   phoneNotifications: PhoneNotification[]
   phoneLocked: boolean
@@ -60,6 +63,9 @@ interface GameState {
   setPans: (pans: Pan[]) => void
   updatePan: (panId: number, update: Partial<Pan>) => void
   addKitchenScore: (points: number) => void
+
+  // Dining actions
+  addDiningPlacedItem: (item: string) => void
 
   // Phone actions
   addPhoneNotification: (notif: PhoneNotification) => void
@@ -121,6 +127,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   pans: [...initialPans],
   kitchenScore: 0,
 
+  // ── Dining ──
+  diningPlacedItems: [],
+
   // ── Phone ──
   phoneNotifications: [],
   phoneLocked: true,
@@ -178,6 +187,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     pans: s.pans.map((p) => p.id === panId ? { ...p, ...update } : p),
   })),
   addKitchenScore: (points) => set((s) => ({ kitchenScore: s.kitchenScore + points })),
+
+  // Dining
+  addDiningPlacedItem: (item) => set((s) => ({
+    diningPlacedItems: s.diningPlacedItems.includes(item)
+      ? s.diningPlacedItems
+      : [...s.diningPlacedItems, item],
+  })),
 
   // Phone
   addPhoneNotification: (notif) => set((s) => ({
@@ -260,6 +276,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     avatarMoving: false,
     pans: [...initialPans],
     kitchenScore: 0,
+    diningPlacedItems: [],
     phoneNotifications: [],
     phoneLocked: true,
     robot: { room: 'kitchen', speaking: false, text: '', visible: true },

@@ -1,6 +1,7 @@
 /** HUD — game clock + kitchen score. */
 
 import { useGameStore } from '../../stores/gameStore'
+import { ClockTriggerEffect } from './TriggerEffects'
 
 export default function HUD() {
   const gameClock = useGameStore((s) => s.gameClock)
@@ -12,7 +13,10 @@ export default function HUD() {
       {/* Block + Clock */}
       <div className="bg-slate-800/80 backdrop-blur rounded-lg px-4 py-2 flex items-center gap-4">
         <span className="text-cooking-300 text-xs font-medium">Block {blockNumber}</span>
-        <span className="text-white text-sm font-mono font-bold">{gameClock}</span>
+        <span className="text-white text-sm font-mono font-bold relative">
+          {gameClock}
+          <ClockTriggerEffect />
+        </span>
       </div>
 
       {/* Score */}

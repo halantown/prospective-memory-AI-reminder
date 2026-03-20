@@ -140,6 +140,7 @@ export default function TriggerEffects() {
       // Auto-clear effect after 4 seconds
       setTimeout(() => {
         clearTriggerEffect(effect.triggerEvent)
+        playedRef.current.delete(key)
       }, 4000)
     }
   }, [activeTriggerEffects, clearTriggerEffect])

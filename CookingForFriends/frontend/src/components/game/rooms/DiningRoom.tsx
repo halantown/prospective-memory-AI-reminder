@@ -1,18 +1,18 @@
 /** Dining room — table setting task. */
 
-import { useState } from 'react'
 import { useGameStore } from '../../../stores/gameStore'
 import PMTargetItems from '../PMTargetItems'
 
 const REQUIRED_ITEMS = ['plate', 'fork', 'knife', 'glass', 'napkin']
 
 export default function DiningRoom() {
-  const [placed, setPlaced] = useState<string[]>([])
+  const placed = useGameStore((s) => s.diningPlacedItems)
+  const addDiningPlacedItem = useGameStore((s) => s.addDiningPlacedItem)
   const wsSend = useGameStore((s) => s.wsSend)
 
   const handlePlaceItem = (item: string) => {
     if (placed.includes(item)) return
-    setPlaced([...placed, item])
+    addDiningPlacedItem(item)
     if (wsSend) {
       wsSend({
         type: 'task_action',

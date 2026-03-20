@@ -272,7 +272,7 @@ async def import_reminders(reminders: list[dict], db: AsyncSession = Depends(get
             context_activity=r.get("context_activity"),
             text=r["text"],
             audio_url=r.get("audio_url"),
-            metadata=r.get("metadata"),
+            extra_metadata=r.get("metadata"),
             is_placeholder=False,
         )
         db.add(msg)

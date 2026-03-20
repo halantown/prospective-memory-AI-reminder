@@ -1,6 +1,8 @@
-/** App root — path-based routing. */
+/** App root — path-based routing with session recovery. */
 
+import { useEffect } from 'react'
 import { useGameStore } from './stores/gameStore'
+import { getSessionStatus } from './services/api'
 import WelcomePage from './pages/game/WelcomePage'
 import EncodingPage from './pages/game/EncodingPage'
 import GamePage from './pages/game/GamePage'
@@ -22,12 +24,55 @@ export default function App() {
 
 function GameShell() {
   const phase = useGameStore((s) => s.phase)
+  const sessionId = useGameStore((s) => s.sessionId)
+  const setSession = useGameStore((s) => s.setSession)
+  const setPhase = useGameStore((s) => s.setPhase)
+  const setBlockNumber = useGameStore((s) => s.setBlockNumber)
+
+  // Recover session from sessionStorage on mount
+  useEffect(() => {
+    if (sessionId) return
+    const saved = sessionStorage.getItem('cff_session')
+    if (!saved) return
+
+    try {
+      const data = JSON.parse(saved)
+      if (!data.session_id) return
+
+      // Restore session and fetch current status
+      setSession(data)
+      getSessionStatus(data.session_id)
+        .then((status) => {
+          if (status.current_block) setBlockNumber(status.current_block)
+          // Map backend status/phase to frontend phase
+          const phaseMap: Record<string, string> = {
+            pending: 'encoding',
+            encoding: 'encoding',
+            playing: 'playing',
+            microbreak: 'microbreak',
+            completed: 'encoding', // next block starts with encoding
+          }
+          const resolvedPhase = phaseMap[status.phase || ''] || 'welcome'
+          if (status.status === 'completed') {
+            setPhase('complete')
+          } else if (status.status === 'in_progress') {
+            setPhase(resolvedPhase as any)
+          }
+        })
+        .catch(() => {
+          // Session invalid — clear and go to welcome
+          sessionStorage.removeItem('cff_session')
+        })
+    } catch {
+      sessionStorage.removeItem('cff_session')
+    }
+  }, [])
 
   switch (phase) {
     case 'welcome':
       return <WelcomePage />
     case 'onboarding':
-      return <WelcomePage /> // Onboarding embedded in welcome flow
+      return <WelcomePage />
     case 'encoding':
       return <EncodingPage />
     case 'playing':

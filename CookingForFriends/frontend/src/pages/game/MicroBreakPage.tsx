@@ -11,6 +11,7 @@ export default function MicroBreakPage() {
   const blockNumber = useGameStore((s) => s.blockNumber)
   const setPhase = useGameStore((s) => s.setPhase)
   const setBlockNumber = useGameStore((s) => s.setBlockNumber)
+  const resetBlock = useGameStore((s) => s.resetBlock)
 
   const [countdown, setCountdown] = useState(BREAK_DURATION_S)
   const [showNasaTLX, setShowNasaTLX] = useState(false)
@@ -40,6 +41,7 @@ export default function MicroBreakPage() {
       })
 
       if (result.next_block) {
+        resetBlock()
         setBlockNumber(result.next_block)
         setPhase('encoding')
       } else {

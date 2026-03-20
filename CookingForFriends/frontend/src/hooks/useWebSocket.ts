@@ -159,6 +159,11 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
       }
       setWsSend(sendFn)
 
+      // If we're in playing phase, signal backend to start/resume timeline
+      if (useGameStore.getState().phase === 'playing') {
+        sendFn({ type: 'start_game', data: { block_number: blockNumber } })
+      }
+
       heartbeatRef.current = setInterval(() => {
         sendFn({ type: 'heartbeat', data: { timestamp: Date.now() / 1000 } })
       }, HEARTBEAT_INTERVAL)

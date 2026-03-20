@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
-import { startSession } from '../../services/api'
+import { startSession, getSessionStatus } from '../../services/api'
 
 export default function WelcomePage() {
   const [token, setToken] = useState('')
@@ -34,8 +34,31 @@ export default function WelcomePage() {
         condition_order: data.condition_order as any,
         current_block: data.current_block,
       })
+      // Persist session for page refresh recovery
+      sessionStorage.setItem('cff_session', JSON.stringify({
+        session_id: data.session_id,
+        participant_id: data.participant_id,
+        group: data.group,
+        condition_order: data.condition_order,
+        current_block: data.current_block,
+      }))
       setBlockNumber(data.current_block > 0 ? data.current_block : 1)
-      setPhase('encoding')
+
+      // Check session status to resume at correct phase for returning participants
+      try {
+        const status = await getSessionStatus(data.session_id)
+        if (status.status === 'completed') {
+          setPhase('complete')
+        } else if (status.phase === 'playing') {
+          setPhase('playing')
+        } else if (status.phase === 'microbreak') {
+          setPhase('microbreak')
+        } else {
+          setPhase('encoding')
+        }
+      } catch {
+        setPhase('encoding')
+      }
     } catch (err: any) {
       console.error('[Welcome] Failed:', err)
       setError(err.message || 'Failed to start session')

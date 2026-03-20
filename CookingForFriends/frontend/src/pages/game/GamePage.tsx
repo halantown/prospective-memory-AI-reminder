@@ -15,12 +15,22 @@ export default function GamePage() {
   const sessionId = useGameStore((s) => s.sessionId)
   const blockNumber = useGameStore((s) => s.blockNumber)
   const wsConnected = useGameStore((s) => s.wsConnected)
+  const setPhase = useGameStore((s) => s.setPhase)
+
+  // Guard: redirect to welcome if no session
+  useEffect(() => {
+    if (!sessionId) {
+      setPhase('welcome')
+    }
+  }, [sessionId, setPhase])
 
   // Connect WebSocket
   useWebSocket(sessionId, blockNumber)
 
   // Start mouse tracking
   useMouseTracker()
+
+  if (!sessionId) return null
 
   return (
     <div className="h-screen w-screen flex overflow-hidden bg-slate-900 select-none">

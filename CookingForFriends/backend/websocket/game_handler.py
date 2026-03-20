@@ -32,6 +32,36 @@ async def handle_game_ws(
     async def send_event(event_type: str, data: dict):
         await manager.send_to_participant(participant_id, event_type, data)
 
+    # Determine block condition and start timeline if game is playing
+    timeline_task = None
+    try:
+        async with db_factory() as db:
+            from sqlalchemy import select
+            from models.block import Block, BlockStatus
+            from models.experiment import Participant
+
+            result = await db.execute(
+                select(Block).where(
+                    Block.participant_id == participant_id,
+                    Block.block_number == block_number,
+                )
+            )
+            block = result.scalar_one_or_none()
+
+            if block and block.status in (BlockStatus.PLAYING, "playing"):
+                # Resume timeline for reconnecting client
+                condition = block.condition
+                timeline_task = await run_timeline(
+                    participant_id=participant_id,
+                    block_number=block_number,
+                    condition=condition,
+                    send_fn=send_event,
+                    db_factory=db_factory,
+                )
+                logger.info(f"Timeline resumed for {participant_id} block {block_number}")
+    except Exception as e:
+        logger.error(f"Failed to check/start timeline: {e}")
+
     # Start pump and receiver concurrently
     pump_task = asyncio.create_task(ws_pump(queue, ws))
     receiver_task = asyncio.create_task(
@@ -52,6 +82,8 @@ async def handle_game_ws(
         manager.disconnect_participant(participant_id, ws)
         pump_task.cancel()
         receiver_task.cancel()
+        # Mark participant offline
+        await _set_participant_offline(participant_id, db_factory)
 
 
 async def _ws_receiver(
@@ -74,6 +106,9 @@ async def _ws_receiver(
 
             if msg_type == "heartbeat":
                 await _handle_heartbeat(participant_id, db_factory)
+            elif msg_type == "start_game":
+                await _handle_start_game(participant_id, block_number, db_factory,
+                                         lambda et, d: manager.send_to_participant(participant_id, et, d))
             elif msg_type == "room_switch":
                 await _handle_room_switch(participant_id, block_number, data, db_factory)
             elif msg_type == "task_action":
@@ -96,6 +131,45 @@ async def _ws_receiver(
         logger.info(f"WS receiver ended for {participant_id}")
     except Exception as e:
         logger.error(f"WS receiver error for {participant_id}: {e}")
+
+
+async def _handle_start_game(participant_id: str, block_number: int, db_factory, send_fn):
+    """Start the block timeline when the frontend enters playing phase."""
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.block import Block, BlockStatus
+        from datetime import datetime
+
+        result = await db.execute(
+            select(Block).where(
+                Block.participant_id == participant_id,
+                Block.block_number == block_number,
+            )
+        )
+        block = result.scalar_one_or_none()
+        if not block:
+            logger.warning(f"start_game: block not found for {participant_id} block {block_number}")
+            return
+
+        # Only start if block is in encoding or pending state
+        if block.status not in (BlockStatus.PENDING, BlockStatus.ENCODING, "pending", "encoding"):
+            logger.info(f"start_game: block already in state {block.status}, skipping timeline start")
+            return
+
+        block.status = BlockStatus.PLAYING
+        block.started_at = block.started_at or datetime.utcnow()
+        await db.commit()
+        condition = block.condition
+
+    # Start the timeline
+    await run_timeline(
+        participant_id=participant_id,
+        block_number=block_number,
+        condition=condition,
+        send_fn=send_fn,
+        db_factory=db_factory,
+    )
+    logger.info(f"Timeline started for {participant_id} block {block_number} ({condition})")
 
 
 async def _handle_heartbeat(participant_id: str, db_factory):
@@ -149,12 +223,9 @@ async def _handle_trigger_ack(participant_id, data, db_factory):
     if not trigger_id:
         return
 
-    async with db_factory() as db:
-        from sqlalchemy import select
-        trigger = get_active_trigger(participant_id)
-        if trigger:
-            # Store trigger_received_at for latency measurement
-            trigger["trigger_received_at"] = received_at
+    trigger = get_active_trigger(participant_id)
+    if trigger:
+        trigger["trigger_received_at"] = received_at
 
 
 async def _handle_interaction(participant_id, block_number, event_type, data, db_factory):
@@ -210,6 +281,13 @@ async def _handle_pm_attempt(participant_id, block_number, data, db_factory):
         )
         trial = result.scalar_one_or_none()
         if not trial:
+            logger.debug(f"PM attempt: no unscored trial found for {participant_id}")
+            return
+
+        # Guard: re-check trial hasn't been scored since our query (race condition guard)
+        await db.refresh(trial)
+        if trial.score is not None:
+            logger.warning(f"PM attempt: trial {trial.id} already scored (race condition prevented)")
             return
 
         # Cancel the execution window timer
@@ -272,6 +350,7 @@ async def _handle_pm_attempt(participant_id, block_number, data, db_factory):
                 user_actions=[data],
                 score=score,
                 response_time_ms=rt_ms,
+                exec_window_end=attempt_time,
             )
         )
         await db.commit()
@@ -322,4 +401,21 @@ async def _handle_mouse(participant_id, block_number, data, db_factory):
         )
         db.add(track)
         await db.commit()
+
+
+async def _set_participant_offline(participant_id: str, db_factory):
+    """Mark participant as offline when WebSocket disconnects."""
+    try:
+        async with db_factory() as db:
+            from sqlalchemy import update
+            from models.experiment import Participant
+            await db.execute(
+                update(Participant)
+                .where(Participant.id == participant_id)
+                .values(is_online=False)
+            )
+            await db.commit()
+            logger.info(f"Participant {participant_id} marked offline")
+    except Exception as e:
+        logger.error(f"Failed to mark participant offline: {e}")
 
