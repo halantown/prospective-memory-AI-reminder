@@ -12,18 +12,19 @@ CookingForFriends/
 │   ├── database.py         # Async SQLAlchemy engine
 │   ├── models/             # SQLAlchemy ORM models
 │   │   ├── experiment.py   # Experiment, Participant
-│   │   ├── block.py        # Block, PMTrial, ReminderMessage
+│   │   ├── block.py        # Block, PMTrial, PMAttemptRecord, EncodingQuizAttempt
 │   │   ├── logging.py      # InteractionLog, MouseTrack, etc.
 │   │   └── schemas.py      # Pydantic request/response schemas
 │   ├── routers/
-│   │   ├── session.py      # Token login, encoding, NASA-TLX, debrief
+│   │   ├── session.py      # Token login, encoding, quiz, NASA-TLX, debrief
 │   │   └── admin.py        # Participant CRUD, monitoring
 │   ├── websocket/
 │   │   ├── connection_manager.py  # WS pub/sub manager
 │   │   └── game_handler.py        # Bidirectional game WS handler
 │   ├── engine/
 │   │   ├── timeline.py     # Block timeline engine (JSON → scheduled WS events)
-│   │   ├── pm_scorer.py    # 0-6 PM scoring
+│   │   ├── pm_scorer.py    # 0-6 PM scoring (score_pm_attempt)
+│   │   ├── execution_window.py  # Silent 30/60s execution window manager
 │   │   ├── condition_assigner.py  # Latin Square 3-level assignment
 │   │   └── snapshot.py     # Game state snapshot helper
 │   └── data/timelines/     # JSON timeline templates
@@ -31,7 +32,7 @@ CookingForFriends/
 │   ├── src/
 │   │   ├── pages/game/     # WelcomePage, EncodingPage, GamePage, MicroBreakPage, DebriefPage
 │   │   ├── pages/admin/    # DashboardPage
-│   │   ├── components/game/ # WorldView, KitchenRoom, DiningRoom, RobotAvatar, PhoneSidebar, HUD, PMInteraction
+│   │   ├── components/game/ # WorldView, rooms/*, RobotAvatar, PhoneSidebar, HUD, PMTargetItems, TriggerEffects
 │   │   ├── stores/         # Zustand gameStore (central state)
 │   │   ├── hooks/          # useWebSocket, useMouseTracker
 │   │   ├── services/       # API client
@@ -77,7 +78,7 @@ Built files in `dist/` are served by FastAPI at `/`.
 
 - **Single-factor 3-level within-subjects**: Control / AF (Associative Fidelity) / AF+CB (Contextual Bridging)
 - **3 blocks per participant**, 4 PM tasks per block
-- AF/AFCB blocks: 3 reminded + 1 unreminded (confusion trial)
+- AF/AFCB blocks: 3 reminded + 1 unreminded (filler trial)
 - Control: robot present with neutral utterances but no PM reminders
 - **Latin Square**: 6 groups (A–F) for counterbalancing, round-robin assignment
 
@@ -88,16 +89,57 @@ Built files in `dist/` are served by FastAPI at `/`.
 - Frontend treats all robot speech identically — participants cannot distinguish reminders from neutral utterances
 - `log_tag` field (only in backend) marks messages as `reminder` vs `neutral` for analysis
 
+### PM Execution Flow
+```
+Trigger Event (doorbell/email/washing/clock)
+  → Participant perceives trigger (audio + visual cue)
+  → Navigate to target room
+  → Find correct item among 2 visually similar items
+  → Select item → Confirm action
+  → Backend scores silently (0-6)
+```
+
+- **No PM UI buttons.** Target items are embedded naturally in room scenes
+- **Execution window is silent** — frontend has no knowledge of the timer
+- **Ongoing tasks continue** during PM execution (steaks keep cooking)
+
 ### PM Scoring (0–6, hidden from participant)
 | Score | Meaning |
 |-------|---------|
-| 6 | Perfect: correct room + target + action within 30s |
-| 5 | Correct but delayed (>15s within window) |
-| 4 | Right target, wrong action |
-| 3 | Right room, wrong target |
-| 2 | PM intent shown, wrong direction |
+| 6 | Perfect: correct room + target + action ≤15s |
+| 5 | All correct but delayed (15-30s) |
+| 4 | Right target, wrong action (within 30s) |
+| 3 | Right room, wrong target (within 30s) |
+| 2 | PM intent shown, wrong room (within 30s) |
 | 1 | Very late response (30–60s) |
-| 0 | No response within window |
+| 0 | No response within 60s window |
+
+### Execution Window
+- **Primary window**: 0–30s after trigger → score 2-6 based on accuracy
+- **Extended window**: 30–60s → score = 1 (late response)
+- **Expiry**: >60s → auto-score 0 via backend timer
+- Frontend receives **zero** information about windows
+
+### Encoding Quiz
+- 3 multiple-choice questions per PM task (trigger/target/action)
+- Wrong answer → re-show encoding card → re-test
+- 2 failures → forced re-display with emphasis
+- Attempts recorded in `encoding_quiz_attempts` table
+
+### Filler Trials
+- AF/AFCB blocks: 4th trial has no robot reminder
+- Identical frontend code path — no `has_reminder`/`is_filler` sent to client
+- Scored identically (0-6)
+
+### Response Time Recording
+All PM-related timestamps are recorded:
+1. `trigger_fired_at` — server push time
+2. `trigger_received_at` — client receipt time
+3. `first_room_switch_at` — first room change after trigger
+4. `first_pm_room_entered_at` — first entry to target room
+5. `target_selected_at` — target item selection
+6. `action_completed_at` — action confirmation
+7. `resumption_lag_ms` — time from PM completion to resuming ongoing task
 
 ### Token System
 - 6-char alphanumeric (excludes ambiguous chars: 0/O/1/I)
@@ -111,6 +153,7 @@ Built files in `dist/` are served by FastAPI at `/`.
 |--------|------|-------------|
 | POST | `/api/session/start` | Start session with token |
 | GET | `/api/session/{id}/block/{n}/encoding` | Get PM task encoding data |
+| POST | `/api/session/{id}/block/{n}/quiz` | Submit encoding quiz answers |
 | POST | `/api/session/{id}/block/{n}/nasa-tlx` | Submit NASA-TLX responses |
 | POST | `/api/session/{id}/debrief` | Submit debrief questionnaire |
 | GET | `/api/session/{id}/status` | Get current session status |
@@ -134,8 +177,21 @@ Built files in `dist/` are served by FastAPI at `/`.
 ### WS Protocol
 - **Server → Client**: `{"event": "<type>", "data": {...}, "server_ts": <float>}`
 - **Client → Server**: `{"type": "<type>", "data": {...}}`
-- Events: `block_start`, `time_tick`, `robot_speak`, `robot_move`, `pm_trigger`, `phone_notification`, `phone_lock`, `block_end`, `ongoing_task_event`, `keepalive`
-- Client messages: `heartbeat`, `room_switch`, `task_action`, `pm_attempt`, `phone_unlock`, `phone_action`, `mouse_position`, `encoding_complete`
+- Server events: `block_start`, `time_tick`, `robot_speak`, `robot_move`, `pm_trigger`, `phone_notification`, `phone_lock`, `block_end`, `ongoing_task_event`, `keepalive`
+- Client messages: `heartbeat`, `room_switch`, `task_action`, `pm_attempt`, `trigger_ack`, `phone_unlock`, `phone_action`, `mouse_position`, `encoding_complete`
+
+## PM Trigger Types
+
+| Trigger | Audio | Visual |
+|---------|-------|--------|
+| doorbell | Double ding (880Hz) | Living room glow |
+| email_dentist | Ding (1200Hz) | Phone notification |
+| washing_done | Triple beep (660Hz) | Balcony glow |
+| clock_6pm | Chime (523Hz) | HUD clock highlight |
+| knock | Triple knock (220Hz) | Living room glow |
+| phone_message | Double ding (1000Hz) | Phone notification |
+| plant_reminder | Tone (440Hz) | Balcony glow |
+| tv_on | Tone (350Hz) | Living room glow |
 
 ## Web Routes (Frontend)
 
@@ -157,6 +213,7 @@ Built files in `dist/` are served by FastAPI at `/`.
 | Communication | WebSocket (bidirectional) |
 | Database | SQLite (prototype; migration-ready for MySQL) |
 | State Management | Zustand (frontend), SQLAlchemy models (backend) |
+| Audio | Web Audio API (placeholder tones for trigger effects) |
 
 ## Data Models
 
@@ -164,7 +221,9 @@ Built files in `dist/` are served by FastAPI at `/`.
 - **Experiment** — experiment metadata and status
 - **Participant** — token, Latin Square group, condition order, session state
 - **Block** — one of 3 blocks per participant, with condition assignment
-- **PMTrial** — individual PM task trial with scoring
+- **PMTrial** — individual PM task trial with scoring + resumption_lag_ms
+- **PMAttemptRecord** — granular PM attempt data (6 timestamps, room sequence, scoring)
+- **EncodingQuizAttempt** — per-question quiz attempt tracking
 - **ReminderMessage** — pre-generated reminder texts (placeholder for agent system)
 
 ### Logging Tables
