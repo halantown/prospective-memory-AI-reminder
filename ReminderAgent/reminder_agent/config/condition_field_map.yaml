@@ -1,25 +1,16 @@
 # Condition Field Map — Authoritative field whitelist per condition
-# Maps each AF × CB condition to the Task JSON fields permitted in the LLM prompt.
-# This file is the single source of truth for the operationalisation (TECH_DOC v0.2 §3.2).
+# Maps each experimental group to the Task JSON fields permitted in the LLM prompt.
+# This file is the single source of truth for the operationalisation.
+#
+# 3-group between-subjects design:
+#   Group 1 (Control): No reminder — not listed here (no text generation needed).
+#   Group 2 (AF_only): High Associative Fidelity, no Contextual Bridging.
+#   Group 3 (AF_CB):   High Associative Fidelity + Contextual Bridging.
 #
 # Field paths use dot notation into the Task JSON (snake_case, rooted at reminder_context).
 # excluded_zones: entire top-level zones stripped before the extractor even reads fields.
 
-LowAF_LowCB:
-  required_fields:
-    - "reminder_context.element1.action_verb"
-    - "reminder_context.element1.target_entity.entity_name"
-  conditional_fields: []
-  excluded_fields:
-    - "reminder_context.element1.target_entity.cues.visual"
-    - "reminder_context.element1.target_entity.domain_properties"
-    - "reminder_context.element2.origin.task_creator"
-    - "reminder_context.element3.detected_activity_raw"
-  excluded_zones:
-    - "agent_reasoning_context"
-    - "placeholder"
-
-HighAF_LowCB:
+AF_only:
   required_fields:
     - "reminder_context.element1.action_verb"
     - "reminder_context.element1.target_entity.entity_name"
@@ -34,21 +25,7 @@ HighAF_LowCB:
     - "agent_reasoning_context"
     - "placeholder"
 
-LowAF_HighCB:
-  required_fields:
-    - "reminder_context.element1.action_verb"
-    - "reminder_context.element1.target_entity.entity_name"
-    - "reminder_context.element3.detected_activity_raw"
-  conditional_fields: []
-  excluded_fields:
-    - "reminder_context.element1.target_entity.cues.visual"
-    - "reminder_context.element1.target_entity.domain_properties"
-    - "reminder_context.element2.origin.task_creator"
-  excluded_zones:
-    - "agent_reasoning_context"
-    - "placeholder"
-
-HighAF_HighCB:
+AF_CB:
   required_fields:
     - "reminder_context.element1.action_verb"
     - "reminder_context.element1.target_entity.entity_name"

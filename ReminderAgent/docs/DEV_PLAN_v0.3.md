@@ -3,11 +3,11 @@
 
 | | |
 |---|---|
-| **Version** | v0.3 — Theory review complete; S4 Quality Gate spec updated (CB consistency check + tone constant) |
+| **Version** | v0.4 — 3-group between-subjects redesign; S4 Quality Gate complete |
 | **Date** | 2026-03-12 |
 | **Owner** | Claude (project tracking) |
 | **Developer** | Thesis Candidate (local) |
-| **Status** | 🔵 S3 complete — S4 ready to start |
+| **Status** | 🔵 S4 complete — S5 ready to start |
 
 ---
 
@@ -18,6 +18,7 @@
 | v0.1 | 2026-03-11 | Initial plan |
 | v0.2 | 2026-03-11 | S1 closed (`f3ff85a`); S2 closed (`e420846`); S3 updated with Ollama + dual format |
 | v0.3 | 2026-03-12 | S3 closed (`7c7caee`); theory review: S4 Quality Gate adds CB activity consistency check; prompt_constructor adds tone constant (Option C); open items C3–C6 logged |
+| v0.4 | 2026-03-12 | 3-group between-subjects redesign: 4 conditions → 2 active (AF_only, AF_CB) + 1 control; S4 Quality Gate complete; forbidden keyword check dormant (no Low AF) |
 
 ---
 
@@ -36,10 +37,10 @@
 |---|---|---|---|
 | **S1** | Project skeleton + Config layer | ✅ `f3ff85a` | Directory created; configs load without error |
 | **S2** | Context Extractor | ✅ `e420846` | Passes all unit tests on Medicine A |
-| **S3** | LLM Backend + Prompt Constructor | ✅ `7c7caee` | Generates plausible text for Medicine A, all 4 conditions |
-| **S4** | Quality Gate | 🔵 Ready | Auto-checks catch planted violations reliably |
-| **S5** | Batch Runner + Output Store | ⬜ | Full run: 32 combinations × 3 variants logged to DB |
-| **S6** | Scale to N=10 + Review Interface | ⬜ | 320 variants in DB; human review complete |
+| **S3** | LLM Backend + Prompt Constructor | ✅ `7c7caee` | Generates plausible text for Medicine A, both conditions |
+| **S4** | Quality Gate | ✅ Done | Auto-checks catch planted violations reliably |
+| **S5** | Batch Runner + Output Store | ⬜ | Full run: 16 combinations × 3 variants logged to DB |
+| **S6** | Scale to N=10 + Review Interface | ⬜ | 160 variants in DB; human review complete |
 | **S7** | Stage 1 Demo | ⬜ | ReAct agent extracts Medicine A JSON from email.txt |
 
 Stage 1 (S7) is intentionally last — it does not block experiment data collection.
@@ -62,11 +63,11 @@ Notable: `excluded_zones` implementation cleanly blocks `agent_reasoning_context
 
 ## Sprint 3 — LLM Backend + Prompt Constructor ✅ `7c7caee`
 
-All exit criteria met. End-to-end verified: all 4 conditions produce plausible reminders via local Ollama (`llama3:latest`). 38 tests passing.
+All exit criteria met. End-to-end verified: both conditions produce plausible reminders via local Ollama (`llama3:latest`). 38 tests passing.
 
-**Post-sprint finding:** LowAF text occasionally includes entity name (e.g., "Doxycycline") — confirmed **not a violation** (entity_name is must_include for all conditions). Quality Gate should not flag this.
+**Post-sprint finding:** Entity name (e.g., "Doxycycline") is included in all reminders — confirmed correct behaviour since both active conditions are High AF and entity_name is a required field.
 
-**Post-sprint action (before S4 starts):** Add tone constant to `prompt_constructor.py` system prompt — intention-reactivation framing required for all conditions (see §Tone Constant below).
+**Post-sprint action (before S4 starts):** Add tone constant to `prompt_constructor.py` system prompt — intention-reactivation framing required for both conditions (see §Tone Constant below).
 
 ---
 
@@ -89,31 +90,31 @@ Use intention-reactivation framing ONLY:
 
 ---
 
-## Sprint 4 — Quality Gate
+## Sprint 4 — Quality Gate ✅ Done
 
 **Goal:** Automatically flag generated texts that violate condition rules.
 
 ### Tasks
 
-- [ ] Write `stage2/quality_gate.py`
-- [ ] Write `data/forbidden_keywords.yaml` — per-task visual/domain keywords forbidden in Low AF
+- [x] Write `stage2/quality_gate.py`
+- [x] Write `data/forbidden_keywords.yaml` — per-task visual/domain keywords (retained but dormant — no Low AF conditions in 3-group design)
 
 **Checks to implement:**
 
 | Check | Method | Fail condition |
 |---|---|---|
-| **Forbidden keyword leak** | String match vs `forbidden_keywords[task_id]` | Visual/domain keyword in Low AF text |
+| **Forbidden keyword leak** | String match vs `forbidden_keywords[task_id]` | Visual/domain keyword in text (currently **dormant** — no Low AF conditions) |
 | **Required entity present** | Check entity name appears in output | Entity name absent |
 | **Length constraint** | Word count | < `min_words` or > `max_words` from config |
 | **Duplicate detection** | Levenshtein ratio vs prior variants | Ratio > `similarity_threshold` |
 | **Language check** | `langdetect` | Not `en` |
-| **CB activity consistency** *(new — C1)* | Check High CB variants all reference the same activity | CB sentence describes different activity across variants in same batch |
+| **CB activity consistency** *(new — C1)* | Check AF_CB variants all reference the same activity | CB sentence describes different activity across variants in same batch |
 
 **CB activity consistency check detail:**
-- Extract the activity phrase from each High CB variant (heuristic: sentence containing "I can see" or "I notice")
+- Extract the activity phrase from each AF_CB variant (heuristic: sentence containing "I can see" or "I notice")
 - Compute semantic similarity between all activity phrases in the batch
 - Flag if any variant's activity phrase diverges significantly from the majority
-- This ensures the 10 variants for a given (task, HighCB) pair all bridge to the same detected activity
+- This ensures the 10 variants for a given (task, AF_CB) pair all bridge to the same detected activity
 
 **`forbidden_keywords.yaml` structure:**
 ```yaml
@@ -126,15 +127,14 @@ medicine_b:
 # ... all 8 tasks
 ```
 
-*Note: `domain_keywords` forbidden in Low AF only. `visual_keywords` forbidden in all Low AF. Gate logic must encode this distinction.*
+*Note: `domain_keywords` and `visual_keywords` checks are **dormant** under the 3-group design (no Low AF conditions). Retained for potential future use.*
 
-- [ ] Write `tests/test_quality_gate.py`
-  - Plant deliberate visual keyword in Low AF → assert fails
-  - Plant domain keyword in Low AF → assert fails
+- [x] Write `tests/test_quality_gate.py`
+  - Plant deliberate visual keyword → assert forbidden check triggers (dormant path test)
   - Valid High AF text → assert passes all checks
   - Duplicate text → assert fails similarity check
-  - High CB batch with inconsistent activity → assert CB consistency check fails
-  - High CB batch with consistent activity → assert passes
+  - AF_CB batch with inconsistent activity → assert CB consistency check fails
+  - AF_CB batch with consistent activity → assert passes
 
 ### Exit criteria
 
@@ -146,7 +146,7 @@ python -m pytest tests/test_quality_gate.py   # all pass
 
 ## Sprint 5 — Batch Runner + Output Store
 
-**Goal:** End-to-end run for all 32 combinations × N=3 variants. Results written to SQLite.
+**Goal:** End-to-end run for all 16 combinations × N=3 variants. Results written to SQLite.
 
 ### Tasks
 
@@ -171,18 +171,18 @@ python -m pytest tests/test_quality_gate.py   # all pass
 ```bash
 python stage2/batch_runner.py
 # Expected output:
-# Processing 32 combinations × 3 variants = 96 total
-# Generated: 96 | Failed: 0 | Retried: N
+# Processing 16 combinations × 3 variants = 48 total
+# Generated: 48 | Failed: 0 | Retried: N
 # Output written to output/reminders.db
 ```
 
-Manual check: open `reminders.json`, verify Low AF entries contain no forbidden keywords.
+Manual check: open `reminders.json`, verify both conditions (AF_only, AF_CB) produce correct outputs.
 
 ---
 
 ## Sprint 6 — Scale to N=10 + Review Interface
 
-**Goal:** Full 320-variant run. Human review complete. `reminders.db` ready for experiment platform.
+**Goal:** Full 160-variant run. Human review complete. `reminders.db` ready for experiment platform.
 
 ### Tasks
 
@@ -195,13 +195,13 @@ Manual check: open `reminders.json`, verify Low AF entries contain no forbidden 
   - Updates `review_status` in `reminders.db`
 
 **Review priority order:**
-1. All Low AF conditions first (leak check)
-2. All High CB conditions (naturalness check)
-3. Remaining conditions spot-check (3 per group)
+1. All AF_CB conditions first (naturalness of bridging check)
+2. AF_only conditions spot-check (3 per group)
+3. Cross-condition comparison for any given task (ensure AF_only and AF_CB are distinct)
 
 ### Exit criteria
 
-- `reminders.db` contains ≥ 10 `approved` variants per `(task_id, condition)` combination (32 combinations)
+- `reminders.db` contains ≥ 10 `approved` variants per `(task_id, condition)` combination (16 combinations)
 - `review_log.json` documents all decisions
 - Rejection rate < 20% (if higher, prompt needs revision — return to S3)
 
@@ -238,7 +238,7 @@ These do not block S4–S6 development but must be resolved before data collecti
 | ID | Priority | Item | Owner | Blocks |
 |---|---|---|---|---|
 | **C3** | 🔴 Pre-data | Encoding card content (domain_properties confirmed) — finalise exact wording shown to participants | Thesis candidate | Methods section |
-| **C4** | 🔴 Pre-data | AF×CB interaction direction: predict null or positive? Choose one, write into Hypotheses section | Thesis candidate | Introduction/Hypotheses |
+| **C4** | 🔴 Pre-data | AF+CB interaction direction: predict null or positive for AF_CB vs AF_only? Choose one, write into Hypotheses section | Thesis candidate | Introduction/Hypotheses |
 | **C5** | 🟡 Pre-submission | AF operationalization: write "encoded intention specificity" framing into Methods section | Thesis candidate | Reviewer defence |
 | **C6** | 🟢 S6 | Human review: add semantic equivalence check dimension across variants in same batch | S6 Review interface | Review quality |
 
@@ -289,7 +289,7 @@ Mid-sprint syncs welcome for: design questions, unexpected LLM behaviour, config
 
 | Risk | Probability | Impact | Mitigation |
 |---|---|---|---|
-| LLM repeatedly fails Low AF compliance | Medium | High | Tighten system prompt; add explicit negative examples in few-shot; last resort: template-based Low AF generation |
+| LLM repeatedly fails condition compliance | Low | Medium | Both active conditions are High AF, reducing compliance complexity; tighten system prompt if needed |
 | Quality gate rejects > 20% of variants | Medium | Medium | Review forbidden keyword list for over-triggering; adjust threshold |
 | Together.ai API latency slows iteration | Low | Low | Cache responses during prompt development; switch to Ollama for dev cycles |
 | Task JSON schema changes mid-development | Medium | Medium | All field paths in `condition_field_map.yaml`; code change-free if only config updated |
@@ -299,7 +299,7 @@ Mid-sprint syncs welcome for: design questions, unexpected LLM behaviour, config
 
 ## Definition of Done (full project)
 
-- [ ] `reminders.db` contains ≥ 10 approved variants for all 32 `(task_id, condition)` combinations
+- [ ] `reminders.db` contains ≥ 10 approved variants for all 16 `(task_id, condition)` combinations
 - [ ] `generation_log.json` documents all generation attempts
 - [ ] `review_log.json` documents all human review decisions
 - [ ] All unit tests pass (`pytest tests/`)

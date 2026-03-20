@@ -2,6 +2,11 @@
 
 Implements the dual format strategy (prose/json) from TECH_DOC v0.3 §4.2.
 Tone constant (intention-reactivation framing) per TECH_DOC v0.4 §2.4.
+
+3-group design:
+  Control — no generation (handled upstream).
+  AF_only — high AF, no CB.
+  AF_CB   — high AF + contextual bridging.
 """
 
 from __future__ import annotations
@@ -26,22 +31,12 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 CONDITION_DESCRIPTIONS: dict[str, dict[str, str]] = {
-    "LowAF_LowCB": {
-        "include": "only the generic action and entity name (e.g., 'take your medicine')",
-        "exclude": "any specific details about the target's appearance, dosage, form, who prescribed it, or what the user is currently doing",
-        "tone": "Keep it short and generic — a simple nudge.",
-    },
-    "HighAF_LowCB": {
+    "AF_only": {
         "include": "the action, entity name, visual appearance of the target (colour, shape, container), specific properties (dosage, form), and who assigned the task (if a professional)",
         "exclude": "any reference to what the user is currently doing or their detected activity",
         "tone": "Be specific and descriptive about the target object so the user can identify it.",
     },
-    "LowAF_HighCB": {
-        "include": "the generic action and entity name, plus a reference to what the user is currently doing",
-        "exclude": "any specific details about the target's appearance, dosage, form, or who prescribed it",
-        "tone": "Acknowledge what the user is doing, then give a brief generic reminder.",
-    },
-    "HighAF_HighCB": {
+    "AF_CB": {
         "include": "everything: the action, entity name, visual appearance, specific properties, who assigned it (if a professional), and a reference to what the user is currently doing",
         "exclude": "nothing — this is the full-information condition",
         "tone": "Acknowledge what the user is doing, then give a detailed, specific reminder.",
@@ -230,8 +225,8 @@ if __name__ == "__main__":
     gen_cfg = load_generation_config()
     fm = load_condition_field_map()
 
-    # Demo: HighAF_HighCB with no prior variants
-    condition = "HighAF_HighCB"
+    # Demo: AF_CB with no prior variants
+    condition = "AF_CB"
     system, user = build_prompts(
         task_json, condition, field_map=fm, gen_config=gen_cfg
     )

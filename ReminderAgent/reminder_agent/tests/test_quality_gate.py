@@ -1,12 +1,12 @@
 """Tests for stage2/quality_gate.py — Sprint 4.
 
-Covers all 6 quality checks:
-  1. Forbidden keyword leak (Low AF)
+Covers all 6 quality checks (updated for 3-group design):
+  1. Forbidden keyword leak (always passes — no Low AF conditions)
   2. Required entity presence
   3. Length constraint
   4. Duplicate detection (Levenshtein)
   5. Language check
-  6. CB activity consistency (batch-level)
+  6. CB activity consistency (batch-level, AF_CB only)
 Plus the aggregate `check()` and `check_batch()` functions.
 """
 
@@ -30,11 +30,14 @@ from reminder_agent.stage2.quality_gate import (
 
 
 # ===================================================================
-# 1. Forbidden keyword leak
+# 1. Forbidden keyword leak (now always passes — no Low AF conditions)
 # ===================================================================
 
 class TestForbiddenKeywords:
-    """Test forbidden keyword leak check (Low AF only)."""
+    """Test forbidden keyword leak check.
+
+    In the 3-group design all conditions are High AF, so this check always passes.
+    """
 
     FORBIDDEN_KW = {
         "medicine_a": {
@@ -43,84 +46,28 @@ class TestForbiddenKeywords:
         },
     }
 
-    def test_low_af_clean_text_passes(self) -> None:
+    def test_af_only_always_passes(self) -> None:
         result = check_forbidden_keywords(
-            "Remember to take your Doxycycline after dinner.",
-            "medicine_a", "LowAF_LowCB", self.FORBIDDEN_KW,
-        )
-        assert result.passed
-
-    def test_low_af_visual_keyword_fails(self) -> None:
-        result = check_forbidden_keywords(
-            "Remember to take the red Doxycycline.",
-            "medicine_a", "LowAF_LowCB", self.FORBIDDEN_KW,
-        )
-        assert not result.passed
-        assert "red" in result.detail
-
-    def test_low_af_domain_keyword_fails(self) -> None:
-        result = check_forbidden_keywords(
-            "Remember to take your Doxycycline tablet.",
-            "medicine_a", "LowAF_LowCB", self.FORBIDDEN_KW,
-        )
-        assert not result.passed
-        assert "tablet" in result.detail
-
-    def test_low_af_multiple_keywords_reports_all(self) -> None:
-        result = check_forbidden_keywords(
-            "Take the red round 100mg Doxycycline tablet from the bottle.",
-            "medicine_a", "LowAF_LowCB", self.FORBIDDEN_KW,
-        )
-        assert not result.passed
-        # Should find multiple leaked keywords
-        assert "red" in result.detail
-        assert "round" in result.detail
-
-    def test_low_af_case_insensitive(self) -> None:
-        result = check_forbidden_keywords(
-            "Remember to take the RED ROUND Doxycycline.",
-            "medicine_a", "LowAF_LowCB", self.FORBIDDEN_KW,
-        )
-        assert not result.passed
-
-    def test_high_af_always_passes(self) -> None:
-        result = check_forbidden_keywords(
-            "Take the red round 100mg tablet from the bottle.",
-            "medicine_a", "HighAF_LowCB", self.FORBIDDEN_KW,
+            "Remember to take the red round Doxycycline tablet.",
+            "medicine_a", "AF_only", self.FORBIDDEN_KW,
         )
         assert result.passed
         assert "skipped" in result.detail.lower()
 
-    def test_high_af_high_cb_always_passes(self) -> None:
+    def test_af_cb_always_passes(self) -> None:
         result = check_forbidden_keywords(
-            "Take the red round tablet.",
-            "medicine_a", "HighAF_HighCB", self.FORBIDDEN_KW,
+            "I see you're done eating. Take the red Doxycycline tablet.",
+            "medicine_a", "AF_CB", self.FORBIDDEN_KW,
         )
         assert result.passed
+        assert "skipped" in result.detail.lower()
 
-    def test_low_af_high_cb_still_checked(self) -> None:
-        """LowAF_HighCB is still a Low AF condition — keywords should be checked."""
+    def test_skipped_detail_message(self) -> None:
         result = check_forbidden_keywords(
-            "I see you're done eating. Take the red Doxycycline.",
-            "medicine_a", "LowAF_HighCB", self.FORBIDDEN_KW,
+            "Take the red round 100mg tablet from the bottle.",
+            "medicine_a", "AF_only", self.FORBIDDEN_KW,
         )
-        assert not result.passed
-
-    def test_unknown_task_id_passes_with_warning(self) -> None:
-        result = check_forbidden_keywords(
-            "Take the red pill.",
-            "unknown_task", "LowAF_LowCB", self.FORBIDDEN_KW,
-        )
-        assert result.passed
-        assert "No keywords defined" in result.detail
-
-    def test_multi_word_keyword(self) -> None:
-        result = check_forbidden_keywords(
-            "Look for the bottle with the white label.",
-            "medicine_a", "LowAF_LowCB", self.FORBIDDEN_KW,
-        )
-        assert not result.passed
-        assert "white label" in result.detail
+        assert "No Low AF" in result.detail
 
 
 # ===================================================================
@@ -164,14 +111,12 @@ class TestLength:
     """Test word count constraint check."""
 
     def test_within_range(self) -> None:
-        # 8 words
         result = check_length(
             "Remember to take your Doxycycline after dinner today.", 5, 35
         )
         assert result.passed
 
     def test_too_short(self) -> None:
-        # 3 words
         result = check_length("Take your medicine.", 5, 35)
         assert not result.passed
         assert "Too short" in result.detail
@@ -272,64 +217,57 @@ class TestLanguage:
     def test_very_short_text(self) -> None:
         # langdetect can be unreliable on very short text; we accept either outcome
         result = check_language("Hi")
-        # Just check it returns a valid CheckResult
         assert isinstance(result, CheckResult)
 
 
 # ===================================================================
-# 6. CB activity consistency
+# 6. CB activity consistency (AF_CB only)
 # ===================================================================
 
 class TestCBConsistency:
-    """Test CB activity consistency (batch-level)."""
+    """Test CB activity consistency (batch-level, AF_CB only)."""
 
-    def test_low_cb_always_passes(self) -> None:
+    def test_af_only_always_passes(self) -> None:
         result = check_cb_consistency(
-            ["Some text.", "Other text."], "LowAF_LowCB"
+            ["Some text.", "Other text."], "AF_only"
         )
         assert result.passed
         assert "skipped" in result.detail.lower()
 
-    def test_high_cb_consistent_variants(self) -> None:
+    def test_af_cb_consistent_variants(self) -> None:
         variants = [
             "I can see you're finishing dinner. Remember to take your Doxycycline.",
             "I can see you're finishing dinner. Don't forget your Doxycycline.",
             "Since you're finishing dinner, remember to take your Doxycycline.",
         ]
-        result = check_cb_consistency(variants, "HighAF_HighCB")
+        result = check_cb_consistency(variants, "AF_CB")
         assert result.passed
 
-    def test_high_cb_inconsistent_variants(self) -> None:
+    def test_af_cb_inconsistent_variants(self) -> None:
         variants = [
             "I can see you're finishing dinner. Remember to take your Doxycycline.",
             "I can see you're watching television in the living room. Don't forget your Doxycycline.",
         ]
-        result = check_cb_consistency(variants, "LowAF_HighCB", similarity_threshold=0.60)
+        result = check_cb_consistency(variants, "AF_CB", similarity_threshold=0.60)
         assert not result.passed
         assert "divergence" in result.detail.lower()
 
-    def test_high_cb_missing_activity_reference(self) -> None:
+    def test_af_cb_missing_activity_reference(self) -> None:
         variants = [
             "I can see you're finishing dinner. Remember your Doxycycline.",
             "Remember to take your Doxycycline.",  # no CB reference
         ]
-        result = check_cb_consistency(variants, "HighAF_HighCB")
+        result = check_cb_consistency(variants, "AF_CB")
         assert not result.passed
         assert "no detectable cb activity" in result.detail.lower()
 
     def test_single_variant_passes(self) -> None:
         result = check_cb_consistency(
             ["I can see you're eating. Remember your medicine."],
-            "HighAF_HighCB",
+            "AF_CB",
         )
         assert result.passed
         assert "fewer than 2" in result.detail.lower()
-
-    def test_high_af_low_cb_skipped(self) -> None:
-        result = check_cb_consistency(
-            ["Some text.", "Other text."], "HighAF_LowCB"
-        )
-        assert result.passed
 
 
 # ===================================================================
@@ -388,10 +326,10 @@ class TestAggregateCheck:
         },
     }
 
-    def test_valid_low_af_passes(self) -> None:
+    def test_valid_af_only_passes(self) -> None:
         result = check(
-            text="Remember to take your Doxycycline after dinner tonight.",
-            condition="LowAF_LowCB",
+            text="Remember to take the red round Doxycycline 100mg tablet from the bottle.",
+            condition="AF_only",
             task_id="medicine_a",
             entity_name="Doxycycline",
             forbidden_kw=self.FORBIDDEN_KW,
@@ -399,32 +337,20 @@ class TestAggregateCheck:
         assert result.passed
         assert len(result.failures) == 0
 
-    def test_valid_high_af_passes(self) -> None:
+    def test_valid_af_cb_passes(self) -> None:
         result = check(
-            text="Remember to take the red round Doxycycline 100mg tablet from the bottle.",
-            condition="HighAF_LowCB",
+            text="I see you just finished dinner. Remember to take the red round Doxycycline tablet from the bottle.",
+            condition="AF_CB",
             task_id="medicine_a",
             entity_name="Doxycycline",
             forbidden_kw=self.FORBIDDEN_KW,
         )
         assert result.passed
 
-    def test_leaked_keyword_fails_aggregate(self) -> None:
-        result = check(
-            text="Remember to take the red Doxycycline from the bottle.",
-            condition="LowAF_LowCB",
-            task_id="medicine_a",
-            entity_name="Doxycycline",
-            forbidden_kw=self.FORBIDDEN_KW,
-        )
-        assert not result.passed
-        failed_names = [f.check_name for f in result.failures]
-        assert "forbidden_keywords" in failed_names
-
     def test_missing_entity_fails_aggregate(self) -> None:
         result = check(
-            text="Remember to take your medicine after dinner tonight.",
-            condition="LowAF_LowCB",
+            text="Remember to take your medicine after dinner tonight from the red bottle.",
+            condition="AF_only",
             task_id="medicine_a",
             entity_name="Doxycycline",
             forbidden_kw=self.FORBIDDEN_KW,
@@ -436,7 +362,7 @@ class TestAggregateCheck:
     def test_too_short_fails_aggregate(self) -> None:
         result = check(
             text="Take Doxycycline.",
-            condition="LowAF_LowCB",
+            condition="AF_only",
             task_id="medicine_a",
             entity_name="Doxycycline",
             forbidden_kw=self.FORBIDDEN_KW,
@@ -446,10 +372,10 @@ class TestAggregateCheck:
         assert "length" in failed_names
 
     def test_duplicate_fails_aggregate(self) -> None:
-        prior = ["Remember to take your Doxycycline after dinner tonight."]
+        prior = ["Remember to take the red round Doxycycline 100mg tablet from the bottle."]
         result = check(
-            text="Remember to take your Doxycycline after dinner tonight.",
-            condition="LowAF_LowCB",
+            text="Remember to take the red round Doxycycline 100mg tablet from the bottle.",
+            condition="AF_only",
             task_id="medicine_a",
             entity_name="Doxycycline",
             prior_variants=prior,
@@ -461,8 +387,8 @@ class TestAggregateCheck:
 
     def test_gate_result_summary(self) -> None:
         result = check(
-            text="Remember to take your Doxycycline after dinner tonight.",
-            condition="LowAF_LowCB",
+            text="Remember to take the red round Doxycycline 100mg tablet from the bottle.",
+            condition="AF_only",
             task_id="medicine_a",
             entity_name="Doxycycline",
             forbidden_kw=self.FORBIDDEN_KW,
@@ -477,24 +403,24 @@ class TestAggregateCheck:
 class TestCheckBatch:
     """Test the batch-level check_batch() function."""
 
-    def test_batch_low_cb_passes(self) -> None:
+    def test_batch_af_only_passes(self) -> None:
         result = check_batch(
-            ["text1", "text2"], "LowAF_LowCB"
+            ["text1", "text2"], "AF_only"
         )
         assert result.passed
 
-    def test_batch_high_cb_consistent(self) -> None:
+    def test_batch_af_cb_consistent(self) -> None:
         variants = [
             "I can see you're finishing dinner. Remember to take your Doxycycline.",
             "I can see you're finishing dinner. Don't forget your Doxycycline.",
         ]
-        result = check_batch(variants, "HighAF_HighCB")
+        result = check_batch(variants, "AF_CB")
         assert result.passed
 
-    def test_batch_high_cb_inconsistent(self) -> None:
+    def test_batch_af_cb_inconsistent(self) -> None:
         variants = [
             "I can see you're finishing dinner. Remember your Doxycycline.",
             "I can see you're playing video games. Remember your Doxycycline.",
         ]
-        result = check_batch(variants, "LowAF_HighCB", cb_similarity_threshold=0.60)
+        result = check_batch(variants, "AF_CB", cb_similarity_threshold=0.60)
         assert not result.passed

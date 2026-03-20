@@ -4,7 +4,7 @@
 
 |                      |                                                                                                     |
 | -------------------- | --------------------------------------------------------------------------------------------------- |
-| **Version**    | v0.4 — Theory review complete; tone constant added; Quality Gate updated with CB consistency check |
+| **Version**    | v0.5 — 3-group between-subjects redesign; conditions reduced from 4 to 2 active + 1 control |
 | **Date**       | 2026-03-12                                                                                          |
 | **Author**     | Thesis Candidate                                                                                    |
 | **Status**     | 🟡 Architecture defined; implementation not started                                                 |
@@ -20,6 +20,7 @@
 | v0.2    | 2026-03-11 | Task JSON 3-zone structure; snake_case field paths                                                                                   |
 | v0.3    | 2026-03-11 | S2 complete; S3 design: Ollama config, dual format_context                                                                           |
 | v0.4    | 2026-03-12 | Theory review: tone constant (§2.4 new); Quality Gate adds CB activity consistency check; AF operationalization note added to §3.1 |
+| v0.5    | 2026-03-12 | 3-group between-subjects redesign: 4 conditions → 2 active (AF_only, AF_CB) + 1 control (no generation); 320 → 160 variants; forbidden keyword check dormant (no Low AF conditions) |
 
 ---
 
@@ -27,12 +28,12 @@
 
 ### 1.1 Purpose
 
-The Reminder Agent is an **offline batch generation pipeline** that produces all reminder texts required for the 2×2 within-subjects experiment. Its outputs — 320 reminder text variants (4 conditions × 8 tasks × 10 variants) — are pre-generated, human-reviewed, and loaded into the experiment platform before data collection begins.
+The Reminder Agent is an **offline batch generation pipeline** that produces all reminder texts required for the 3-group between-subjects experiment. Its outputs — 160 reminder text variants (2 active conditions × 8 tasks × 10 variants) — are pre-generated, human-reviewed, and loaded into the experiment platform before data collection begins. Group 1 (Control) receives no reminder and requires no text generation.
 
 This pre-generation approach serves two experimental goals:
 
 1. **Decoupling LLM variance from condition effects.** If only one text per condition were generated, observed differences between conditions could reflect idiosyncratic phrasing quality rather than the manipulation itself. With N=10 semantically equivalent but linguistically varied variants per condition-task pair, text quality effects are averaged out across participants.
-2. **Manipulation fidelity control.** Reminder texts are the primary experimental stimulus. Their correctness — whether Low AF texts genuinely withhold discriminating information, whether High CB texts sound natural — directly determines whether the AF and CB manipulations are valid. Pre-generation allows human review before the stimuli are deployed.
+2. **Manipulation fidelity control.** Reminder texts are the primary experimental stimulus. Their correctness — whether AF_only texts provide specific cues without activity context, whether AF_CB texts sound natural with bridging — directly determines whether the AF and CB manipulations are valid. Pre-generation allows human review before the stimuli are deployed.
 
 ### 1.2 Relationship to Experiment Platform
 
@@ -151,7 +152,7 @@ The robot may only reference information the user encoded at task creation time.
 
 Reminder tone (instruction-like vs. intention-reactivation) is an uncontrolled variable that would confound AF and CB effects if left free. All generated texts across all conditions must use **intention-reactivation framing** — this is a **constant, not a variable**.
 
-**Enforced in:** `prompt_constructor.build_system_prompt()` — hard constraint in system prompt for all 4 conditions:
+**Enforced in:** `prompt_constructor.build_system_prompt()` — hard constraint in system prompt for both active conditions:
 
 ```
 
@@ -162,7 +163,7 @@ Tone rule (applies to ALL conditions):
 
 ```
 
-**Why this matters:** If Low AF texts happened to sound more conversational and High AF texts sounded more clinical, observed DV differences could reflect tone rather than AF. Fixing tone to intention-reactivation framing across all conditions removes this confound.
+**Why this matters:** Fixing tone to intention-reactivation framing across both active conditions removes potential confounds from linguistic register.
 
 **Thesis framing:**
 > "Reminder tone was held constant across conditions using standardised intention-reactivation framing (Option C), isolating the effects of AF and CB from potential confounds introduced by linguistic register."
@@ -195,7 +196,7 @@ Tone rule (applies to ALL conditions):
 ---
 
 **P1 — Input truncation over output filtering.**
-The LLM must not see fields it is not allowed to use. For Low AF conditions, the JSON is pruned to contain only whitelisted fields before being passed to the LLM. This is more reliable than instructing the LLM to ignore information it has already seen.
+The LLM must not see fields it is not allowed to use. For AF_only conditions, the JSON is pruned to exclude `detected_activity_raw` before being passed to the LLM. This is more reliable than instructing the LLM to ignore information it has already seen.
 
 **P2 — Condition schema as the single source of truth.**
 The mapping between conditions and JSON fields is defined in one configuration file (`condition_field_map.yaml`). Generation code, quality checks, and documentation all derive from this single source. When the schema changes, only the config file changes.
@@ -215,28 +216,34 @@ Automated quality checks filter obvious violations. Human review (spot-checking 
 
 ### 3.1 Theoretical Grounding
 
-The condition schema operationalises the 2×2 manipulation:
+The condition schema operationalises the 3-group between-subjects manipulation:
+
+| Group | Condition | Description |
+|-------|-----------|-------------|
+| **Group 1** | **Control** | No reminder (baseline) — no text generation needed |
+| **Group 2** | **AF_only** | High AF reminder, no CB — specific cues without activity context (equivalent to old `HighAF_LowCB`) |
+| **Group 3** | **AF_CB** | High AF + high CB — specific cues with contextual bridging (equivalent to old `HighAF_HighCB`) |
 
 - **Associative Fidelity (AF):** specificity of the **encoded intention context** in the reminder, operationalising the associative link described by McDaniel & Einstein's Multiprocess Framework. High AF provides information that allows the participant to identify the correct target (not the distractor) and execute the correct action. AF is defined broadly as encoded intention specificity — encompassing target perceptual features (visual cue), action-relevant properties (domain properties), and encoding episode context (task_creator when authority). This broader definition is grounded in Encoding Specificity (Tulving, 1973): reinstatement of encoding context facilitates retrieval, not only reinstatement of the target-action link per se.
-- **Contextual Bridging (CB):** whether the reminder references the participant's currently detected activity, operationalising the interruption-softening mechanism described by Altmann & Trafton's Goal Activation Model.
+- **Contextual Bridging (CB):** whether the reminder references the participant's currently detected activity, operationalising the interruption-softening mechanism described by Altmann & Trafton's Goal Activation Model. Present only in Group 3 (AF_CB).
 
 AF and CB act on **different stages of the PM lifecycle** (encoding/retention vs. noticing/switching cost) and are operationalised using **different JSON elements**, making them theoretically and empirically orthogonal.
 
 ### 3.2 Field Whitelist per Condition
 
-This table is the authoritative definition of what information each condition may contain. It maps directly to `condition_field_map.yaml`.
+This table is the authoritative definition of what information each active condition may contain. It maps directly to `condition_field_map.yaml`. Group 1 (Control) receives no reminder and is omitted.
 
-| JSON Field                | Path                                                          | LowAF LowCB | HighAF LowCB      | LowAF HighCB | HighAF HighCB     |
-| ------------------------- | ------------------------------------------------------------- | ----------- | ----------------- | ------------ | ----------------- |
-| `action_verb`           | `reminder_context.element1.action_verb`                     | ✅          | ✅                | ✅           | ✅                |
-| `entity_name`           | `reminder_context.element1.target_entity.entity_name`       | ✅          | ✅                | ✅           | ✅                |
-| `cues.visual`           | `reminder_context.element1.target_entity.cues.visual`       | ❌          | ✅                | ❌           | ✅                |
-| `domain_properties`     | `reminder_context.element1.target_entity.domain_properties` | ❌          | ✅                | ❌           | ✅                |
-| `task_creator`          | `reminder_context.element2.origin.task_creator`             | ❌          | ✅ (if authority) | ❌           | ✅ (if authority) |
-| `detected_activity_raw` | `reminder_context.element3.detected_activity_raw`           | ❌          | ❌                | ✅           | ✅                |
-| `execution_protocol.*`  | `agent_reasoning_context.execution_protocol.*`              | ❌          | ❌                | ❌           | ❌                |
-| `encoding_info.*`       | `agent_reasoning_context.encoding_info.*`                   | ❌          | ❌                | ❌           | ❌                |
-| `placeholder.*`         | `placeholder.*`                                             | ❌          | ❌                | ❌           | ❌                |
+| JSON Field                | Path                                                          | AF_only            | AF_CB              |
+| ------------------------- | ------------------------------------------------------------- | ----------------- | ------------------ |
+| `action_verb`           | `reminder_context.element1.action_verb`                     | ✅                | ✅                 |
+| `entity_name`           | `reminder_context.element1.target_entity.entity_name`       | ✅                | ✅                 |
+| `cues.visual`           | `reminder_context.element1.target_entity.cues.visual`       | ✅                | ✅                 |
+| `domain_properties`     | `reminder_context.element1.target_entity.domain_properties` | ✅                | ✅                 |
+| `task_creator`          | `reminder_context.element2.origin.task_creator`             | ✅ (if authority) | ✅ (if authority)  |
+| `detected_activity_raw` | `reminder_context.element3.detected_activity_raw`           | ❌                | ✅                 |
+| `execution_protocol.*`  | `agent_reasoning_context.execution_protocol.*`              | ❌                | ❌                 |
+| `encoding_info.*`       | `agent_reasoning_context.encoding_info.*`                   | ❌                | ❌                 |
+| `placeholder.*`         | `placeholder.*`                                             | ❌                | ❌                 |
 
 **Notes on excluded fields:**
 
@@ -246,27 +253,19 @@ This table is the authoritative definition of what information each condition ma
 
 ### 3.3 Canonical Examples — Medicine Task
 
-The following examples illustrate the four conditions for Task A (Doxycycline). These serve as seed few-shot examples in the generation pipeline.
+The following examples illustrate the two active conditions for Task A (Doxycycline). Group 1 (Control) receives no reminder text. These serve as seed few-shot examples in the generation pipeline.
 
-**LowAF_LowCB:**
-
-> "Don't forget to take your medicine."
-
-**HighAF_LowCB:**
+**AF_only (Group 2):**
 
 > "Remember to take your Doxycycline — the 100mg tablet in the red round bottle. Your doctor prescribed it."
 
-**LowAF_HighCB:**
-
-> "I can see you just finished dinner. Don't forget to take your medicine."
-
-**HighAF_HighCB:**
+**AF_CB (Group 3):**
 
 > "I can see you just finished dinner. Remember to take your Doxycycline — the 100mg tablet in the red round bottle. Your doctor prescribed it."
 
 ### 3.4 CB Text per Task Pair
 
-CB text is a fixed string per task pair (PRD §2.5 fixed-state method). The detected activity string injected into High CB reminders is:
+CB text is a fixed string per task pair (PRD §2.5 fixed-state method). The detected activity string injected into AF_CB reminders is:
 
 | Task Pair              | Primary Activity               | Fixed Detected_Activity String                      |
 | ---------------------- | ------------------------------ | --------------------------------------------------- |
@@ -296,10 +295,8 @@ reminder_agent/
 │   │   ├── laundry_c.json
 │   │   └── ...
 │   ├── few_shot_examples/            # Seed examples per condition
-│   │   ├── LowAF_LowCB.json
-│   │   ├── HighAF_LowCB.json
-│   │   ├── LowAF_HighCB.json
-│   │   └── HighAF_HighCB.json
+│   │   ├── AF_only.json
+│   │   └── AF_CB.json
 │   └── simulated_sources/            # Stage 1 demo inputs (.txt)
 │       ├── calendar.txt
 │       ├── email.txt
@@ -316,7 +313,7 @@ reminder_agent/
 │   ├── llm_backend.py               # Model-agnostic LLM interface
 │   ├── generator.py                  # Orchestrates N-variant generation loop
 │   ├── quality_gate.py              # Automated compliance checks
-│   └── batch_runner.py              # Entry point: runs all 32 combinations
+│   └── batch_runner.py              # Entry point: runs all 16 combinations
 │
 ├── review/
 │   ├── review_interface.py           # CLI review tool for human spot-check
@@ -337,19 +334,10 @@ reminder_agent/
 
 #### `config/condition_field_map.yaml`
 
-Single source of truth for the AF × CB operationalisation. Example structure:
+Single source of truth for the AF × CB operationalisation. With the 3-group between-subjects redesign, only 2 active conditions remain (Control group needs no generation). Example structure:
 
 ```yaml
-LowAF_LowCB:
-  required_fields:
-    - "reminder_context.element1.action_verb"
-    - "reminder_context.element1.target_entity.entity_name"
-  conditional_fields: []
-  excluded_zones:
-    - "agent_reasoning_context"
-    - "placeholder"
-
-HighAF_LowCB:
+AF_only:
   required_fields:
     - "reminder_context.element1.action_verb"
     - "reminder_context.element1.target_entity.entity_name"
@@ -364,21 +352,7 @@ HighAF_LowCB:
     - "agent_reasoning_context"
     - "placeholder"
 
-LowAF_HighCB:
-  required_fields:
-    - "reminder_context.element1.action_verb"
-    - "reminder_context.element1.target_entity.entity_name"
-    - "reminder_context.element3.detected_activity_raw"
-  conditional_fields: []
-  excluded_fields:
-    - "reminder_context.element1.target_entity.cues.visual"
-    - "reminder_context.element1.target_entity.domain_properties"
-    - "reminder_context.element2.origin.task_creator"
-  excluded_zones:
-    - "agent_reasoning_context"
-    - "placeholder"
-
-HighAF_HighCB:
+AF_CB:
   required_fields:
     - "reminder_context.element1.action_verb"
     - "reminder_context.element1.target_entity.entity_name"
@@ -488,14 +462,14 @@ Automated compliance checks applied to each generated variant before it is writt
 
 | Check                                      | Method                                                                                 | Fail condition                                                                                                         |
 | ------------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Forbidden field leak**             | Keyword matching against `forbidden_keywords.yaml`                                   | Visual/domain keyword appears in Low AF text                                                                           |
+| **Forbidden field leak**             | Keyword matching against `forbidden_keywords.yaml`                                   | Visual/domain keyword appears in text (currently **dormant** — no Low AF conditions in 3-group design) |
 | **Required field presence**          | Check that whitelisted entity names / action verbs appear                              | Entity name absent from text                                                                                           |
 | **Length constraint**                | Word count                                                                             | <`min_words` or > `max_words` from config                                                                          |
 | **Duplicate detection**              | Levenshtein similarity against existing variants                                       | Similarity >`similarity_threshold` with any prior variant in same batch                                              |
 | **Language check**                   | `langdetect`                                                                         | Not English                                                                                                            |
-| **CB activity consistency** *(C1)* | Semantic similarity between activity phrases across all High CB variants in same batch | Any variant's activity phrase diverges from majority (heuristic: extract sentence containing "I can see" / "I notice") |
+| **CB activity consistency** *(C1)* | Semantic similarity between activity phrases across all AF_CB variants in same batch   | Any variant's activity phrase diverges from majority (heuristic: extract sentence containing "I can see" / "I notice") |
 
-Note: the forbidden field leak check is heuristic, not exhaustive. It catches obvious violations (e.g., "red bottle" in Low AF text). Subtle semantic leakage is caught in human review. CB consistency check runs at batch level (after all N variants are generated), not per-variant.
+Note: the forbidden field leak check is implemented but currently **dormant** — the 3-group between-subjects design has no Low AF conditions, so the check will not trigger in practice. It is retained for potential future use or if the design reverts. CB consistency check runs at batch level (after all N variants are generated for an AF_CB task pair), not per-variant.
 
 #### `review/review_interface.py`
 
@@ -503,9 +477,9 @@ CLI tool that presents generated texts grouped by `(task_id, condition)`. Review
 
 Suggested review workflow:
 
-- Full review of all 32 × first variants (one per condition-task pair) before expanding to 10 variants
+- Full review of all 16 × first variants (one per condition-task pair) before expanding to 10 variants
 - Spot-check 3 random variants per condition-task pair for subsequent variants
-- Special attention: Low AF conditions (check for leakage), High CB conditions (check naturalness)
+- Special attention: AF_CB conditions (check naturalness of bridging)
 
 #### `stage2/batch_runner.py`
 
@@ -513,7 +487,7 @@ Entry point that orchestrates the full generation run.
 
 ```
 for task_id in all_8_tasks:
-    for condition in all_4_conditions:
+    for condition in [AF_only, AF_CB]:
         pruned_context = context_extractor(task_json[task_id], condition)
         variants = []
         for n in range(N_VARIANTS):
@@ -535,7 +509,7 @@ for task_id in all_8_tasks:
 | Field             | Type      | Description                                                                   |
 | ----------------- | --------- | ----------------------------------------------------------------------------- |
 | `task_id`       | TEXT      | e.g.,`medicine_a`                                                           |
-| `condition`     | TEXT      | `LowAF_LowCB` / `HighAF_LowCB` / `LowAF_HighCB` / `HighAF_HighCB`     |
+| `condition`     | TEXT      | `AF_only` / `AF_CB` (Control group has no entries)                       |
 | `variant_idx`   | INTEGER   | 0–9                                                                          |
 | `text`          | TEXT      | Final approved reminder text                                                  |
 | `audio_file`    | TEXT      | `reminder_{task_id}_{condition}_{idx}.mp3` (populated after TTS generation) |
@@ -627,7 +601,7 @@ The Stage 1 agent produces a Task JSON conforming to the three-element schema:
 Phase 1 — Prompt development
   Backend: qwen3-max via Aliyun Bailian API
   Goal: Stabilise prompts until condition compliance is consistent
-  Cost estimate: ~$2–3 for full 320-variant run at $0.9/1M tokens
+  Cost estimate: ~$1–2 for full 160-variant run at $0.9/1M tokens
 
 Phase 2 — Local model validation
   Backend: Gemma3-4B or Llama-3.1 or Qwen-3 via Ollama (local, RTX 2060 mobile)
@@ -670,7 +644,7 @@ Regardless of which LLM is used for final generation, the system is documented a
 | ID             | Priority | Topic                                   | Status                                                                                                                                                            |
 | -------------- | -------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **TQ-1** | 🔴 P0    | Few-shot examples                       | Need to author 2–3 seed examples per condition (8 total) before generation can begin. These are the ground truth for quality assessment.                         |
-| **TQ-2** | 🟡 P1    | Forbidden keyword list for Low AF check | Need to enumerate all visual cue keywords per task (colours, shapes, brand names) to populate the automated leak checker.                                         |
+| **TQ-2** | 🟢 P2    | Forbidden keyword list for Low AF check | Dormant under 3-group design (no Low AF conditions). Retained for potential revert. Keywords enumerated but check will not trigger.                                |
 | **TQ-3** | 🟡 P1    | Stage 1 demo scope                      | Confirm: one task (Medicine) from one source (email.txt) is sufficient for thesis demonstration.                                                                  |
 | **TQ-4** | 🟡 P1    | N variants per condition                | Currently set to 10. Confirm with supervisor whether this is sufficient for statistical purposes.                                                                 |
 | **TQ-5** | 🟢 P2    | TTS pipeline                            | Audio generation (ElevenLabs or equivalent) is a downstream step after text approval. Document the naming convention and loading procedure for Pepper separately. |
@@ -688,4 +662,4 @@ Regardless of which LLM is used for final generation, the system is documented a
 | Stage 1 ReAct demo              | Architecture demonstration                    | System Design chapter               |
 | Quality gate + review log       | Stimulus validation methodology               | Methods: Stimulus preparation       |
 | Model-agnostic backend          | Design principle, future work enabler         | Discussion                          |
-| 320 approved reminder texts     | Experimental stimuli                          | Appendix                            |
+| 160 approved reminder texts     | Experimental stimuli                          | Appendix                            |

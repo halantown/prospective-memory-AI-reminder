@@ -2,6 +2,9 @@
 
 The LLM receives only the pruned output. It cannot leak information it never sees.
 This implements Design Principle P1 (input truncation over output filtering).
+
+3-group design: Only AF_only and AF_CB conditions use this extractor.
+Control group generates no text and never calls this module.
 """
 
 from __future__ import annotations
@@ -89,7 +92,7 @@ def load_field_map(
     """Load the field whitelist for a specific condition.
 
     Args:
-        condition: One of the 4 condition names (e.g. "LowAF_LowCB").
+        condition: One of the active condition names (e.g. "AF_only", "AF_CB").
         field_map: Pre-loaded field map. If None, loads from default config path.
 
     Returns:
@@ -115,7 +118,7 @@ def extract(
 
     Args:
         task_json: The complete Task JSON dict (with all 3 zones).
-        condition: One of the 4 condition names.
+        condition: One of the active condition names ("AF_only" or "AF_CB").
         field_map: Pre-loaded field map. If None, loads from default config path.
 
     Returns:
@@ -206,7 +209,7 @@ if __name__ == "__main__":
     with open(task_path) as f:
         task_json = json.load(f)
 
-    conditions = ["LowAF_LowCB", "HighAF_LowCB", "LowAF_HighCB", "HighAF_HighCB"]
+    conditions = ["AF_only", "AF_CB"]
     fm = load_condition_field_map()
 
     for cond in conditions:

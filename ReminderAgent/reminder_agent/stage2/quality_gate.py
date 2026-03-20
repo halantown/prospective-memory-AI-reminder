@@ -1,12 +1,12 @@
 """Quality Gate — automated compliance checks for generated reminder texts.
 
 Implements checks from TECH_DOC v0.4 §4.2 / DEV_PLAN v0.3 S4:
-  1. Forbidden keyword leak (Low AF only)
+  1. Forbidden keyword leak (reserved for future use; no Low AF conditions in 3-group design)
   2. Required entity presence
   3. Length constraint (word count)
   4. Duplicate detection (Levenshtein similarity)
   5. Language check (English only)
-  6. CB activity consistency (batch-level, High CB only)
+  6. CB activity consistency (batch-level, AF_CB only)
 """
 
 from __future__ import annotations
@@ -104,26 +104,11 @@ def check_forbidden_keywords(
 ) -> CheckResult:
     """Check that Low AF text does not contain forbidden visual/domain keywords.
 
-    Only applies to LowAF conditions. High AF conditions always pass.
+    In the current 3-group design there are no Low AF conditions, so this check
+    always passes.  The mechanism is retained for potential future use.
     """
-    if "LowAF" not in condition:
-        return CheckResult("forbidden_keywords", True, "Not a LowAF condition — skipped")
-
-    if forbidden_kw is None:
-        forbidden_kw = load_forbidden_keywords()
-
-    task_kw = forbidden_kw.get(task_id)
-    if task_kw is None:
-        logger.warning("No forbidden keywords defined for task '%s'", task_id)
-        return CheckResult("forbidden_keywords", True, f"No keywords defined for {task_id}")
-
-    text_lower = text.lower()
-    all_forbidden = task_kw["visual_keywords"] + task_kw["domain_keywords"]
-    found = [kw for kw in all_forbidden if kw in text_lower]
-
-    if found:
-        return CheckResult("forbidden_keywords", False, f"Leaked keywords: {found}")
-    return CheckResult("forbidden_keywords", True)
+    # No Low AF conditions in 3-group design — always pass
+    return CheckResult("forbidden_keywords", True, "No Low AF conditions in current design — skipped")
 
 
 def check_entity_present(text: str, entity_name: str) -> CheckResult:
@@ -239,19 +224,19 @@ def check_cb_consistency(
     condition: str,
     similarity_threshold: float = 0.40,
 ) -> CheckResult:
-    """Check that High CB variants all reference the same activity.
+    """Check that CB variants all reference the same activity.
 
-    Only applies to HighCB conditions. Compares activity sentences
+    Only applies to the AF_CB condition. Compares activity sentences
     pairwise using normalised Levenshtein similarity. Flags if any pair
     has similarity below the threshold (meaning they describe different activities).
 
     Args:
         variants: All generated variants for this (task, condition) batch.
-        condition: The condition string (only HighCB is checked).
+        condition: The condition string (only AF_CB is checked).
         similarity_threshold: Minimum pairwise similarity for activity sentences.
     """
-    if "HighCB" not in condition:
-        return CheckResult("cb_consistency", True, "Not a HighCB condition — skipped")
+    if condition != "AF_CB":
+        return CheckResult("cb_consistency", True, "Not AF_CB condition — skipped")
 
     if len(variants) < 2:
         return CheckResult("cb_consistency", True, "Fewer than 2 variants — skipped")
@@ -353,15 +338,15 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     # Demo: check a good and a bad text for medicine_a
-    good_low_af = "Remember to take your Doxycycline after dinner."
-    bad_low_af = "Remember to take the red round Doxycycline tablet."
+    good_af = "Remember to take the red round Doxycycline 100mg tablet from the bottle."
+    bad_af = "Remember to take your medicine after dinner."
 
-    print("=== Quality Gate Demo (medicine_a, LowAF_LowCB) ===\n")
+    print("=== Quality Gate Demo (medicine_a, AF_only) ===\n")
 
-    for label, text in [("Good", good_low_af), ("Bad (leaked keywords)", bad_low_af)]:
+    for label, text in [("Good (AF_only)", good_af), ("Bad (missing entity details)", bad_af)]:
         result = check(
             text=text,
-            condition="LowAF_LowCB",
+            condition="AF_only",
             task_id="medicine_a",
             entity_name="Doxycycline",
         )

@@ -1,5 +1,7 @@
 """Tests for config_loader — validates that all configs load cleanly and
 that validation catches missing / invalid fields.
+
+Updated for 3-group between-subjects design (AF_only, AF_CB).
 """
 
 from __future__ import annotations
@@ -47,18 +49,7 @@ def tmp_config_dir(tmp_path: Path) -> Path:
     """))
 
     (cfg / "condition_field_map.yaml").write_text(textwrap.dedent("""\
-        LowAF_LowCB:
-          required_fields:
-            - "reminder_context.element1.action_verb"
-            - "reminder_context.element1.target_entity.entity_name"
-          conditional_fields: []
-          excluded_fields:
-            - "reminder_context.element1.target_entity.cues.visual"
-          excluded_zones:
-            - "agent_reasoning_context"
-            - "placeholder"
-
-        HighAF_LowCB:
+        AF_only:
           required_fields:
             - "reminder_context.element1.action_verb"
             - "reminder_context.element1.target_entity.entity_name"
@@ -73,19 +64,7 @@ def tmp_config_dir(tmp_path: Path) -> Path:
             - "agent_reasoning_context"
             - "placeholder"
 
-        LowAF_HighCB:
-          required_fields:
-            - "reminder_context.element1.action_verb"
-            - "reminder_context.element1.target_entity.entity_name"
-            - "reminder_context.element3.detected_activity_raw"
-          conditional_fields: []
-          excluded_fields:
-            - "reminder_context.element1.target_entity.cues.visual"
-          excluded_zones:
-            - "agent_reasoning_context"
-            - "placeholder"
-
-        HighAF_HighCB:
+        AF_CB:
           required_fields:
             - "reminder_context.element1.action_verb"
             - "reminder_context.element1.target_entity.entity_name"
@@ -114,7 +93,7 @@ class TestLoadFromProductionConfigs:
         model, gen, field_map = load_all_configs()
         assert model.backend == "ollama"
         assert gen.n_variants == 3
-        assert len(field_map.conditions) == 4
+        assert len(field_map.conditions) == 2
 
     def test_model_config(self) -> None:
         cfg = load_model_config()
@@ -135,35 +114,33 @@ class TestLoadFromProductionConfigs:
 
     def test_condition_field_map_all_conditions(self) -> None:
         cfg = load_condition_field_map()
-        expected = {"LowAF_LowCB", "HighAF_LowCB", "LowAF_HighCB", "HighAF_HighCB"}
+        expected = {"AF_only", "AF_CB"}
         assert set(cfg.conditions.keys()) == expected
 
-    def test_lowaf_has_no_visual_cues(self) -> None:
+    def test_af_only_has_visual_cues(self) -> None:
         cfg = load_condition_field_map()
-        low_af = cfg.conditions["LowAF_LowCB"]
-        required_paths = low_af.required_fields
-        assert "reminder_context.element1.target_entity.cues.visual" not in required_paths
+        af_only = cfg.conditions["AF_only"]
+        assert "reminder_context.element1.target_entity.cues.visual" in af_only.required_fields
 
-    def test_highaf_has_visual_cues(self) -> None:
+    def test_af_only_excludes_detected_activity(self) -> None:
         cfg = load_condition_field_map()
-        high_af = cfg.conditions["HighAF_LowCB"]
-        assert "reminder_context.element1.target_entity.cues.visual" in high_af.required_fields
+        af_only = cfg.conditions["AF_only"]
+        assert "reminder_context.element3.detected_activity_raw" not in af_only.required_fields
 
-    def test_highcb_has_detected_activity(self) -> None:
+    def test_af_cb_has_detected_activity(self) -> None:
         cfg = load_condition_field_map()
-        for cond_name in ("LowAF_HighCB", "HighAF_HighCB"):
+        af_cb = cfg.conditions["AF_CB"]
+        assert "reminder_context.element3.detected_activity_raw" in af_cb.required_fields
+
+    def test_both_conditions_have_domain_properties(self) -> None:
+        cfg = load_condition_field_map()
+        for cond_name in ("AF_only", "AF_CB"):
             entry = cfg.conditions[cond_name]
-            assert "reminder_context.element3.detected_activity_raw" in entry.required_fields
-
-    def test_lowcb_excludes_detected_activity(self) -> None:
-        cfg = load_condition_field_map()
-        for cond_name in ("LowAF_LowCB", "HighAF_LowCB"):
-            entry = cfg.conditions[cond_name]
-            assert "reminder_context.element3.detected_activity_raw" not in entry.required_fields
+            assert "reminder_context.element1.target_entity.domain_properties" in entry.required_fields
 
     def test_conditional_authority_field(self) -> None:
         cfg = load_condition_field_map()
-        for cond_name in ("HighAF_LowCB", "HighAF_HighCB"):
+        for cond_name in ("AF_only", "AF_CB"):
             entry = cfg.conditions[cond_name]
             cond_fields = [cf.field for cf in entry.conditional_fields]
             assert "reminder_context.element2.origin.task_creator" in cond_fields
@@ -223,7 +200,7 @@ class TestValidationErrors:
     def test_missing_condition_in_field_map(self, tmp_config_dir: Path) -> None:
         path = tmp_config_dir / "condition_field_map.yaml"
         data = yaml.safe_load(path.read_text())
-        del data["HighAF_HighCB"]
+        del data["AF_CB"]
         path.write_text(yaml.dump(data))
         with pytest.raises(ValueError, match="Missing condition"):
             load_condition_field_map(path)
@@ -231,7 +208,7 @@ class TestValidationErrors:
     def test_extra_condition_in_field_map(self, tmp_config_dir: Path) -> None:
         path = tmp_config_dir / "condition_field_map.yaml"
         data = yaml.safe_load(path.read_text())
-        data["BogusCondition"] = data["LowAF_LowCB"]
+        data["BogusCondition"] = data["AF_only"]
         path.write_text(yaml.dump(data))
         with pytest.raises(ValueError, match="Unexpected condition"):
             load_condition_field_map(path)
@@ -247,4 +224,4 @@ class TestTmpConfigRoundTrip:
         model, gen, field_map = load_all_configs(tmp_config_dir)
         assert model.backend == "together"
         assert gen.n_variants == 3
-        assert len(field_map.conditions) == 4
+        assert len(field_map.conditions) == 2

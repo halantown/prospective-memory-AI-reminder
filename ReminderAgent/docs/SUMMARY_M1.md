@@ -1,19 +1,20 @@
 # Reminder Agent — System Summary
 
-> **Version**: Post-Sprint 3 | **Date**: 2026-03-12 | **Status**: S1–S3 complete, S4–S7 pending
+> **Version**: Post-Sprint 4 (3-group between-subjects redesign) | **Date**: 2026-03-12 | **Status**: S1–S4 complete, S5–S7 pending
 
 ---
 
 ## 1. Project Purpose
 
-The Reminder Agent is an **offline batch generation pipeline** for a 2×2 within-subjects prospective memory experiment. It produces **320 reminder text variants** (4 conditions × 8 tasks × 10 variants per pair) that are pre-generated, quality-checked, human-reviewed, and loaded into the experiment platform (FastAPI + Pepper robot) before data collection.
+The Reminder Agent is an **offline batch generation pipeline** for a 3-group between-subjects prospective memory experiment. It produces **160 reminder text variants** (2 active conditions × 8 tasks × 10 variants per pair) that are pre-generated, quality-checked, human-reviewed, and loaded into the experiment platform (FastAPI + Pepper robot) before data collection. Group 1 (Control) receives no reminder and requires no text generation.
 
-The two independent variables are:
+The three groups are:
 
-| Variable                            | Low                                     | High                                      |
-| ----------------------------------- | --------------------------------------- | ----------------------------------------- |
-| **Associative Fidelity (AF)** | Generic reminder ("take your medicine") | Specific cues (visual, dosage, authority) |
-| **Contextual Bridging (CB)**  | No activity reference                   | References user's current activity        |
+| Group | Condition | Description |
+|-------|-----------|-------------|
+| **Group 1** | **Control** | No reminder (baseline) — no text generation |
+| **Group 2** | **AF_only** | High AF, no CB — specific cues without activity context |
+| **Group 3** | **AF_CB** | High AF + CB — specific cues with contextual bridging |
 
 ---
 
@@ -50,7 +51,7 @@ The two independent variables are:
 
 | Stage                          | Purpose                                               | Status                      |
 | ------------------------------ | ----------------------------------------------------- | --------------------------- |
-| **Stage 2** (production) | Condition-controlled batch text generation            | S1–S3 done; S4–S6 pending |
+| **Stage 2** (production) | Condition-controlled batch text generation            | S1–S4 done; S5–S6 pending |
 | **Stage 1** (demo)       | ReAct agent: extract Task JSON from unstructured text | S7 pending (independent)    |
 
 ---
@@ -83,7 +84,7 @@ ReminderAgent/
     │   ├── context_extractor.py           # ✅ S2 — JSON pruner per condition
     │   ├── llm_backend.py                 # ✅ S3 — Model-agnostic generation
     │   ├── prompt_constructor.py          # ✅ S3 — System/user prompt assembly
-    │   ├── quality_gate.py                # 📋 S4 — Automated compliance checks
+    │   ├── quality_gate.py                # ✅ S4 — Automated compliance checks
     │   ├── batch_runner.py                # 📋 S5 — Full generation orchestrator
     │   └── output_store.py                # 📋 S5 — SQLite output storage
     │
@@ -120,7 +121,7 @@ ReminderAgent/
 | --------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `ModelConfig`       | `model_config.yaml`        | `backend`, `model_name`, `temperature`, `max_tokens`, `base_url`, `api_key_env`                             |
 | `GenerationConfig`  | `generation_config.yaml`   | `n_variants`, `max_retries`, `min_words`, `max_words`, `similarity_threshold`, `context_format`             |
-| `ConditionFieldMap` | `condition_field_map.yaml` | 4 ×`ConditionEntry` (each with `required_fields`, `conditional_fields`, `excluded_fields`, `excluded_zones`) |
+| `ConditionFieldMap` | `condition_field_map.yaml` | 2 × `ConditionEntry` (each with `required_fields`, `conditional_fields`, `excluded_fields`, `excluded_zones`) |
 
 **Public functions:**
 
@@ -134,7 +135,7 @@ ReminderAgent/
 - Backend must be one of `{together, ollama, openai, anthropic}`
 - Temperature: 0.0–2.0 | max_tokens > 0 | max_words ≥ min_words
 - Context format must be `prose` or `json`
-- All 4 conditions must be present in field map (no more, no fewer)
+- All 2 active conditions must be present in field map (AF_only, AF_CB)
 
 ---
 
@@ -150,7 +151,7 @@ ReminderAgent/
 **Logic flow:**
 
 ```
-extract(task_json, "LowAF_LowCB")
+extract(task_json, "AF_only")
   1. Load condition entry from field map
   2. For each required_field path:
      → resolve in task_json → copy to output (or raise MissingRequiredFieldError)
@@ -257,7 +258,7 @@ medicine_a.json                    condition_field_map.yaml
       ▼                                     ▼
  ┌──────────────────────────────────────────────────┐
  │                context_extractor.extract()       │
- │  Full JSON + "HighAF_LowCB" → pruned dict        │
+ │  Full JSON + "AF_only" → pruned dict             │
  │  (only: action_verb, entity_name, visual,        │
  │   domain_properties, + task_creator if authority)│
  └───────────────────────┬──────────────────────────┘
@@ -333,16 +334,16 @@ Each task schema is divided into three zones as an **engineering control** — d
 
 ## 7. Condition Field Whitelist Summary
 
-| Field                         | LowAF_LowCB | HighAF_LowCB      | LowAF_HighCB | HighAF_HighCB     |
-| ----------------------------- | ----------- | ----------------- | ------------ | ----------------- |
-| `action_verb`               | ✅          | ✅                | ✅           | ✅                |
-| `entity_name`               | ✅          | ✅                | ✅           | ✅                |
-| `cues.visual`               | ❌          | ✅                | ❌           | ✅                |
-| `domain_properties`         | ❌          | ✅                | ❌           | ✅                |
-| `task_creator`              | ❌          | ✅ (if authority) | ❌           | ✅ (if authority) |
-| `detected_activity_raw`     | ❌          | ❌                | ✅           | ✅                |
-| `agent_reasoning_context.*` | ❌ zone     | ❌ zone           | ❌ zone      | ❌ zone           |
-| `placeholder.*`             | ❌ zone     | ❌ zone           | ❌ zone      | ❌ zone           |
+| Field                         | AF_only            | AF_CB              |
+| ----------------------------- | ----------------- | ------------------ |
+| `action_verb`               | ✅                | ✅                 |
+| `entity_name`               | ✅                | ✅                 |
+| `cues.visual`               | ✅                | ✅                 |
+| `domain_properties`         | ✅                | ✅                 |
+| `task_creator`              | ✅ (if authority) | ✅ (if authority)  |
+| `detected_activity_raw`     | ❌                | ✅                 |
+| `agent_reasoning_context.*` | ❌ zone           | ❌ zone            |
+| `placeholder.*`             | ❌ zone           | ❌ zone            |
 
 ---
 
@@ -365,36 +366,31 @@ External dependencies: `pydantic`, `pyyaml`, `httpx`, `pytest`
 | Test Module                   | Tests        | Covers                                                                                                                                    |
 | ----------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `test_config_loader.py`     | 18           | All 3 config files: happy path loading, field semantics, validation errors (bad backend, missing fields, out-of-range values), round-trip |
-| `test_context_extractor.py` | 20           | All 4 conditions × medicine_a: field inclusion/exclusion, zone stripping, conditional authority logic, error handling                    |
-| **Total**               | **38** | **All pass**                                                                                                                        |
+| `test_context_extractor.py` | 20           | Both active conditions × medicine_a: field inclusion/exclusion, zone stripping, conditional authority logic, error handling               |
+| `test_quality_gate.py`      | 38           | Forbidden keyword (dormant path), entity presence, length, duplicates, language, CB consistency                                           |
+| **Total**               | **76** | **All pass**                                                                                                                        |
 
 *Note: llm_backend and prompt_constructor are tested via CLI entry points (manual verification), not automated tests. Their outputs depend on an LLM and are inherently non-deterministic.*
 
 ---
 
-## 10. Completed Work (Sprints 1–3)
+## 10. Completed Work (Sprints 1–4)
 
 | Sprint       | Commit      | What was built                                                                                                                                                           |
 | ------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **S1** | `f3ff85a` | Directory structure, 3 YAML configs,`config_loader.py` with Pydantic validation, 18 tests                                                                              |
 | **S2** | `e420846` | `context_extractor.py` (JSON pruner), `medicine_a.json`, v0.2 schema migration (snake_case + `excluded_zones`), 20 tests                                           |
 | **S3** | `7c7caee` | `llm_backend.py` (4 backends + retry), `prompt_constructor.py` (dual format + diversity), config updates (`base_url`, `context_format`), end-to-end verification |
+| **S4** | — | `quality_gate.py` (6 checks incl. CB consistency), `forbidden_keywords.yaml`, `test_quality_gate.py` (38 tests), 3-group redesign applied |
 
 ---
 
-## 11. Pending Work (Sprints 4–7)
-
-### S4 — Quality Gate
-
-- `quality_gate.py`: forbidden keyword leak check, entity presence, word count, Levenshtein duplicate detection, language detection
-- `forbidden_keywords.yaml`: per-task visual cue keywords
-- `test_quality_gate.py`: planted violations, valid passes, duplicate detection
-- **Key concern:** LowAF text currently sometimes leaks entity name (e.g., "Doxycycline") — this sprint addresses it
+## 11. Pending Work (Sprints 5–7)
 
 ### S5 — Batch Runner + Output Store
 
 - `output_store.py`: SQLite `reminders.db` (schema: task_id, condition, variant_idx, text, review_status, model_used, ...)
-- `batch_runner.py`: loop over 8 tasks × 4 conditions × N variants, with quality gate retry
+- `batch_runner.py`: loop over 8 tasks × 2 conditions × N variants, with quality gate retry
 - Remaining 7 task JSON files (medicine_b through chores_h)
 - `generation_log.json`: full log of all generation attempts
 
@@ -402,7 +398,7 @@ External dependencies: `pydantic`, `pyyaml`, `httpx`, `pytest`
 
 - Scale `n_variants` from 3 to 10
 - `review_interface.py`: CLI tool for human keep/reject/flag review
-- Target: 320 approved variants in `reminders.db`
+- Target: 160 approved variants in `reminders.db`
 
 ### S7 — Stage 1 Demo (independent, can run in parallel)
 

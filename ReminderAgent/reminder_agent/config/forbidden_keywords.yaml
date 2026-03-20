@@ -1,6 +1,9 @@
-# Forbidden Keywords — per-task visual/domain keywords forbidden in Low AF conditions.
-# visual_keywords: appearance cues (colour, shape, container) — forbidden in LowAF
-# domain_keywords: specific properties (dosage, form) — forbidden in LowAF
+# Forbidden Keywords — per-task visual/domain keywords.
+# Originally used to enforce Low AF compliance (Low AF conditions removed in 3-group redesign).
+# Retained for reference and potential future quality-gate extensions.
+#
+# visual_keywords: appearance cues (colour, shape, container)
+# domain_keywords: specific properties (dosage, form)
 #
 # Only medicine_a is fully populated now; remaining tasks will be added in S5
 # when their task JSON files are authored.

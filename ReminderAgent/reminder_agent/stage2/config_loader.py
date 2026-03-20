@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 
 VALID_BACKENDS = {"together", "ollama", "openai", "anthropic"}
-VALID_CONDITIONS = {"LowAF_LowCB", "HighAF_LowCB", "LowAF_HighCB", "HighAF_HighCB"}
+VALID_CONDITIONS = {"AF_only", "AF_CB"}
 
 
 # ---------------------------------------------------------------------------
@@ -73,9 +73,14 @@ class GenerationConfig(BaseModel):
 *        ConditionFieldMap schema         *
 ===========================================
 
+3-group between-subjects design:
+  Group 1 (Control): No reminder — not in field map.
+  Group 2 (AF_only): High AF, no CB.
+  Group 3 (AF_CB):   High AF + CB.
+
 ConditionFieldMap
 └── conditions (dict[str, ConditionEntry])
-    ├── LowAF_LowCB (ConditionEntry)
+    ├── AF_only (ConditionEntry)
     │   ├── required_fields (list[str])
     │   ├── conditional_fields (list[ConditionalField])
     │   │   └── ConditionalField
@@ -83,11 +88,7 @@ ConditionFieldMap
     │   │       └── condition (str)
     │   ├── excluded_fields (list[str])
     │   └── excluded_zones (list[str])
-    ├── HighAF_LowCB (ConditionEntry)
-    │   ├── ...
-    ├── LowAF_HighCB (ConditionEntry)
-    │   ├── ...
-    └── HighAF_HighCB (ConditionEntry)
+    └── AF_CB (ConditionEntry)
         ├── ...
 """
 

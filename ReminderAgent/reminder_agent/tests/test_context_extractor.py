@@ -1,5 +1,5 @@
 """Tests for context_extractor — validates that pruning logic correctly
-implements the condition field whitelist for all 4 AF × CB conditions.
+implements the condition field whitelist for the 3-group design (AF_only, AF_CB).
 """
 
 from __future__ import annotations
@@ -64,120 +64,90 @@ def _collect_leaf_paths(d: dict, prefix: str = "") -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# LowAF tests — must not contain visual cues or domain properties
+# AF_only tests — High AF, no CB (no detected_activity)
 # ---------------------------------------------------------------------------
 
-class TestLowAF:
+class TestAFOnly:
 
-    def test_lowaf_lowcb_contains_action_and_entity(
+    def test_af_only_contains_action_and_entity(
         self, medicine_a: dict, field_map
     ) -> None:
-        pruned = extract(medicine_a, "LowAF_LowCB", field_map=field_map)
+        pruned = extract(medicine_a, "AF_only", field_map=field_map)
         ctx = pruned["reminder_context"]["element1"]
         assert ctx["action_verb"] == "Take"
         assert ctx["target_entity"]["entity_name"] == "Doxycycline"
 
-    def test_lowaf_lowcb_excludes_visual_cues(
+    def test_af_only_contains_visual_cues(
         self, medicine_a: dict, field_map
     ) -> None:
-        pruned = extract(medicine_a, "LowAF_LowCB", field_map=field_map)
-        paths = _collect_leaf_paths(pruned)
-        assert not any("cues" in p for p in paths), f"Visual cues leaked: {paths}"
-
-    def test_lowaf_lowcb_excludes_domain_properties(
-        self, medicine_a: dict, field_map
-    ) -> None:
-        pruned = extract(medicine_a, "LowAF_LowCB", field_map=field_map)
-        paths = _collect_leaf_paths(pruned)
-        assert not any("domain_properties" in p for p in paths)
-
-    def test_lowaf_lowcb_excludes_detected_activity(
-        self, medicine_a: dict, field_map
-    ) -> None:
-        pruned = extract(medicine_a, "LowAF_LowCB", field_map=field_map)
-        paths = _collect_leaf_paths(pruned)
-        assert not any("detected_activity" in p for p in paths)
-
-    def test_lowaf_lowcb_excludes_agent_reasoning(
-        self, medicine_a: dict, field_map
-    ) -> None:
-        pruned = extract(medicine_a, "LowAF_LowCB", field_map=field_map)
-        assert "agent_reasoning_context" not in pruned
-
-    def test_lowaf_lowcb_excludes_placeholder(
-        self, medicine_a: dict, field_map
-    ) -> None:
-        pruned = extract(medicine_a, "LowAF_LowCB", field_map=field_map)
-        assert "placeholder" not in pruned
-
-    def test_lowaf_lowcb_only_two_leaf_values(
-        self, medicine_a: dict, field_map
-    ) -> None:
-        pruned = extract(medicine_a, "LowAF_LowCB", field_map=field_map)
-        paths = _collect_leaf_paths(pruned)
-        assert len(paths) == 2, f"Expected 2 leaf values, got {len(paths)}: {paths}"
-
-
-# ---------------------------------------------------------------------------
-# HighAF tests — must contain visual cues and domain properties
-# ---------------------------------------------------------------------------
-
-class TestHighAF:
-
-    def test_highaf_lowcb_contains_visual_cues(
-        self, medicine_a: dict, field_map
-    ) -> None:
-        pruned = extract(medicine_a, "HighAF_LowCB", field_map=field_map)
+        pruned = extract(medicine_a, "AF_only", field_map=field_map)
         visual = pruned["reminder_context"]["element1"]["target_entity"]["cues"]["visual"]
         assert "Red round bottle" in visual
 
-    def test_highaf_lowcb_contains_domain_properties(
+    def test_af_only_contains_domain_properties(
         self, medicine_a: dict, field_map
     ) -> None:
-        pruned = extract(medicine_a, "HighAF_LowCB", field_map=field_map)
+        pruned = extract(medicine_a, "AF_only", field_map=field_map)
         props = pruned["reminder_context"]["element1"]["target_entity"]["domain_properties"]
         assert props["dosage"] == "100mg"
         assert props["form"] == "Tablet"
 
-    def test_highaf_lowcb_excludes_detected_activity(
+    def test_af_only_excludes_detected_activity(
         self, medicine_a: dict, field_map
     ) -> None:
-        pruned = extract(medicine_a, "HighAF_LowCB", field_map=field_map)
+        pruned = extract(medicine_a, "AF_only", field_map=field_map)
         paths = _collect_leaf_paths(pruned)
         assert not any("detected_activity" in p for p in paths)
 
+    def test_af_only_excludes_agent_reasoning(
+        self, medicine_a: dict, field_map
+    ) -> None:
+        pruned = extract(medicine_a, "AF_only", field_map=field_map)
+        assert "agent_reasoning_context" not in pruned
+
+    def test_af_only_excludes_placeholder(
+        self, medicine_a: dict, field_map
+    ) -> None:
+        pruned = extract(medicine_a, "AF_only", field_map=field_map)
+        assert "placeholder" not in pruned
+
 
 # ---------------------------------------------------------------------------
-# HighCB tests — must contain detected_activity
+# AF_CB tests — High AF + Contextual Bridging (includes detected_activity)
 # ---------------------------------------------------------------------------
 
-class TestHighCB:
+class TestAFCB:
 
-    def test_lowaf_highcb_contains_detected_activity(
+    def test_af_cb_contains_all_key_fields(
         self, medicine_a: dict, field_map
     ) -> None:
-        pruned = extract(medicine_a, "LowAF_HighCB", field_map=field_map)
-        activity = pruned["reminder_context"]["element3"]["detected_activity_raw"]
-        assert "dinner" in activity.lower()
-
-    def test_lowaf_highcb_excludes_visual_cues(
-        self, medicine_a: dict, field_map
-    ) -> None:
-        pruned = extract(medicine_a, "LowAF_HighCB", field_map=field_map)
-        paths = _collect_leaf_paths(pruned)
-        assert not any("cues" in p for p in paths)
-
-    def test_highaf_highcb_contains_all_fields(
-        self, medicine_a: dict, field_map
-    ) -> None:
-        pruned = extract(medicine_a, "HighAF_HighCB", field_map=field_map)
-        # Should have: action_verb, entity_name, cues.visual, domain_properties, detected_activity_raw
+        pruned = extract(medicine_a, "AF_CB", field_map=field_map)
         paths = _collect_leaf_paths(pruned)
         assert any("action_verb" in p for p in paths)
         assert any("entity_name" in p for p in paths)
         assert any("cues.visual" in p for p in paths)
         assert any("domain_properties" in p for p in paths)
         assert any("detected_activity_raw" in p for p in paths)
+
+    def test_af_cb_contains_detected_activity(
+        self, medicine_a: dict, field_map
+    ) -> None:
+        pruned = extract(medicine_a, "AF_CB", field_map=field_map)
+        activity = pruned["reminder_context"]["element3"]["detected_activity_raw"]
+        assert "dinner" in activity.lower()
+
+    def test_af_cb_contains_visual_cues(
+        self, medicine_a: dict, field_map
+    ) -> None:
+        pruned = extract(medicine_a, "AF_CB", field_map=field_map)
+        visual = pruned["reminder_context"]["element1"]["target_entity"]["cues"]["visual"]
+        assert "Red round bottle" in visual
+
+    def test_af_cb_excludes_agent_reasoning(
+        self, medicine_a: dict, field_map
+    ) -> None:
+        pruned = extract(medicine_a, "AF_CB", field_map=field_map)
+        assert "agent_reasoning_context" not in pruned
 
 
 # ---------------------------------------------------------------------------
@@ -186,26 +156,33 @@ class TestHighCB:
 
 class TestConditionalAuthority:
 
-    def test_highaf_includes_creator_when_authority(
+    def test_af_only_includes_creator_when_authority(
         self, medicine_a: dict, field_map
     ) -> None:
-        pruned = extract(medicine_a, "HighAF_LowCB", field_map=field_map)
+        pruned = extract(medicine_a, "AF_only", field_map=field_map)
         creator = pruned["reminder_context"]["element2"]["origin"]["task_creator"]
         assert creator == "Doctor"
 
-    def test_highaf_excludes_creator_when_not_authority(
+    def test_af_only_excludes_creator_when_not_authority(
         self, medicine_a_no_authority: dict, field_map
     ) -> None:
-        pruned = extract(medicine_a_no_authority, "HighAF_LowCB", field_map=field_map)
+        pruned = extract(medicine_a_no_authority, "AF_only", field_map=field_map)
         paths = _collect_leaf_paths(pruned)
         assert not any("task_creator" in p for p in paths)
 
-    def test_highaf_highcb_includes_creator_when_authority(
+    def test_af_cb_includes_creator_when_authority(
         self, medicine_a: dict, field_map
     ) -> None:
-        pruned = extract(medicine_a, "HighAF_HighCB", field_map=field_map)
+        pruned = extract(medicine_a, "AF_CB", field_map=field_map)
         creator = pruned["reminder_context"]["element2"]["origin"]["task_creator"]
         assert creator == "Doctor"
+
+    def test_af_cb_excludes_creator_when_not_authority(
+        self, medicine_a_no_authority: dict, field_map
+    ) -> None:
+        pruned = extract(medicine_a_no_authority, "AF_CB", field_map=field_map)
+        paths = _collect_leaf_paths(pruned)
+        assert not any("task_creator" in p for p in paths)
 
 
 # ---------------------------------------------------------------------------
@@ -225,29 +202,13 @@ class TestErrors:
             },
         }
         with pytest.raises(MissingRequiredFieldError, match="entity_name"):
-            extract(incomplete_task, "LowAF_LowCB", field_map=field_map)
+            extract(incomplete_task, "AF_only", field_map=field_map)
 
     def test_unknown_condition_raises(self, medicine_a: dict, field_map) -> None:
         with pytest.raises(ValueError, match="Unknown condition"):
             extract(medicine_a, "InvalidCondition", field_map=field_map)
 
-
-# ---------------------------------------------------------------------------
-# LowCB tests — must not contain detected_activity
-# ---------------------------------------------------------------------------
-
-class TestLowCB:
-
-    def test_lowaf_lowcb_no_detected_activity(
-        self, medicine_a: dict, field_map
-    ) -> None:
-        pruned = extract(medicine_a, "LowAF_LowCB", field_map=field_map)
-        paths = _collect_leaf_paths(pruned)
-        assert not any("detected_activity" in p for p in paths)
-
-    def test_highaf_lowcb_no_detected_activity(
-        self, medicine_a: dict, field_map
-    ) -> None:
-        pruned = extract(medicine_a, "HighAF_LowCB", field_map=field_map)
-        paths = _collect_leaf_paths(pruned)
-        assert not any("detected_activity" in p for p in paths)
+    def test_old_condition_name_raises(self, medicine_a: dict, field_map) -> None:
+        """Old 2×2 condition names should no longer be accepted."""
+        with pytest.raises(ValueError, match="Unknown condition"):
+            extract(medicine_a, "LowAF_LowCB", field_map=field_map)
