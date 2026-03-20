@@ -37,6 +37,11 @@ SNAPSHOT_INTERVAL_S = 15
 HEARTBEAT_INTERVAL_S = 10
 HEARTBEAT_TIMEOUT_S = 30
 
+# Development seed — set to None to disable
+# This participant is auto-created/reset on every startup; it always works.
+# Remove or set to None before production deployment.
+DEV_TOKEN: str | None = "ABC123"
+
 # Latin Square — 3 conditions, 6 possible orderings (3×3 Latin Square)
 LATIN_SQUARE = {
     "A": ["CONTROL", "AF", "AFCB"],

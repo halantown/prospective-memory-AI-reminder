@@ -20,7 +20,54 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def get_db() -> AsyncSession:
+async def seed_dev_participant():
+    """Auto-create or reset the dev test participant defined in config.DEV_TOKEN.
+
+    This runs on every startup so the token always works even after DB resets.
+    Set config.DEV_TOKEN = None to disable.
+    """
+    import logging
+    from config import DEV_TOKEN, LATIN_SQUARE
+    from models.experiment import Participant, ParticipantStatus
+
+    if not DEV_TOKEN:
+        return
+
+    logger = logging.getLogger(__name__)
+
+    async with async_session() as db:
+        from sqlalchemy import select
+        result = await db.execute(
+            select(Participant).where(Participant.token == DEV_TOKEN)
+        )
+        p = result.scalar_one_or_none()
+        if p:
+            # Reset to REGISTERED so it can be reused
+            p.status = ParticipantStatus.REGISTERED
+            p.current_block = None
+            p.started_at = None
+            p.completed_at = None
+            p.is_online = False
+            await db.commit()
+            logger.warning(
+                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' reset to REGISTERED — "
+                "remove config.DEV_TOKEN before production!"
+            )
+        else:
+            group = list(LATIN_SQUARE.keys())[0]
+            p = Participant(
+                participant_id="DEV_TESTER",
+                token=DEV_TOKEN,
+                status=ParticipantStatus.REGISTERED,
+                latin_square_group=group,
+                condition_order=LATIN_SQUARE[group],
+            )
+            db.add(p)
+            await db.commit()
+            logger.warning(
+                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' created (group={group}) — "
+                "remove config.DEV_TOKEN before production!"
+            )
     """Yield a database session."""
     async with async_session() as session:
         yield session
