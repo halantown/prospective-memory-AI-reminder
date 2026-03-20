@@ -68,6 +68,9 @@ async def seed_dev_participant():
                 f"⚠️  DEV_TOKEN '{DEV_TOKEN}' created (group={group}) — "
                 "remove config.DEV_TOKEN before production!"
             )
+
+
+async def get_db() -> AsyncSession:
     """Yield a database session."""
     async with async_session() as session:
         yield session
