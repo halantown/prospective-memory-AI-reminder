@@ -8,6 +8,12 @@ import DiningRoom from './rooms/DiningRoom'
 import LivingRoom from './rooms/LivingRoom'
 import StudyRoom from './rooms/StudyRoom'
 import BalconyRoom from './rooms/BalconyRoom'
+import KitchenFurniture from './rooms/KitchenFurniture'
+import DiningFurniture from './rooms/DiningFurniture'
+import LivingFurniture from './rooms/LivingFurniture'
+import StudyFurniture from './rooms/StudyFurniture'
+import BalconyFurniture from './rooms/BalconyFurniture'
+import { FLOOR_STYLES } from './rooms/furniture/styles'
 import { TriggerRoomGlow } from './TriggerEffects'
 import type { RoomId } from '../../types'
 
@@ -29,6 +35,22 @@ const ROOMS: RoomDef[] = [
   { id: 'balcony', label: 'Balcony', emoji: '🌿', x: '68%', y: '60%', w: '30%', h: '38%' },
 ]
 
+const FURNITURE_MAP: Record<RoomId, React.ComponentType> = {
+  kitchen: KitchenFurniture,
+  dining: DiningFurniture,
+  living_room: LivingFurniture,
+  study: StudyFurniture,
+  balcony: BalconyFurniture,
+}
+
+const ROOM_CONTENT: Record<RoomId, React.ComponentType> = {
+  kitchen: KitchenRoom,
+  dining: DiningRoom,
+  living_room: LivingRoom,
+  study: StudyRoom,
+  balcony: BalconyRoom,
+}
+
 export default function WorldView() {
   const currentRoom = useGameStore((s) => s.currentRoom)
   const avatarMoving = useGameStore((s) => s.avatarMoving)
@@ -39,7 +61,6 @@ export default function WorldView() {
     if (roomId === currentRoom || avatarMoving) return
 
     setAvatarMoving(true)
-    // Simulate avatar walking (1-2s)
     setTimeout(() => {
       setCurrentRoom(roomId)
       setAvatarMoving(false)
@@ -51,6 +72,10 @@ export default function WorldView() {
       <div className="relative w-full h-full">
         {ROOMS.map((room) => {
           const isActive = room.id === currentRoom
+          const FurnitureComp = FURNITURE_MAP[room.id]
+          const RoomContent = ROOM_CONTENT[room.id]
+          const floor = FLOOR_STYLES[room.id]
+
           return (
             <motion.div
               key={room.id}
@@ -67,37 +92,36 @@ export default function WorldView() {
               onClick={() => handleRoomClick(room.id)}
               whileHover={!isActive ? { scale: 1.01 } : {}}
             >
-              {/* Room background */}
-              <div className={`absolute inset-0 ${
-                isActive ? 'bg-slate-700/80' : 'bg-slate-800/90'
-              }`} />
+              {/* Floor background + furniture (always visible) */}
+              <div className="absolute inset-0" style={floor}>
+                <FurnitureComp />
+              </div>
 
-              {/* Room content */}
-              <div className="relative h-full p-3 flex flex-col">
-                {/* Room header */}
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xl">{room.emoji}</span>
-                  <span className={`text-sm font-semibold ${
+              {/* Room label badge */}
+              <div className="absolute top-1.5 left-1.5 z-[2] pointer-events-none">
+                <div className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1
+                  ${isActive ? 'bg-slate-900/70' : 'bg-slate-900/50'}`}
+                >
+                  <span className="text-sm">{room.emoji}</span>
+                  <span className={`text-xs font-semibold ${
                     isActive ? 'text-cooking-300' : 'text-slate-400'
                   }`}>
                     {room.label}
                   </span>
                   {isActive && (
-                    <span className="text-xs bg-cooking-500 text-white px-2 py-0.5 rounded-full ml-auto">
+                    <span className="text-[10px] bg-cooking-500 text-white px-1.5 py-0.5 rounded-full">
                       HERE
                     </span>
                   )}
                 </div>
-
-                {/* Room-specific content */}
-                <div className="flex-1 overflow-hidden">
-                  {room.id === 'kitchen' && isActive && <KitchenRoom />}
-                  {room.id === 'dining' && isActive && <DiningRoom />}
-                  {room.id === 'living_room' && isActive && <LivingRoom />}
-                  {room.id === 'study' && isActive && <StudyRoom />}
-                  {room.id === 'balcony' && isActive && <BalconyRoom />}
-                </div>
               </div>
+
+              {/* Interactive content overlay (active room only) */}
+              {isActive && (
+                <div className="absolute inset-0 z-[3]">
+                  <RoomContent />
+                </div>
+              )}
 
               {/* Trigger room glow effect */}
               <TriggerRoomGlow room={room.id} />
@@ -105,7 +129,7 @@ export default function WorldView() {
               {/* Avatar indicator */}
               {isActive && !avatarMoving && (
                 <motion.div
-                  className="absolute bottom-2 right-2 text-2xl"
+                  className="absolute bottom-2 right-2 text-2xl z-[4]"
                   animate={{ y: [0, -4, 0] }}
                   transition={{ repeat: Infinity, duration: 2 }}
                 >

@@ -1,6 +1,7 @@
 """Experiment and Participant models."""
 
 import enum
+import uuid
 from datetime import datetime
 from sqlalchemy import (
     Integer, String, Enum, DateTime, JSON, Float, Boolean, ForeignKey, Text,
@@ -42,7 +43,7 @@ class Experiment(Base):
 class Participant(Base):
     __tablename__ = "participants"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)  # UUID
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))  # UUID
     experiment_id: Mapped[int] = mapped_column(Integer, ForeignKey("experiments.id"), nullable=False)
     participant_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)  # P001
     token: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)

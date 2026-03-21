@@ -1,18 +1,14 @@
-/** Study room — desk, bookshelf, calendar. PM target items embedded. */
+/** Study room — PM target items on shelf area. */
 
 import PMTargetItems from '../PMTargetItems'
 
 export default function StudyRoom() {
   return (
-    <div className="flex flex-col gap-2 h-full">
-      <p className="text-xs text-slate-400">A quiet study with a desk and bookshelf.</p>
-      <div className="flex gap-3 mt-1">
-        <span className="text-2xl">🪑</span>
-        <span className="text-2xl">📚</span>
-        <span className="text-2xl">🖥️</span>
-        <span className="text-2xl">📅</span>
+    <div className="absolute inset-0">
+      {/* PM targets positioned on shelf area */}
+      <div className="absolute z-10" style={{ left: '5%', top: '55%', width: '70%' }}>
+        <PMTargetItems room="study" />
       </div>
-      <PMTargetItems room="study" />
     </div>
   )
 }
