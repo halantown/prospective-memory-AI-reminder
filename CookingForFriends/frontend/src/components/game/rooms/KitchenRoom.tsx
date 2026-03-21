@@ -4,9 +4,13 @@
  *  Missing the flip or plate window → burnt immediately.
  *  Timers run as long as the component is mounted (even when room is inactive)
  *  so the participant must monitor from other rooms.
+ *
+ *  Visual: steaks are irregular ellipses with color gradients.
+ *  No text labels except "Empty" on empty pans. No progress bars.
+ *  State communicated through color: pink(raw) → brown(cooked) → black(burnt).
  */
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
 import type { SteakState } from '../../../types'
@@ -16,6 +20,52 @@ const COOK_SIDE1_DURATION = 30_000
 const FLIP_WINDOW = 10_000
 const COOK_SIDE2_DURATION = 25_000
 const PLATE_WINDOW = 10_000
+
+const STEAK_COLORS = {
+  raw: '#E8A0A0',
+  cooking_start: '#E8A0A0',
+  cooking_end: '#B87333',
+  ready_to_flip: '#B87333',
+  side2_start: '#B87333',
+  side2_end: '#8B6914',
+  ready_to_plate: '#8B6914',
+  burnt: '#2A1A0A',
+}
+
+function interpolateColor(from: string, to: string, t: number): string {
+  const clamp = Math.max(0, Math.min(1, t))
+  const r1 = parseInt(from.slice(1, 3), 16)
+  const g1 = parseInt(from.slice(3, 5), 16)
+  const b1 = parseInt(from.slice(5, 7), 16)
+  const r2 = parseInt(to.slice(1, 3), 16)
+  const g2 = parseInt(to.slice(3, 5), 16)
+  const b2 = parseInt(to.slice(5, 7), 16)
+  const r = Math.round(r1 + (r2 - r1) * clamp)
+  const g = Math.round(g1 + (g2 - g1) * clamp)
+  const b = Math.round(b1 + (b2 - b1) * clamp)
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
+function getSteakColor(state: SteakState, progress: number): string {
+  switch (state) {
+    case 'raw':
+      return STEAK_COLORS.raw
+    case 'cooking':
+      return interpolateColor(STEAK_COLORS.cooking_start, STEAK_COLORS.cooking_end, progress)
+    case 'ready_to_flip':
+      return STEAK_COLORS.ready_to_flip
+    case 'cooking_side2':
+      return interpolateColor(STEAK_COLORS.side2_start, STEAK_COLORS.side2_end, progress)
+    case 'ready_to_plate':
+      return STEAK_COLORS.ready_to_plate
+    case 'done':
+      return STEAK_COLORS.ready_to_plate
+    case 'burnt':
+      return STEAK_COLORS.burnt
+    default:
+      return 'transparent'
+  }
+}
 
 export default function KitchenRoom({ isActive }: { isActive: boolean }) {
   const pans = useGameStore((s) => s.pans)
@@ -47,22 +97,36 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
     timersRef.current.set(key, setTimeout(fn, ms))
   }
 
-  // Reactive timer management
+  // Track which state each pan's timer was set for, so we can detect state
+  // changes and re-arm timers correctly.
+  const timerStateRef = useRef<Map<string, SteakState>>(new Map())
+
   useEffect(() => {
     pans.forEach(pan => {
       const timerKey = `pan_${pan.id}`
+      const prevTimerState = timerStateRef.current.get(timerKey)
 
-      // cooking → ready_to_flip after COOK_SIDE1_DURATION
+      // If the pan state changed since we last set a timer, clear the stale one
+      if (prevTimerState && prevTimerState !== pan.state) {
+        clearTimer(timerKey)
+        timerStateRef.current.delete(timerKey)
+      }
+
       if (pan.state === 'cooking' && !timersRef.current.has(timerKey)) {
+        timerStateRef.current.set(timerKey, 'cooking')
         setTimer(timerKey, () => {
+          timersRef.current.delete(timerKey)
+          timerStateRef.current.delete(timerKey)
           if (!mountedRef.current) return
           updatePan(pan.id, { state: 'ready_to_flip' })
         }, COOK_SIDE1_DURATION)
       }
 
-      // ready_to_flip → burnt after FLIP_WINDOW (missed flip)
       if (pan.state === 'ready_to_flip' && !timersRef.current.has(timerKey)) {
+        timerStateRef.current.set(timerKey, 'ready_to_flip')
         setTimer(timerKey, () => {
+          timersRef.current.delete(timerKey)
+          timerStateRef.current.delete(timerKey)
           if (!mountedRef.current) return
           const p = useGameStore.getState().pans.find(p => p.id === pan.id)
           if (p && p.state === 'ready_to_flip') {
@@ -73,17 +137,21 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
         }, FLIP_WINDOW)
       }
 
-      // cooking_side2 → ready_to_plate after COOK_SIDE2_DURATION
       if (pan.state === 'cooking_side2' && !timersRef.current.has(timerKey)) {
+        timerStateRef.current.set(timerKey, 'cooking_side2')
         setTimer(timerKey, () => {
+          timersRef.current.delete(timerKey)
+          timerStateRef.current.delete(timerKey)
           if (!mountedRef.current) return
           updatePan(pan.id, { state: 'ready_to_plate' })
         }, COOK_SIDE2_DURATION)
       }
 
-      // ready_to_plate → burnt after PLATE_WINDOW (missed plate)
       if (pan.state === 'ready_to_plate' && !timersRef.current.has(timerKey)) {
+        timerStateRef.current.set(timerKey, 'ready_to_plate')
         setTimer(timerKey, () => {
+          timersRef.current.delete(timerKey)
+          timerStateRef.current.delete(timerKey)
           if (!mountedRef.current) return
           const p = useGameStore.getState().pans.find(p => p.id === pan.id)
           if (p && p.state === 'ready_to_plate') {
@@ -94,7 +162,7 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
         }, PLATE_WINDOW)
       }
 
-      // Clear timer if state changed away from what we set it for
+      // Terminal states: clear any leftover timer
       if (
         pan.state !== 'cooking' &&
         pan.state !== 'ready_to_flip' &&
@@ -102,6 +170,7 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
         pan.state !== 'ready_to_plate'
       ) {
         clearTimer(timerKey)
+        timerStateRef.current.delete(timerKey)
       }
     })
   }, [pans, updatePan, addKitchenScore])
@@ -139,19 +208,18 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
       mountedRef.current = false
       timersRef.current.forEach(t => clearTimeout(t))
       timersRef.current.clear()
+      timerStateRef.current.clear()
     }
   }, [])
 
   return (
     <div className="absolute inset-0">
-      {/* Instruction badge */}
       <div className="absolute top-9 left-2 z-10 pointer-events-none">
         <span className="text-[10px] text-slate-300/80 bg-slate-900/50 rounded px-1.5 py-0.5">
           Click pans to flip / plate steaks
         </span>
       </div>
 
-      {/* Pans positioned on stovetop area */}
       <div
         className="absolute flex gap-2 items-center justify-center z-10"
         style={{ left: '18%', top: '30%', right: '5%', height: '34%' }}
@@ -166,7 +234,6 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
         ))}
       </div>
 
-      {/* PM targets on shelf area */}
       <div className="absolute z-10" style={{ left: '3%', bottom: '4%', width: '55%' }}>
         <PMTargetItems room="kitchen" />
       </div>
@@ -179,44 +246,60 @@ function PanComponent({
   onClick,
   isActive,
 }: {
-  pan: { id: number; state: SteakState }
+  pan: { id: number; state: SteakState; placedAt: number | null }
   onClick: () => void
   isActive: boolean
 }) {
   const isUrgent = pan.state === 'ready_to_flip' || pan.state === 'ready_to_plate'
+  const isEmpty = pan.state === 'empty'
+  const isBurnt = pan.state === 'burnt'
+  const isCooking = pan.state === 'cooking' || pan.state === 'cooking_side2'
 
-  const cfg: Record<SteakState, { emoji: string; label: string; bg: string; pulse?: boolean }> = {
-    empty: { emoji: '🍳', label: 'Empty', bg: 'bg-slate-600/70' },
-    raw: { emoji: '🥩', label: 'Raw', bg: 'bg-red-900/60' },
-    cooking: { emoji: '🥩', label: 'Cooking...', bg: 'bg-orange-900/60', pulse: true },
-    ready_to_flip: { emoji: '🔥', label: 'FLIP NOW!', bg: 'bg-yellow-600/60', pulse: true },
-    cooking_side2: { emoji: '🥩', label: 'Side 2...', bg: 'bg-orange-800/60', pulse: true },
-    ready_to_plate: { emoji: '✅', label: 'PLATE NOW!', bg: 'bg-green-600/60', pulse: true },
-    done: { emoji: '✅', label: 'Done!', bg: 'bg-green-700/60' },
-    burnt: { emoji: '💨', label: 'Burnt!', bg: 'bg-red-700/60' },
-  }
-  const c = cfg[pan.state]
+  const [progress, setProgress] = useState(0)
+  useEffect(() => {
+    if (!isCooking || !pan.placedAt) {
+      setProgress(0)
+      return
+    }
+    const duration = pan.state === 'cooking' ? COOK_SIDE1_DURATION : COOK_SIDE2_DURATION
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - pan.placedAt!
+      setProgress(Math.min(1, elapsed / duration))
+    }, 500)
+    return () => clearInterval(interval)
+  }, [pan.state, pan.placedAt, isCooking])
+
+  const steakColor = getSteakColor(pan.state, progress)
+
+  const panBorderClass = pan.state === 'ready_to_flip'
+    ? 'border-yellow-400 pan-glow-flip steak-urgent'
+    : pan.state === 'ready_to_plate'
+    ? 'border-green-400 pan-glow-plate steak-urgent'
+    : isBurnt
+    ? 'border-red-500 pan-glow-burnt'
+    : 'border-slate-500/60'
 
   return (
     <motion.button
       onClick={onClick}
       disabled={!isActive}
-      className={`${c.bg} backdrop-blur-sm rounded-xl w-16 h-16 flex flex-col items-center
-                  justify-center border-2 transition-colors
+      className={`relative rounded-full w-[72px] h-[72px] flex items-center justify-center
+                  border-[3px] transition-colors
                   ${isActive ? 'cursor-pointer' : 'cursor-default'}
-                  ${pan.state === 'ready_to_flip' ? 'border-yellow-400 steak-urgent-flip' :
-                    pan.state === 'ready_to_plate' ? 'border-green-400 steak-urgent-plate' :
-                    pan.state === 'burnt' ? 'border-red-400' : 'border-slate-500/60'}
+                  ${panBorderClass}
+                  ${isEmpty ? 'bg-slate-700/50 border-dashed' : 'bg-slate-800/70'}
                   ${isUrgent ? 'steak-urgent' : ''}`}
-      animate={c.pulse ? { scale: [1, 1.05, 1] } : {}}
-      transition={c.pulse ? { repeat: Infinity, duration: 1 } : {}}
+      animate={isUrgent ? { scale: [1, 1.05, 1] } : {}}
+      transition={isUrgent ? { repeat: Infinity, duration: 1 } : {}}
     >
-      <span className="text-xl">{c.emoji}</span>
-      <span className={`text-[9px] font-medium mt-0.5 ${
-        pan.state === 'ready_to_flip' ? 'text-yellow-300' :
-        pan.state === 'ready_to_plate' ? 'text-green-300' :
-        pan.state === 'burnt' ? 'text-red-300' : 'text-slate-300'
-      }`}>{c.label}</span>
+      {isEmpty ? (
+        <span className="text-[9px] text-slate-500 font-medium">Empty</span>
+      ) : (
+        <div
+          className={`steak-shape w-[50px] h-[38px] ${isBurnt ? 'steak-smoke' : ''}`}
+          style={{ backgroundColor: steakColor }}
+        />
+      )}
     </motion.button>
   )
 }
