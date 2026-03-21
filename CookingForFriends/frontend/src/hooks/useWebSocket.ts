@@ -12,24 +12,11 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
   const wsRef = useRef<WebSocket | null>(null)
   const retryCount = useRef(0)
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const closedByUser = useRef(false)
-
-  const {
-    setWsConnected,
-    setWsSend,
-    setGameClock,
-    setElapsedSeconds,
-    setRobotSpeaking,
-    clearRobotSpeech,
-    setRobotRoom,
-    addPhoneNotification,
-    setPhoneLocked,
-    addPMTrial,
-    addTriggerEffect,
-    setPhase,
-    handleOngoingTaskEvent,
-    phase,
-  } = useGameStore()
+  // Monotonically increasing connection id — only the latest connection should
+  // attempt reconnects.  This prevents the race where a stale onclose handler
+  // (whose closedByUser flag was already reset by the next effect run) spawns
+  // an extra connection.
+  const connIdRef = useRef(0)
 
   const handleMessage = useCallback((event: MessageEvent) => {
     let msg: { event: string; data: Record<string, unknown>; server_ts?: number }
@@ -40,6 +27,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
     }
 
     const { event: eventType, data } = msg
+    const store = useGameStore.getState()
 
     console.log('[WS RECEIVED]', eventType, data)
 
@@ -49,17 +37,17 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         break
 
       case 'time_tick':
-        if (data.game_clock) setGameClock(data.game_clock as string)
-        if (data.elapsed != null) setElapsedSeconds(data.elapsed as number)
+        if (data.game_clock) store.setGameClock(data.game_clock as string)
+        if (data.elapsed != null) store.setElapsedSeconds(data.elapsed as number)
         break
 
       case 'robot_speak':
-        setRobotSpeaking(data.text as string)
-        setTimeout(() => clearRobotSpeech(), 5000)
+        store.setRobotSpeaking(data.text as string)
+        setTimeout(() => store.clearRobotSpeech(), 5000)
         break
 
       case 'robot_move':
-        setRobotRoom(data.to_room as any)
+        store.setRobotRoom(data.to_room as any)
         break
 
       case 'pm_trigger': {
@@ -76,7 +64,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
           distractor_object: (data.distractor_object as string) || '',
         }
 
-        addPMTrial({
+        store.addPMTrial({
           triggerId,
           triggerEvent,
           serverTriggerTs: serverTs,
@@ -84,10 +72,8 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
           taskConfig,
         })
 
-        // Fire trigger effect (audio/visual)
-        addTriggerEffect(triggerEvent)
+        store.addTriggerEffect(triggerEvent)
 
-        // Send trigger acknowledgment to backend
         const send = useGameStore.getState().wsSend
         if (send) {
           send({
@@ -99,7 +85,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
       }
 
       case 'phone_notification':
-        addPhoneNotification({
+        store.addPhoneNotification({
           id: `notif_${Date.now()}`,
           sender: data.sender as string,
           preview: data.preview as string,
@@ -110,18 +96,18 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         break
 
       case 'phone_lock':
-        setPhoneLocked(true)
+        store.setPhoneLocked(true)
         break
 
       case 'block_end':
-        setPhase('microbreak')
+        store.setPhase('microbreak')
         break
 
       case 'pm_received':
         break
 
       case 'ongoing_task_event':
-        handleOngoingTaskEvent(data)
+        store.handleOngoingTaskEvent(data)
         break
 
       case 'force_sync':
@@ -134,12 +120,12 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
       default:
         console.log('[WS] Unknown event:', eventType, data)
     }
-  }, [setGameClock, setElapsedSeconds, setRobotSpeaking, clearRobotSpeech,
-      setRobotRoom, addPhoneNotification, setPhoneLocked, addPMTrial,
-      addTriggerEffect, setPhase, handleOngoingTaskEvent])
+  }, [])   // no deps — reads from getState() so always stable
 
   const connect = useCallback(() => {
     if (!sessionId || blockNumber < 1) return
+
+    const myConnId = ++connIdRef.current
 
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
@@ -153,16 +139,15 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
     ws.onopen = () => {
       console.log('[WS] Connected')
       retryCount.current = 0
-      setWsConnected(true)
+      useGameStore.getState().setWsConnected(true)
 
       const sendFn = (msg: Record<string, unknown>) => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify(msg))
         }
       }
-      setWsSend(sendFn)
+      useGameStore.getState().setWsSend(sendFn)
 
-      // If we're in playing phase, signal backend to start/resume timeline
       if (useGameStore.getState().phase === 'playing') {
         sendFn({ type: 'start_game', data: { block_number: blockNumber } })
       }
@@ -175,10 +160,11 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
     ws.onmessage = handleMessage
 
     ws.onclose = () => {
-      setWsConnected(false)
+      useGameStore.getState().setWsConnected(false)
       if (heartbeatRef.current) clearInterval(heartbeatRef.current)
 
-      if (!closedByUser.current) {
+      // Only reconnect if this is still the latest connection attempt
+      if (connIdRef.current === myConnId) {
         const delay = Math.min(
           RECONNECT_BASE_MS * Math.pow(2, retryCount.current),
           RECONNECT_MAX_MS,
@@ -192,14 +178,14 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
     ws.onerror = (err) => {
       console.error('[WS] Error:', err)
     }
-  }, [sessionId, blockNumber, handleMessage, setWsConnected, setWsSend])
+  }, [sessionId, blockNumber, handleMessage])
 
   useEffect(() => {
-    closedByUser.current = false
     connect()
 
     return () => {
-      closedByUser.current = true
+      // Bump connId so the closing WS won't attempt to reconnect
+      connIdRef.current++
       if (heartbeatRef.current) clearInterval(heartbeatRef.current)
       if (wsRef.current) {
         wsRef.current.close()

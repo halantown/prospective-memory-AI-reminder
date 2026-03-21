@@ -2,7 +2,7 @@
 
 import PMTargetItems from '../PMTargetItems'
 
-export default function StudyRoom() {
+export default function StudyRoom({ isActive: _isActive }: { isActive: boolean }) {
   return (
     <div className="absolute inset-0">
       {/* PM targets positioned on shelf area */}

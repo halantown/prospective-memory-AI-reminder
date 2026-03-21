@@ -229,7 +229,9 @@ could cause the auto-start check to also miss it.
 All event types have proper `case` handlers, store actions create new objects. ✓
 
 ### ✅ ConnectionManager: Verified correct
-Queue-based with pump. Keepalive prevents timeout. ✓
+Queue-based with pump. Keepalive prevents timeout.
+New connections for the same participant **evict** all previous connections
+(close with code 4001 "superseded") to prevent message duplication. ✓
 
 ---
 

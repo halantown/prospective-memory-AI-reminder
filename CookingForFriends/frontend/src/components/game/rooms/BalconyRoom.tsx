@@ -2,7 +2,7 @@
 
 import PMTargetItems from '../PMTargetItems'
 
-export default function BalconyRoom() {
+export default function BalconyRoom({ isActive: _isActive }: { isActive: boolean }) {
   return (
     <div className="absolute inset-0">
       {/* PM targets positioned at garden supplies area */}

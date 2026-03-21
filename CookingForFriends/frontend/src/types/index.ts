@@ -93,11 +93,27 @@ export interface ClientMessage {
 
 // ── Kitchen / Ongoing Tasks ──
 
-export type SteakState = 'empty' | 'raw' | 'cooking' | 'ready_to_flip' | 'flipped' | 'done' | 'burnt'
+export type SteakState = 'empty' | 'raw' | 'cooking' | 'ready_to_flip' | 'cooking_side2' | 'ready_to_plate' | 'done' | 'burnt'
 
 // ── Dining ──
 
-export type DiningPhase = 'idle' | 'messy' | 'setting' | 'done'
+export type DiningPhase = 'idle' | 'active'
+
+export type UtensilType = 'plate' | 'knife' | 'fork' | 'glass'
+
+export interface SeatState {
+  plate: boolean
+  knife: boolean
+  fork: boolean
+  glass: boolean
+}
+
+export interface DiningState {
+  currentRound: number
+  seats: SeatState[]
+  selectedUtensil: UtensilType | null
+  totalCompleted: number
+}
 
 export interface Pan {
   id: number

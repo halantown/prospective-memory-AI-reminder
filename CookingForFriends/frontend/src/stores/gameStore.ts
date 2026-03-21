@@ -3,8 +3,10 @@
 import { create } from 'zustand'
 import type {
   Phase, Condition, RoomId, Pan, PhoneNotification, RobotState, SessionData,
-  ActivePMTrial, PMTaskConfig, DiningPhase, SteakState,
+  ActivePMTrial, PMTaskConfig, DiningPhase, SteakState, SeatState, UtensilType,
 } from '../types'
+
+const EMPTY_SEAT: SeatState = { plate: false, knife: false, fork: false, glass: false }
 
 interface GameState {
   // ── Session ──
@@ -25,9 +27,11 @@ interface GameState {
   kitchenScore: number
 
   // ── Dining ──
-  diningPlacedItems: string[]
   diningPhase: DiningPhase
-  messyItems: string[]
+  diningSeats: SeatState[]
+  diningSelectedUtensil: UtensilType | null
+  diningRound: number
+  diningScore: number
 
   // ── Visitors ──
   visitors: string[]
@@ -70,9 +74,11 @@ interface GameState {
   addKitchenScore: (points: number) => void
 
   // Dining actions
-  addDiningPlacedItem: (item: string) => void
   setDiningPhase: (phase: DiningPhase) => void
-  removeMessyItem: (item: string) => void
+  selectUtensil: (utensil: UtensilType | null) => void
+  placeUtensil: (seatIndex: number) => boolean
+  completeDiningRound: () => void
+  addDiningScore: (points: number) => void
 
   // Visitor actions
   addVisitor: (name: string) => void
@@ -111,6 +117,7 @@ interface GameState {
   // Helpers
   getActivePMForRoom: (room: RoomId) => ActivePMTrial | undefined
   hasActivePMTrigger: () => boolean
+  totalScore: () => number
 
   // Reset
   resetBlock: () => void
@@ -141,9 +148,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   kitchenScore: 0,
 
   // ── Dining ──
-  diningPlacedItems: [],
   diningPhase: 'idle',
-  messyItems: [],
+  diningSeats: [{ ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }],
+  diningSelectedUtensil: null,
+  diningRound: 0,
+  diningScore: 0,
 
   // ── Visitors ──
   visitors: [],
@@ -207,15 +216,27 @@ export const useGameStore = create<GameState>((set, get) => ({
   addKitchenScore: (points) => set((s) => ({ kitchenScore: s.kitchenScore + points })),
 
   // Dining
-  addDiningPlacedItem: (item) => set((s) => ({
-    diningPlacedItems: s.diningPlacedItems.includes(item)
-      ? s.diningPlacedItems
-      : [...s.diningPlacedItems, item],
-  })),
   setDiningPhase: (phase) => set({ diningPhase: phase }),
-  removeMessyItem: (item) => set((s) => ({
-    messyItems: s.messyItems.filter(i => i !== item),
+  selectUtensil: (utensil) => set({ diningSelectedUtensil: utensil }),
+  placeUtensil: (seatIndex) => {
+    const { diningSeats, diningSelectedUtensil } = get()
+    if (!diningSelectedUtensil) return false
+    const seat = diningSeats[seatIndex]
+    if (!seat || seat[diningSelectedUtensil]) return false
+
+    const newSeats = diningSeats.map((s, i) =>
+      i === seatIndex ? { ...s, [diningSelectedUtensil]: true } : s
+    )
+    set({ diningSeats: newSeats, diningSelectedUtensil: null })
+    return true
+  },
+  completeDiningRound: () => set((s) => ({
+    diningRound: s.diningRound + 1,
+    diningScore: s.diningScore + 20,
+    diningSeats: [{ ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }],
+    diningSelectedUtensil: null,
   })),
+  addDiningScore: (points) => set((s) => ({ diningScore: s.diningScore + points })),
 
   // Visitors
   addVisitor: (name) => set((s) => ({
@@ -256,7 +277,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     const trial = s.activePMTrials.find(t => t.triggerId === triggerId)
     const newCompleted = new Set(s.completedPMTrialIds)
     newCompleted.add(triggerId)
-    // Add visitor if trigger was visitor-type (doorbell/knock)
     const visitorTriggers = ['doorbell', 'knock', 'doorbell_ring']
     const newVisitors = trial && visitorTriggers.includes(trial.triggerEvent)
       ? [...s.visitors, trial.taskConfig.task_id.replace(/^pm_/, '').replace(/_/g, ' ')]
@@ -296,43 +316,28 @@ export const useGameStore = create<GameState>((set, get) => ({
     const event = data.event as string
 
     if (task === 'steak') {
-      if (event === 'auto_place' || event === 'place_meat') {
+      if (event === 'place_steak' || event === 'auto_place' || event === 'place_meat') {
+        const panId = data.pan as number | undefined
         const pans = get().pans
-        const emptyPan = pans.find(p => p.state === 'empty')
-        if (emptyPan) {
+
+        // Target a specific pan if specified, otherwise find first empty
+        const targetPan = panId
+          ? pans.find(p => p.id === panId && p.state === 'empty')
+          : pans.find(p => p.state === 'empty')
+
+        if (targetPan) {
           set({
             pans: pans.map(p =>
-              p.id === emptyPan.id
+              p.id === targetPan.id
                 ? { ...p, state: 'cooking' as const, placedAt: Date.now() }
-                : p
-            ),
-          })
-        }
-      } else if (event === 'urgent_flip' || event === 'ready_to_flip') {
-        const pans = get().pans
-        const cookingPan = pans.find(p => p.state === 'cooking')
-        if (cookingPan) {
-          set({
-            pans: pans.map(p =>
-              p.id === cookingPan.id
-                ? { ...p, state: 'ready_to_flip' as const }
                 : p
             ),
           })
         }
       }
     } else if (task === 'dining') {
-      if (event === 'table_messy' || event === 'table_needs_clearing') {
-        const itemCount = (data.items_to_clear as number) || 6
-        const labels = ['📰 Old newspaper', '☕ Dirty mug', '🍬 Candy wrapper',
-                        '📮 Junk mail', '🥤 Empty glass', '🧾 Old receipt',
-                        '📋 Used napkin', '🍪 Crumb plate']
-        const items = labels.slice(0, itemCount)
-        set({ diningPhase: 'messy' as const, messyItems: items })
-      } else if (event === 'table_cleared_check') {
-        if (get().messyItems.length === 0) {
-          set({ diningPhase: 'setting' as const })
-        }
+      if (event === 'table_ready') {
+        set({ diningPhase: 'active' as const })
       }
     }
   },
@@ -350,6 +355,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   hasActivePMTrigger: () => get().activePMTrials.length > 0,
 
+  totalScore: () => get().kitchenScore + get().diningScore,
+
   // Reset for new block
   resetBlock: () => set({
     currentRoom: 'kitchen',
@@ -357,9 +364,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     avatarMoving: false,
     pans: [...initialPans],
     kitchenScore: 0,
-    diningPlacedItems: [],
     diningPhase: 'idle',
-    messyItems: [],
+    diningSeats: [{ ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }],
+    diningSelectedUtensil: null,
+    diningRound: 0,
+    diningScore: 0,
     visitors: [],
     phoneNotifications: [],
     phoneLocked: true,

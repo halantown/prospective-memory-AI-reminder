@@ -1,4 +1,7 @@
-/** World View — home panorama with rooms, activation/dimming, click to navigate. */
+/** World View — home panorama with rooms, activation/dimming, click to navigate.
+ *  All rooms are ALWAYS visible. Inactive rooms are dimmed (opacity) but their
+ *  content is still rendered so the participant can monitor state from any room.
+ */
 
 import { useCallback } from 'react'
 import { motion } from 'framer-motion'
@@ -43,7 +46,7 @@ const FURNITURE_MAP: Record<RoomId, React.ComponentType> = {
   balcony: BalconyFurniture,
 }
 
-const ROOM_CONTENT: Record<RoomId, React.ComponentType> = {
+const ROOM_CONTENT: Record<RoomId, React.ComponentType<{ isActive: boolean }>> = {
   kitchen: KitchenRoom,
   dining: DiningRoom,
   living_room: LivingRoom,
@@ -77,66 +80,73 @@ export default function WorldView() {
           const floor = FLOOR_STYLES[room.id]
 
           return (
-            <motion.div
+            <div
               key={room.id}
-              className={`absolute rounded-xl border-2 cursor-pointer overflow-hidden
-                transition-all duration-400 ${
-                  isActive
-                    ? 'border-cooking-400 shadow-lg shadow-cooking-400/20 room-active'
-                    : 'border-slate-600 room-dimmed hover:border-slate-500'
-                }`}
+              className="absolute cursor-pointer"
               style={{
                 left: room.x, top: room.y,
                 width: room.w, height: room.h,
               }}
               onClick={() => handleRoomClick(room.id)}
-              whileHover={!isActive ? { scale: 1.01 } : {}}
             >
-              {/* Floor background + furniture (always visible) */}
-              <div className="absolute inset-0" style={floor}>
-                <FurnitureComp />
-              </div>
+              <motion.div
+                className={`relative w-full h-full rounded-xl border-2 overflow-hidden
+                  transition-all duration-400 ${
+                    isActive
+                      ? 'border-cooking-400 shadow-lg shadow-cooking-400/20 room-active'
+                      : 'border-slate-600 hover:border-slate-500'
+                  }`}
+                whileHover={!isActive ? { scale: 1.01 } : {}}
+              >
+                {/* Floor background + furniture (always visible) */}
+                <div className="absolute inset-0" style={floor}>
+                  <FurnitureComp />
+                </div>
 
-              {/* Room label badge */}
-              <div className="absolute top-1.5 left-1.5 z-[2] pointer-events-none">
-                <div className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1
-                  ${isActive ? 'bg-slate-900/70' : 'bg-slate-900/50'}`}
-                >
-                  <span className="text-sm">{room.emoji}</span>
-                  <span className={`text-xs font-semibold ${
-                    isActive ? 'text-cooking-300' : 'text-slate-400'
-                  }`}>
-                    {room.label}
-                  </span>
-                  {isActive && (
-                    <span className="text-[10px] bg-cooking-500 text-white px-1.5 py-0.5 rounded-full">
-                      HERE
+                {/* Room label badge */}
+                <div className="absolute top-1.5 left-1.5 z-[2] pointer-events-none">
+                  <div className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1
+                    ${isActive ? 'bg-slate-900/70' : 'bg-slate-900/50'}`}
+                  >
+                    <span className="text-sm">{room.emoji}</span>
+                    <span className={`text-xs font-semibold ${
+                      isActive ? 'text-cooking-300' : 'text-slate-400'
+                    }`}>
+                      {room.label}
                     </span>
-                  )}
+                    {isActive && (
+                      <span className="text-[10px] bg-cooking-500 text-white px-1.5 py-0.5 rounded-full">
+                        HERE
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Interactive content overlay (active room only) */}
-              {isActive && (
-                <div className="absolute inset-0 z-[3]">
-                  <RoomContent />
-                </div>
-              )}
-
-              {/* Trigger room glow effect */}
-              <TriggerRoomGlow room={room.id} />
-
-              {/* Avatar indicator */}
-              {isActive && !avatarMoving && (
-                <motion.div
-                  className="absolute bottom-2 right-2 text-2xl z-[4]"
-                  animate={{ y: [0, -4, 0] }}
-                  transition={{ repeat: Infinity, duration: 2 }}
+                {/* Room content — ALWAYS rendered. Inactive rooms are dimmed
+                    and non-interactive but still visible for monitoring. */}
+                <div
+                  className={`absolute inset-0 z-[3] transition-opacity duration-400 ${
+                    isActive ? '' : 'room-inactive-content'
+                  }`}
                 >
-                  🧑
-                </motion.div>
-              )}
-            </motion.div>
+                  <RoomContent isActive={isActive} />
+                </div>
+
+                {/* Trigger room glow effect */}
+                <TriggerRoomGlow room={room.id} />
+
+                {/* Avatar indicator */}
+                {isActive && !avatarMoving && (
+                  <motion.div
+                    className="absolute bottom-2 right-2 text-2xl z-[4]"
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                  >
+                    🧑
+                  </motion.div>
+                )}
+              </motion.div>
+            </div>
           )
         })}
 

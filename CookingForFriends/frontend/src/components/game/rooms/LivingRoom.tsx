@@ -8,7 +8,7 @@ const VISITOR_COLORS = [
   'bg-yellow-500', 'bg-orange-500',
 ]
 
-export default function LivingRoom() {
+export default function LivingRoom({ isActive: _isActive }: { isActive: boolean }) {
   const visitors = useGameStore((s) => s.visitors)
 
   return (

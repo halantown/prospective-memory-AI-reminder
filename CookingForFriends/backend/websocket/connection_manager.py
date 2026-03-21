@@ -20,13 +20,28 @@ class ConnectionManager:
         self._admin_connections: list[tuple[WebSocket, asyncio.Queue]] = []
 
     async def connect_participant(self, participant_id: str, ws: WebSocket):
-        """Accept and register a participant WebSocket."""
+        """Accept and register a participant WebSocket.
+
+        Evicts any existing connections for this participant first so that
+        only one active WS per participant exists at a time.  This prevents
+        timeline events from being delivered multiple times when the frontend
+        reconnects (race-condition accumulation).
+        """
         await ws.accept()
         queue = asyncio.Queue(maxsize=256)
-        if participant_id not in self._connections:
-            self._connections[participant_id] = []
-        self._connections[participant_id].append((ws, queue))
-        logger.info(f"WS connected: participant {participant_id} (total: {len(self._connections[participant_id])})")
+
+        # Evict stale connections for this participant
+        old = self._connections.pop(participant_id, [])
+        for old_ws, old_q in old:
+            try:
+                await old_ws.close(code=4001, reason="superseded")
+            except Exception:
+                pass
+        if old:
+            logger.info(f"Evicted {len(old)} old connection(s) for {participant_id}")
+
+        self._connections[participant_id] = [(ws, queue)]
+        logger.info(f"WS connected: participant {participant_id} (1 connection)")
         return queue
 
     def disconnect_participant(self, participant_id: str, ws: WebSocket):

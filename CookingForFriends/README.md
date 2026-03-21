@@ -82,6 +82,38 @@ Built files in `dist/` are served by FastAPI at `/`.
 - Control: robot present with neutral utterances but no PM reminders
 - **Latin Square**: 6 groups (A–F) for counterbalancing, round-robin assignment
 
+## Ongoing Tasks
+
+### Kitchen — Steak Cooking
+
+Three pans, each running an independent steak timer controlled by the frontend:
+
+| Phase | Duration | Visual | Action |
+|-------|----------|--------|--------|
+| Cooking side 1 | 30 s | Gradually browning 🥩 | None (idle window) |
+| Ready to flip | 10 s window | Orange border flash 🔥 | Click to flip |
+| Cooking side 2 | 25 s | Continues browning 🥩 | None (idle window) |
+| Ready to plate | 10 s window | Green border flash ✅ | Click to plate |
+| Burnt | — | Black 💨 | Click to discard |
+
+- Total steak life cycle: ~75 s
+- Steaks are placed by the backend timeline engine (`place_steak` events), staggered 20 s apart across the 3 pans
+- **Scoring**: plate = +10, burnt = −5
+- Missing either the flip or plate window burns the steak
+
+### Dining — Cycling Table Setting
+
+Four seats, each requiring 4 utensils (plate, knife, fork, glass):
+
+1. Select a utensil from the bottom bar
+2. Click a seat to place it
+3. Repeat until all 16 slots are filled → +20 pts → auto-reset → next round
+4. Infinite cycling; participants fill in between kitchen operations
+
+### Room Visibility
+
+All rooms are **always visible**. Inactive rooms are dimmed (opacity 0.45) with `pointer-events: none` on their content, but the room wrapper itself remains clickable for navigation. Urgent steak states (ready_to_flip, ready_to_plate) pierce through the dimming with full opacity and a pulsing glow animation so participants can monitor the kitchen from any room.
+
 ## Key Design Decisions
 
 ### Robot Communication
