@@ -191,12 +191,21 @@ export default function PhoneSidebar() {
           {/* Screen content */}
           {locked ? (
             <div
-              className="flex-1 phone-locked flex flex-col items-center justify-center cursor-pointer px-4"
+              className="flex-1 phone-locked flex flex-col px-4 pt-3 pb-4"
               onClick={(e) => { e.stopPropagation(); handleUnlock() }}
             >
-              <div className="text-5xl mb-6">🔒</div>
-              <div className="text-4xl font-extralight text-white mb-1 tracking-wider">{gameClock}</div>
-              <p className="text-slate-400 text-xs mt-6 animate-pulse">Tap to unlock</p>
+              {/* Clock + lock icon */}
+              <div className="flex flex-col items-center mb-4">
+                <div className="text-2xl mb-1">🔒</div>
+                <div className="text-3xl font-extralight text-white tracking-wider">{gameClock}</div>
+              </div>
+
+              {/* Unread/unreplied message previews */}
+              <LockScreenPreviews messages={messages} onUnlock={handleUnlock} />
+
+              <p className="text-slate-500 text-[10px] text-center mt-auto animate-pulse cursor-pointer">
+                Tap to unlock
+              </p>
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
@@ -348,5 +357,73 @@ function MessageBubble({
         </div>
       )}
     </motion.div>
+  )
+}
+
+const MAX_LOCK_PREVIEWS = 4
+
+function LockScreenPreviews({
+  messages,
+  onUnlock,
+}: {
+  messages: PhoneMessage[]
+  onUnlock: () => void
+}) {
+  // Show unreplied + unread non-ad messages, newest first, max 4
+  const previews = [...messages]
+    .filter(m => !m.is_ad && !m.replied)
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, MAX_LOCK_PREVIEWS)
+
+  const total = messages.filter(m => !m.is_ad && !m.replied).length
+  const overflow = total - MAX_LOCK_PREVIEWS
+
+  if (previews.length === 0) return null
+
+  return (
+    <div className="flex flex-col gap-1.5 w-full">
+      <AnimatePresence>
+        {previews.map((msg, idx) => (
+          <motion.div
+            key={msg.id}
+            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ delay: idx * 0.04, type: 'spring', stiffness: 280, damping: 22 }}
+            onClick={(e) => { e.stopPropagation(); onUnlock() }}
+            className={`flex items-center gap-2 rounded-xl px-2.5 py-2 cursor-pointer
+                        backdrop-blur-sm border transition-colors
+                        ${msg.replies && msg.replies.length > 0
+                          ? 'bg-blue-950/60 border-blue-700/50'
+                          : 'bg-slate-800/60 border-slate-700/40'
+                        }`}
+          >
+            <div className="w-7 h-7 rounded-full bg-blue-600/50 flex items-center justify-center
+                            text-xs font-bold text-blue-100 flex-shrink-0">
+              {msg.avatar}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold text-blue-300 leading-none">
+                  {msg.sender}
+                </span>
+                {msg.replies && msg.replies.length > 0 && (
+                  <span className="w-1.5 h-1.5 bg-blue-400 rounded-full flex-shrink-0" />
+                )}
+              </div>
+              <p className="text-[10px] text-slate-300 truncate leading-tight mt-0.5">
+                {msg.text}
+              </p>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {overflow > 0 && (
+        <p className="text-[9px] text-slate-500 text-center mt-0.5">
+          +{overflow} more message{overflow > 1 ? 's' : ''}
+        </p>
+      )}
+    </div>
   )
 }
