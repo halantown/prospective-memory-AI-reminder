@@ -5,33 +5,69 @@
   "duration_seconds": 600,
   "events": [
     { "t": 0,   "type": "block_start", "data": {} },
-    { "t": 5,   "type": "time_tick",   "data": { "game_clock": "17:00" } },
+
+    { "t": 5,   "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
+    { "t": 10,  "type": "ongoing_task_event", "data": { "task": "dining", "event": "table_messy", "items_to_clear": 6, "room": "dining" } },
+
     { "t": 30,  "type": "robot_speak",  "data": { "text": "Lovely weather today, isn't it?", "log_tag": "neutral" } },
+
+    { "t": 45,  "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
+
     { "t": 60,  "type": "phone_notification", "data": { "sender": "Alice", "preview": "Can't wait for dinner!", "is_ad": false } },
-    { "t": 90,  "type": "ongoing_task_event", "data": { "task": "steak", "event": "place_meat", "room": "kitchen" } },
-    { "t": 110, "type": "ongoing_task_event", "data": { "task": "steak", "event": "urgent_flip", "room": "kitchen" } },
+
+    { "t": 90,  "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
+    { "t": 100, "type": "robot_speak",  "data": { "text": "The kitchen smells wonderful already.", "log_tag": "neutral" } },
+
     { "t": 120, "type": "robot_speak",  "data": { "text": "{{reminder:pm_b1_t1}}", "log_tag": "reminder" } },
-    { "t": 150, "type": "robot_speak",  "data": { "text": "The kitchen smells wonderful.", "log_tag": "neutral" } },
+
+    { "t": 135, "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
+    { "t": 150, "type": "robot_speak",  "data": { "text": "I think Alice will love this dinner.", "log_tag": "neutral" } },
+
+    { "t": 180, "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
     { "t": 180, "type": "phone_notification", "data": { "sender": "Ad", "preview": "50% off all kitchen appliances!", "is_ad": true } },
+
     { "t": 200, "type": "ongoing_task_event", "data": { "task": "steak", "event": "urgent_flip", "room": "kitchen" } },
+
+    { "t": 220, "type": "ongoing_task_event", "data": { "task": "dining", "event": "table_cleared_check", "room": "dining" } },
+
     { "t": 240, "type": "pm_trigger",   "data": { "trigger_id": "pm_b1_t1", "trigger_event": "doorbell" } },
-    { "t": 270, "type": "robot_speak",  "data": { "text": "I think someone's at the door.", "log_tag": "neutral" } },
-    { "t": 300, "type": "ongoing_task_event", "data": { "task": "steak", "event": "place_meat", "room": "kitchen" } },
+
+    { "t": 260, "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
+    { "t": 270, "type": "robot_speak",  "data": { "text": "I think someone was at the door.", "log_tag": "neutral" } },
+
+    { "t": 300, "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
     { "t": 310, "type": "robot_speak",  "data": { "text": "{{reminder:pm_b1_t2}}", "log_tag": "reminder" } },
+
     { "t": 340, "type": "phone_notification", "data": { "sender": "Dentist Office", "preview": "Appointment confirmed for Wed 3PM", "is_ad": false } },
+    { "t": 350, "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
+
     { "t": 360, "type": "ongoing_task_event", "data": { "task": "steak", "event": "urgent_flip", "room": "kitchen" } },
+
+    { "t": 400, "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
+
     { "t": 420, "type": "pm_trigger",   "data": { "trigger_id": "pm_b1_t2", "trigger_event": "email_dentist" } },
     { "t": 430, "type": "robot_speak",  "data": { "text": "Have you checked your emails lately?", "log_tag": "neutral" } },
-    { "t": 450, "type": "ongoing_task_event", "data": { "task": "steak", "event": "place_meat", "room": "kitchen" } },
+
+    { "t": 450, "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
     { "t": 460, "type": "robot_speak",  "data": { "text": "{{reminder:pm_b1_t3}}", "log_tag": "reminder" } },
+
     { "t": 490, "type": "phone_notification", "data": { "sender": "Ad", "preview": "New deals on home decor!", "is_ad": true } },
+    { "t": 500, "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
+
     { "t": 510, "type": "ongoing_task_event", "data": { "task": "steak", "event": "urgent_flip", "room": "kitchen" } },
+
     { "t": 540, "type": "pm_trigger",   "data": { "trigger_id": "pm_b1_t3", "trigger_event": "washing_done" } },
     { "t": 545, "type": "robot_speak",  "data": { "text": "Sounds like the washing machine just finished.", "log_tag": "neutral" } },
+    { "t": 550, "type": "ongoing_task_event", "data": { "task": "steak", "event": "auto_place", "room": "kitchen" } },
+
     { "t": 555, "type": "pm_trigger",   "data": { "trigger_id": "pm_b1_t4", "trigger_event": "clock_6pm" } },
-    { "t": 560, "type": "time_tick",    "data": { "game_clock": "18:00" } },
-    { "t": 570, "type": "robot_speak",  "data": { "text": "It's getting late, dinner should be ready soon.", "log_tag": "neutral" } },
-    { "t": 590, "type": "ongoing_task_event", "data": { "task": "steak", "event": "block_warning", "room": "kitchen" } },
+
+    { "t": 560, "type": "robot_speak",  "data": { "text": "Almost time for dinner!", "log_tag": "neutral" } },
+
+    { "t": 580, "type": "ongoing_task_event", "data": { "task": "dining", "event": "serve_food_prompt", "room": "dining" } },
+
+    { "t": 590, "type": "robot_speak",  "data": { "text": "It's getting late, dinner should be ready soon.", "log_tag": "neutral" } },
+
     { "t": 600, "type": "block_end",    "data": {} }
   ]
 }

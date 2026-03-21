@@ -27,6 +27,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
     addPMTrial,
     addTriggerEffect,
     setPhase,
+    handleOngoingTaskEvent,
     phase,
   } = useGameStore()
 
@@ -118,7 +119,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         break
 
       case 'ongoing_task_event':
-        console.log('[WS] Ongoing task event:', data)
+        handleOngoingTaskEvent(data)
         break
 
       case 'force_sync':
@@ -133,7 +134,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
     }
   }, [setGameClock, setElapsedSeconds, setRobotSpeaking, clearRobotSpeech,
       setRobotRoom, addPhoneNotification, setPhoneLocked, addPMTrial,
-      addTriggerEffect, setPhase])
+      addTriggerEffect, setPhase, handleOngoingTaskEvent])
 
   const connect = useCallback(() => {
     if (!sessionId || blockNumber < 1) return

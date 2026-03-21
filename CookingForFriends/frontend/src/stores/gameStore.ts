@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import type {
   Phase, Condition, RoomId, Pan, PhoneNotification, RobotState, SessionData,
-  ActivePMTrial, PMTaskConfig,
+  ActivePMTrial, PMTaskConfig, DiningPhase, SteakState,
 } from '../types'
 
 interface GameState {
@@ -26,6 +26,11 @@ interface GameState {
 
   // ── Dining ──
   diningPlacedItems: string[]
+  diningPhase: DiningPhase
+  messyItems: string[]
+
+  // ── Visitors ──
+  visitors: string[]
 
   // ── Phone ──
   phoneNotifications: PhoneNotification[]
@@ -66,6 +71,11 @@ interface GameState {
 
   // Dining actions
   addDiningPlacedItem: (item: string) => void
+  setDiningPhase: (phase: DiningPhase) => void
+  removeMessyItem: (item: string) => void
+
+  // Visitor actions
+  addVisitor: (name: string) => void
 
   // Phone actions
   addPhoneNotification: (notif: PhoneNotification) => void
@@ -90,6 +100,9 @@ interface GameState {
   // Game clock
   setGameClock: (clock: string) => void
   setElapsedSeconds: (s: number) => void
+
+  // Ongoing task events from backend
+  handleOngoingTaskEvent: (data: Record<string, unknown>) => void
 
   // WS
   setWsConnected: (connected: boolean) => void
@@ -129,6 +142,11 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // ── Dining ──
   diningPlacedItems: [],
+  diningPhase: 'idle',
+  messyItems: [],
+
+  // ── Visitors ──
+  visitors: [],
 
   // ── Phone ──
   phoneNotifications: [],
@@ -194,6 +212,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       ? s.diningPlacedItems
       : [...s.diningPlacedItems, item],
   })),
+  setDiningPhase: (phase) => set({ diningPhase: phase }),
+  removeMessyItem: (item) => set((s) => ({
+    messyItems: s.messyItems.filter(i => i !== item),
+  })),
+
+  // Visitors
+  addVisitor: (name) => set((s) => ({
+    visitors: s.visitors.includes(name) ? s.visitors : [...s.visitors, name],
+  })),
 
   // Phone
   addPhoneNotification: (notif) => set((s) => ({
@@ -226,13 +253,20 @@ export const useGameStore = create<GameState>((set, get) => ({
   }),
 
   completePMTrial: (triggerId) => set((s) => {
+    const trial = s.activePMTrials.find(t => t.triggerId === triggerId)
     const newCompleted = new Set(s.completedPMTrialIds)
     newCompleted.add(triggerId)
+    // Add visitor if trigger was visitor-type (doorbell/knock)
+    const visitorTriggers = ['doorbell', 'knock', 'doorbell_ring']
+    const newVisitors = trial && visitorTriggers.includes(trial.triggerEvent)
+      ? [...s.visitors, trial.taskConfig.task_id.replace(/^pm_/, '').replace(/_/g, ' ')]
+      : s.visitors
     return {
       activePMTrials: s.activePMTrials.filter(t => t.triggerId !== triggerId),
       completedPMTrialIds: newCompleted,
       pmTargetSelected: null,
       pmActionPhase: 'idle',
+      visitors: newVisitors,
     }
   }),
 
@@ -256,6 +290,53 @@ export const useGameStore = create<GameState>((set, get) => ({
   setGameClock: (clock) => set({ gameClock: clock }),
   setElapsedSeconds: (s) => set({ elapsedSeconds: s }),
 
+  // Ongoing task event dispatcher from backend timeline
+  handleOngoingTaskEvent: (data) => {
+    const task = data.task as string
+    const event = data.event as string
+
+    if (task === 'steak') {
+      if (event === 'auto_place' || event === 'place_meat') {
+        const pans = get().pans
+        const emptyPan = pans.find(p => p.state === 'empty')
+        if (emptyPan) {
+          set({
+            pans: pans.map(p =>
+              p.id === emptyPan.id
+                ? { ...p, state: 'cooking' as const, placedAt: Date.now() }
+                : p
+            ),
+          })
+        }
+      } else if (event === 'urgent_flip' || event === 'ready_to_flip') {
+        const pans = get().pans
+        const cookingPan = pans.find(p => p.state === 'cooking')
+        if (cookingPan) {
+          set({
+            pans: pans.map(p =>
+              p.id === cookingPan.id
+                ? { ...p, state: 'ready_to_flip' as const }
+                : p
+            ),
+          })
+        }
+      }
+    } else if (task === 'dining') {
+      if (event === 'table_messy' || event === 'table_needs_clearing') {
+        const itemCount = (data.items_to_clear as number) || 6
+        const labels = ['📰 Old newspaper', '☕ Dirty mug', '🍬 Candy wrapper',
+                        '📮 Junk mail', '🥤 Empty glass', '🧾 Old receipt',
+                        '📋 Used napkin', '🍪 Crumb plate']
+        const items = labels.slice(0, itemCount)
+        set({ diningPhase: 'messy' as const, messyItems: items })
+      } else if (event === 'table_cleared_check') {
+        if (get().messyItems.length === 0) {
+          set({ diningPhase: 'setting' as const })
+        }
+      }
+    }
+  },
+
   // WS
   setWsConnected: (connected) => set({ wsConnected: connected }),
   setWsSend: (fn) => set({ wsSend: fn }),
@@ -277,6 +358,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     pans: [...initialPans],
     kitchenScore: 0,
     diningPlacedItems: [],
+    diningPhase: 'idle',
+    messyItems: [],
+    visitors: [],
     phoneNotifications: [],
     phoneLocked: true,
     robot: { room: 'kitchen', speaking: false, text: '', visible: true },

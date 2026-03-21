@@ -95,6 +95,10 @@ export interface ClientMessage {
 
 export type SteakState = 'empty' | 'raw' | 'cooking' | 'ready_to_flip' | 'flipped' | 'done' | 'burnt'
 
+// ── Dining ──
+
+export type DiningPhase = 'idle' | 'messy' | 'setting' | 'done'
+
 export interface Pan {
   id: number
   state: SteakState

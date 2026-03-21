@@ -78,12 +78,32 @@ async def run_timeline(
         if factory:
             trial_lookup = await _build_trial_lookup(participant_id, block_number, factory)
 
+        # Track last emitted game-clock tick
+        last_tick_num = -1
+
         for event in events:
             if asyncio.current_task().cancelled():
                 break
 
             t = event.get("t", 0)
             elapsed = time.time() - start_time
+
+            # While waiting for next event, emit time_tick every 10 real seconds
+            while t - elapsed > 1.0:
+                tick_num = int(elapsed) // 10
+                if tick_num != last_tick_num:
+                    last_tick_num = tick_num
+                    game_minutes = tick_num
+                    game_hour = 17 + game_minutes // 60
+                    game_min = game_minutes % 60
+                    game_clock = f"{game_hour}:{game_min:02d}"
+                    await send_fn("time_tick", {
+                        "elapsed": int(elapsed),
+                        "game_clock": game_clock,
+                    })
+                await asyncio.sleep(1.0)
+                elapsed = time.time() - start_time
+
             wait = t - elapsed
             if wait > 0:
                 await asyncio.sleep(wait)
@@ -122,10 +142,23 @@ async def run_timeline(
             logger.debug(f"Timeline event [{key}] t={t}: {event_type}")
             await send_fn(event_type, event_data)
 
-        # Wait for remaining duration
+        # Wait for remaining duration, continuing to emit time_ticks
         remaining = duration - (time.time() - start_time)
-        if remaining > 0:
-            await asyncio.sleep(remaining)
+        while remaining > 0:
+            elapsed = time.time() - start_time
+            tick_num = int(elapsed) // 10
+            if tick_num != last_tick_num:
+                last_tick_num = tick_num
+                game_minutes = tick_num
+                game_hour = 17 + game_minutes // 60
+                game_min = game_minutes % 60
+                game_clock = f"{game_hour}:{game_min:02d}"
+                await send_fn("time_tick", {
+                    "elapsed": int(elapsed),
+                    "game_clock": game_clock,
+                })
+            await asyncio.sleep(1.0)
+            remaining = duration - (time.time() - start_time)
 
         await send_fn("block_end", {})
         logger.info(f"Timeline completed: {key}")

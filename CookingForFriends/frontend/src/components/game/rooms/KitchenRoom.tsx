@@ -1,4 +1,8 @@
-/** Kitchen room — steak cooking with 3 pans. */
+/** Kitchen room — steak cooking with 3 pans.
+ *  Timers are reactive: whenever a pan enters 'cooking', 'ready_to_flip', or
+ *  'flipped' state (whether via user click OR backend ongoing_task_event),
+ *  a timer is auto-started for the next transition.
+ */
 
 import { useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
@@ -14,7 +18,7 @@ export default function KitchenRoom() {
   const updatePan = useGameStore((s) => s.updatePan)
   const addKitchenScore = useGameStore((s) => s.addKitchenScore)
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
-
+  const activeTimerStates = useRef<Map<number, SteakState>>(new Map())
   const mountedRef = useRef(true)
 
   const reportAction = (panId: number, action: string) => {
@@ -27,25 +31,63 @@ export default function KitchenRoom() {
     }
   }
 
-  const startCooking = useCallback((panId: number) => {
-    updatePan(panId, { state: 'cooking', placedAt: Date.now() })
+  // Reactive timer management: auto-starts timers when pan state changes
+  useEffect(() => {
+    pans.forEach(pan => {
+      const activeState = activeTimerStates.current.get(pan.id)
 
-    const t1 = setTimeout(() => {
-      if (!mountedRef.current) return
-      updatePan(panId, { state: 'ready_to_flip' })
-
-      const t2 = setTimeout(() => {
-        if (!mountedRef.current) return
-        const pan = useGameStore.getState().pans.find(p => p.id === panId)
-        if (pan && pan.state === 'ready_to_flip') {
-          updatePan(panId, { state: 'burnt' })
-          reportAction(panId, 'burnt')
+      // Cancel stale timer if pan state no longer matches
+      if (activeState && activeState !== pan.state) {
+        const timerKey = pan.id * 100 +
+          (activeState === 'cooking' ? 1 : activeState === 'ready_to_flip' ? 2 : 3)
+        const timer = timersRef.current.get(timerKey)
+        if (timer) {
+          clearTimeout(timer)
+          timersRef.current.delete(timerKey)
         }
-      }, FLIP_WINDOW)
-      timersRef.current.set(panId * 100 + 2, t2)
-    }, COOK_TIME)
-    timersRef.current.set(panId * 100 + 1, t1)
-  }, [updatePan])
+        activeTimerStates.current.delete(pan.id)
+      }
+
+      // Start cook → ready_to_flip timer
+      if (pan.state === 'cooking' && !activeTimerStates.current.has(pan.id)) {
+        activeTimerStates.current.set(pan.id, 'cooking')
+        const t = setTimeout(() => {
+          if (!mountedRef.current) return
+          activeTimerStates.current.delete(pan.id)
+          updatePan(pan.id, { state: 'ready_to_flip' })
+        }, COOK_TIME)
+        timersRef.current.set(pan.id * 100 + 1, t)
+      }
+
+      // Start ready_to_flip → burnt timer
+      if (pan.state === 'ready_to_flip' && !activeTimerStates.current.has(pan.id)) {
+        activeTimerStates.current.set(pan.id, 'ready_to_flip')
+        const t = setTimeout(() => {
+          if (!mountedRef.current) return
+          activeTimerStates.current.delete(pan.id)
+          const currentPan = useGameStore.getState().pans.find(p => p.id === pan.id)
+          if (currentPan && currentPan.state === 'ready_to_flip') {
+            updatePan(pan.id, { state: 'burnt' })
+            reportAction(pan.id, 'burnt')
+          }
+        }, FLIP_WINDOW)
+        timersRef.current.set(pan.id * 100 + 2, t)
+      }
+
+      // Start flipped → done timer
+      if (pan.state === 'flipped' && !activeTimerStates.current.has(pan.id)) {
+        activeTimerStates.current.set(pan.id, 'flipped')
+        const t = setTimeout(() => {
+          if (!mountedRef.current) return
+          activeTimerStates.current.delete(pan.id)
+          updatePan(pan.id, { state: 'done' })
+          addKitchenScore(10)
+          reportAction(pan.id, 'done')
+        }, COOK_TIME)
+        timersRef.current.set(pan.id * 100 + 3, t)
+      }
+    })
+  }, [pans, updatePan, addKitchenScore])
 
   const handlePanClick = useCallback((panId: number) => {
     const pan = pans.find(p => p.id === panId)
@@ -53,21 +95,13 @@ export default function KitchenRoom() {
 
     switch (pan.state) {
       case 'empty':
-        updatePan(panId, { state: 'raw' })
-        setTimeout(() => startCooking(panId), 500)
+        updatePan(panId, { state: 'cooking', placedAt: Date.now() })
         reportAction(panId, 'place_meat')
         break
       case 'ready_to_flip':
         updatePan(panId, { state: 'flipped', placedAt: Date.now() })
         addKitchenScore(10)
         reportAction(panId, 'flip')
-        const t = setTimeout(() => {
-          if (!mountedRef.current) return
-          updatePan(panId, { state: 'done' })
-          addKitchenScore(10)
-          reportAction(panId, 'done')
-        }, COOK_TIME)
-        timersRef.current.set(panId * 100 + 3, t)
         break
       case 'done':
         updatePan(panId, { state: 'empty', placedAt: null })
@@ -81,7 +115,7 @@ export default function KitchenRoom() {
       default:
         break
     }
-  }, [pans, updatePan, addKitchenScore, startCooking])
+  }, [pans, updatePan, addKitchenScore])
 
   useEffect(() => {
     mountedRef.current = true
@@ -89,6 +123,7 @@ export default function KitchenRoom() {
       mountedRef.current = false
       timersRef.current.forEach(t => clearTimeout(t))
       timersRef.current.clear()
+      activeTimerStates.current.clear()
     }
   }, [])
 
