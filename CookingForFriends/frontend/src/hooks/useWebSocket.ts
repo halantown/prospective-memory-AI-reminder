@@ -41,6 +41,8 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
 
     const { event: eventType, data } = msg
 
+    console.log('[WS RECEIVED]', eventType, data)
+
     switch (eventType) {
       case 'block_start':
         console.log('[WS] Block started:', data)

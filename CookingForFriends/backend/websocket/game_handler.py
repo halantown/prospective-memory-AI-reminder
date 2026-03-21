@@ -51,6 +51,7 @@ async def handle_game_ws(
             if block and block.status in (BlockStatus.PLAYING, "playing"):
                 # Resume timeline for reconnecting client
                 condition = block.condition
+                logger.info(f"[GAME_HANDLER] Auto-starting timeline (block already PLAYING) for {participant_id} block {block_number}")
                 timeline_task = await run_timeline(
                     participant_id=participant_id,
                     block_number=block_number,
@@ -58,7 +59,10 @@ async def handle_game_ws(
                     send_fn=send_event,
                     db_factory=db_factory,
                 )
-                logger.info(f"Timeline resumed for {participant_id} block {block_number}")
+                logger.info(f"[GAME_HANDLER] Timeline resumed for {participant_id} block {block_number}")
+            else:
+                block_status = block.status if block else "NO_BLOCK"
+                logger.info(f"[GAME_HANDLER] Block status on connect: {block_status} (not auto-starting)")
     except Exception as e:
         logger.error(f"Failed to check/start timeline: {e}")
 
@@ -104,37 +108,48 @@ async def _ws_receiver(
             msg_type = msg.get("type", "")
             data = msg.get("data", {})
 
-            if msg_type == "heartbeat":
-                await _handle_heartbeat(participant_id, db_factory)
-            elif msg_type == "start_game":
-                await _handle_start_game(participant_id, block_number, db_factory,
-                                         lambda et, d: manager.send_to_participant(participant_id, et, d))
-            elif msg_type == "room_switch":
-                await _handle_room_switch(participant_id, block_number, data, db_factory)
-            elif msg_type == "task_action":
-                await _handle_task_action(participant_id, block_number, data, db_factory)
-            elif msg_type == "pm_attempt":
-                await _handle_pm_attempt(participant_id, block_number, data, db_factory)
-                await ws.send_text(json.dumps({"event": "pm_received", "data": {}}))
-            elif msg_type == "trigger_ack":
-                await _handle_trigger_ack(participant_id, data, db_factory)
-            elif msg_type == "phone_unlock":
-                await _handle_interaction(participant_id, block_number, "phone_unlock", data, db_factory)
-            elif msg_type == "phone_action":
-                await _handle_interaction(participant_id, block_number, "phone_action", data, db_factory)
-            elif msg_type == "mouse_position":
-                await _handle_mouse(participant_id, block_number, data, db_factory)
-            else:
-                logger.debug(f"Unknown client message type: {msg_type}")
+            # Each handler is wrapped so one failure never kills the receiver loop
+            try:
+                if msg_type == "heartbeat":
+                    await _handle_heartbeat(participant_id, db_factory)
+                elif msg_type == "start_game":
+                    logger.info(f"[GAME_HANDLER] Received start_game from {participant_id} block {block_number}")
+                    await _handle_start_game(participant_id, block_number, db_factory,
+                                             lambda et, d: manager.send_to_participant(participant_id, et, d))
+                elif msg_type == "room_switch":
+                    await _handle_room_switch(participant_id, block_number, data, db_factory)
+                elif msg_type == "task_action":
+                    await _handle_task_action(participant_id, block_number, data, db_factory)
+                elif msg_type == "pm_attempt":
+                    await _handle_pm_attempt(participant_id, block_number, data, db_factory)
+                    await ws.send_text(json.dumps({"event": "pm_received", "data": {}}))
+                elif msg_type == "trigger_ack":
+                    await _handle_trigger_ack(participant_id, data, db_factory)
+                elif msg_type == "phone_unlock":
+                    await _handle_interaction(participant_id, block_number, "phone_unlock", data, db_factory)
+                elif msg_type == "phone_action":
+                    await _handle_interaction(participant_id, block_number, "phone_action", data, db_factory)
+                elif msg_type == "mouse_position":
+                    await _handle_mouse(participant_id, block_number, data, db_factory)
+                else:
+                    logger.debug(f"Unknown client message type: {msg_type}")
+            except Exception as handler_err:
+                logger.error(
+                    f"[GAME_HANDLER] Handler error for '{msg_type}' "
+                    f"(participant={participant_id}): {handler_err}",
+                    exc_info=True,
+                )
 
     except WebSocketDisconnect:
         logger.info(f"WS receiver ended for {participant_id}")
     except Exception as e:
-        logger.error(f"WS receiver error for {participant_id}: {e}")
+        logger.error(f"WS receiver error for {participant_id}: {e}", exc_info=True)
 
 
 async def _handle_start_game(participant_id: str, block_number: int, db_factory, send_fn):
     """Start the block timeline when the frontend enters playing phase."""
+    logger.info(f"[GAME_HANDLER] _handle_start_game called: participant={participant_id} block={block_number}")
+
     async with db_factory() as db:
         from sqlalchemy import select
         from models.block import Block, BlockStatus
@@ -148,12 +163,14 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         )
         block = result.scalar_one_or_none()
         if not block:
-            logger.warning(f"start_game: block not found for {participant_id} block {block_number}")
+            logger.warning(f"[GAME_HANDLER] start_game: block not found for {participant_id} block {block_number}")
             return
+
+        logger.info(f"[GAME_HANDLER] Block found: id={block.id} status={block.status} condition={block.condition}")
 
         # Only start if block is in encoding or pending state
         if block.status not in (BlockStatus.PENDING, BlockStatus.ENCODING, "pending", "encoding"):
-            logger.info(f"start_game: block already in state {block.status}, skipping timeline start")
+            logger.info(f"[GAME_HANDLER] start_game: block already in state {block.status}, skipping timeline start")
             return
 
         block.status = BlockStatus.PLAYING
@@ -162,14 +179,15 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         condition = block.condition
 
     # Start the timeline
-    await run_timeline(
+    logger.info(f"[GAME_HANDLER] Creating TimelineEngine for {participant_id} block {block_number} ({condition})")
+    task = await run_timeline(
         participant_id=participant_id,
         block_number=block_number,
         condition=condition,
         send_fn=send_fn,
         db_factory=db_factory,
     )
-    logger.info(f"Timeline started for {participant_id} block {block_number} ({condition})")
+    logger.info(f"[GAME_HANDLER] Timeline task created: {task}")
 
 
 async def _handle_heartbeat(participant_id: str, db_factory):

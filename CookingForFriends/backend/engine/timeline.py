@@ -65,31 +65,95 @@ async def run_timeline(
     timeline = load_timeline(block_number, condition)
     events = timeline.get("events", [])
     duration = timeline.get("duration_seconds", 600)
+    logger.info(f"[TIMELINE] Loaded timeline for {key}: {len(events)} events, {duration}s duration")
 
     # Use provided or global db_factory
     factory = db_factory or _db_factory
 
     async def _run():
-        start_time = time.time()
-        logger.info(f"Timeline started: {key} ({len(events)} events, {duration}s)")
+        try:
+            start_time = time.time()
+            logger.info(f"[TIMELINE] _run started: {key} ({len(events)} events, {duration}s)")
 
-        # Build trial lookup for this block
-        trial_lookup = {}
-        if factory:
-            trial_lookup = await _build_trial_lookup(participant_id, block_number, factory)
+            # Build trial lookup for this block
+            trial_lookup = {}
+            if factory:
+                trial_lookup = await _build_trial_lookup(participant_id, block_number, factory)
 
-        # Track last emitted game-clock tick
-        last_tick_num = -1
+            # Track last emitted game-clock tick
+            last_tick_num = -1
 
-        for event in events:
-            if asyncio.current_task().cancelled():
-                break
+            for event in events:
+                if asyncio.current_task().cancelled():
+                    break
 
-            t = event.get("t", 0)
-            elapsed = time.time() - start_time
+                t = event.get("t", 0)
+                elapsed = time.time() - start_time
 
-            # While waiting for next event, emit time_tick every 10 real seconds
-            while t - elapsed > 1.0:
+                # While waiting for next event, emit time_tick every 10 real seconds
+                while t - elapsed > 1.0:
+                    tick_num = int(elapsed) // 10
+                    if tick_num != last_tick_num:
+                        last_tick_num = tick_num
+                        game_minutes = tick_num
+                        game_hour = 17 + game_minutes // 60
+                        game_min = game_minutes % 60
+                        game_clock = f"{game_hour}:{game_min:02d}"
+                        try:
+                            await send_fn("time_tick", {
+                                "elapsed": int(elapsed),
+                                "game_clock": game_clock,
+                            })
+                        except Exception as e:
+                            logger.error(f"[TIMELINE] Failed to send time_tick: {e}")
+                    await asyncio.sleep(1.0)
+                    elapsed = time.time() - start_time
+
+                wait = t - elapsed
+                if wait > 0:
+                    await asyncio.sleep(wait)
+
+                event_type = event.get("type", "unknown")
+                event_data = event.get("data", {})
+
+                # Resolve reminder placeholders
+                if event_type == "robot_speak" and "text" in event_data:
+                    text = event_data["text"]
+                    if text.startswith("{{reminder:"):
+                        task_id = text.strip("{}").split(":")[1]
+                        event_data["text"] = _resolve_reminder(task_id, condition)
+
+                # Handle PM trigger events — start execution window
+                if event_type == "pm_trigger":
+                    trigger_id = event_data.get("trigger_id", "")
+                    trigger_time = time.time()
+                    event_data["server_trigger_ts"] = trigger_time
+
+                    if factory and trigger_id in trial_lookup:
+                        trial = trial_lookup[trigger_id]
+                        # Record trigger_fired_at
+                        await _record_trigger_fired(trial["id"], trigger_time, factory)
+
+                        # Start silent execution window
+                        start_window(
+                            participant_id=participant_id,
+                            trial_id=trial["id"],
+                            block_id=trial["block_id"],
+                            trigger_time=trigger_time,
+                            task_config=trial["task_config"],
+                            on_expire=_on_window_expire,
+                        )
+
+                logger.debug(f"[TIMELINE] Firing event [{key}] t={t}: {event_type}")
+                try:
+                    await send_fn(event_type, event_data)
+                except Exception as e:
+                    logger.error(f"[TIMELINE] Failed to send {event_type}: {e}")
+
+            # Wait for remaining duration, continuing to emit time_ticks
+            remaining = duration - (time.time() - start_time)
+            while remaining > 0:
+                elapsed = time.time() - start_time
                 tick_num = int(elapsed) // 10
                 if tick_num != last_tick_num:
                     last_tick_num = tick_num
@@ -97,76 +161,38 @@ async def run_timeline(
                     game_hour = 17 + game_minutes // 60
                     game_min = game_minutes % 60
                     game_clock = f"{game_hour}:{game_min:02d}"
-                    await send_fn("time_tick", {
-                        "elapsed": int(elapsed),
-                        "game_clock": game_clock,
-                    })
+                    try:
+                        await send_fn("time_tick", {
+                            "elapsed": int(elapsed),
+                            "game_clock": game_clock,
+                        })
+                    except Exception as e:
+                        logger.error(f"[TIMELINE] Failed to send time_tick (tail): {e}")
                 await asyncio.sleep(1.0)
-                elapsed = time.time() - start_time
+                remaining = duration - (time.time() - start_time)
 
-            wait = t - elapsed
-            if wait > 0:
-                await asyncio.sleep(wait)
+            await send_fn("block_end", {})
+            logger.info(f"[TIMELINE] Timeline completed: {key}")
 
-            event_type = event.get("type", "unknown")
-            event_data = event.get("data", {})
+            if on_complete:
+                await on_complete()
 
-            # Resolve reminder placeholders
-            if event_type == "robot_speak" and "text" in event_data:
-                text = event_data["text"]
-                if text.startswith("{{reminder:"):
-                    task_id = text.strip("{}").split(":")[1]
-                    event_data["text"] = _resolve_reminder(task_id, condition)
+        except asyncio.CancelledError:
+            logger.info(f"[TIMELINE] Timeline cancelled: {key}")
+            raise
+        except Exception as e:
+            logger.error(f"[TIMELINE] _run() CRASHED for {key}: {e}", exc_info=True)
 
-            # Handle PM trigger events — start execution window
-            if event_type == "pm_trigger":
-                trigger_id = event_data.get("trigger_id", "")
-                trigger_time = time.time()
-                event_data["server_trigger_ts"] = trigger_time
-
-                if factory and trigger_id in trial_lookup:
-                    trial = trial_lookup[trigger_id]
-                    # Record trigger_fired_at
-                    await _record_trigger_fired(trial["id"], trigger_time, factory)
-
-                    # Start silent execution window
-                    start_window(
-                        participant_id=participant_id,
-                        trial_id=trial["id"],
-                        block_id=trial["block_id"],
-                        trigger_time=trigger_time,
-                        task_config=trial["task_config"],
-                        on_expire=_on_window_expire,
-                    )
-
-            logger.debug(f"Timeline event [{key}] t={t}: {event_type}")
-            await send_fn(event_type, event_data)
-
-        # Wait for remaining duration, continuing to emit time_ticks
-        remaining = duration - (time.time() - start_time)
-        while remaining > 0:
-            elapsed = time.time() - start_time
-            tick_num = int(elapsed) // 10
-            if tick_num != last_tick_num:
-                last_tick_num = tick_num
-                game_minutes = tick_num
-                game_hour = 17 + game_minutes // 60
-                game_min = game_minutes % 60
-                game_clock = f"{game_hour}:{game_min:02d}"
-                await send_fn("time_tick", {
-                    "elapsed": int(elapsed),
-                    "game_clock": game_clock,
-                })
-            await asyncio.sleep(1.0)
-            remaining = duration - (time.time() - start_time)
-
-        await send_fn("block_end", {})
-        logger.info(f"Timeline completed: {key}")
-
-        if on_complete:
-            await on_complete()
+    def _on_task_done(t: asyncio.Task):
+        """Log if the timeline task failed with an unhandled exception."""
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc:
+            logger.error(f"[TIMELINE] Task failed for {key}: {exc}", exc_info=exc)
 
     task = asyncio.create_task(_run())
+    task.add_done_callback(_on_task_done)
     _active_timelines[key] = task
     return task
 

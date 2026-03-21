@@ -59,9 +59,44 @@ async def seed_dev_participant():
             p.started_at = None
             p.completed_at = None
             p.is_online = False
+
+            # Also reset all blocks back to PENDING and clear runtime data
+            from sqlalchemy import update as sql_update
+            from models.block import Block, BlockStatus, PMTrial
+            await db.execute(
+                sql_update(Block)
+                .where(Block.participant_id == p.id)
+                .values(
+                    status=BlockStatus.PENDING,
+                    started_at=None,
+                    ended_at=None,
+                    nasa_tlx=None,
+                )
+            )
+            # Reset PM trial runtime fields (scores, timing)
+            block_result = await db.execute(
+                select(Block.id).where(Block.participant_id == p.id)
+            )
+            block_ids = [r[0] for r in block_result.all()]
+            if block_ids:
+                await db.execute(
+                    sql_update(PMTrial)
+                    .where(PMTrial.block_id.in_(block_ids))
+                    .values(
+                        trigger_fired_at=None,
+                        exec_window_start=None,
+                        exec_window_end=None,
+                        user_actions=None,
+                        score=None,
+                        response_time_ms=None,
+                        resumption_lag_ms=None,
+                        reminder_played_at=None,
+                    )
+                )
+
             await db.commit()
             logger.warning(
-                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' reset to REGISTERED — "
+                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' reset to REGISTERED (blocks reset to PENDING) — "
                 "remove config.DEV_TOKEN before production!"
             )
         else:

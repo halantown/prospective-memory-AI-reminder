@@ -43,7 +43,10 @@ class ConnectionManager:
         """Push an event to all connections for a participant."""
         msg = json.dumps({"event": event_type, "data": data, "server_ts": time.time()})
         if participant_id not in self._connections:
+            logger.warning(f"[CM] No connections for participant {participant_id}, dropping {event_type}")
             return
+        conn_count = len(self._connections[participant_id])
+        logger.debug(f"[CM] Sending {event_type} to {participant_id} ({conn_count} connections)")
         for ws, queue in self._connections[participant_id]:
             try:
                 await queue.put(msg)

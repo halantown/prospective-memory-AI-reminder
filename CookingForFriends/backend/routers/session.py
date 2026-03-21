@@ -106,10 +106,10 @@ async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = 
     if not block:
         raise HTTPException(404, "Block not found")
 
-    # Update block status to encoding
-    if block.status in (BlockStatus.PENDING, "pending"):
+    # Update block status to encoding (reset from any non-playing state)
+    if block.status not in (BlockStatus.PLAYING,):
         block.status = BlockStatus.ENCODING
-        block.started_at = datetime.utcnow()
+        block.started_at = block.started_at or datetime.utcnow()
         await db.commit()
 
     # Get PM trials for this block
