@@ -316,9 +316,9 @@ function MessageBubble({
         </p>
       </div>
 
-      {/* Reply buttons — equal-width horizontal row */}
+      {/* Reply buttons — vertical stack, full width */}
       {hasReplies && !msg.replied && (
-        <div className="px-3 pb-3 flex gap-2">
+        <div className="px-3 pb-3 flex flex-col gap-1.5">
           {msg.replies!.map((reply) => (
             <button
               key={reply.id}
@@ -326,9 +326,10 @@ function MessageBubble({
                 e.stopPropagation()
                 onReply(reply.id, reply.text)
               }}
-              className="flex-1 text-[11px] px-1 py-2 rounded-lg bg-blue-600/20 text-blue-200
+              style={{ height: '36px' }}
+              className="w-full text-[11px] px-3 rounded-lg bg-blue-600/20 text-blue-200
                          border border-blue-500/30 hover:bg-blue-600/40 hover:border-blue-400/50
-                         transition-colors active:scale-95 text-center truncate"
+                         transition-colors active:scale-95 text-center"
             >
               {reply.text}
             </button>
