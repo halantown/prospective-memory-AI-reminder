@@ -27,17 +27,9 @@ export default function PhoneSidebar() {
   const feedRef = useRef<HTMLDivElement>(null)
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Sort: unreplied messages first, then by timestamp desc
+  // All messages newest-first, no priority sorting
   const sortedMessages = useMemo(() => {
-    return [...messages].sort((a, b) => {
-      const aUnreplied = a.replies && a.replies.length > 0 && !a.replied
-      const bUnreplied = b.replies && b.replies.length > 0 && !b.replied
-
-      if (aUnreplied && !bUnreplied) return -1
-      if (!aUnreplied && bUnreplied) return 1
-
-      return b.timestamp - a.timestamp
-    })
+    return [...messages].sort((a, b) => b.timestamp - a.timestamp)
   }, [messages])
 
   // Auto-lock after timeout
@@ -272,19 +264,14 @@ function MessageBubble({
 
   const isAd = msg.is_ad
   const hasReplies = msg.replies && msg.replies.length > 0
-  const needsReply = hasReplies && !msg.replied
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: msg.replied ? 0.55 : 1, y: 0 }}
-      transition={{ layout: { type: 'spring', stiffness: 200, damping: 25 } }}
       className={`rounded-2xl border overflow-hidden ${
         isAd
           ? 'bg-slate-800/30 border-slate-700/30'
-          : needsReply
-          ? 'bg-blue-950/40 border-blue-700/50 border-l-[3px] border-l-blue-400'
           : msg.replied
           ? 'bg-slate-800/30 border-slate-700/30'
           : msg.read
@@ -369,13 +356,13 @@ function LockScreenPreviews({
   messages: PhoneMessage[]
   onUnlock: () => void
 }) {
-  // Show unreplied + unread non-ad messages, newest first, max 4
+  // Latest 4 unread non-ad messages, newest first
   const previews = [...messages]
-    .filter(m => !m.is_ad && !m.replied)
+    .filter(m => !m.is_ad && !m.read)
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, MAX_LOCK_PREVIEWS)
 
-  const total = messages.filter(m => !m.is_ad && !m.replied).length
+  const total = messages.filter(m => !m.is_ad && !m.read).length
   const overflow = total - MAX_LOCK_PREVIEWS
 
   if (previews.length === 0) return null
@@ -391,26 +378,17 @@ function LockScreenPreviews({
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ delay: idx * 0.04, type: 'spring', stiffness: 280, damping: 22 }}
             onClick={(e) => { e.stopPropagation(); onUnlock() }}
-            className={`flex items-center gap-2 rounded-xl px-2.5 py-2 cursor-pointer
-                        backdrop-blur-sm border transition-colors
-                        ${msg.replies && msg.replies.length > 0
-                          ? 'bg-blue-950/60 border-blue-700/50'
-                          : 'bg-slate-800/60 border-slate-700/40'
-                        }`}
+            className="flex items-center gap-2 rounded-xl px-2.5 py-2 cursor-pointer
+                       bg-slate-800/60 border border-slate-700/40 backdrop-blur-sm"
           >
             <div className="w-7 h-7 rounded-full bg-blue-600/50 flex items-center justify-center
                             text-xs font-bold text-blue-100 flex-shrink-0">
               {msg.avatar}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-semibold text-blue-300 leading-none">
-                  {msg.sender}
-                </span>
-                {msg.replies && msg.replies.length > 0 && (
-                  <span className="w-1.5 h-1.5 bg-blue-400 rounded-full flex-shrink-0" />
-                )}
-              </div>
+              <span className="text-[10px] font-semibold text-blue-300 leading-none block">
+                {msg.sender}
+              </span>
               <p className="text-[10px] text-slate-300 truncate leading-tight mt-0.5">
                 {msg.text}
               </p>
