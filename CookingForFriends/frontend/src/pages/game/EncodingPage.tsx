@@ -16,7 +16,7 @@ import type { PMEncodingCard } from '../../types'
 
 type QuestionType = 'trigger' | 'target' | 'action'
 
-const QUESTION_TYPES: QuestionType[] = ['trigger', 'target', 'action']
+const QUESTION_TYPES: QuestionType[] = ['trigger']
 
 /** Deterministic shuffle seeded by a number. */
 function seededShuffle<T>(arr: T[], seed: number): T[] {
@@ -201,17 +201,9 @@ export default function EncodingPage() {
     setFailCount(0)
     setReShowCard(false)
     setHighlightSection(null)
-
-    if (currentQuestionIndex < 2) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1)
-      setAttemptNumber(1)
-      setSelected(null)
-      setFeedback(null)
-      setQuizStartTime(Date.now())
-    } else {
-      advanceToNextCard()
-    }
-  }, [currentQuestionIndex, advanceToNextCard])
+    // Single question per card — always advance to next card
+    advanceToNextCard()
+  }, [advanceToNextCard])
 
   // ── Event handlers ──
 
