@@ -1,8 +1,8 @@
-/** Dining room furniture — table, chairs, plates, side table, cabinet. */
+/** Bedroom furniture — table, chairs, plates, side table, cabinet. */
 
 import { C } from './furniture/styles'
 
-export default function DiningFurniture() {
+export default function BedroomFurniture() {
   return (
     <svg
       className="absolute inset-0 w-full h-full"

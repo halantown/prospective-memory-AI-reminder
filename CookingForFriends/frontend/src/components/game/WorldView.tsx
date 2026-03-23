@@ -7,15 +7,15 @@ import { useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
 import KitchenRoom from './rooms/KitchenRoom'
-import DiningRoom from './rooms/DiningRoom'
+import BedroomRoom from './rooms/BedroomRoom'
 import LivingRoom from './rooms/LivingRoom'
 import StudyRoom from './rooms/StudyRoom'
-import BalconyRoom from './rooms/BalconyRoom'
+import BathroomRoom from './rooms/BathroomRoom'
 import KitchenFurniture from './rooms/KitchenFurniture'
-import DiningFurniture from './rooms/DiningFurniture'
+import BedroomFurniture from './rooms/BedroomFurniture'
 import LivingFurniture from './rooms/LivingFurniture'
 import StudyFurniture from './rooms/StudyFurniture'
-import BalconyFurniture from './rooms/BalconyFurniture'
+import BathroomFurniture from './rooms/BathroomFurniture'
 import { FLOOR_STYLES } from './rooms/furniture/styles'
 import { TriggerRoomGlow } from './TriggerEffects'
 import type { RoomId } from '../../types'
@@ -32,26 +32,26 @@ interface RoomDef {
 
 const ROOMS: RoomDef[] = [
   { id: 'kitchen', label: 'Kitchen', emoji: '🍳', x: '2%', y: '2%', w: '46%', h: '55%' },
-  { id: 'dining', label: 'Dining Room', emoji: '🍽️', x: '52%', y: '2%', w: '46%', h: '55%' },
+  { id: 'bedroom', label: 'Bedroom', emoji: '🛏️', x: '52%', y: '2%', w: '46%', h: '55%' },
   { id: 'living_room', label: 'Living Room', emoji: '🛋️', x: '2%', y: '60%', w: '30%', h: '38%' },
   { id: 'study', label: 'Study', emoji: '📚', x: '35%', y: '60%', w: '30%', h: '38%' },
-  { id: 'balcony', label: 'Balcony', emoji: '🌿', x: '68%', y: '60%', w: '30%', h: '38%' },
+  { id: 'bathroom', label: 'Bathroom', emoji: '🚿', x: '68%', y: '60%', w: '30%', h: '38%' },
 ]
 
 const FURNITURE_MAP: Record<RoomId, React.ComponentType> = {
   kitchen: KitchenFurniture,
-  dining: DiningFurniture,
+  bedroom: BedroomFurniture,
   living_room: LivingFurniture,
   study: StudyFurniture,
-  balcony: BalconyFurniture,
+  bathroom: BathroomFurniture,
 }
 
 const ROOM_CONTENT: Record<RoomId, React.ComponentType<{ isActive: boolean }>> = {
   kitchen: KitchenRoom,
-  dining: DiningRoom,
+  bedroom: BedroomRoom,
   living_room: LivingRoom,
   study: StudyRoom,
-  balcony: BalconyRoom,
+  bathroom: BathroomRoom,
 }
 
 export default function WorldView() {

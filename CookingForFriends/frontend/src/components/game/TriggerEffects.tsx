@@ -36,7 +36,7 @@ const TRIGGER_EFFECTS: Record<string, {
     label: 'New email',
   },
   washing_done: {
-    sourceRoom: 'balcony',
+    sourceRoom: 'bathroom',
     audioFreq: 660,
     audioDuration: 0.2,
     audioPattern: 'triple',
@@ -68,7 +68,7 @@ const TRIGGER_EFFECTS: Record<string, {
     label: 'New message',
   },
   plant_reminder: {
-    sourceRoom: 'balcony',
+    sourceRoom: 'bathroom',
     audioFreq: 440,
     audioDuration: 0.3,
     audioPattern: 'single',

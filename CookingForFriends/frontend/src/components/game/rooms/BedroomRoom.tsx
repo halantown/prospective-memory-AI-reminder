@@ -1,4 +1,4 @@
-/** Dining room — cycling table-setting task.
+/** Bedroom — cycling table-setting task.
  *  4 seats × 4 utensils (plate, knife, fork, glass) = 16 placements per round.
  *  Drag utensil from bar → drop on seat to place.
  *  Click-to-select fallback: click utensil → click seat.
@@ -20,7 +20,7 @@ const UTENSILS: { type: UtensilType; emoji: string; label: string }[] = [
 
 const SEAT_LABELS = ['Seat 1', 'Seat 2', 'Seat 3', 'Seat 4']
 
-export default function DiningRoom({ isActive }: { isActive: boolean }) {
+export default function BedroomRoom({ isActive }: { isActive: boolean }) {
   const diningPhase = useGameStore((s) => s.diningPhase)
   const seats = useGameStore((s) => s.diningSeats)
   const selectedUtensil = useGameStore((s) => s.diningSelectedUtensil)
@@ -171,7 +171,7 @@ export default function DiningRoom({ isActive }: { isActive: boolean }) {
           </span>
         </div>
         <div className="absolute z-10" style={{ left: '3%', bottom: '3%', width: '50%' }}>
-          <PMTargetItems room="dining" />
+          <PMTargetItems room="bedroom" />
         </div>
       </div>
     )
@@ -321,7 +321,7 @@ export default function DiningRoom({ isActive }: { isActive: boolean }) {
 
       {/* PM targets */}
       <div className="absolute z-10" style={{ left: '3%', bottom: '3%', width: '50%' }}>
-        <PMTargetItems room="dining" />
+        <PMTargetItems room="bedroom" />
       </div>
     </div>
   )

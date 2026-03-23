@@ -1,8 +1,8 @@
-/** Balcony furniture — plant pots, washing machine, drying rack, garden supplies. */
+/** Bathroom furniture — plant pots, washing machine, drying rack, garden supplies. */
 
 import { C } from './furniture/styles'
 
-export default function BalconyFurniture() {
+export default function BathroomFurniture() {
   return (
     <svg
       className="absolute inset-0 w-full h-full"

@@ -23,7 +23,7 @@ export interface SessionData {
 
 // ── Rooms ──
 
-export type RoomId = 'kitchen' | 'dining' | 'living_room' | 'study' | 'balcony'
+export type RoomId = 'kitchen' | 'bedroom' | 'living_room' | 'study' | 'bathroom'
 
 export interface RoomConfig {
   id: RoomId
@@ -124,6 +124,25 @@ export interface Pan {
 
 // ── Phone ──
 
+export interface PhoneReplyOption {
+  id: string
+  text: string
+}
+
+export interface PhoneMessage {
+  id: string
+  sender: string
+  avatar: string
+  text: string
+  is_ad: boolean
+  replies: PhoneReplyOption[] | null
+  timestamp: number
+  read: boolean
+  replied: boolean
+  replySelected: string | null
+}
+
+/** @deprecated Use PhoneMessage instead — kept for backward compat with old phone_notification events */
 export interface PhoneNotification {
   id: string
   sender: string
