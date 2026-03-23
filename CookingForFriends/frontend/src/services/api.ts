@@ -1,5 +1,7 @@
 /** API service — all HTTP calls to backend. */
 
+import type { BlockEncoding } from '../types'
+
 const API_BASE = '/api'
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -38,20 +40,26 @@ export async function getSessionStatus(sessionId: string) {
 }
 
 export async function getBlockEncoding(sessionId: string, blockNum: number) {
-  return request<{
-    block_number: number
-    condition: string
-    day_story: string
-    pm_tasks: Array<{
-      trial_number: number
-      trigger_description: string
-      target_room: string
-      target_description: string
-      target_image: string
-      action_description: string
-      visual_cues: Record<string, string | number>
-    }>
-  }>(`/session/${sessionId}/block/${blockNum}/encoding`)
+  return request<BlockEncoding>(`/session/${sessionId}/block/${blockNum}/encoding`)
+}
+
+export async function submitEncodingQuiz(
+  sessionId: string,
+  blockNum: number,
+  data: {
+    trial_number: number
+    question_type: string
+    attempt_number: number
+    selected_answer: string
+    correct_answer: string
+    is_correct: boolean
+    response_time_ms: number
+  },
+) {
+  return request<{ status: string }>(
+    `/session/${sessionId}/block/${blockNum}/encoding/quiz`,
+    { method: 'POST', body: JSON.stringify(data) },
+  )
 }
 
 export async function submitNasaTLX(sessionId: string, blockNum: number, data: {

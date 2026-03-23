@@ -40,12 +40,22 @@ def score_pm_attempt(
     target_room = task_config.get("target_room", "")
     correct_target = task_config.get("target_object", "")
     correct_action = task_config.get("target_action", "")
+    task_id = task_config.get("task_id", "")
 
     room_correct = room.lower() == target_room.lower()
-    target_correct = (
-        target_selected is not None
-        and target_selected.lower() == correct_target.lower()
-    )
+
+    # Target matching: accept both full description match and ID-based match
+    # Frontend sends IDs like "b1_book_target" or "b1_book_distractor"
+    target_correct = False
+    if target_selected is not None:
+        sel = target_selected.lower()
+        if sel == correct_target.lower():
+            target_correct = True
+        elif task_id and sel == f"{task_id}_target":
+            target_correct = True
+        elif task_id and sel.endswith("_target") and sel.startswith(task_id):
+            target_correct = True
+
     action_correct = (
         action_performed is not None
         and action_performed.lower() == correct_action.lower()

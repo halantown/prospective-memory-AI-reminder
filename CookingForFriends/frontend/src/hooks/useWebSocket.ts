@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
-import type { ActivePMTrial, PMTaskConfig } from '../types'
+import type { ActivePMTrial, PMTaskConfig, PhoneMessage } from '../types'
 
 const HEARTBEAT_INTERVAL = 10_000
 const RECONNECT_BASE_MS = 500
@@ -62,6 +62,8 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
           target_object: (data.target_object as string) || '',
           target_action: (data.target_action as string) || '',
           distractor_object: (data.distractor_object as string) || '',
+          action_destination: (data.action_destination as string) || '',
+          discriminating_cue: (data.discriminating_cue as string) || '',
         }
 
         store.addPMTrial({
@@ -81,6 +83,48 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
             data: { trigger_id: triggerId, received_at: receivedAt },
           })
         }
+        break
+      }
+
+      case 'fake_trigger': {
+        const triggerType = data.trigger_type as string
+        const duration = (data.duration as number) || 4
+
+        // Map trigger_type to a default trigger_visual for audio/display lookup
+        const visualMap: Record<string, string> = {
+          visitor: 'visitor_arrival',
+          communication: 'phone_message_banner',
+          appliance: 'dishwasher_indicator_done',
+          activity: 'steak_all_plated',
+        }
+        const triggerEvent = visualMap[triggerType] || triggerType
+
+        store.addTriggerEffect(triggerEvent, { isFake: true, duration })
+        break
+      }
+
+      case 'phone_message': {
+        const phoneMsg = {
+          id: data.id as string,
+          sender: data.sender as string,
+          avatar: data.avatar as string || '💬',
+          text: data.text as string,
+          is_ad: data.is_ad as boolean,
+          replies: (data.replies as Array<{id: string; text: string}>) || null,
+          timestamp: Date.now(),
+          read: false,
+          replied: false,
+          replySelected: null,
+        }
+        store.addPhoneMessage(phoneMsg)
+        store.setPhoneBanner(phoneMsg)
+        // Auto-dismiss banner after 3 seconds
+        setTimeout(() => {
+          const current = useGameStore.getState().phoneBanner
+          if (current && current.id === phoneMsg.id) {
+            useGameStore.getState().setPhoneBanner(null)
+          }
+        }, 3000)
         break
       }
 

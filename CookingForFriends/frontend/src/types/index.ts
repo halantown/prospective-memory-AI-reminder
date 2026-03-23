@@ -36,21 +36,34 @@ export interface RoomConfig {
 
 // ── PM Tasks ──
 
-export interface PMEncodingCard {
-  trial_number: number
+export interface EncodingCardData {
   trigger_description: string
   target_room: string
   target_description: string
   target_image: string
   action_description: string
-  visual_cues: Record<string, string | number>
+  encoding_text: string
+  visual_cues: {
+    target: string
+    distractor: string
+    cue: string
+  }
+  quiz_question: string
+  quiz_options: string[]
+  quiz_correct_index: number
+}
+
+export interface PMEncodingCard {
+  trial_number: number
+  encoding_card: EncodingCardData
+  task_config: PMTaskConfig
 }
 
 export interface BlockEncoding {
   block_number: number
   condition: string
   day_story: string
-  pm_tasks: PMEncodingCard[]
+  cards: PMEncodingCard[]
 }
 
 export interface PMTaskConfig {
@@ -60,6 +73,8 @@ export interface PMTaskConfig {
   target_object: string
   target_action: string
   distractor_object: string
+  action_destination?: string
+  discriminating_cue?: string
 }
 
 export interface ActivePMTrial {

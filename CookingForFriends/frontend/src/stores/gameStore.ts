@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import type {
-  Phase, Condition, RoomId, Pan, PhoneNotification, RobotState, SessionData,
+  Phase, Condition, RoomId, Pan, PhoneNotification, PhoneMessage, RobotState, SessionData,
   ActivePMTrial, PMTaskConfig, DiningPhase, SteakState, SeatState, UtensilType,
 } from '../types'
 
@@ -37,9 +37,12 @@ interface GameState {
   visitors: string[]
 
   // ── Phone ──
-  phoneNotifications: PhoneNotification[]
+  phoneMessages: PhoneMessage[]
+  phoneNotifications: PhoneNotification[]  // backward compat
   phoneLocked: boolean
   phoneLastActivity: number
+  phoneBanner: PhoneMessage | null
+  phoneMessageScore: { correct: number; wrong: number; missed: number }
 
   // ── Robot ──
   robot: RobotState
@@ -51,7 +54,7 @@ interface GameState {
   pmActionPhase: 'idle' | 'target_select' | 'action_confirm' | 'completed'
 
   // ── Trigger Effects ──
-  activeTriggerEffects: Array<{ triggerEvent: string; timestamp: number }>
+  activeTriggerEffects: Array<{ triggerEvent: string; timestamp: number; isFake?: boolean; duration?: number }>
 
   // ── Game Clock ──
   gameClock: string
@@ -84,9 +87,13 @@ interface GameState {
   addVisitor: (name: string) => void
 
   // Phone actions
+  addPhoneMessage: (msg: PhoneMessage) => void
   addPhoneNotification: (notif: PhoneNotification) => void
   setPhoneLocked: (locked: boolean) => void
   markNotificationRead: (id: string) => void
+  markMessageRead: (id: string) => void
+  replyToMessage: (messageId: string, replyId: string, replyText: string) => void
+  setPhoneBanner: (msg: PhoneMessage | null) => void
 
   // Robot actions
   setRobotSpeaking: (text: string) => void
@@ -100,7 +107,7 @@ interface GameState {
   setPMActionPhase: (phase: 'idle' | 'target_select' | 'action_confirm' | 'completed') => void
 
   // Trigger effects
-  addTriggerEffect: (triggerEvent: string) => void
+  addTriggerEffect: (triggerEvent: string, opts?: { isFake?: boolean; duration?: number }) => void
   clearTriggerEffect: (triggerEvent: string) => void
 
   // Game clock
@@ -158,9 +165,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   visitors: [],
 
   // ── Phone ──
+  phoneMessages: [],
   phoneNotifications: [],
   phoneLocked: true,
   phoneLastActivity: Date.now(),
+  phoneBanner: null,
+  phoneMessageScore: { correct: 0, wrong: 0, missed: 0 },
 
   // ── Robot ──
   robot: { room: 'kitchen', speaking: false, text: '', visible: true },
@@ -244,6 +254,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   })),
 
   // Phone
+  addPhoneMessage: (msg) => set((s) => ({
+    phoneMessages: [...s.phoneMessages, msg],
+  })),
   addPhoneNotification: (notif) => set((s) => ({
     phoneNotifications: [...s.phoneNotifications, notif],
   })),
@@ -253,6 +266,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       n.id === id ? { ...n, read: true } : n
     ),
   })),
+  markMessageRead: (id) => set((s) => ({
+    phoneMessages: s.phoneMessages.map((m) =>
+      m.id === id ? { ...m, read: true } : m
+    ),
+  })),
+  replyToMessage: (messageId, replyId, replyText) => set((s) => ({
+    phoneMessages: s.phoneMessages.map((m) =>
+      m.id === messageId ? { ...m, replied: true, replySelected: replyText } : m
+    ),
+  })),
+  setPhoneBanner: (msg) => set({ phoneBanner: msg }),
 
   // Robot
   setRobotSpeaking: (text) => set((s) => ({
@@ -294,10 +318,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   setPMActionPhase: (phase) => set({ pmActionPhase: phase }),
 
   // Trigger effects
-  addTriggerEffect: (triggerEvent) => set((s) => ({
+  addTriggerEffect: (triggerEvent, opts) => set((s) => ({
     activeTriggerEffects: [
       ...s.activeTriggerEffects,
-      { triggerEvent, timestamp: Date.now() },
+      { triggerEvent, timestamp: Date.now(), ...opts },
     ],
   })),
   clearTriggerEffect: (triggerEvent) => set((s) => ({
@@ -370,8 +394,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     diningRound: 0,
     diningScore: 0,
     visitors: [],
+    phoneMessages: [],
     phoneNotifications: [],
     phoneLocked: true,
+    phoneBanner: null,
+    phoneMessageScore: { correct: 0, wrong: 0, missed: 0 },
     robot: { room: 'kitchen', speaking: false, text: '', visible: true },
     activePMTrials: [],
     completedPMTrialIds: new Set(),

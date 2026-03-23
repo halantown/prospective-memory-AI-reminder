@@ -3,7 +3,9 @@
 import uuid
 import json
 import time
+import random
 import logging
+from dataclasses import asdict
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, WebSocket
 from sqlalchemy import select, func
@@ -15,17 +17,41 @@ from models.block import Block, BlockStatus, PMTrial, ReminderMessage
 from models.logging import InteractionLog
 from models.schemas import ParticipantCreateResponse
 from engine.condition_assigner import assign_group, get_condition_order, generate_token, next_participant_id
+from engine.pm_tasks import (
+    get_tasks_for_block, get_task, BLOCK_TRIGGER_ORDER, BLOCK_GUESTS,
+)
 from websocket.connection_manager import manager
 from config import LATIN_SQUARE
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin")
 
-DAY_STORIES = [
-    "Day 1: Cooking steak dinner for Alice",
-    "Day 2: Preparing pasta for Bob and Carol",
-    "Day 3: Making soup for David and Emma",
-]
+# Day stories per block, using the real guest names
+DAY_STORIES = {
+    1: f"Day 1: Cooking steak dinner for {BLOCK_GUESTS[1]}",
+    2: f"Day 2: Cooking steak dinner for {BLOCK_GUESTS[2]}",
+    3: f"Day 3: Cooking steak dinner for {BLOCK_GUESTS[3]}",
+}
+
+# 24 unique counterbalancing assignments:
+# 6 Latin Square sequences × 4 unreminded positions per block
+_UNREMINDED_POSITIONS = list(range(4))  # 0, 1, 2, 3 → which trial in trigger order is unreminded
+
+
+def _get_assignment_combo(participant_index: int) -> tuple[str, list[int]]:
+    """Return (group, [unreminded_pos_b1, _b2, _b3]) using round-robin over 24 combos."""
+    groups = list(LATIN_SQUARE.keys())
+    combo_index = participant_index % 24
+    group_index = combo_index // 4
+    unreminded_offset = combo_index % 4
+    group = groups[group_index]
+    # Rotate unreminded position across blocks for variety
+    positions = [
+        (unreminded_offset + 0) % 4,
+        (unreminded_offset + 1) % 4,
+        (unreminded_offset + 2) % 4,
+    ]
+    return group, positions
 
 
 @router.post("/participant/create", response_model=ParticipantCreateResponse)
@@ -37,17 +63,22 @@ async def create_participant(db: AsyncSession = Depends(get_db)):
     )
     experiment = result.scalar_one_or_none()
     if not experiment:
-        # Auto-create default experiment
         experiment = Experiment(name="Cooking for Friends v3", status=ExperimentStatus.ACTIVE)
         db.add(experiment)
         await db.flush()
 
+    # Count existing participants for round-robin
+    count_result = await db.execute(select(func.count(Participant.id)))
+    participant_count = count_result.scalar() or 0
+
     # Generate IDs
     pid = str(uuid.uuid4())[:8]
     participant_id = await next_participant_id(db)
-    group = await assign_group(db)
+    group, unreminded_positions = _get_assignment_combo(participant_count)
     token = await generate_token(db)
     condition_order = get_condition_order(group)
+    af_variant_index = random.randint(0, 9)
+    target_position_seed = random.randint(0, 99999)
 
     # Create participant
     participant = Participant(
@@ -61,30 +92,36 @@ async def create_participant(db: AsyncSession = Depends(get_db)):
     )
     db.add(participant)
 
-    # Pre-create blocks
-    for i, condition in enumerate(condition_order, start=1):
+    # Pre-create blocks with real PM task data
+    for block_num, condition in enumerate(condition_order, start=1):
         block = Block(
             participant_id=pid,
-            block_number=i,
+            block_number=block_num,
             condition=condition,
-            day_story=DAY_STORIES[i - 1],
+            day_story=DAY_STORIES[block_num],
             status=BlockStatus.PENDING,
         )
         db.add(block)
         await db.flush()
 
-        # Pre-create PM trials (4 per block)
-        has_reminder_flags = _get_reminder_flags(condition)
-        for trial_num in range(1, 5):
+        trigger_order = BLOCK_TRIGGER_ORDER[block_num]
+        unreminded_pos = unreminded_positions[block_num - 1]
+
+        for trial_idx, task_id in enumerate(trigger_order):
+            task_def = get_task(task_id)
+            is_unreminded = (trial_idx == unreminded_pos)
+            # CONTROL: all unreminded. AF/AFCB: 3 reminded + 1 unreminded
+            has_reminder = (condition != "CONTROL") and (not is_unreminded)
+
             trial = PMTrial(
                 block_id=block.id,
-                trial_number=trial_num,
-                has_reminder=has_reminder_flags[trial_num - 1],
-                is_filler=(not has_reminder_flags[trial_num - 1] and condition != "CONTROL"),
-                task_config=_get_placeholder_task(i, trial_num),
-                encoding_card=_get_placeholder_encoding_card(i, trial_num),
-                reminder_text=_get_placeholder_reminder(condition) if has_reminder_flags[trial_num - 1] else None,
-                reminder_condition=condition if has_reminder_flags[trial_num - 1] else None,
+                trial_number=trial_idx + 1,
+                has_reminder=has_reminder,
+                is_filler=is_unreminded and condition != "CONTROL",
+                task_config=_task_def_to_config(task_def),
+                encoding_card=_task_def_to_encoding_card(task_def),
+                reminder_text=task_def.baseline_reminder if has_reminder else None,
+                reminder_condition=condition if has_reminder else None,
             )
             db.add(trial)
 
@@ -106,95 +143,39 @@ async def create_participant(db: AsyncSession = Depends(get_db)):
     )
 
 
-def _get_reminder_flags(condition: str) -> list[bool]:
-    """Return has_reminder flags for 4 trials in a block."""
-    if condition == "CONTROL":
-        return [False, False, False, False]
-    # AF or AFCB: 3 reminded + 1 filler (no reminder)
-    return [True, True, True, False]
+def _task_def_to_config(task_def) -> dict:
+    """Convert PMTaskDef to the task_config JSON stored in PMTrial."""
+    return {
+        "task_id": task_def.task_id,
+        "trigger_type": task_def.trigger_type,
+        "trigger_event": task_def.trigger_visual,
+        "target_room": task_def.target_room,
+        "target_object": task_def.target_name,
+        "target_action": task_def.action_description,
+        "distractor_object": task_def.distractor_name,
+        "action_destination": task_def.action_destination,
+        "discriminating_cue": task_def.discriminating_cue,
+    }
 
 
-def _get_placeholder_task(block_num: int, trial_num: int) -> dict:
-    """Placeholder PM task configuration."""
-    tasks = [
-        {
-            "task_id": f"pm_b{block_num}_t{trial_num}",
-            "trigger_event": "doorbell",
-            "target_room": "living_room",
-            "target_object": "red_book",
-            "target_action": "give_to_friend",
-            "distractor_object": "blue_book",
+def _task_def_to_encoding_card(task_def) -> dict:
+    """Convert PMTaskDef to encoding card JSON stored in PMTrial."""
+    return {
+        "trigger_description": task_def.trigger_event,
+        "target_room": task_def.target_room,
+        "target_description": task_def.target_name,
+        "target_image": f"/assets/pm/{task_def.target_image}",
+        "action_description": task_def.action_description,
+        "encoding_text": task_def.encoding_text,
+        "visual_cues": {
+            "target": task_def.target_visual_desc,
+            "distractor": task_def.distractor_visual_desc,
+            "cue": task_def.discriminating_cue,
         },
-        {
-            "task_id": f"pm_b{block_num}_t{trial_num}",
-            "trigger_event": "email_dentist",
-            "target_room": "study",
-            "target_object": "calendar",
-            "target_action": "mark_appointment",
-            "distractor_object": "notebook",
-        },
-        {
-            "task_id": f"pm_b{block_num}_t{trial_num}",
-            "trigger_event": "washing_done",
-            "target_room": "balcony",
-            "target_object": "black_sweater",
-            "target_action": "hang_to_dry",
-            "distractor_object": "gray_sweater",
-        },
-        {
-            "task_id": f"pm_b{block_num}_t{trial_num}",
-            "trigger_event": "clock_6pm",
-            "target_room": "kitchen",
-            "target_object": "red_medicine_bottle",
-            "target_action": "take_medicine",
-            "distractor_object": "orange_vitamin_bottle",
-        },
-    ]
-    return tasks[(trial_num - 1) % len(tasks)]
-
-
-def _get_placeholder_encoding_card(block_num: int, trial_num: int) -> dict:
-    """Placeholder encoding card for PM task."""
-    cards = [
-        {
-            "trigger_description": "When the doorbell rings (a friend arrives)",
-            "target_room": "Living Room",
-            "target_description": "A book with a red cover and mountain illustration",
-            "target_image": "/assets/pm/red_book.png",
-            "action_description": "Pick up the book and give it to the friend",
-            "visual_cues": {"color": "red", "pattern": "mountain illustration", "size": "medium"},
-        },
-        {
-            "trigger_description": "When you receive a dentist confirmation email",
-            "target_room": "Study",
-            "target_description": "The wall calendar with a blue label",
-            "target_image": "/assets/pm/calendar.png",
-            "action_description": "Mark the appointment on Wednesday at 3 PM",
-            "visual_cues": {"label_color": "blue", "day": "Wednesday", "time": "3 PM"},
-        },
-        {
-            "trigger_description": "When the washing machine beeps (laundry done)",
-            "target_room": "Balcony",
-            "target_description": "A black wool sweater",
-            "target_image": "/assets/pm/black_sweater.png",
-            "action_description": "Take it out and lay it flat to dry",
-            "visual_cues": {"color": "black", "material": "wool", "drying": "lay flat"},
-        },
-        {
-            "trigger_description": "When the game clock reaches 6:00 PM",
-            "target_room": "Kitchen",
-            "target_description": "A red medicine bottle on the shelf",
-            "target_image": "/assets/pm/medicine.png",
-            "action_description": "Take one Doxycycline tablet",
-            "visual_cues": {"container": "red bottle", "form": "round tablet", "quantity": 1},
-        },
-    ]
-    return cards[(trial_num - 1) % len(cards)]
-
-
-def _get_placeholder_reminder(condition: str) -> str:
-    """Placeholder reminder text."""
-    return f"[Placeholder] This is a {condition} reminder (agent-generated text pending)"
+        "quiz_question": task_def.quiz_question,
+        "quiz_options": task_def.quiz_options,
+        "quiz_correct_index": task_def.quiz_correct_index,
+    }
 
 
 @router.get("/participants")
@@ -299,6 +280,43 @@ async def list_reminders(db: AsyncSession = Depends(get_db)):
         }
         for r in reminders
     ]
+
+
+@router.get("/assignments")
+async def list_assignments(db: AsyncSession = Depends(get_db)):
+    """List all participant assignments for checking counterbalancing."""
+    result = await db.execute(
+        select(Participant).order_by(Participant.created_at)
+    )
+    participants = result.scalars().all()
+    assignments = []
+    for p in participants:
+        # Fetch blocks to show unreminded info
+        blocks_result = await db.execute(
+            select(Block).where(Block.participant_id == p.id).order_by(Block.block_number)
+        )
+        blocks = blocks_result.scalars().all()
+        block_info = []
+        for b in blocks:
+            trials_result = await db.execute(
+                select(PMTrial).where(PMTrial.block_id == b.id).order_by(PMTrial.trial_number)
+            )
+            trials = trials_result.scalars().all()
+            unreminded = [t for t in trials if not t.has_reminder and t.is_filler]
+            block_info.append({
+                "block_number": b.block_number,
+                "condition": b.condition,
+                "unreminded_task": (
+                    unreminded[0].task_config.get("task_id") if unreminded else None
+                ),
+            })
+        assignments.append({
+            "participant_id": p.participant_id,
+            "group": p.latin_square_group,
+            "condition_order": p.condition_order,
+            "blocks": block_info,
+        })
+    return assignments
 
 
 # WebSocket endpoint moved to main.py (no /api prefix needed)

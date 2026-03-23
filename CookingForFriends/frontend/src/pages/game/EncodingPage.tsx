@@ -1,30 +1,33 @@
-/** Encoding page — display PM task cards + single MC quiz before each block.
+/** Encoding page — display PM task cards + multi-question quiz before each block.
  *
  * Flow per task card:
- *   1. Show encoding card (trigger, room, target, action)
- *   2. Quiz: 1 MC question — "What event should trigger this task?"
- *      Options = the 4 triggers from this block (mutual distractors)
- *   3. Wrong answer → re-show card → re-quiz
- *   4. After 2 failures → forced re-display with emphasis, then auto-pass
- *   5. Correct → next card (or start game)
+ *   1. Show encoding card (story paragraph + trigger, room, target, action boxes)
+ *   2. 10-second read timer before the "I've memorized this" button enables
+ *   3. Quiz: 3 sequential MC questions — trigger, target object, action
+ *   4. Wrong answer → re-show card with highlighted section → re-quiz same question
+ *   5. After 2 consecutive failures on same question → auto-pass with "Let's move on"
+ *   6. After all cards quizzed → completion summary → start game
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useGameStore } from '../../stores/gameStore'
-import { getBlockEncoding, submitQuiz } from '../../services/api'
+import { getBlockEncoding, submitEncodingQuiz } from '../../services/api'
 import type { PMEncodingCard } from '../../types'
 
-// ── Trigger event value lookup ──
+type QuestionType = 'trigger' | 'target' | 'action'
 
-const TRIGGER_EVENT_MAP: Record<string, string> = {
-  'When the doorbell rings (a friend arrives)': 'doorbell',
-  'When you receive a dentist confirmation email': 'email_dentist',
-  'When the washing machine beeps (laundry done)': 'washing_done',
-  'When the game clock reaches 6:00 PM': 'clock_6pm',
-  'When someone knocks on the door': 'knock',
-  'When a phone message arrives': 'phone_message',
-  'When a plant watering reminder sounds': 'plant_reminder',
-  'When the TV turns on': 'tv_on',
+const QUESTION_TYPES: QuestionType[] = ['trigger', 'target', 'action']
+
+/** Deterministic shuffle seeded by a number. */
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const shuffled = [...arr]
+  let s = seed
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    s = (s * 1103515245 + 12345) & 0x7fffffff
+    const j = s % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
 }
 
 export default function EncodingPage() {
@@ -32,20 +35,60 @@ export default function EncodingPage() {
   const blockNumber = useGameStore((s) => s.blockNumber)
   const setPhase = useGameStore((s) => s.setPhase)
   const resetBlock = useGameStore((s) => s.resetBlock)
+  const wsSend = useGameStore((s) => s.wsSend)
 
   const [cards, setCards] = useState<PMEncodingCard[]>([])
   const [dayStory, setDayStory] = useState('')
-  const [currentCard, setCurrentCard] = useState(0)
+  const [currentCardIndex, setCurrentCardIndex] = useState(0)
   const [loading, setLoading] = useState(true)
+
+  // Read timer
+  const [readCountdown, setReadCountdown] = useState(10)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Quiz state
   const [quizMode, setQuizMode] = useState(false)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
-  const [quizStartTime, setQuizStartTime] = useState(Date.now())
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null)
+  const [quizStartTime, setQuizStartTime] = useState(0)
   const [failCount, setFailCount] = useState(0)
+  const [attemptNumber, setAttemptNumber] = useState(1)
+  const [autoPassMessage, setAutoPassMessage] = useState(false)
+
+  // Re-show state
   const [reShowCard, setReShowCard] = useState(false)
-  const [emphasize, setEmphasize] = useState(false)
+  const [highlightSection, setHighlightSection] = useState<QuestionType | null>(null)
+
+  // Completion
+  const [allDone, setAllDone] = useState(false)
+
+  // ── Read timer helpers ──
+
+  const clearReadTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }, [])
+
+  const startReadTimer = useCallback(() => {
+    setReadCountdown(10)
+    clearReadTimer()
+    timerRef.current = setInterval(() => {
+      setReadCountdown((prev) => {
+        if (prev <= 1) {
+          clearReadTimer()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [clearReadTimer])
+
+  useEffect(() => clearReadTimer, [clearReadTimer])
+
+  // ── Load encoding data ──
 
   useEffect(() => {
     if (!sessionId) return
@@ -55,33 +98,146 @@ export default function EncodingPage() {
     getBlockEncoding(sessionId, blockNumber)
       .then((data) => {
         setDayStory(data.day_story)
-        setCards(data.pm_tasks)
+        setCards(data.cards)
         setLoading(false)
+        startReadTimer()
       })
       .catch((err) => {
         console.error('Failed to load encoding:', err)
         setLoading(false)
       })
-  }, [sessionId, blockNumber, resetBlock])
+  }, [sessionId, blockNumber, resetBlock, startReadTimer])
 
-  const card = cards[currentCard]
+  // ── Derived values ──
 
-  // Build 4 trigger options from this block's tasks (shuffled deterministically)
-  const getTriggerOptions = () => {
-    if (cards.length === 0) return []
-    const opts = cards.map(c => ({
-      value: TRIGGER_EVENT_MAP[c.trigger_description] || c.trigger_description,
-      label: c.trigger_description,
-    }))
-    // Deterministic shuffle seeded by current card's trial number
-    const shuffled = [...opts]
-    let seed = (card?.trial_number ?? 0) * 7 + 42
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff
-      const j = seed % (i + 1);
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  const card = cards[currentCardIndex]
+  const ec = card?.encoding_card
+
+  // ── Quiz question builder ──
+
+  const getQuestionData = useCallback(
+    (qIndex: number) => {
+      if (!card || !ec) return { question: '', options: [] as string[], correct: '' }
+
+      const seed = (card.trial_number * 7 + 42) + qIndex * 13
+
+      if (qIndex === 0) {
+        const allTriggers = cards.map((c) => c.encoding_card.trigger_description)
+        return {
+          question: 'What event should trigger this task?',
+          options: seededShuffle(allTriggers, seed),
+          correct: ec.trigger_description,
+        }
+      } else if (qIndex === 1) {
+        return {
+          question: ec.quiz_question,
+          options: [...ec.quiz_options],
+          correct: ec.quiz_options[ec.quiz_correct_index],
+        }
+      } else {
+        const allActions = cards.map((c) => c.encoding_card.action_description)
+        return {
+          question: 'What should you do with the item?',
+          options: seededShuffle(allActions, seed),
+          correct: ec.action_description,
+        }
+      }
+    },
+    [card, ec, cards],
+  )
+
+  // ── Quiz attempt logging (fire-and-forget) ──
+
+  const logQuizAttempt = useCallback(
+    (
+      qType: QuestionType,
+      attempt: number,
+      selectedAnswer: string,
+      correctAnswer: string,
+      isCorrect: boolean,
+      responseTimeMs: number,
+    ) => {
+      if (!sessionId || !card) return
+      submitEncodingQuiz(sessionId, blockNumber, {
+        trial_number: card.trial_number,
+        question_type: qType,
+        attempt_number: attempt,
+        selected_answer: selectedAnswer,
+        correct_answer: correctAnswer,
+        is_correct: isCorrect,
+        response_time_ms: responseTimeMs,
+      }).catch(() => {
+        // Non-critical — endpoint may not exist yet
+      })
+    },
+    [sessionId, blockNumber, card],
+  )
+
+  // ── Navigation helpers ──
+
+  const advanceToNextCard = useCallback(() => {
+    setQuizMode(false)
+    setReShowCard(false)
+    setHighlightSection(null)
+    setFailCount(0)
+    setAttemptNumber(1)
+    setCurrentQuestionIndex(0)
+    setSelected(null)
+    setFeedback(null)
+    setAutoPassMessage(false)
+
+    if (currentCardIndex < cards.length - 1) {
+      setCurrentCardIndex(currentCardIndex + 1)
+      startReadTimer()
+    } else {
+      setAllDone(true)
     }
-    return shuffled
+  }, [currentCardIndex, cards.length, startReadTimer])
+
+  const advanceQuestion = useCallback(() => {
+    setAutoPassMessage(false)
+    setFailCount(0)
+    setReShowCard(false)
+    setHighlightSection(null)
+
+    if (currentQuestionIndex < 2) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1)
+      setAttemptNumber(1)
+      setSelected(null)
+      setFeedback(null)
+      setQuizStartTime(Date.now())
+    } else {
+      advanceToNextCard()
+    }
+  }, [currentQuestionIndex, advanceToNextCard])
+
+  // ── Event handlers ──
+
+  const handleMemorized = () => {
+    if (readCountdown > 0) return
+    setQuizMode(true)
+    setCurrentQuestionIndex(0)
+    setSelected(null)
+    setFeedback(null)
+    setFailCount(0)
+    setAttemptNumber(1)
+    setQuizStartTime(Date.now())
+    setHighlightSection(null)
+    setReShowCard(false)
+  }
+
+  const handleReReadDone = () => {
+    if (readCountdown > 0) return
+    if (failCount >= 2) {
+      advanceQuestion()
+      return
+    }
+    setReShowCard(false)
+    setHighlightSection(null)
+    setQuizMode(true)
+    setSelected(null)
+    setFeedback(null)
+    setQuizStartTime(Date.now())
   }
 
   const handleSelectOption = (value: string) => {
@@ -89,77 +245,53 @@ export default function EncodingPage() {
     setSelected(value)
   }
 
-  const advanceToNextCard = () => {
-    setQuizMode(false)
-    setReShowCard(false)
-    setEmphasize(false)
-    setFailCount(0)
-    setSelected(null)
-
-    if (currentCard < cards.length - 1) {
-      setCurrentCard(currentCard + 1)
-    } else {
-      setPhase('playing')
-    }
-  }
-
-  const handleConfirmAnswer = async () => {
+  const handleConfirmAnswer = () => {
     if (!selected || !card || !sessionId) return
 
     const elapsed = Date.now() - quizStartTime
+    const qData = getQuestionData(currentQuestionIndex)
+    const qType = QUESTION_TYPES[currentQuestionIndex]
+    const isCorrect = selected === qData.correct
 
-    try {
-      const resp = await submitQuiz(sessionId, blockNumber, [{
-        trial_number: card.trial_number,
-        question_type: 'trigger',
-        selected_answer: selected,
-        response_time_ms: elapsed,
-      }])
+    logQuizAttempt(qType, attemptNumber, selected, qData.correct, isCorrect, elapsed)
 
-      const result = resp.results[0]
-      if (result?.is_correct) {
-        setFeedback('correct')
-        setTimeout(() => {
-          setFeedback(null)
-          advanceToNextCard()
-        }, 800)
-      } else {
-        setFeedback('wrong')
-        const newFails = failCount + 1
-        setFailCount(newFails)
+    if (isCorrect) {
+      setFeedback('correct')
+      setTimeout(() => {
+        setFeedback(null)
+        advanceQuestion()
+      }, 800)
+    } else {
+      setFeedback('wrong')
+      const newFails = failCount + 1
+      setFailCount(newFails)
+      setAttemptNumber((a) => a + 1)
 
-        setTimeout(() => {
-          setFeedback(null)
-          setSelected(null)
+      setTimeout(() => {
+        setFeedback(null)
+        setSelected(null)
 
-          if (newFails >= 2) {
-            // 2+ failures → force re-show with emphasis, then auto-pass
-            setReShowCard(true)
-            setEmphasize(true)
-            setQuizMode(false)
-          } else {
-            // First failure → re-show card normally
-            setReShowCard(true)
-            setQuizMode(false)
-          }
-        }, 1200)
-      }
-    } catch (err) {
-      console.error('Quiz submit error:', err)
+        if (newFails >= 2) {
+          setAutoPassMessage(true)
+          setTimeout(() => advanceQuestion(), 1500)
+        } else {
+          setReShowCard(true)
+          setHighlightSection(qType)
+          setQuizMode(false)
+          startReadTimer()
+        }
+      }, 1000)
     }
   }
 
-  const handleStartQuiz = () => {
-    // After 2 failures + re-show, auto-advance
-    if (emphasize && reShowCard) {
-      advanceToNextCard()
-      return
+  const handleStartGame = () => {
+    if (wsSend) {
+      wsSend({ type: 'start_game', data: { block_number: blockNumber } })
     }
-    setQuizMode(true)
-    setReShowCard(false)
-    setSelected(null)
-    setQuizStartTime(Date.now())
+    setPhase('playing')
   }
+
+  // ── Render: loading ──
 
   if (loading) {
     return (
@@ -169,9 +301,68 @@ export default function EncodingPage() {
     )
   }
 
+  // ── Render: completion summary ──
+
+  if (allDone) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-8 space-y-6">
+          <div className="text-center">
+            <div className="text-4xl mb-3">🎉</div>
+            <h2 className="text-2xl font-bold text-slate-800">
+              You've learned all {cards.length} tasks for this block!
+            </h2>
+            <p className="text-slate-500 mt-2">Here's a quick summary:</p>
+          </div>
+
+          <div className="space-y-3">
+            {cards.map((c, i) => (
+              <div key={i} className="bg-slate-50 rounded-xl p-3 flex items-start gap-3">
+                <span className="text-sm font-bold text-blue-500 shrink-0">{i + 1}.</span>
+                <p className="text-sm text-slate-700">
+                  <span className="font-medium text-amber-700">
+                    {c.encoding_card.trigger_description}
+                  </span>
+                  {' → '}
+                  <span className="font-medium text-blue-700">
+                    {c.encoding_card.action_description}
+                  </span>
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleStartGame}
+            className="w-full py-4 bg-green-500 hover:bg-green-600
+                       text-white text-lg font-bold rounded-xl transition-colors"
+          >
+            🍳 Ready to start cooking!
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Render: auto-pass message ──
+
+  if (autoPassMessage) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center space-y-3">
+          <div className="text-3xl">💪</div>
+          <p className="text-lg font-medium text-slate-700">Let's move on</p>
+          <p className="text-sm text-slate-400">Don't worry — you'll do great!</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Render: card + quiz ──
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center p-6">
-      {/* Day story header */}
+      {/* Header */}
       <div className="mb-6 text-center">
         <h1 className="text-2xl font-bold text-slate-800">Block {blockNumber}</h1>
         <p className="text-slate-600 mt-1">{dayStory}</p>
@@ -186,128 +377,193 @@ export default function EncodingPage() {
           <div
             key={i}
             className={`w-3 h-3 rounded-full ${
-              i < currentCard ? 'bg-green-400' :
-              i === currentCard ? 'bg-blue-500' : 'bg-slate-200'
+              i < currentCardIndex
+                ? 'bg-green-400'
+                : i === currentCardIndex
+                  ? 'bg-blue-500'
+                  : 'bg-slate-200'
             }`}
           />
         ))}
       </div>
 
       {/* Card + Quiz area */}
-      {card && (
+      {card && ec && (
         <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-              Task {currentCard + 1} of {cards.length}
+              Task {currentCardIndex + 1} of {cards.length}
             </span>
-            {emphasize && (
-              <span className="text-xs font-medium text-red-500 bg-red-50 px-2 py-1 rounded-full">
-                ⚠ Please read carefully
+            {highlightSection && (
+              <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                ⚠ Pay attention to the highlighted section
               </span>
             )}
           </div>
 
           {!quizMode ? (
             <>
-              {/* Encoding card display */}
-              <div className={`space-y-3 ${emphasize ? 'ring-2 ring-red-300 rounded-xl p-2' : ''}`}>
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <p className="text-sm font-medium text-amber-800 mb-1">When this happens:</p>
-                  <p className="text-amber-900 font-semibold">{card.trigger_description}</p>
+              {/* Encoding story paragraph */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <p className="text-slate-700 leading-relaxed text-[15px] text-left">
+                  {ec.encoding_text}
+                </p>
+              </div>
+
+              {/* Info boxes */}
+              <div className="space-y-3">
+                {/* Trigger */}
+                <div
+                  className={`rounded-xl p-4 border transition-all ${
+                    highlightSection === 'trigger'
+                      ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-300'
+                      : 'bg-amber-50 border-amber-200'
+                  }`}
+                >
+                  <p className="text-sm font-medium text-amber-800 mb-1">🔔 When this happens:</p>
+                  <p className="text-amber-900 font-semibold">{ec.trigger_description}</p>
                 </div>
 
+                {/* Target room */}
                 <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                  <p className="text-sm font-medium text-green-800 mb-1">Go to:</p>
-                  <p className="text-green-900 font-semibold">{card.target_room}</p>
+                  <p className="text-sm font-medium text-green-800 mb-1">📍 Go to:</p>
+                  <p className="text-green-900 font-semibold">{ec.target_room}</p>
                 </div>
 
-                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
-                  <p className="text-sm font-medium text-purple-800 mb-1">Find this item:</p>
-                  <p className="text-purple-900 font-semibold">{card.target_description}</p>
-                  {card.visual_cues && Object.keys(card.visual_cues).length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {Object.entries(card.visual_cues).map(([key, val]) => (
-                        <span key={key} className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                          {key}: {val}
-                        </span>
-                      ))}
-                    </div>
+                {/* Target item + visual cues */}
+                <div
+                  className={`rounded-xl p-4 border transition-all ${
+                    highlightSection === 'target'
+                      ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-300'
+                      : 'bg-purple-50 border-purple-200'
+                  }`}
+                >
+                  <p className="text-sm font-medium text-purple-800 mb-1">🔍 Find this item:</p>
+                  <p className="text-purple-900 font-semibold">{ec.target_description}</p>
+                  {ec.visual_cues?.cue && (
+                    <p className="mt-2 text-sm font-medium text-purple-700 bg-purple-100 px-3 py-1.5 rounded-lg inline-block">
+                      👁 Look for: <span className="font-bold">{ec.visual_cues.cue}</span>
+                    </p>
                   )}
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <p className="text-sm font-medium text-blue-800 mb-1">Do this:</p>
-                  <p className="text-blue-900 font-semibold">{card.action_description}</p>
+                {/* Action */}
+                <div
+                  className={`rounded-xl p-4 border transition-all ${
+                    highlightSection === 'action'
+                      ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-300'
+                      : 'bg-blue-50 border-blue-200'
+                  }`}
+                >
+                  <p className="text-sm font-medium text-blue-800 mb-1">✋ Do this:</p>
+                  <p className="text-blue-900 font-semibold">{ec.action_description}</p>
                 </div>
               </div>
 
+              {/* Read timer / proceed button */}
               <button
-                onClick={handleStartQuiz}
-                className="w-full py-3 bg-blue-500 hover:bg-blue-600
-                           text-white font-bold rounded-xl transition-colors"
+                onClick={reShowCard ? handleReReadDone : handleMemorized}
+                disabled={readCountdown > 0}
+                className={`w-full py-3 font-bold rounded-xl transition-colors ${
+                  readCountdown > 0
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
               >
-                {emphasize ? 'I understand — Continue'
-                  : reShowCard ? 'I\'ve reviewed it — Test me again'
-                  : 'I remember — Test me'}
+                {readCountdown > 0
+                  ? `Read carefully... (${readCountdown}s)`
+                  : reShowCard
+                    ? "I've reviewed it — Test me again"
+                    : "I've memorized this ✓"}
               </button>
             </>
           ) : (
             <>
-              {/* Single MC Quiz — trigger identification */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-slate-800">Quick Check</h3>
-                <p className="text-slate-600 font-medium">
-                  What event should trigger this task?
-                </p>
+              {/* Multi-question quiz */}
+              {(() => {
+                const qData = getQuestionData(currentQuestionIndex)
+                const qType = QUESTION_TYPES[currentQuestionIndex]
 
-                <div className="space-y-2">
-                  {getTriggerOptions().map((opt) => {
-                    const isSelected = selected === opt.value
-                    const showWrong = feedback === 'wrong' && isSelected
-                    const showSuccess = feedback === 'correct' && isSelected
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-slate-800">Quick Check</h3>
+                      <span className="text-xs text-slate-400">
+                        Question {currentQuestionIndex + 1} of 3
+                      </span>
+                    </div>
 
-                    return (
+                    {/* Question type badge */}
+                    <span
+                      className={`text-xs font-medium px-2 py-1 rounded-full inline-block ${
+                        qType === 'trigger'
+                          ? 'bg-amber-50 text-amber-700'
+                          : qType === 'target'
+                            ? 'bg-purple-50 text-purple-700'
+                            : 'bg-blue-50 text-blue-700'
+                      }`}
+                    >
+                      {qType === 'trigger'
+                        ? '🔔 Trigger'
+                        : qType === 'target'
+                          ? '🔍 Target'
+                          : '✋ Action'}
+                    </span>
+
+                    <p className="text-slate-600 font-medium">{qData.question}</p>
+
+                    <div className="space-y-2">
+                      {qData.options.map((opt, idx) => {
+                        const isSelected = selected === opt
+                        const showWrong = feedback === 'wrong' && isSelected
+                        const showCorrect = feedback === 'correct' && isSelected
+
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => handleSelectOption(opt)}
+                            disabled={!!feedback}
+                            className={`w-full text-left px-4 py-3 rounded-xl border transition-all
+                              ${
+                                showCorrect
+                                  ? 'bg-green-100 border-green-400 text-green-800'
+                                  : showWrong
+                                    ? 'bg-red-100 border-red-400 text-red-800'
+                                    : isSelected
+                                      ? 'bg-blue-100 border-blue-400 text-blue-800'
+                                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                              }
+                              ${feedback ? 'cursor-default' : 'cursor-pointer'}
+                            `}
+                          >
+                            {opt}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {feedback === 'wrong' && (
+                      <p className="text-red-600 text-sm font-medium">
+                        ✗ Incorrect. Let's review the task card again.
+                      </p>
+                    )}
+                    {feedback === 'correct' && (
+                      <p className="text-green-600 text-sm font-medium">✓ Correct!</p>
+                    )}
+
+                    {!feedback && (
                       <button
-                        key={opt.value}
-                        onClick={() => handleSelectOption(opt.value)}
-                        disabled={!!feedback}
-                        className={`w-full text-left px-4 py-3 rounded-xl border transition-all
-                          ${showSuccess ? 'bg-green-100 border-green-400 text-green-800' :
-                            showWrong ? 'bg-red-100 border-red-400 text-red-800' :
-                            isSelected ? 'bg-blue-100 border-blue-400 text-blue-800' :
-                            'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                          }
-                          ${feedback ? 'cursor-default' : 'cursor-pointer'}
-                        `}
+                        onClick={handleConfirmAnswer}
+                        disabled={!selected}
+                        className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-200
+                                   text-white font-bold rounded-xl transition-colors"
                       >
-                        {opt.label}
+                        Confirm
                       </button>
-                    )
-                  })}
-                </div>
-
-                {feedback === 'wrong' && (
-                  <p className="text-red-600 text-sm font-medium">
-                    ✗ Incorrect. Let's review the task card again.
-                  </p>
-                )}
-                {feedback === 'correct' && (
-                  <p className="text-green-600 text-sm font-medium">
-                    ✓ Correct!
-                  </p>
-                )}
-              </div>
-
-              {!feedback && (
-                <button
-                  onClick={handleConfirmAnswer}
-                  disabled={!selected}
-                  className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-200
-                             text-white font-bold rounded-xl transition-colors"
-                >
-                  Confirm
-                </button>
-              )}
+                    )}
+                  </div>
+                )
+              })()}
             </>
           )}
         </div>

@@ -13,7 +13,7 @@ from engine.execution_window import (
     start_window, cancel_window, get_active_trigger, clear_active_trigger,
     record_room_switch, get_room_sequence, get_first_pm_room_entry,
 )
-from models.logging import InteractionLog, MouseTrack
+from models.logging import InteractionLog, MouseTrack, PhoneMessageLog
 from models.block import PMTrial, PMAttemptRecord
 
 logger = logging.getLogger(__name__)
@@ -129,6 +129,10 @@ async def _ws_receiver(
                     await _handle_interaction(participant_id, block_number, "phone_unlock", data, db_factory)
                 elif msg_type == "phone_action":
                     await _handle_interaction(participant_id, block_number, "phone_action", data, db_factory)
+                elif msg_type == "phone_reply":
+                    await _handle_phone_reply(participant_id, block_number, data, db_factory)
+                elif msg_type == "phone_read":
+                    await _handle_phone_read(participant_id, block_number, data, db_factory)
                 elif msg_type == "mouse_position":
                     await _handle_mouse(participant_id, block_number, data, db_factory)
                 else:
@@ -216,7 +220,8 @@ async def _handle_room_switch(participant_id, block_number, data, db_factory):
 
 
 async def _handle_task_action(participant_id, block_number, data, db_factory):
-    """Log ongoing task action — also used for resumption lag detection."""
+    """Log ongoing task action — also used for resumption lag detection
+    and activity watcher condition checking."""
     ts = data.get("timestamp", time.time())
 
     # Check if this is a resumption event (returning to ongoing task after PM)
@@ -229,6 +234,11 @@ async def _handle_task_action(participant_id, block_number, data, db_factory):
             trigger["trial_id"], resumption_lag_ms, db_factory,
         )
         clear_active_trigger(participant_id)
+
+    # Check activity watchers for condition-based PM triggers
+    task = data.get("task", "")
+    event = data.get("event", "")
+    await _check_activity_conditions(participant_id, task, event, data)
 
     await _handle_interaction(participant_id, block_number, "task_action", data, db_factory)
 
@@ -397,6 +407,99 @@ async def _record_resumption_lag(trial_id: int, lag_ms: int, db_factory):
         logger.info(f"Resumption lag recorded: trial={trial_id} lag={lag_ms}ms")
 
 
+async def _handle_phone_reply(participant_id, block_number, data, db_factory):
+    """Handle a phone message reply — validate and log."""
+    from engine.message_loader import get_message, get_correct_reply
+    from sqlalchemy import select, update
+
+    message_id = data.get("message_id", "")
+    reply_id = data.get("reply_id", "")
+    timestamp = data.get("timestamp", time.time())
+
+    if not message_id or not reply_id:
+        return
+
+    # Check correctness from the message pool
+    message = get_message(block_number, message_id)
+    is_correct = get_correct_reply(message, reply_id) if message else None
+
+    # Find the reply text
+    reply_text = ""
+    if message and message.get("replies"):
+        for r in message["replies"]:
+            if r["id"] == reply_id:
+                reply_text = r.get("text", "")
+                break
+
+    async with db_factory() as db:
+        from models.block import Block
+        result = await db.execute(
+            select(Block.id).where(
+                Block.participant_id == participant_id,
+                Block.block_number == block_number,
+            )
+        )
+        block_id = result.scalar_one_or_none()
+        if block_id is None:
+            return
+
+        # Update the existing PhoneMessageLog with reply data
+        await db.execute(
+            update(PhoneMessageLog)
+            .where(
+                PhoneMessageLog.participant_id == participant_id,
+                PhoneMessageLog.block_id == block_id,
+                PhoneMessageLog.message_id == message_id,
+            )
+            .values(
+                replied_at=timestamp,
+                reply_selected=reply_text,
+                reply_correct=is_correct,
+            )
+        )
+        await db.commit()
+
+    logger.debug(f"Phone reply: {participant_id} msg={message_id} reply={reply_id} correct={is_correct}")
+
+    # Also log as generic interaction
+    await _handle_interaction(participant_id, block_number, "phone_reply", data, db_factory)
+
+
+async def _handle_phone_read(participant_id, block_number, data, db_factory):
+    """Handle phone message read — update read_at timestamp."""
+    from sqlalchemy import select, update
+
+    message_id = data.get("message_id", "")
+    timestamp = data.get("timestamp", time.time())
+
+    if not message_id:
+        return
+
+    async with db_factory() as db:
+        from models.block import Block
+        result = await db.execute(
+            select(Block.id).where(
+                Block.participant_id == participant_id,
+                Block.block_number == block_number,
+            )
+        )
+        block_id = result.scalar_one_or_none()
+        if block_id is None:
+            return
+
+        await db.execute(
+            update(PhoneMessageLog)
+            .where(
+                PhoneMessageLog.participant_id == participant_id,
+                PhoneMessageLog.block_id == block_id,
+                PhoneMessageLog.message_id == message_id,
+                PhoneMessageLog.read_at.is_(None),
+            )
+            .values(read_at=timestamp)
+        )
+        await db.commit()
+
+
 async def _handle_mouse(participant_id, block_number, data, db_factory):
     """Store mouse tracking batch."""
     async with db_factory() as db:
@@ -436,4 +539,31 @@ async def _set_participant_offline(participant_id: str, db_factory):
             logger.info(f"Participant {participant_id} marked offline")
     except Exception as e:
         logger.error(f"Failed to mark participant offline: {e}")
+
+
+async def _check_activity_conditions(
+    participant_id: str, task: str, event: str, data: dict
+):
+    """Map game state changes to activity watcher conditions.
+
+    Conditions:
+    - all_steaks_plated: all 3 steak pans reach 'plated' state
+    - table_full_set: all 4 dining seats have all utensils placed
+    - message_batch_end: a phone message with batch_end flag arrives
+    """
+    from engine.timeline import check_activity_watchers
+
+    condition = None
+    if task == "steak" and event == "steak_plated":
+        # Check if all steaks are now plated (data may contain pan states)
+        all_plated = data.get("all_plated", False)
+        if all_plated:
+            condition = "all_steaks_plated"
+    elif task == "dining" and event == "table_complete":
+        condition = "table_full_set"
+    elif task == "phone" and event == "batch_end":
+        condition = "message_batch_end"
+
+    if condition:
+        await check_activity_watchers(participant_id, condition)
 

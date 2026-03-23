@@ -121,6 +121,7 @@ async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = 
     pm_tasks = []
     for trial in trials:
         card = trial.encoding_card or {}
+        task_cfg = trial.task_config or {}
         # Include task info for encoding — but never reveal scoring or reminder status
         pm_tasks.append({
             "trial_number": trial.trial_number,
@@ -129,7 +130,17 @@ async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = 
             "target_description": card.get("target_description", ""),
             "target_image": card.get("target_image", ""),
             "action_description": card.get("action_description", ""),
+            "encoding_text": card.get("encoding_text", ""),
             "visual_cues": card.get("visual_cues", {}),
+            "quiz_question": card.get("quiz_question", ""),
+            "quiz_options": card.get("quiz_options", []),
+            "quiz_correct_index": card.get("quiz_correct_index", 0),
+            "task_config": {
+                "task_id": task_cfg.get("task_id", ""),
+                "trigger_type": task_cfg.get("trigger_type", ""),
+                "target_room": task_cfg.get("target_room", ""),
+                "action_destination": task_cfg.get("action_destination", ""),
+            },
         })
 
     return BlockEncodingResponse(
@@ -224,11 +235,17 @@ async def submit_quiz(
 def _get_correct_answer(question_type: str, task_config: dict, encoding_card: dict) -> str:
     """Get the correct answer for a quiz question type."""
     if question_type == "trigger":
-        return task_config.get("trigger_event", "")
+        # Correct answer is the trigger_description from encoding card
+        return encoding_card.get("trigger_description", task_config.get("trigger_event", ""))
     elif question_type == "target":
+        # For the new multi-question quiz, "target" uses the card's quiz system
+        quiz_options = encoding_card.get("quiz_options", [])
+        quiz_correct_index = encoding_card.get("quiz_correct_index", 0)
+        if quiz_options and 0 <= quiz_correct_index < len(quiz_options):
+            return quiz_options[quiz_correct_index]
         return task_config.get("target_object", "")
     elif question_type == "action":
-        return task_config.get("target_action", "")
+        return encoding_card.get("action_description", task_config.get("target_action", ""))
     return ""
 
 

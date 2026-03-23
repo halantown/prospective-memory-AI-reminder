@@ -1,16 +1,17 @@
 /** Trigger Effects — audio and visual feedback for PM trigger events.
  *
- * Each trigger type gets a distinct audio tone + visual cue.
- * Effects are noticeable but don't tell the participant what to do.
- * Uses Web Audio API for placeholder tones (replace with real audio later).
+ * Supports 4 PM trigger types: visitor, communication, appliance, activity.
+ * Each trigger_visual value maps to a distinct audio tone + visual cue.
+ * Fake triggers (non-PM) show a brief banner but don't create PM trials.
+ * Uses Web Audio API for synthesized tones.
  */
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
 import type { RoomId } from '../../types'
 
-// Map trigger events to their source room and visual config
+// Map trigger_visual values → source room, audio config, and display info
 const TRIGGER_EFFECTS: Record<string, {
   sourceRoom: RoomId | null
   audioFreq: number
@@ -19,69 +20,73 @@ const TRIGGER_EFFECTS: Record<string, {
   icon: string
   label: string
 }> = {
-  doorbell: {
+  // ── Visitor ──
+  visitor_arrival: {
     sourceRoom: 'living_room',
     audioFreq: 880,
     audioDuration: 0.3,
     audioPattern: 'double',
     icon: '🔔',
-    label: 'Ding-dong!',
+    label: "Ding-dong! Someone's at the door!",
   },
-  email_dentist: {
-    sourceRoom: null, // phone sidebar
-    audioFreq: 1200,
-    audioDuration: 0.15,
-    audioPattern: 'single',
-    icon: '📧',
-    label: 'New email',
-  },
-  washing_done: {
-    sourceRoom: 'bathroom',
-    audioFreq: 660,
-    audioDuration: 0.2,
-    audioPattern: 'triple',
-    icon: '🫧',
-    label: 'Beep beep beep!',
-  },
-  clock_6pm: {
-    sourceRoom: null, // HUD clock
-    audioFreq: 523,
-    audioDuration: 0.5,
-    audioPattern: 'single',
-    icon: '🕕',
-    label: 'Clock chimes',
-  },
-  knock: {
-    sourceRoom: 'living_room',
-    audioFreq: 220,
-    audioDuration: 0.1,
-    audioPattern: 'triple',
-    icon: '🚪',
-    label: 'Knock knock!',
-  },
-  phone_message: {
+  // ── Communication ──
+  phone_message_banner: {
     sourceRoom: null,
     audioFreq: 1000,
     audioDuration: 0.15,
     audioPattern: 'double',
     icon: '💬',
-    label: 'New message',
+    label: 'New message!',
   },
-  plant_reminder: {
+  // ── Appliance ──
+  dishwasher_indicator_done: {
+    sourceRoom: 'kitchen',
+    audioFreq: 660,
+    audioDuration: 0.2,
+    audioPattern: 'triple',
+    icon: '🍽️',
+    label: 'Dishwasher finished!',
+  },
+  washer_indicator_done: {
     sourceRoom: 'bathroom',
+    audioFreq: 660,
+    audioDuration: 0.2,
+    audioPattern: 'triple',
+    icon: '🫧',
+    label: 'Washing machine finished!',
+  },
+  dryer_indicator_done: {
+    sourceRoom: 'bathroom',
+    audioFreq: 660,
+    audioDuration: 0.2,
+    audioPattern: 'triple',
+    icon: '👔',
+    label: 'Dryer finished!',
+  },
+  // ── Activity ──
+  steak_all_plated: {
+    sourceRoom: 'kitchen',
     audioFreq: 440,
     audioDuration: 0.3,
     audioPattern: 'single',
-    icon: '🌱',
-    label: 'Reminder tone',
+    icon: '🥩',
+    label: 'All steaks are plated!',
   },
-  tv_on: {
-    sourceRoom: 'living_room',
-    audioFreq: 350,
-    audioDuration: 0.4,
+  table_all_set: {
+    sourceRoom: 'bedroom',
+    audioFreq: 440,
+    audioDuration: 0.3,
     audioPattern: 'single',
-    icon: '📺',
-    label: 'TV turns on',
+    icon: '🍽️',
+    label: 'Table is fully set!',
+  },
+  phone_batch_end: {
+    sourceRoom: null,
+    audioFreq: 1000,
+    audioDuration: 0.3,
+    audioPattern: 'single',
+    icon: '📱',
+    label: 'Message batch finished!',
   },
 }
 
@@ -125,7 +130,7 @@ export default function TriggerEffects() {
   const clearTriggerEffect = useGameStore((s) => s.clearTriggerEffect)
   const playedRef = useRef<Set<string>>(new Set())
 
-  // Play audio when new trigger effects appear
+  // Play audio when new trigger effects appear and schedule auto-clear
   useEffect(() => {
     for (const effect of activeTriggerEffects) {
       const key = `${effect.triggerEvent}_${effect.timestamp}`
@@ -137,22 +142,51 @@ export default function TriggerEffects() {
         playTriggerTone(cfg.audioFreq, cfg.audioDuration, cfg.audioPattern)
       }
 
-      // Auto-clear effect after 4 seconds
+      // Fake triggers use their own duration; real triggers default to 4s
+      const clearDelay = (effect.isFake && effect.duration ? effect.duration : 4) * 1000
       setTimeout(() => {
         clearTriggerEffect(effect.triggerEvent)
         playedRef.current.delete(key)
-      }, 4000)
+      }, clearDelay)
     }
   }, [activeTriggerEffects, clearTriggerEffect])
 
-  return null
+  // Render notification banners for active trigger effects
+  return (
+    <div className="fixed top-16 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+      <AnimatePresence>
+        {activeTriggerEffects.map((effect) => {
+          const cfg = TRIGGER_EFFECTS[effect.triggerEvent]
+          if (!cfg) return null
+          return (
+            <motion.div
+              key={`${effect.triggerEvent}_${effect.timestamp}`}
+              initial={{ opacity: 0, x: 60 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 60 }}
+              transition={{ duration: 0.3 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg backdrop-blur
+                ${effect.isFake
+                  ? 'bg-slate-700/80 border border-slate-500/40'
+                  : 'bg-amber-900/80 border border-amber-400/50'}`}
+            >
+              <span className="text-xl">{cfg.icon}</span>
+              <span className="text-sm text-white font-medium">{cfg.label}</span>
+            </motion.div>
+          )
+        })}
+      </AnimatePresence>
+    </div>
+  )
 }
 
-/** Room glow indicator — shows which room a trigger is coming from. */
+/** Room glow indicator — shows which room a trigger is coming from.
+ *  Only glows for real PM triggers (not fake triggers). */
 export function TriggerRoomGlow({ room }: { room: RoomId }) {
   const activeTriggerEffects = useGameStore((s) => s.activeTriggerEffects)
 
   const isGlowing = activeTriggerEffects.some(e => {
+    if (e.isFake) return false
     const cfg = TRIGGER_EFFECTS[e.triggerEvent]
     return cfg?.sourceRoom === room
   })
@@ -171,10 +205,12 @@ export function TriggerRoomGlow({ room }: { room: RoomId }) {
   )
 }
 
-/** HUD clock trigger effect — highlights clock when clock trigger fires. */
+/** HUD clock trigger effect — kept for backward compatibility.
+ *  No current trigger_visual maps to a clock effect. */
 export function ClockTriggerEffect() {
   const activeTriggerEffects = useGameStore((s) => s.activeTriggerEffects)
 
+  // No trigger_visual currently activates the clock effect
   const isClockTrigger = activeTriggerEffects.some(
     e => e.triggerEvent === 'clock_6pm'
   )
