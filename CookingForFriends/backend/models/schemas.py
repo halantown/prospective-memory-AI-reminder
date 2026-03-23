@@ -27,7 +27,7 @@ class BlockEncodingResponse(BaseModel):
     block_number: int
     condition: str
     day_story: str
-    pm_tasks: list[dict]
+    cards: list[dict]
 
 
 class NasaTLXRequest(BaseModel):

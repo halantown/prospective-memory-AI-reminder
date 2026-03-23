@@ -122,19 +122,21 @@ async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = 
     for trial in trials:
         card = trial.encoding_card or {}
         task_cfg = trial.task_config or {}
-        # Include task info for encoding — but never reveal scoring or reminder status
+        # Nest encoding_card fields to match frontend PMEncodingCard type
         pm_tasks.append({
             "trial_number": trial.trial_number,
-            "trigger_description": card.get("trigger_description", ""),
-            "target_room": card.get("target_room", ""),
-            "target_description": card.get("target_description", ""),
-            "target_image": card.get("target_image", ""),
-            "action_description": card.get("action_description", ""),
-            "encoding_text": card.get("encoding_text", ""),
-            "visual_cues": card.get("visual_cues", {}),
-            "quiz_question": card.get("quiz_question", ""),
-            "quiz_options": card.get("quiz_options", []),
-            "quiz_correct_index": card.get("quiz_correct_index", 0),
+            "encoding_card": {
+                "trigger_description": card.get("trigger_description", ""),
+                "target_room": card.get("target_room", ""),
+                "target_description": card.get("target_description", ""),
+                "target_image": card.get("target_image", ""),
+                "action_description": card.get("action_description", ""),
+                "encoding_text": card.get("encoding_text", ""),
+                "visual_cues": card.get("visual_cues", {}),
+                "quiz_question": card.get("quiz_question", ""),
+                "quiz_options": card.get("quiz_options", []),
+                "quiz_correct_index": card.get("quiz_correct_index", 0),
+            },
             "task_config": {
                 "task_id": task_cfg.get("task_id", ""),
                 "trigger_type": task_cfg.get("trigger_type", ""),
@@ -147,7 +149,7 @@ async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = 
         block_number=block.block_number,
         condition=block.condition,
         day_story=block.day_story,
-        pm_tasks=pm_tasks,
+        cards=pm_tasks,
     )
 
 

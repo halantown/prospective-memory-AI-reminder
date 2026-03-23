@@ -41,6 +41,7 @@ export default function EncodingPage() {
   const [dayStory, setDayStory] = useState('')
   const [currentCardIndex, setCurrentCardIndex] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Read timer
   const [readCountdown, setReadCountdown] = useState(10)
@@ -104,6 +105,7 @@ export default function EncodingPage() {
       })
       .catch((err) => {
         console.error('Failed to load encoding:', err)
+        setError(err.message || 'Failed to load task cards')
         setLoading(false)
       })
   }, [sessionId, blockNumber, resetBlock, startReadTimer])
@@ -297,6 +299,42 @@ export default function EncodingPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-slate-400 text-lg">Loading task cards...</div>
+      </div>
+    )
+  }
+
+  // ── Render: error ──
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-xl p-6 text-center space-y-4">
+          <p className="text-red-600 font-medium">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Render: no cards ──
+
+  if (!cards.length || !card || !ec) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-xl p-6 text-center space-y-4">
+          <p className="text-slate-600">No task cards available. Please refresh.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          >
+            Reload
+          </button>
+        </div>
       </div>
     )
   }
