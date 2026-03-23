@@ -1,0 +1,61 @@
+{
+  "task_id": "b3_speaker",
+  "description": "Get Bluetooth speaker after finishing message batch",
+
+  "reminder_context": {
+    "element1": {
+      "action_verb": "get and set up",
+      "target_entity": {
+        "entity_name": "Bluetooth speaker",
+        "object_type": "electronics",
+        "cues": {
+          "visual": "Small round speaker with gray fabric mesh cover"
+        },
+        "domain_properties": {
+          "cover_material": "fabric"
+        }
+      },
+      "location": {
+        "room": "living_room",
+        "spot": "sideboard, bottom shelf"
+      }
+    },
+    "element2": {
+      "origin": {
+        "task_creator": "self",
+        "creator_is_authority": false
+      },
+      "creation_context": "Dinner music setup"
+    },
+    "element3": {
+      "detected_activity_raw": "User just finished reading the last message in batch"
+    }
+  },
+
+  "agent_reasoning_context": {
+    "encoding_info": {
+      "encoding_text": "After you finish the first batch of messages, go to the living room and get the Bluetooth speaker from the sideboard, bottom shelf — the round one with the fabric cover. Set it up in the dining area for dinner music.",
+      "encoding_image": "b3_speaker_target.png",
+      "confirmation_question": {
+        "question": "What type of cover does the speaker have?",
+        "options": ["Rubber", "Fabric", "Plastic"],
+        "correct_index": 1
+      }
+    },
+    "distractor_info": {
+      "distractor_description": "Round speaker with black rubber cover, same shelf",
+      "discriminating_dimension": "cover material (fabric vs rubber)"
+    },
+    "trigger_info": {
+      "trigger_type": "activity",
+      "trigger_event": "Message batch complete",
+      "trigger_time_in_block": "~450s (state-dependent)"
+    }
+  },
+
+  "placeholder": {
+    "motivation": "Background music for dinner",
+    "consequence_if_missed": "No music during dinner",
+    "status": "EXCLUDED — requires inferential reasoning"
+  }
+}

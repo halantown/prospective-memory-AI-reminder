@@ -3,8 +3,11 @@
 The LLM receives only the pruned output. It cannot leak information it never sees.
 This implements Design Principle P1 (input truncation over output filtering).
 
-3-group design: Only AF_only and AF_CB conditions use this extractor.
-Control group generates no text and never calls this module.
+3-group design + Baseline:
+  Baseline: template-only (action + entity), uses this extractor for pruning.
+  AF_only: High AF, no CB.
+  AF_CB:   High AF + CB.
+  Control: No reminder — never calls this module.
 """
 
 from __future__ import annotations
@@ -209,7 +212,7 @@ if __name__ == "__main__":
     with open(task_path) as f:
         task_json = json.load(f)
 
-    conditions = ["AF_only", "AF_CB"]
+    conditions = ["AF_only", "AF_CB", "Baseline"]
     fm = load_condition_field_map()
 
     for cond in conditions:

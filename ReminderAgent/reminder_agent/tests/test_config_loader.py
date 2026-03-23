@@ -1,7 +1,7 @@
 """Tests for config_loader — validates that all configs load cleanly and
 that validation catches missing / invalid fields.
 
-Updated for 3-group between-subjects design (AF_only, AF_CB).
+Updated for 3-group between-subjects design (Baseline, AF_only, AF_CB).
 """
 
 from __future__ import annotations
@@ -49,17 +49,33 @@ def tmp_config_dir(tmp_path: Path) -> Path:
     """))
 
     (cfg / "condition_field_map.yaml").write_text(textwrap.dedent("""\
+        Baseline:
+          required_fields:
+            - "reminder_context.element1.action_verb"
+            - "reminder_context.element1.target_entity.entity_name"
+          conditional_fields: []
+          excluded_fields:
+            - "reminder_context.element1.target_entity.cues"
+            - "reminder_context.element1.target_entity.domain_properties"
+            - "reminder_context.element1.location"
+            - "reminder_context.element2"
+            - "reminder_context.element3"
+          excluded_zones:
+            - "agent_reasoning_context"
+            - "placeholder"
+
         AF_only:
           required_fields:
             - "reminder_context.element1.action_verb"
             - "reminder_context.element1.target_entity.entity_name"
             - "reminder_context.element1.target_entity.cues.visual"
             - "reminder_context.element1.target_entity.domain_properties"
+            - "reminder_context.element1.location"
           conditional_fields:
             - field: "reminder_context.element2.origin.task_creator"
               condition: "reminder_context.element2.origin.creator_is_authority == true"
           excluded_fields:
-            - "reminder_context.element3.detected_activity_raw"
+            - "reminder_context.element3"
           excluded_zones:
             - "agent_reasoning_context"
             - "placeholder"
@@ -70,10 +86,12 @@ def tmp_config_dir(tmp_path: Path) -> Path:
             - "reminder_context.element1.target_entity.entity_name"
             - "reminder_context.element1.target_entity.cues.visual"
             - "reminder_context.element1.target_entity.domain_properties"
+            - "reminder_context.element1.location"
             - "reminder_context.element3.detected_activity_raw"
           conditional_fields:
             - field: "reminder_context.element2.origin.task_creator"
               condition: "reminder_context.element2.origin.creator_is_authority == true"
+          excluded_fields: []
           excluded_zones:
             - "agent_reasoning_context"
             - "placeholder"
@@ -93,7 +111,7 @@ class TestLoadFromProductionConfigs:
         model, gen, field_map = load_all_configs()
         assert model.backend == "ollama"
         assert gen.n_variants == 3
-        assert len(field_map.conditions) == 2
+        assert len(field_map.conditions) == 3
 
     def test_model_config(self) -> None:
         cfg = load_model_config()
@@ -114,7 +132,7 @@ class TestLoadFromProductionConfigs:
 
     def test_condition_field_map_all_conditions(self) -> None:
         cfg = load_condition_field_map()
-        expected = {"AF_only", "AF_CB"}
+        expected = {"Baseline", "AF_only", "AF_CB"}
         assert set(cfg.conditions.keys()) == expected
 
     def test_af_only_has_visual_cues(self) -> None:
@@ -224,4 +242,4 @@ class TestTmpConfigRoundTrip:
         model, gen, field_map = load_all_configs(tmp_config_dir)
         assert model.backend == "together"
         assert gen.n_variants == 3
-        assert len(field_map.conditions) == 2
+        assert len(field_map.conditions) == 3

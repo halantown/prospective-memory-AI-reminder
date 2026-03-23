@@ -1,0 +1,62 @@
+{
+  "task_id": "b1_book",
+  "description": "Find the travel book for Mei when she arrives",
+
+  "reminder_context": {
+    "element1": {
+      "action_verb": "find and bring",
+      "target_entity": {
+        "entity_name": "book",
+        "object_type": "personal item",
+        "cues": {
+          "visual": "Red cover with mountain landscape illustration"
+        },
+        "domain_properties": {
+          "title": "Erta Ale",
+          "format": "paperback"
+        }
+      },
+      "location": {
+        "room": "study",
+        "spot": "second shelf of the bookcase"
+      }
+    },
+    "element2": {
+      "origin": {
+        "task_creator": "friend Mei",
+        "creator_is_authority": false
+      },
+      "creation_context": "Mei asked to borrow it during a phone call yesterday"
+    },
+    "element3": {
+      "detected_activity_raw": "User is flipping steak on pan #2"
+    }
+  },
+
+  "agent_reasoning_context": {
+    "encoding_info": {
+      "encoding_text": "Your friend Mei asked to borrow a travel book. When Mei arrives, go to the study and find the book on the second shelf of the bookcase. It is a red paperback with a mountain illustration on the cover, titled Erta Ale. Bring it to the living room and give it to Mei.",
+      "encoding_image": "b1_book_target.png",
+      "confirmation_question": {
+        "question": "What is on the cover of the book you need to find?",
+        "options": ["Ocean landscape", "Mountain landscape", "City skyline"],
+        "correct_index": 1
+      }
+    },
+    "distractor_info": {
+      "distractor_description": "Red paperback with ocean landscape illustration, titled Blue Horizon, same shelf",
+      "discriminating_dimension": "cover illustration (mountain vs ocean)"
+    },
+    "trigger_info": {
+      "trigger_type": "visitor",
+      "trigger_event": "Doorbell — Mei arrives",
+      "trigger_time_in_block": "~360s"
+    }
+  },
+
+  "placeholder": {
+    "motivation": "Mei is going hiking and wants travel inspiration",
+    "consequence_if_missed": "Mei leaves without the book",
+    "status": "EXCLUDED — requires inferential reasoning"
+  }
+}

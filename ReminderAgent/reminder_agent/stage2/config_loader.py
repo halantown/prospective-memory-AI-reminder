@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 
 VALID_BACKENDS = {"together", "ollama", "openai", "anthropic"}
-VALID_CONDITIONS = {"AF_only", "AF_CB"}
+VALID_CONDITIONS = {"Baseline", "AF_only", "AF_CB"}
 
 
 # ---------------------------------------------------------------------------
