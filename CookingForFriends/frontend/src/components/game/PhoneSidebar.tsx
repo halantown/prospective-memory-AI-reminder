@@ -347,7 +347,7 @@ function MessageBubble({
   )
 }
 
-const MAX_LOCK_PREVIEWS = 4
+const MAX_LOCK_PREVIEWS = 3
 
 function LockScreenPreviews({
   messages,
