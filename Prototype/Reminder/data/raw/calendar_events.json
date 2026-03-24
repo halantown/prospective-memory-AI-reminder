@@ -1,0 +1,23 @@
+[
+  {
+    "event_id": "evt_101",
+    "title": "Grocery Shopping",
+    "start_time": "2026-01-11T09:00:00",
+    "end_time": "2026-01-11T10:00:00",
+    "location": "Albert Heijn"
+  },
+  {
+    "event_id": "evt_102",
+    "title": "Appointment with Dr. Wang",
+    "start_time": "2026-01-11T14:00:00",
+    "end_time": "2026-01-11T15:00:00",
+    "location": "City Hospital, Room 302"
+  },
+  {
+    "event_id": "evt_103",
+    "title": "Bridge Club",
+    "start_time": "2026-01-12T15:00:00",
+    "end_time": "2026-01-12T17:00:00",
+    "location": "Community Center"
+  }
+]

@@ -1,0 +1,206 @@
+"""
+Block Timeline Generator — builds per-participant timeline JSON.
+
+Generates a complete block timeline with PM triggers, reminders, neutral
+utterances, fake triggers, and ongoing task events properly spaced according
+to the experimental design rules.
+"""
+
+import random
+from engine.pm_tasks import (
+    get_task,
+    get_tasks_for_block,
+    BLOCK_TRIGGER_ORDER,
+    BLOCK_TRIGGER_TIMES,
+    BLOCK_GUESTS,
+    ACTIVITY_WATCH_CONFIG,
+    NEUTRAL_UTTERANCES,
+    PMTaskDef,
+)
+from config import REMINDER_LEAD_S
+
+
+# Steak placement cadence: every 20s, 3 pans cycling
+_STEAK_INTERVAL_S = 20
+_NUM_PANS = 3
+
+# Fake trigger definitions per block
+_FAKE_TRIGGERS: dict[int, list[dict]] = {
+    1: [
+        {"type": "fake_trigger", "trigger_type": "visitor",
+         "content": "Courier drops off a flyer, leaves immediately", "duration": 5},
+    ],
+    2: [
+        {"type": "fake_trigger", "trigger_type": "appliance",
+         "content": "Microwave beeps briefly — nothing to do", "duration": 3},
+    ],
+    3: [
+        {"type": "fake_trigger", "trigger_type": "visitor",
+         "content": "Neighbor waves hello through the window", "duration": 4},
+    ],
+}
+
+
+def generate_block_timeline(
+    block_number: int,
+    condition: str,
+    unreminded_task_id: str | None,
+    af_variant_index: int = 0,
+) -> dict:
+    """Generate a complete block timeline JSON.
+
+    Args:
+        block_number: 1, 2, or 3
+        condition: "CONTROL", "AF", or "AFCB"
+        unreminded_task_id: task_id of the unreminded trial (None for CONTROL)
+        af_variant_index: participant's variant index for AF/AFCB reminders
+
+    Returns:
+        Timeline dict compatible with the existing timeline engine.
+    """
+    guest = BLOCK_GUESTS[block_number]
+    trigger_order = BLOCK_TRIGGER_ORDER[block_number]
+    events: list[dict] = []
+
+    # ── Block start ──
+    events.append({"t": 0, "type": "block_start", "data": {}})
+
+    # ── Ongoing task events (steaks): place every 20s across 3 pans ──
+    pan = 1
+    for t in range(0, 600, _STEAK_INTERVAL_S):
+        events.append({
+            "t": t,
+            "type": "ongoing_task_event",
+            "data": {"task": "steak", "event": "place_steak", "pan": pan, "room": "kitchen"},
+        })
+        pan = (pan % _NUM_PANS) + 1
+
+    # ── Table setting readiness (t=5) ──
+    events.append({
+        "t": 5,
+        "type": "ongoing_task_event",
+        "data": {"task": "dining", "event": "table_ready", "room": "bedroom"},
+    })
+
+    # ── PM reminders + triggers ──
+    for task_id in trigger_order:
+        task_def = get_task(task_id)
+
+        if task_def.trigger_type == "activity":
+            # Activity trigger: watch for game state condition
+            watch_cfg = ACTIVITY_WATCH_CONFIG[task_id]
+            events.append({
+                "t": watch_cfg["watch_from"],
+                "type": "pm_watch_activity",
+                "data": {
+                    "task_id": task_id,
+                    "watch_condition": watch_cfg["condition"],
+                    "fallback_time": watch_cfg["fallback"],
+                },
+            })
+            trigger_time = watch_cfg["fallback"]  # for reminder timing calc
+        else:
+            # Fixed-time trigger
+            trigger_time = BLOCK_TRIGGER_TIMES[block_number][task_id]
+            events.append({
+                "t": trigger_time,
+                "type": "pm_trigger",
+                "data": {
+                    "trigger_id": task_id,
+                    "trigger_event": task_def.trigger_visual,
+                    "trigger_type": task_def.trigger_type,
+                    "task_id": task_id,
+                    "signal": {
+                        "audio": task_def.trigger_audio,
+                        "visual": task_def.trigger_visual,
+                    },
+                },
+            })
+
+        # Reminder: fires ~REMINDER_LEAD_S before trigger (skip for unreminded / CONTROL)
+        is_reminded = (
+            condition != "CONTROL"
+            and task_id != unreminded_task_id
+        )
+        if is_reminded:
+            reminder_time = max(60, trigger_time - REMINDER_LEAD_S)
+            events.append({
+                "t": reminder_time,
+                "type": "robot_speak",
+                "data": {
+                    "text": f"{{{{reminder:{task_id}}}}}",
+                    "log_tag": "reminder",
+                    "task_id": task_id,
+                    "condition": condition,
+                },
+            })
+
+        # Also inject phone message for communication triggers
+        if task_def.trigger_type == "communication":
+            events.append({
+                "t": trigger_time,
+                "type": "phone_message",
+                "data": {"message_id": f"pm_trigger_{task_id}"},
+            })
+
+    # ── Neutral robot utterances ──
+    utterances = list(NEUTRAL_UTTERANCES[block_number])
+    # Place at roughly even intervals, avoiding ±20s of triggers
+    trigger_times_set = set()
+    for task_id in trigger_order:
+        if task_id in BLOCK_TRIGGER_TIMES.get(block_number, {}):
+            trigger_times_set.add(BLOCK_TRIGGER_TIMES[block_number][task_id])
+        if task_id in ACTIVITY_WATCH_CONFIG:
+            trigger_times_set.add(ACTIVITY_WATCH_CONFIG[task_id]["fallback"])
+
+    neutral_times = [45, 150, 260, 470]  # default placement
+    for i, utt in enumerate(utterances):
+        t = neutral_times[i] if i < len(neutral_times) else 100 + i * 120
+        events.append({
+            "t": t,
+            "type": "robot_speak",
+            "data": {"text": utt, "log_tag": "neutral"},
+        })
+
+    # ── Fake triggers ──
+    for fake in _FAKE_TRIGGERS.get(block_number, []):
+        # Place 30s before first real trigger to set expectations
+        first_trigger_time = min(trigger_times_set) if trigger_times_set else 200
+        fake_time = max(90, first_trigger_time - 45)
+        events.append({
+            "t": fake_time,
+            "type": "fake_trigger",
+            "data": {
+                "trigger_type": fake["trigger_type"],
+                "content": fake["content"],
+                "duration": fake["duration"],
+            },
+        })
+
+    # ── Phone messages (from message pool, loaded by timeline engine) ──
+    # These are loaded from the messages JSON file by the existing engine
+    # We include scheduled message IDs here
+    msg_times = list(range(30, 590, 25))  # ~22 messages
+    for i, t in enumerate(msg_times):
+        msg_id = f"msg_{i+1:03d}" if i < 18 else f"ad_{i-17:03d}"
+        events.append({
+            "t": t,
+            "type": "phone_message",
+            "data": {"message_id": msg_id},
+        })
+
+    # ── Block end ──
+    events.append({"t": 600, "type": "block_end", "data": {}})
+
+    # Sort by time, then by type priority (block_start first, block_end last)
+    type_priority = {"block_start": 0, "block_end": 99}
+    events.sort(key=lambda e: (e["t"], type_priority.get(e["type"], 50)))
+
+    return {
+        "block_number": block_number,
+        "condition": condition,
+        "guest": guest,
+        "day_story": f"Day {block_number}: Cooking steak dinner for {guest}",
+        "duration_seconds": 600,
+        "events": events,
+    }

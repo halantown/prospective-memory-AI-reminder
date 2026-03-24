@@ -1,0 +1,372 @@
+{
+  "skin": "books_v3",
+  "game_type": "semantic_cat",
+  "categories": [
+    "Fiction",
+    "Non-Fiction",
+    "Textbook"
+  ],
+  "instruction": "Sort each book into the correct shelf.",
+  "items": [
+    {
+      "id": 1,
+      "stimulus": "The Great Gatsby 📖",
+      "preview": "A tale of the Jazz Age by F. Scott Fitzgerald",
+      "category": "Fiction"
+    },
+    {
+      "id": 2,
+      "stimulus": "Sapiens 🌍",
+      "preview": "A brief history of humankind by Yuval Harari",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 3,
+      "stimulus": "Introduction to Algorithms 📐",
+      "preview": "Cormen, Leiserson, Rivest & Stein",
+      "category": "Textbook"
+    },
+    {
+      "id": 4,
+      "stimulus": "1984 👁️",
+      "preview": "George Orwell's dystopian masterpiece",
+      "category": "Fiction"
+    },
+    {
+      "id": 5,
+      "stimulus": "Thinking, Fast and Slow 🧠",
+      "preview": "Daniel Kahneman on decision making",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 6,
+      "stimulus": "Organic Chemistry 🧪",
+      "preview": "Morrison & Boyd, 7th edition",
+      "category": "Textbook"
+    },
+    {
+      "id": 7,
+      "stimulus": "Pride and Prejudice 💕",
+      "preview": "Jane Austen's timeless romance",
+      "category": "Fiction"
+    },
+    {
+      "id": 8,
+      "stimulus": "The Diary of a Young Girl 📔",
+      "preview": "Anne Frank's wartime journal",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 9,
+      "stimulus": "Calculus: Early Transcendentals 📏",
+      "preview": "James Stewart, standard calc text",
+      "category": "Textbook"
+    },
+    {
+      "id": 10,
+      "stimulus": "To Kill a Mockingbird 🐦",
+      "preview": "Harper Lee's classic on justice",
+      "category": "Fiction"
+    },
+    {
+      "id": 11,
+      "stimulus": "Educated 🎓",
+      "preview": "Tara Westover's memoir of self-invention",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 12,
+      "stimulus": "Campbell Biology 🧬",
+      "preview": "The definitive biology textbook",
+      "category": "Textbook"
+    },
+    {
+      "id": 13,
+      "stimulus": "Harry Potter and the Sorcerer's Stone ⚡",
+      "preview": "J.K. Rowling's wizarding debut",
+      "category": "Fiction"
+    },
+    {
+      "id": 14,
+      "stimulus": "The Wright Brothers ✈️",
+      "preview": "David McCullough on aviation pioneers",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 15,
+      "stimulus": "Physics: Principles with Applications 🔬",
+      "preview": "Giancoli, 7th edition",
+      "category": "Textbook"
+    },
+    {
+      "id": 16,
+      "stimulus": "The Hobbit 🐉",
+      "preview": "Bilbo's unexpected journey by Tolkien",
+      "category": "Fiction"
+    },
+    {
+      "id": 17,
+      "stimulus": "Quiet: The Power of Introverts 🤫",
+      "preview": "Susan Cain on introversion",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 18,
+      "stimulus": "Data Structures in Java ☕",
+      "preview": "Mark Allen Weiss textbook",
+      "category": "Textbook"
+    },
+    {
+      "id": 19,
+      "stimulus": "Brave New World 🌐",
+      "preview": "Aldous Huxley's vision of the future",
+      "category": "Fiction"
+    },
+    {
+      "id": 20,
+      "stimulus": "Born a Crime 😂",
+      "preview": "Trevor Noah's South African childhood",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 21,
+      "stimulus": "Principles of Economics 💰",
+      "preview": "N. Gregory Mankiw, 9th edition",
+      "category": "Textbook"
+    },
+    {
+      "id": 22,
+      "stimulus": "Dune 🏜️",
+      "preview": "Frank Herbert's sci-fi epic",
+      "category": "Fiction"
+    },
+    {
+      "id": 23,
+      "stimulus": "Becoming 🌟",
+      "preview": "Michelle Obama's personal memoir",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 24,
+      "stimulus": "Human Anatomy & Physiology 🫀",
+      "preview": "Marieb & Hoehn, 11th edition",
+      "category": "Textbook"
+    },
+    {
+      "id": 25,
+      "stimulus": "The Catcher in the Rye 🧢",
+      "preview": "J.D. Salinger's coming-of-age novel",
+      "category": "Fiction"
+    },
+    {
+      "id": 26,
+      "stimulus": "Guns, Germs, and Steel 🗡️",
+      "preview": "Jared Diamond on civilization",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 27,
+      "stimulus": "Linear Algebra Done Right 📊",
+      "preview": "Sheldon Axler, 4th edition",
+      "category": "Textbook"
+    },
+    {
+      "id": 28,
+      "stimulus": "Crime and Punishment ⚖️",
+      "preview": "Dostoevsky's psychological thriller",
+      "category": "Fiction"
+    },
+    {
+      "id": 29,
+      "stimulus": "The Immortal Life of Henrietta Lacks 🔬",
+      "preview": "Rebecca Skloot on medical ethics",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 30,
+      "stimulus": "Fundamentals of Nursing 🏥",
+      "preview": "Potter & Perry clinical guide",
+      "category": "Textbook"
+    },
+    {
+      "id": 31,
+      "stimulus": "One Hundred Years of Solitude 🦋",
+      "preview": "Gabriel García Márquez's masterwork",
+      "category": "Fiction"
+    },
+    {
+      "id": 32,
+      "stimulus": "Outliers 📈",
+      "preview": "Malcolm Gladwell on success factors",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 33,
+      "stimulus": "Computer Networking: A Top-Down Approach 🌐",
+      "preview": "Kurose & Ross",
+      "category": "Textbook"
+    },
+    {
+      "id": 34,
+      "stimulus": "The Road 🛤️",
+      "preview": "Cormac McCarthy's post-apocalyptic journey",
+      "category": "Fiction"
+    },
+    {
+      "id": 35,
+      "stimulus": "Atomic Habits ⚛️",
+      "preview": "James Clear on habit formation",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 36,
+      "stimulus": "Statistics for Business 📉",
+      "preview": "Anderson, Sweeney & Williams",
+      "category": "Textbook"
+    },
+    {
+      "id": 37,
+      "stimulus": "Fahrenheit 451 🔥",
+      "preview": "Ray Bradbury's book-burning future",
+      "category": "Fiction"
+    },
+    {
+      "id": 38,
+      "stimulus": "Freakonomics 🎯",
+      "preview": "Levitt & Dubner on hidden economics",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 39,
+      "stimulus": "Molecular Biology of the Cell 🧫",
+      "preview": "Alberts et al., 7th edition",
+      "category": "Textbook"
+    },
+    {
+      "id": 40,
+      "stimulus": "The Alchemist ✨",
+      "preview": "Paulo Coelho's philosophical fable",
+      "category": "Fiction"
+    },
+    {
+      "id": 41,
+      "stimulus": "A Short History of Nearly Everything 🔭",
+      "preview": "Bill Bryson's science tour",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 42,
+      "stimulus": "Introduction to Psychology 🧩",
+      "preview": "Hilgard's standard text",
+      "category": "Textbook"
+    },
+    {
+      "id": 43,
+      "stimulus": "The Name of the Wind 🌀",
+      "preview": "Patrick Rothfuss fantasy epic",
+      "category": "Fiction"
+    },
+    {
+      "id": 44,
+      "stimulus": "When Breath Becomes Air 💨",
+      "preview": "Paul Kalanithi's medical memoir",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 45,
+      "stimulus": "Discrete Mathematics 🔢",
+      "preview": "Rosen, 8th edition",
+      "category": "Textbook"
+    },
+    {
+      "id": 46,
+      "stimulus": "Catch-22 🎖️",
+      "preview": "Joseph Heller's satirical war novel",
+      "category": "Fiction"
+    },
+    {
+      "id": 47,
+      "stimulus": "Sapiens: A Graphic History 🎨",
+      "preview": "Harari's illustrated edition",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 48,
+      "stimulus": "Operating System Concepts 💻",
+      "preview": "Silberschatz, Galvin & Gagne",
+      "category": "Textbook"
+    },
+    {
+      "id": 49,
+      "stimulus": "The Kite Runner 🪁",
+      "preview": "Khaled Hosseini's Afghan story",
+      "category": "Fiction"
+    },
+    {
+      "id": 50,
+      "stimulus": "The Code Breaker 🧬",
+      "preview": "Walter Isaacson on Jennifer Doudna",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 51,
+      "stimulus": "Probability and Statistics 🎲",
+      "preview": "Wackerly, Mendenhall & Scheaffer",
+      "category": "Textbook"
+    },
+    {
+      "id": 52,
+      "stimulus": "Circe 🏺",
+      "preview": "Madeline Miller's mythological retelling",
+      "category": "Fiction"
+    },
+    {
+      "id": 53,
+      "stimulus": "The Handmaid's Tale",
+      "preview": "Margaret Atwood's dystopian novel about a theocratic regime...",
+      "category": "Fiction"
+    },
+    {
+      "id": 54,
+      "stimulus": "When Breath Becomes Air",
+      "preview": "Paul Kalanithi's memoir of facing terminal cancer as a neurosurgeon...",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 55,
+      "stimulus": "Biochemistry (Lehninger)",
+      "preview": "Graduate textbook covering enzymes, metabolism, and molecular biology...",
+      "category": "Textbook"
+    },
+    {
+      "id": 56,
+      "stimulus": "The Bell Jar",
+      "preview": "Sylvia Plath's semi-autobiographical novel about mental illness...",
+      "category": "Fiction"
+    },
+    {
+      "id": 57,
+      "stimulus": "The Glass Castle",
+      "preview": "Jeannette Walls' memoir of an unconventional, nomadic childhood...",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 58,
+      "stimulus": "Discrete Mathematics and Its Applications (Rosen)",
+      "preview": "Textbook covering logic, sets, combinatorics, and graph theory...",
+      "category": "Textbook"
+    },
+    {
+      "id": 59,
+      "stimulus": "Stiff: The Curious Lives of Human Cadavers",
+      "preview": "Mary Roach explores the history and science of human remains...",
+      "category": "Non-Fiction"
+    },
+    {
+      "id": 60,
+      "stimulus": "Thermodynamics: An Engineering Approach (Çengel)",
+      "preview": "Engineering textbook on heat transfer, entropy, and energy systems...",
+      "category": "Textbook"
+    }
+  ]
+}

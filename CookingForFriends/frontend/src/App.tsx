@@ -1,0 +1,105 @@
+/** App root — path-based routing with session recovery. */
+
+import { useEffect } from 'react'
+import { useGameStore } from './stores/gameStore'
+import { getSessionStatus } from './services/api'
+import WelcomePage from './pages/game/WelcomePage'
+import EncodingPage from './pages/game/EncodingPage'
+import GamePage from './pages/game/GamePage'
+import MicroBreakPage from './pages/game/MicroBreakPage'
+import DebriefPage from './pages/game/DebriefPage'
+import AdminDashboard from './pages/admin/DashboardPage'
+
+export default function App() {
+  const path = window.location.pathname
+
+  // Admin routes
+  if (path.startsWith('/admin')) {
+    return <AdminDashboard />
+  }
+
+  // Game routes — phase-based rendering
+  return <GameShell />
+}
+
+function GameShell() {
+  const phase = useGameStore((s) => s.phase)
+  const sessionId = useGameStore((s) => s.sessionId)
+  const setSession = useGameStore((s) => s.setSession)
+  const setPhase = useGameStore((s) => s.setPhase)
+  const setBlockNumber = useGameStore((s) => s.setBlockNumber)
+
+  // Recover session from sessionStorage on mount
+  useEffect(() => {
+    if (sessionId) return
+    const saved = sessionStorage.getItem('cff_session')
+    if (!saved) return
+
+    try {
+      const data = JSON.parse(saved)
+      if (!data.session_id) return
+
+      // Restore session and fetch current status
+      setSession(data)
+      getSessionStatus(data.session_id)
+        .then((status) => {
+          if (status.current_block) setBlockNumber(status.current_block)
+          // Map backend status/phase to frontend phase
+          const phaseMap: Record<string, string> = {
+            pending: 'encoding',
+            encoding: 'encoding',
+            playing: 'playing',
+            microbreak: 'microbreak',
+            completed: 'encoding', // next block starts with encoding
+          }
+          const resolvedPhase = phaseMap[status.phase || ''] || 'welcome'
+          if (status.status === 'completed') {
+            setPhase('complete')
+          } else if (status.status === 'in_progress') {
+            setPhase(resolvedPhase as any)
+          }
+        })
+        .catch(() => {
+          // Session invalid — clear and go to welcome
+          sessionStorage.removeItem('cff_session')
+        })
+    } catch {
+      sessionStorage.removeItem('cff_session')
+    }
+  }, [])
+
+  switch (phase) {
+    case 'welcome':
+      return <WelcomePage />
+    case 'onboarding':
+      return <WelcomePage />
+    case 'encoding':
+      return <EncodingPage />
+    case 'playing':
+      return <GamePage />
+    case 'microbreak':
+      return <MicroBreakPage />
+    case 'block_end':
+      return <MicroBreakPage />
+    case 'debrief':
+      return <DebriefPage />
+    case 'complete':
+      return <CompletePage />
+    default:
+      return <WelcomePage />
+  }
+}
+
+function CompletePage() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
+      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+        <div className="text-5xl mb-4">🎉</div>
+        <h1 className="text-2xl font-bold text-slate-800 mb-2">Thank You!</h1>
+        <p className="text-slate-600">
+          You have completed the experiment. Please inform the experimenter.
+        </p>
+      </div>
+    </div>
+  )
+}

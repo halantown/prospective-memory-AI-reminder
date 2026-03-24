@@ -1,0 +1,101 @@
+{
+  "user_id": "u_001",
+  
+  "family": [
+    {
+      "contact_id": "contact_001",
+      "name": "Sarah",
+      "relationship": "daughter",
+      "phone": "+31-20-555-0201",
+      "email": "sarah.woodsen@email.com",
+      "lives_nearby": true,
+      "visit_frequency": "weekly",
+      "typical_activities": ["dinner together", "grocery shopping help", "medication check"],
+      "notes": "Often reminds mother about medications. Visits every Wednesday evening."
+    },
+    {
+      "contact_id": "contact_002",
+      "name": "Tom",
+      "relationship": "son",
+      "phone": "+31-20-555-0202",
+      "lives_nearby": false,
+      "visit_frequency": "monthly",
+      "typical_activities": ["video calls", "birthday visits"],
+      "notes": "Lives in Rotterdam. Calls every Sunday."
+    },
+    {
+      "contact_id": "contact_003",
+      "name": "Emma",
+      "relationship": "granddaughter",
+      "age": 8,
+      "notes": "Sarah's daughter. Alice loves showing her garden photos."
+    }
+  ],
+
+  "medical": [
+    {
+      "contact_id": "contact_101",
+      "name": "Dr. Ming Wang",
+      "relationship": "cardiologist",
+      "institution": "City Hospital",
+      "phone": "+31-20-555-0102",
+      "email": "dr.wang@cityhospital.nl",
+      "appointment_frequency": "monthly",
+      "trust_level": "high",
+      "notes": "Primary physician for hypertension. Very patient and explains things clearly."
+    },
+    {
+      "contact_id": "contact_102",
+      "name": "Nurse Lisa",
+      "relationship": "clinic nurse",
+      "institution": "City Hospital",
+      "phone": "+31-20-555-0103",
+      "notes": "Helps with blood pressure measurements. Always friendly."
+    },
+    {
+      "contact_id": "contact_103",
+      "name": "Apotheek De Pijp",
+      "relationship": "pharmacy",
+      "phone": "+31-20-555-0150",
+      "address": "Ceintuurbaan 123",
+      "notes": "Regular pharmacy for medication refills"
+    }
+  ],
+
+  "friends": [
+    {
+      "contact_id": "contact_201",
+      "name": "Maria",
+      "relationship": "neighbor and friend",
+      "phone": "+31-20-555-0301",
+      "typical_activities": ["morning coffee", "garden chat", "book exchange"],
+      "visit_frequency": "daily",
+      "notes": "Lives next door. They often have coffee together at 10am."
+    },
+    {
+      "contact_id": "contact_202", 
+      "name": "Bridge Club",
+      "relationship": "social group",
+      "location": "Community Center",
+      "schedule": "Every Saturday 15:00-17:00",
+      "members": ["Johanna", "Pieter", "Els", "Hans"],
+      "notes": "Weekly bridge game. Important social activity."
+    },
+    {
+      "contact_id": "contact_203",
+      "name": "Brian",
+      "relationship": "neighbor",
+      "notes": "Lives across the street. Sometimes asks for help with garden."
+    }
+  ],
+
+  "services": [
+    {
+      "contact_id": "contact_301",
+      "name": "Albert Heijn Delivery",
+      "type": "grocery delivery",
+      "phone": "+31-20-555-0400",
+      "notes": "Online grocery orders, delivery on Tuesdays"
+    }
+  ]
+}

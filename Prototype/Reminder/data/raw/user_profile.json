@@ -1,0 +1,14 @@
+{
+  "user_id": "u_001",
+  "name": "Alice Van Der Woodsen",
+  "age": 76,
+  "language": "en-US",
+  "conditions": [
+    "Hypertension",
+    "Mild Cognitive Impairment"
+  ],
+  "preferences": {
+    "reminder_style": "Polite and Detailed",
+    "voice_speed": "Slow"
+  }
+}

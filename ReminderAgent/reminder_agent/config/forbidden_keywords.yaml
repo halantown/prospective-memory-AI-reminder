@@ -1,0 +1,112 @@
+# Forbidden Keywords — per-task visual/domain keywords.
+# Originally used to enforce Low AF compliance (Low AF conditions removed in 3-group redesign).
+# Retained for reference and potential future quality-gate extensions.
+#
+# visual_keywords: appearance cues (colour, shape, container)
+# domain_keywords: specific properties (dosage, form)
+
+b1_book:
+  visual_keywords:
+    - "red"
+    - "mountain"
+    - "landscape"
+    - "cover"
+  domain_keywords:
+    - "erta ale"
+    - "paperback"
+
+b1_giftbag:
+  visual_keywords:
+    - "blue"
+    - "bow"
+    - "small"
+  domain_keywords:
+    - "small"
+    - "bow"
+
+b1_dish:
+  visual_keywords:
+    - "oval"
+    - "white"
+    - "ceramic"
+    - "blue handles"
+  domain_keywords:
+    - "oval"
+    - "blue"
+
+b1_soap:
+  visual_keywords:
+    - "white"
+    - "pump"
+    - "yellow"
+    - "lemon"
+  domain_keywords:
+    - "lemon"
+    - "pump bottle"
+
+b2_vinyl:
+  visual_keywords:
+    - "black"
+    - "car"
+    - "sleeve"
+  domain_keywords:
+    - "night drive"
+
+b2_napkinrings:
+  visual_keywords:
+    - "wood"
+    - "oak"
+    - "natural"
+  domain_keywords:
+    - "wooden"
+
+b2_pot:
+  visual_keywords:
+    - "brown"
+    - "terracotta"
+    - "saucer"
+  domain_keywords:
+    - "saucer"
+
+b2_softener:
+  visual_keywords:
+    - "purple"
+    - "lavender"
+    - "flower"
+  domain_keywords:
+    - "lavender"
+
+b3_hanger:
+  visual_keywords:
+    - "wood"
+    - "wide"
+    - "curved"
+  domain_keywords:
+    - "wide"
+
+b3_speaker:
+  visual_keywords:
+    - "round"
+    - "gray"
+    - "fabric"
+    - "mesh"
+  domain_keywords:
+    - "fabric"
+
+b3_vase:
+  visual_keywords:
+    - "ceramic"
+    - "blue"
+    - "glaze"
+    - "small"
+  domain_keywords:
+    - "blue"
+
+b3_handcream:
+  visual_keywords:
+    - "white"
+    - "purple"
+    - "lavender"
+    - "tube"
+  domain_keywords:
+    - "lavender"

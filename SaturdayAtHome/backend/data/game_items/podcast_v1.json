@@ -1,0 +1,19 @@
+{
+  "skin": "podcast_v1",
+  "game_type": "trivia",
+  "instruction": "Answer each trivia question — True or False?",
+  "items": [
+    {"id": 1,  "question": "The Great Wall of China is visible from space with the naked eye.", "answer": false, "explanation": "It's too narrow to be seen from space without aid."},
+    {"id": 2,  "question": "Honey never spoils if stored properly.", "answer": true, "explanation": "Archaeologists have found 3000-year-old honey that was still edible."},
+    {"id": 3,  "question": "Octopuses have three hearts.", "answer": true, "explanation": "Two pump blood to the gills, one pumps to the rest of the body."},
+    {"id": 4,  "question": "Lightning never strikes the same place twice.", "answer": false, "explanation": "Tall buildings like the Empire State Building are struck many times per year."},
+    {"id": 5,  "question": "Bananas are technically berries.", "answer": true, "explanation": "Botanically, bananas qualify as berries while strawberries do not."},
+    {"id": 6,  "question": "Humans only use 10% of their brain.", "answer": false, "explanation": "Brain imaging shows that virtually all areas of the brain are active."},
+    {"id": 7,  "question": "Venus is the hottest planet in our solar system.", "answer": true, "explanation": "Its thick atmosphere traps heat, making it hotter than Mercury."},
+    {"id": 8,  "question": "Goldfish have a memory span of only 3 seconds.", "answer": false, "explanation": "Studies show goldfish can remember things for months."},
+    {"id": 9,  "question": "A group of flamingos is called a flamboyance.", "answer": true, "explanation": "The collective noun for flamingos is indeed 'flamboyance'."},
+    {"id": 10, "question": "Sound travels faster through water than through air.", "answer": true, "explanation": "Sound travels about 4x faster in water due to higher density."},
+    {"id": 11, "question": "The Earth is closer to the sun in summer.", "answer": false, "explanation": "Seasons are caused by Earth's tilt, not distance from the sun."},
+    {"id": 12, "question": "A day on Venus is longer than a year on Venus.", "answer": true, "explanation": "Venus rotates very slowly — one rotation takes longer than its orbit around the Sun."}
+  ]
+}

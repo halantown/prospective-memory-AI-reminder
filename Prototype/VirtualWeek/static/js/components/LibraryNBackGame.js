@@ -1,0 +1,557 @@
+/**
+ * 图书馆 N-Back 工作记忆任务
+ * Library-themed N-back game: judge if current book/stationery item
+ * matches the one from N steps ago on the reading desk.
+ */
+const LibraryNBackGame = {
+    name: 'LibraryNBackGame',
+    props: ['scenario'],
+    emits: ['complete'],
+
+    setup(props, { emit }) {
+        const { ref, computed, onMounted, onUnmounted, watch } = Vue;
+
+        // ============================================================
+        // 配置
+        // ============================================================
+        const defaultScenario = {
+            nLevel: 2,
+            totalTrials: 20,
+            matchRatio: 0.3,
+            stimulusDuration: 2500,
+            interStimulusInterval: 500,
+            stimuli: ['📕','📗','📘','📙','📓','📒','📔','🔖','📝','📎','📐','✏️'],
+            totalRounds: 1,
+            lang: 'zh'
+        };
+
+        const config = ref({ ...defaultScenario, ...(props.scenario || {}) });
+
+        // ============================================================
+        // i18n
+        // ============================================================
+        const TEXTS = {
+            header_subtitle: { zh: '工作记忆测试', en: 'Working Memory Test', nl: 'Werkgeheugentest' },
+            header_title: { zh: '图书馆记忆', en: 'Library Memory', nl: 'Bibliotheek Geheugen' },
+            trial_progress: { zh: '第 {current} / {total} 个', en: 'Trial {current} / {total}', nl: 'Trial {current} / {total}' },
+            accuracy_label: { zh: '正确率: {value}%', en: 'Accuracy: {value}%', nl: 'Nauwkeurigheid: {value}%' },
+            intro_title: { zh: '📚 图书馆记忆挑战', en: '📚 Library Memory Challenge', nl: '📚 Bibliotheek Geheugenuitdaging' },
+            intro_desc: {
+                zh: '阅读桌上会依次出现<strong class="text-emerald-700">书本和文具</strong>。请判断当前物品是否与<strong class="text-emerald-700"> {n} 个之前</strong>的物品<strong class="text-emerald-700">相同</strong>。',
+                en: '<strong class="text-emerald-700">Books and stationery</strong> will appear one at a time on the reading desk. Determine if the current item is <strong class="text-emerald-700">the same</strong> as the one <strong class="text-emerald-700">{n} steps ago</strong>.',
+                nl: '<strong class="text-emerald-700">Boeken en schrijfwaren</strong> verschijnen één voor één op de leesafel. Bepaal of het huidige item <strong class="text-emerald-700">hetzelfde</strong> is als dat van <strong class="text-emerald-700">{n} stappen geleden</strong>.'
+            },
+            example_label: { zh: '示例 ({n}-back):', en: 'Example ({n}-back):', nl: 'Voorbeeld ({n}-back):' },
+            match_indicator: { zh: '← 匹配！', en: '← Match!', nl: '← Match!' },
+            timing_hint: { zh: '⏱ 每个物品展示 {duration} 秒，请尽快作答。', en: '⏱ Each item is shown for {duration} seconds. Respond quickly.', nl: '⏱ Elk item wordt {duration} seconden getoond. Reageer zo snel mogelijk.' },
+            start_button: { zh: '开始挑战', en: 'Start Challenge', nl: 'Start Uitdaging' },
+            remember_hint: { zh: '请记住这个物品（前 {n} 个无需判断）', en: 'Remember this item (no response needed for first {n})', nl: 'Onthoud dit item (geen reactie nodig voor de eerste {n})' },
+            match_question: { zh: '与 {n} 个前的相同吗？', en: 'Same as {n} back?', nl: 'Hetzelfde als {n} terug?' },
+            match_button: { zh: '匹配', en: 'Match', nl: 'Match' },
+            no_match_button: { zh: '不匹配', en: 'No Match', nl: 'Geen Match' },
+            perf_excellent: { zh: '书虫达人！', en: 'Bookworm Master!', nl: 'Boekenwurm Meester!' },
+            perf_good: { zh: '阅读能手！', en: 'Skilled Reader!', nl: 'Vaardige Lezer!' },
+            perf_practice: { zh: '继续翻阅！', en: 'Keep Reading!', nl: 'Blijf Lezen!' },
+            task_complete: { zh: '图书馆记忆任务完成', en: 'Library Memory Task Complete', nl: 'Bibliotheek Geheugentaak Voltooid' },
+            total_accuracy: { zh: '总正确率', en: 'Total Accuracy', nl: 'Totale Nauwkeurigheid' },
+            avg_rt: { zh: '平均反应时', en: 'Avg Response Time', nl: 'Gem. Reactietijd' },
+            hits_label: { zh: '命中 (Hits)', en: 'Hits', nl: 'Hits' },
+            false_alarms_label: { zh: '虚报 (FA)', en: 'False Alarms', nl: 'Vals Alarm' },
+            remember_first_n: { zh: '请先记住前 {n} 个物品', en: 'Remember the first {n} items', nl: 'Onthoud de eerste {n} items' },
+            answer_instruction: { zh: '按"匹配"或"不匹配"作答', en: 'Press "Match" or "No Match" to respond', nl: 'Druk op "Match" of "Geen Match" om te reageren' },
+            finish_button: { zh: '完成', en: 'Finish', nl: 'Voltooien' },
+            round_label: { zh: '第 {current} / {total} 轮', en: 'Round {current} / {total}', nl: 'Ronde {current} / {total}' },
+            round_complete: { zh: '本轮完成！', en: 'Round Complete!', nl: 'Ronde Voltooid!' },
+            round_accuracy: { zh: '本轮正确率: {value}%', en: 'This round accuracy: {value}%', nl: 'Nauwkeurigheid deze ronde: {value}%' },
+            next_round: { zh: '开始下一轮', en: 'Next Round', nl: 'Volgende Ronde' }
+        };
+        const lang = computed(() => config.value.lang || 'zh');
+        const t = (key, params = {}) => {
+            let text = TEXTS[key]?.[lang.value] || TEXTS[key]?.en || key;
+            Object.entries(params).forEach(([k, v]) => {
+                text = text.replaceAll(`{${k}}`, v);
+            });
+            return text;
+        };
+
+        const N = computed(() => config.value.nLevel);
+
+        // ============================================================
+        // 状态
+        // ============================================================
+        const phase = ref('intro');         // 'intro' | 'playing' | 'round_break' | 'feedback'
+        const sequence = ref([]);
+        const currentTrialIndex = ref(-1);
+        const currentStimulus = ref(null);
+        const showingBlank = ref(false);
+        const responded = ref(false);
+        const trialStartTime = ref(0);
+
+        // Multi-round tracking
+        const currentRound = ref(1);
+        const allRoundResults = ref([]);
+
+        const results = ref([]);
+        const hits = ref(0);
+        const misses = ref(0);
+        const falseAlarms = ref(0);
+        const correctRejections = ref(0);
+
+        let trialTimer = null;
+        let blankTimer = null;
+        let gameStartTime = 0;
+        let isDestroyed = false;
+
+        // ============================================================
+        // 序列生成
+        // ============================================================
+        const generateSequence = () => {
+            const { totalTrials, matchRatio, stimuli } = config.value;
+            const n = N.value;
+            const seq = [];
+            const numMatches = Math.round(totalTrials * matchRatio);
+
+            const matchIndices = new Set();
+            const candidates = [];
+            for (let i = n; i < totalTrials; i++) candidates.push(i);
+            for (let i = candidates.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+            }
+            for (let i = 0; i < Math.min(numMatches, candidates.length); i++) {
+                matchIndices.add(candidates[i]);
+            }
+
+            const getRandomStimulus = () => {
+                return stimuli[Math.floor(Math.random() * stimuli.length)];
+            };
+
+            const getDifferentStimulus = (avoid) => {
+                let s;
+                let attempts = 0;
+                do {
+                    s = getRandomStimulus();
+                    attempts++;
+                } while (s === avoid && attempts < 50);
+                return s;
+            };
+
+            for (let i = 0; i < n && i < totalTrials; i++) {
+                seq.push({ stimulus: getRandomStimulus(), isMatch: false });
+            }
+
+            for (let i = n; i < totalTrials; i++) {
+                if (matchIndices.has(i)) {
+                    seq.push({ stimulus: seq[i - n].stimulus, isMatch: true });
+                } else {
+                    seq.push({ stimulus: getDifferentStimulus(seq[i - n].stimulus), isMatch: false });
+                }
+            }
+            return seq;
+        };
+
+        // ============================================================
+        // 游戏控制
+        // ============================================================
+        const startGame = () => {
+            currentRound.value = 1;
+            allRoundResults.value = [];
+            startRound();
+        };
+
+        const startRound = () => {
+            sequence.value = generateSequence();
+            results.value = [];
+            hits.value = 0;
+            misses.value = 0;
+            falseAlarms.value = 0;
+            correctRejections.value = 0;
+            currentTrialIndex.value = -1;
+            gameStartTime = performance.now();
+            phase.value = 'playing';
+            nextTrial();
+        };
+
+        const nextTrial = () => {
+            if (isDestroyed) return;
+
+            const nextIdx = currentTrialIndex.value + 1;
+            if (nextIdx >= sequence.value.length) {
+                endGame();
+                return;
+            }
+
+            if (currentTrialIndex.value >= 0 && !responded.value) {
+                recordResponse(null);
+            }
+
+            currentTrialIndex.value = nextIdx;
+            const trial = sequence.value[nextIdx];
+            currentStimulus.value = trial.stimulus;
+            showingBlank.value = false;
+            responded.value = false;
+            trialStartTime.value = performance.now();
+
+            trialTimer = setTimeout(() => {
+                if (isDestroyed) return;
+                showingBlank.value = true;
+                blankTimer = setTimeout(() => {
+                    if (isDestroyed) return;
+                    nextTrial();
+                }, config.value.interStimulusInterval);
+            }, config.value.stimulusDuration);
+        };
+
+        const handleResponse = (isMatch) => {
+            if (responded.value || phase.value !== 'playing') return;
+            responded.value = true;
+            recordResponse(isMatch);
+        };
+
+        const recordResponse = (response) => {
+            const idx = currentTrialIndex.value;
+            const trial = sequence.value[idx];
+            const rt = response !== null ? Math.round(performance.now() - trialStartTime.value) : null;
+            const isActualMatch = trial.isMatch;
+
+            let correct = false;
+            if (response === null) {
+                if (isActualMatch) {
+                    misses.value++;
+                } else {
+                    correctRejections.value++;
+                    correct = true;
+                }
+            } else if (response === true) {
+                if (isActualMatch) {
+                    hits.value++;
+                    correct = true;
+                } else {
+                    falseAlarms.value++;
+                }
+            } else {
+                if (!isActualMatch) {
+                    correctRejections.value++;
+                    correct = true;
+                } else {
+                    misses.value++;
+                }
+            }
+
+            results.value.push({
+                trial: idx,
+                stimulus: trial.stimulus,
+                isMatch: isActualMatch,
+                response,
+                correct,
+                rt
+            });
+        };
+
+        const endGame = () => {
+            if (!responded.value && currentTrialIndex.value >= 0) {
+                recordResponse(null);
+            }
+            clearTimeout(trialTimer);
+            clearTimeout(blankTimer);
+
+            // Save this round's results
+            allRoundResults.value.push({
+                round: currentRound.value,
+                accuracy: accuracy.value,
+                hits: hits.value,
+                misses: misses.value,
+                falseAlarms: falseAlarms.value,
+                correctRejections: correctRejections.value,
+                avgResponseTime: avgResponseTime.value,
+                totalTime: Math.round(performance.now() - gameStartTime),
+                trials: [...results.value]
+            });
+
+            const maxRounds = config.value.totalRounds || 1;
+            if (currentRound.value < maxRounds) {
+                phase.value = 'round_break';
+            } else {
+                phase.value = 'feedback';
+            }
+        };
+
+        const startNextRound = () => {
+            currentRound.value++;
+            startRound();
+        };
+
+        // ============================================================
+        // 计算属性
+        // ============================================================
+        const totalResponded = computed(() => results.value.length);
+        const accuracy = computed(() => {
+            if (totalResponded.value === 0) return 0;
+            const correctCount = results.value.filter(r => r.correct).length;
+            return Math.round((correctCount / totalResponded.value) * 100);
+        });
+        const avgResponseTime = computed(() => {
+            const resp = results.value.filter(r => r.rt !== null);
+            if (resp.length === 0) return 0;
+            return Math.round(resp.reduce((sum, r) => sum + r.rt, 0) / resp.length);
+        });
+        const progressPercent = computed(() => {
+            return Math.round(((currentTrialIndex.value + 1) / config.value.totalTrials) * 100);
+        });
+        const performanceLevel = computed(() => {
+            if (accuracy.value >= 80) return 'excellent';
+            if (accuracy.value >= 60) return 'good';
+            return 'needsPractice';
+        });
+
+        // ============================================================
+        // 完成
+        // ============================================================
+        // Overall stats across all rounds
+        const overallAccuracy = computed(() => {
+            const rounds = allRoundResults.value;
+            if (rounds.length === 0) return accuracy.value;
+            const total = rounds.reduce((s, r) => s + r.trials.length, 0);
+            if (total === 0) return 0;
+            const correct = rounds.reduce((s, r) => s + r.trials.filter(t => t.correct).length, 0);
+            return Math.round((correct / total) * 100);
+        });
+
+        const finishGame = () => {
+            clearTimeout(trialTimer);
+            clearTimeout(blankTimer);
+            const rounds = allRoundResults.value;
+            emit('complete', {
+                game: 'LibraryNBackGame',
+                success: overallAccuracy.value >= 60,
+                nLevel: N.value,
+                totalTrials: config.value.totalTrials,
+                totalRounds: rounds.length,
+                accuracy: overallAccuracy.value,
+                hits: rounds.reduce((s, r) => s + r.hits, 0),
+                misses: rounds.reduce((s, r) => s + r.misses, 0),
+                falseAlarms: rounds.reduce((s, r) => s + r.falseAlarms, 0),
+                correctRejections: rounds.reduce((s, r) => s + r.correctRejections, 0),
+                avgResponseTime: Math.round(rounds.reduce((s, r) => s + r.avgResponseTime, 0) / rounds.length),
+                totalTime: rounds.reduce((s, r) => s + r.totalTime, 0),
+                rounds: rounds
+            });
+        };
+
+        // ============================================================
+        // 生命周期
+        // ============================================================
+        onMounted(() => {
+            if (window.lucide) window.lucide.createIcons();
+        });
+
+        onUnmounted(() => {
+            isDestroyed = true;
+            clearTimeout(trialTimer);
+            clearTimeout(blankTimer);
+        });
+
+        return {
+            config, N, phase, currentRound, allRoundResults, overallAccuracy,
+            sequence, currentTrialIndex, currentStimulus, showingBlank, responded,
+            results, hits, misses, falseAlarms, correctRejections,
+            totalResponded, accuracy, avgResponseTime, progressPercent, performanceLevel,
+            startGame, startNextRound, handleResponse, finishGame,
+            t
+        };
+    },
+
+    // ============================================================
+    // 模板
+    // ============================================================
+    template: `
+    <div class="h-full flex flex-col bg-gradient-to-b from-emerald-50 to-stone-50">
+
+        <!-- 顶部标题栏 -->
+        <div class="bg-white/90 backdrop-blur p-5 border-b border-emerald-100 shrink-0">
+            <div class="flex items-center gap-4">
+                <div class="bg-emerald-100 p-3 rounded-xl">
+                    <i data-lucide="book-open" class="w-8 h-8 text-emerald-600"></i>
+                </div>
+                <div>
+                    <span class="text-emerald-600 font-bold text-sm uppercase tracking-wider">{{ t('header_subtitle') }}</span>
+                    <h2 class="text-xl font-black text-amber-800">{{ t('header_title') }}</h2>
+                </div>
+            </div>
+
+            <!-- 进度条 (playing 阶段) -->
+            <div v-if="phase === 'playing'" class="mt-3">
+                <div class="h-2 bg-stone-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-emerald-500 transition-all duration-300"
+                         :style="{ width: progressPercent + '%' }"></div>
+                </div>
+                <div class="flex justify-between text-xs text-stone-500 mt-1">
+                    <span>{{ t('trial_progress', { current: currentTrialIndex + 1, total: config.totalTrials }) }}
+                        <template v-if="config.totalRounds > 1"> · {{ t('round_label', { current: currentRound, total: config.totalRounds }) }}</template>
+                    </span>
+                    <span>{{ t('accuracy_label', { value: accuracy }) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间：游戏主区域 -->
+        <div class="flex-grow p-6 overflow-y-auto flex items-center justify-center">
+
+            <!-- =============== INTRO 阶段 =============== -->
+            <div v-if="phase === 'intro'" class="text-center max-w-md">
+                <div class="text-6xl mb-4">📚</div>
+                <h3 class="text-2xl font-black text-amber-800 mb-3">{{ t('intro_title') }}</h3>
+                <div class="bg-white rounded-2xl p-5 border border-emerald-200 shadow-sm text-left mb-6 space-y-3">
+                    <p class="text-stone-600 leading-relaxed" v-html="t('intro_desc', { n: N })"></p>
+                    <div class="bg-emerald-50 rounded-xl p-4 space-y-2">
+                        <p class="text-sm font-bold text-emerald-700">{{ t('example_label', { n: N }) }}</p>
+                        <div class="flex items-center gap-2 text-2xl">
+                            <template v-if="N === 2">
+                                <span class="bg-white px-3 py-1 rounded-lg border border-stone-200">📕</span>
+                                <span class="bg-white px-3 py-1 rounded-lg border border-stone-200">📗</span>
+                                <span class="bg-green-100 px-3 py-1 rounded-lg border-2 border-green-500 font-bold">📕</span>
+                                <span class="text-green-600 text-sm font-bold">{{ t('match_indicator') }}</span>
+                            </template>
+                            <template v-else>
+                                <span class="bg-white px-3 py-1 rounded-lg border border-stone-200">📕</span>
+                                <span class="bg-green-100 px-3 py-1 rounded-lg border-2 border-green-500 font-bold">📕</span>
+                                <span class="text-green-600 text-sm font-bold">{{ t('match_indicator') }}</span>
+                            </template>
+                        </div>
+                    </div>
+                    <p class="text-stone-500 text-sm">
+                        {{ t('timing_hint', { duration: (config.stimulusDuration / 1000).toFixed(1) }) }}
+                    </p>
+                </div>
+                <button @click="startGame"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-4 rounded-xl font-bold text-lg
+                           shadow-[0_4px_0_#065f46] active:shadow-none active:translate-y-[4px] transition-all">
+                    {{ t('start_button') }}
+                </button>
+            </div>
+
+            <!-- =============== PLAYING 阶段 =============== -->
+            <div v-if="phase === 'playing'" class="text-center w-full max-w-md">
+
+                <!-- 书架/阅读桌刺激展示 -->
+                <div class="relative">
+                    <div class="w-44 h-44 mx-auto rounded-3xl flex items-center justify-center mb-6 transition-all duration-200"
+                         :class="showingBlank
+                            ? 'bg-stone-100 border-2 border-dashed border-stone-300'
+                            : 'bg-amber-50 border-4 border-amber-700/30 shadow-lg shadow-amber-200/50'">
+                        <span v-if="!showingBlank"
+                              class="text-8xl select-none drop-shadow-sm">
+                            {{ currentStimulus }}
+                        </span>
+                        <span v-else class="text-stone-400 text-lg">📖...</span>
+                    </div>
+
+                    <div v-if="responded" class="absolute top-2 right-2">
+                        <span class="text-2xl">✓</span>
+                    </div>
+                </div>
+
+                <!-- 提示文字 -->
+                <p class="text-stone-500 text-sm mb-4">
+                    <template v-if="currentTrialIndex < N">
+                        {{ t('remember_hint', { n: N }) }}
+                    </template>
+                    <template v-else>
+                        {{ t('match_question', { n: N }) }}
+                    </template>
+                </p>
+
+                <!-- 响应按钮 -->
+                <div class="flex gap-4 justify-center"
+                     :class="{ 'opacity-30 pointer-events-none': currentTrialIndex < N || responded || showingBlank }">
+                    <button @click="handleResponse(true)"
+                        class="flex-1 max-w-[180px] bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xl py-5
+                               shadow-[0_4px_0_#065f46] active:shadow-none active:translate-y-[4px] transition-all
+                               flex items-center justify-center gap-2">
+                        <i data-lucide="check" class="w-6 h-6"></i> {{ t('match_button') }}
+                    </button>
+                    <button @click="handleResponse(false)"
+                        class="flex-1 max-w-[180px] bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-xl py-5
+                               shadow-[0_4px_0_#b91c1c] active:shadow-none active:translate-y-[4px] transition-all
+                               flex items-center justify-center gap-2">
+                        <i data-lucide="x" class="w-6 h-6"></i> {{ t('no_match_button') }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- =============== ROUND BREAK 阶段 =============== -->
+            <div v-if="phase === 'round_break'" class="text-center max-w-md w-full">
+                <div class="text-6xl mb-3">✅</div>
+                <h3 class="text-2xl font-black text-amber-800 mb-2">{{ t('round_complete') }}</h3>
+                <p class="text-amber-700 mb-2">{{ t('round_accuracy', { value: accuracy }) }}</p>
+                <p class="text-stone-500 text-sm mb-6">{{ t('round_label', { current: currentRound, total: config.totalRounds }) }}</p>
+                <button @click="startNextRound"
+                    class="bg-amber-600 hover:bg-amber-700 text-white px-10 py-4 rounded-xl font-bold text-lg
+                           shadow-[0_4px_0_#92400e] active:shadow-none active:translate-y-[4px] transition-all">
+                    {{ t('next_round') }}
+                </button>
+            </div>
+
+            <!-- =============== FEEDBACK 阶段 =============== -->
+            <div v-if="phase === 'feedback'" class="text-center max-w-md w-full">
+                <div class="text-6xl mb-3">
+                    {{ performanceLevel === 'excellent' ? '🏆📚' : performanceLevel === 'good' ? '👍📚' : '💪📚' }}
+                </div>
+                <h3 class="text-2xl font-black mb-1"
+                    :class="performanceLevel === 'excellent' ? 'text-emerald-600'
+                          : performanceLevel === 'good' ? 'text-amber-700' : 'text-stone-600'">
+                    {{ performanceLevel === 'excellent' ? t('perf_excellent')
+                     : performanceLevel === 'good' ? t('perf_good') : t('perf_practice') }}
+                </h3>
+                <p class="text-stone-500 mb-5">{{ t('task_complete') }}</p>
+
+                <!-- 结果卡片 -->
+                <div class="bg-white rounded-2xl border border-stone-200 shadow-sm p-5 mb-5">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-emerald-50 rounded-xl p-3">
+                            <div class="text-3xl font-black text-emerald-700">{{ accuracy }}%</div>
+                            <div class="text-xs text-emerald-600 font-bold">{{ t('total_accuracy') }}</div>
+                        </div>
+                        <div class="bg-amber-50 rounded-xl p-3">
+                            <div class="text-3xl font-black text-amber-800">{{ avgResponseTime }}ms</div>
+                            <div class="text-xs text-amber-600 font-bold">{{ t('avg_rt') }}</div>
+                        </div>
+                        <div class="bg-green-50 rounded-xl p-3">
+                            <div class="text-2xl font-black text-green-700">{{ hits }}</div>
+                            <div class="text-xs text-green-600 font-bold">{{ t('hits_label') }}</div>
+                        </div>
+                        <div class="bg-red-50 rounded-xl p-3">
+                            <div class="text-2xl font-black text-red-700">{{ falseAlarms }}</div>
+                            <div class="text-xs text-red-600 font-bold">{{ t('false_alarms_label') }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 底部操作栏 -->
+        <div class="bg-white/95 backdrop-blur p-4 border-t border-stone-100 shrink-0 rounded-b-xl">
+            <!-- playing 阶段提示 -->
+            <div v-if="phase === 'playing'" class="text-center text-stone-400 text-sm">
+                <template v-if="currentTrialIndex < N">
+                    {{ t('remember_first_n', { n: N }) }}
+                </template>
+                <template v-else>
+                    {{ t('answer_instruction') }}
+                </template>
+            </div>
+
+            <!-- feedback 阶段按钮 -->
+            <div v-if="phase === 'feedback'">
+                <button @click="finishGame"
+                    class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold text-lg transition-colors">
+                    {{ t('finish_button') }}
+                </button>
+            </div>
+        </div>
+    </div>
+    `
+};
+
+window.LibraryNBackGame = LibraryNBackGame;

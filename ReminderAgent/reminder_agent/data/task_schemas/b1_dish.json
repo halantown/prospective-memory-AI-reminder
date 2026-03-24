@@ -1,0 +1,62 @@
+{
+  "task_id": "b1_dish",
+  "description": "Get baking dish when oven finishes preheating",
+
+  "reminder_context": {
+    "element1": {
+      "action_verb": "get and bring",
+      "target_entity": {
+        "entity_name": "baking dish",
+        "object_type": "kitchenware",
+        "cues": {
+          "visual": "Oval white ceramic dish with two blue handles"
+        },
+        "domain_properties": {
+          "shape": "oval",
+          "handle_color": "blue"
+        }
+      },
+      "location": {
+        "room": "living_room",
+        "spot": "display cabinet, bottom shelf"
+      }
+    },
+    "element2": {
+      "origin": {
+        "task_creator": "self",
+        "creator_is_authority": false
+      },
+      "creation_context": "Baking a dish for Mei tonight"
+    },
+    "element3": {
+      "detected_activity_raw": "User is replying to a phone message"
+    }
+  },
+
+  "agent_reasoning_context": {
+    "encoding_info": {
+      "encoding_text": "You are baking a dish for Mei tonight. When the oven finishes preheating, go to the living room and get the baking dish from the display cabinet, bottom shelf — it is the oval ceramic dish with blue handles. Bring it to the kitchen.",
+      "encoding_image": "b1_dish_target.png",
+      "confirmation_question": {
+        "question": "What color are the handles on the baking dish?",
+        "options": ["Red", "Blue", "Green"],
+        "correct_index": 1
+      }
+    },
+    "distractor_info": {
+      "distractor_description": "Oval white ceramic dish with two red handles, same shelf",
+      "discriminating_dimension": "handle color (blue vs red)"
+    },
+    "trigger_info": {
+      "trigger_type": "appliance",
+      "trigger_event": "Oven preheat-complete chime",
+      "trigger_time_in_block": "~195s"
+    }
+  },
+
+  "placeholder": {
+    "motivation": "Mei loves baked dishes",
+    "consequence_if_missed": "Cannot start baking on time",
+    "status": "EXCLUDED — requires inferential reasoning"
+  }
+}

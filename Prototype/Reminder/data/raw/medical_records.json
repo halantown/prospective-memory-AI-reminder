@@ -1,0 +1,107 @@
+{
+  "patient_id": "u_001",
+  "patient_name": "Alice Van Der Woodsen",
+  "primary_physician": {
+    "name": "Dr. Ming Wang",
+    "specialty": "Cardiologist",
+    "hospital": "City Hospital",
+    "phone": "+31-20-555-0102"
+  },
+  
+  "conditions": [
+    {
+      "condition_id": "cond_001",
+      "name": "Hypertension",
+      "diagnosed_date": "2020-03-15",
+      "severity": "moderate",
+      "notes": "Blood pressure typically elevated in mornings"
+    },
+    {
+      "condition_id": "cond_002", 
+      "name": "Mild Cognitive Impairment",
+      "diagnosed_date": "2024-06-01",
+      "severity": "mild",
+      "notes": "Occasional memory lapses, especially for prospective tasks"
+    }
+  ],
+
+  "medications": [
+    {
+      "med_id": "med_001",
+      "name": "Lisinopril",
+      "dosage": "10mg",
+      "frequency": "once daily",
+      "timing": "morning, after breakfast",
+      "purpose": "Blood pressure control",
+      "prescriber": "Dr. Wang",
+      "instructions": "Take with food to reduce dizziness. Do not skip doses.",
+      "side_effects": ["dizziness", "dry cough"],
+      "importance": "critical",
+      "last_refill": "2026-01-05",
+      "next_refill": "2026-02-05"
+    },
+    {
+      "med_id": "med_002",
+      "name": "Vitamin D3",
+      "dosage": "1000 IU",
+      "frequency": "once daily",
+      "timing": "morning",
+      "purpose": "Bone health",
+      "prescriber": "Dr. Wang",
+      "instructions": "Take with breakfast for better absorption",
+      "importance": "recommended"
+    }
+  ],
+
+  "appointments": [
+    {
+      "appt_id": "appt_001",
+      "type": "Follow-up",
+      "doctor": "Dr. Wang",
+      "date": "2026-01-11",
+      "time": "14:00",
+      "location": "City Hospital, Building A, Room 302",
+      "purpose": "Review blood pressure readings and adjust medication",
+      "preparation": [
+        "Bring blue medical record book with BP logs",
+        "List all current medications",
+        "Bring December blood pressure readings",
+        "Prepare questions about morning dizziness"
+      ],
+      "reminder_advance": "1 day"
+    }
+  ],
+
+  "vital_history": [
+    {
+      "date": "2026-01-10",
+      "blood_pressure": "145/92",
+      "note": "Slightly elevated, took medication late"
+    },
+    {
+      "date": "2026-01-09", 
+      "blood_pressure": "138/88",
+      "note": "Normal range"
+    },
+    {
+      "date": "2025-12-15",
+      "blood_pressure": "158/98",
+      "note": "High reading - forgot morning medication"
+    }
+  ],
+
+  "doctor_instructions": [
+    {
+      "date": "2025-12-20",
+      "from": "Dr. Wang",
+      "instruction": "Take medication consistently every morning after breakfast. Missing doses can cause blood pressure spikes.",
+      "context": "After reviewing December readings showing missed doses"
+    },
+    {
+      "date": "2025-11-15",
+      "from": "Dr. Wang", 
+      "instruction": "Record blood pressure twice daily - morning and evening. Bring the blue book to every appointment.",
+      "context": "Regular monitoring protocol"
+    }
+  ]
+}
