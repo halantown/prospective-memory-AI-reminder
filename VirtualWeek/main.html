@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Virtual Week - 虚拟一周</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Game Styles -->
+    <link rel="stylesheet" href="css/game.css">
+    
+    <!-- Game Components -->
+    <script src="js/tutorial.js"></script>
+    <script src="js/components/SupermarketGame.js"></script>
+    <script src="js/components/PillBoxGame.js"></script>
+    <script src="js/components/RouteChoiceGame.js"></script>
+    <script src="js/components/ScheduleConflictGame.js"></script>
+    <script src="js/components/PriorityGame.js"></script>
+    <script src="js/components/PhotoSpotGame.js"></script>
+</head>
+<body>
+
+    <div id="app" class="w-full h-full flex flex-col relative">
+
+        <!-- Top Status Bar (Floating) - Only Day Indicator remains -->
+        <div class="absolute top-0 left-0 right-0 z-40 px-4 py-3 pointer-events-none flex justify-center">
+            <!-- Day Indicator -->
+            <div v-if="i18n.dayLabel || i18n.weekdayLabel" class="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-b-xl px-6 py-2 pointer-events-auto mt-[-12px] border-t-0">
+                    <span class="text-sm font-bold text-slate-600 tracking-wide">{{ i18n.dayLabel }}<span v-if="i18n.dayLabel && i18n.weekdayLabel" class="text-slate-300 mx-1">|</span>{{ i18n.weekdayLabel }}</span>
+            </div>
+        </div>
+
+        <!-- The Board -->
+        <div class="game-board">
+            <div v-for="(cell, index) in boardCells" :key="index"
+                class="cell"
+                :class="[
+                    cell.type === 'E' ? 'event' : '',
+                    cell.type === 'Start' ? 'start' : '',
+                    cell.type === 'End' ? 'end' : '',
+                    cell.type === 'Hour' ? 'hour' : '',
+                    playerPos === index ? 'active-cell' : '',
+                    cell.hourMarker ? 'has-marker' : ''  
+                ]"
+                :style="getCellStyle(cell)"
+            >
+                <!-- Arrow (Dynamic Rotation) -->
+                <svg v-if="cell.rotation !== undefined" class="path-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" 
+                    :style="{ transform: `rotate(${cell.rotation}deg)` }">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+
+                <!-- Labels -->
+                <span v-if="cell.type === 'E'" class="text-lg font-black text-amber-600/90 relative z-10">E</span>
+                <span v-else-if="cell.type === 'Start'" class="text-[9px] font-black text-green-700 uppercase relative z-10">Start</span>
+                
+                <!-- Time Markers -->
+                <div v-if="cell.hourMarker" 
+                    class="absolute left-1/2 -translate-x-1/2 z-20 hour-marker"
+                    :class="index === 0 ? '-bottom-4' : '-top-4'">
+                    {{ cell.hourMarker }}
+                </div>
+                
+                <!-- Player Token -->
+                <div v-if="playerPos === index" class="token"></div>
+            </div>
+
+            <!-- Center Hub -->
+            <div class="center-hub relative">
+                
+                <!-- Center Top: Virtual Clock -->
+                <div class="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                    <div class="bg-blue-50 p-2 rounded-lg mb-1">
+                        <i data-lucide="clock" class="w-6 h-6 text-blue-600"></i>
+                    </div>
+                    <div class="text-xs text-slate-400 font-bold uppercase leading-none mb-1">{{ i18n.currentTimeLabel }}</div>
+                    <div class="text-3xl font-black text-slate-800 leading-none">{{ formattedVirtualTime }}</div>
+                </div>
+
+                <!-- Top Right: Real Timer (Smaller) -->
+                <div class="absolute top-4 right-5 flex items-center gap-2 flex-row-reverse text-right opacity-70">
+                    <div class="bg-red-50 p-1.5 rounded-lg">
+                        <i data-lucide="timer" class="w-4 h-4 text-red-500"></i>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-red-300 font-bold uppercase leading-none mb-0.5">{{ i18n.realTimeLabel }}</div>
+                        <div class="text-lg font-mono font-bold text-red-500 leading-none">{{ formattedRealTime }}</div>
+                    </div>
+                </div>
+
+                <!-- Status Text (Adjusted position) -->
+                <div class="w-full text-center mt-24 mb-4 z-10 relative" 
+                     :class="{'opacity-20': phase === 'waiting_confirm' || phase === 'idle'}"
+                     role="status" aria-live="polite">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-2 transition-all">{{ statusMessage }}</h2>
+                    <p class="text-lg text-slate-400 font-medium">{{ subMessage }}</p>
+                </div>
+
+                <!-- Action Area -->
+                <div class="flex-grow flex items-center justify-center w-full min-h-0 relative py-2 z-20">
+                    
+                    <!-- Idle: Dice (Adjusted size and position) -->
+                    <button id="btn-roll-dice" v-if="phase === 'idle'" @click="rollDice" 
+                        class="relative w-24 h-24 mt-4 bg-white border-2 border-slate-200 rounded-2xl flex flex-col items-center justify-center shadow-[0_6px_0_#cbd5e1] active:translate-y-1 active:shadow-none transition-all group overflow-hidden hover:border-blue-400">
+                        
+                        <div v-if="isRolling" class="rolling-anim text-3xl font-black text-blue-500 dice-display">
+                            {{ rollingDisplayValue }}
+                        </div>
+                        <div v-else class="flex flex-col items-center">
+                            <i data-lucide="dices" class="w-8 h-8 text-slate-400 group-hover:text-blue-500 transition-colors mb-1"></i>
+                            <span class="text-sm font-bold text-slate-500 uppercase tracking-wider">{{ i18n.rollButton }}</span>
+                            <span class="text-[10px] text-slate-300 font-mono">(1-6)</span>
+                        </div>
+                        <div v-if="isRolling" class="absolute bottom-0 left-0 h-1.5 bg-blue-500 transition-all duration-100 ease-linear" :style="{ width: rollingProgress + '%' }"></div>
+                    </button>
+
+                    <!-- Moving State (Adjusted number size) -->
+                    <div v-if="phase === 'moving'" class="flex flex-col items-center justify-center">
+                        <div class="w-16 h-16 rounded-full bg-blue-50 border-4 border-blue-100 flex items-center justify-center mb-1">
+                            <span class="text-3xl font-black text-blue-600">{{ diceResult }}</span>
+                        </div>
+                        <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest bg-white px-2 py-0.5 rounded-full border border-blue-100">{{ i18n.moving.value }}</span>
+                    </div>
+
+                    <!-- Confirm (Elevated Z-Index) -->
+                    <div v-if="phase === 'waiting_confirm'" class="w-full max-w-[14rem] relative z-30">
+                        <button id="btn-confirm-step" @click="confirmContinue" class="btn-primary">
+                            {{ i18n.continueButton }}
+                        </button>
+                    </div>
+
+                    <!-- Event Resolve -->
+                    <div v-if="phase === 'resolving_event'" class="w-full max-w-[16rem] text-center">
+                        <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl mb-4">
+                            <p class="text-xs text-amber-600 font-bold uppercase mb-1">{{ i18n.checkTarget.value }}</p>
+                            <p class="text-2xl font-bold text-amber-900">{{ requiredRollText }}</p>
+                        </div>
+                        <button id="btn-roll-event" @click="rollForEvent" class="btn-primary bg-amber-500 shadow-amber-700">
+                            {{ i18n.rollToCheck.value }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bottom Task Button -->
+                <div class="w-full flex justify-between items-center border-t border-slate-100 pt-3 mt-1 flex-shrink-0">
+                    <div class="text-xs text-slate-400 leading-tight font-medium bg-slate-50 px-3 py-2 rounded-xl max-w-[50%]">
+                        <span class="text-amber-500 font-bold block mb-0.5 text-sm">⚠️ {{ i18n.ruleHint }}</span>
+                        {{ i18n.eventPause }}
+                    </div>
+                    <button @click="openTaskMenu" :disabled="!isGameActive" 
+                        class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-[0_3px_0_#be123c] active:shadow-none active:translate-y-[3px] disabled:opacity-50 disabled:shadow-none flex items-center gap-1.5 transition-all text-sm">
+                        <i data-lucide="brain-circuit" class="w-5 h-5"></i>
+                        {{ i18n.taskButton }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Card Modal -->
+        <div v-if="showStartCard" class="modal-overlay">
+            <div class="card bg-white border-t-8 border-green-500 w-full max-w-4xl">
+                <div class="flex items-center gap-5 mb-8">
+                    <div class="bg-green-100 p-5 rounded-2xl text-green-600"><i data-lucide="sun" class="w-14 h-14"></i></div>
+                    <div>
+                        <h2 class="text-4xl font-black text-slate-800">{{ i18n.mondayMorning.value }}</h2>
+                        <p class="text-slate-500 text-xl font-medium mt-1">{{ i18n.readTasksAloud.value }}</p>
+                    </div>
+                </div>
+                <div class="space-y-8 max-h-[55vh] overflow-y-auto pr-2">
+                    <div>
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="w-4 h-4 rounded-full bg-green-500"></span>
+                            <p class="text-lg font-black text-green-600 uppercase tracking-wider">{{ i18n.todaysTasks.value }}</p>
+                        </div>
+                        <ul class="space-y-4">
+                            <li v-for="task in dayScenario.irregularTasks" :key="task.id" class="flex items-start gap-4 bg-green-50 p-5 rounded-2xl border-2 border-green-200">
+                                <span class="bg-green-600 text-white font-bold px-4 py-1.5 rounded-lg text-sm uppercase tracking-wide shrink-0">Task</span>
+                                <span class="text-slate-800 font-bold text-xl leading-relaxed">{{ task.description }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="w-4 h-4 rounded-full bg-blue-500"></span>
+                            <p class="text-lg font-black text-blue-600 uppercase tracking-wider">{{ i18n.recurringTasks.value }}</p>
+                        </div>
+                        <div class="bg-blue-50 p-6 rounded-2xl border-2 border-blue-200 grid grid-cols-2 gap-5 text-lg text-blue-800 font-bold">
+                            <div class="flex items-center gap-3"><i data-lucide="clock" class="w-6 h-6 text-blue-500"></i> {{ i18n.asthma11am.value }}</div>
+                            <div class="flex items-center gap-3"><i data-lucide="clock" class="w-6 h-6 text-blue-500"></i> {{ i18n.asthma9pm.value }}</div>
+                            <div class="flex items-center gap-3"><i data-lucide="utensils" class="w-6 h-6 text-blue-500"></i> {{ i18n.antibioticsBreakfast.value }}</div>
+                            <div class="flex items-center gap-3"><i data-lucide="utensils" class="w-6 h-6 text-blue-500"></i> {{ i18n.antibioticsDinner.value }}</div>
+                            <div class="col-span-2 text-red-600 mt-4 flex items-center gap-3 font-black border-t-2 border-blue-200 pt-5 text-xl"><i data-lucide="timer" class="w-7 h-7"></i> {{ i18n.lungTestInfo.value }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-10">
+                    <button id="btn-start-day" @click="dismissStartCard" class="btn-primary bg-green-600 shadow-green-800 text-2xl py-5">{{ i18n.startDay.value }}</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Card Modal -->
+        <div v-if="showEventCard" class="modal-overlay">
+            <div id="event-card-container" class="card bg-white border-t-8 border-amber-500">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <span class="inline-block bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-bold mb-2 tracking-wide uppercase">EVENT CARD</span>
+                        <h2 class="text-3xl font-black text-slate-800 leading-none">{{ currentEvent.category || 'Event' }}</h2>
+                    </div>
+                    <div class="bg-amber-50 p-3 rounded-full text-amber-500"><i data-lucide="alert-circle" class="w-8 h-8"></i></div>
+                </div>
+                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 mb-6">
+                    <p class="text-xl text-slate-700 font-medium leading-relaxed">{{ currentEvent.text }}</p>
+                </div>
+                <div v-if="currentEvent.choices" class="space-y-3">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{{ i18n.pleaseChooseAction.value }}</p>
+                    <button v-for="(choice, idx) in currentEvent.choices" :key="idx" @click="selectEventChoice(choice)" class="btn-option hover:border-blue-400 flex items-center justify-between group py-4">
+                        <span class="font-bold text-slate-700 text-base">{{ choice.text }}</span>
+                        <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors font-bold">{{ i18n.req.value }}: {{ choice.rollReq }}</span>
+                    </button>
+                </div>
+                <button v-else @click="closeEventCard" class="btn-primary bg-amber-500 shadow-amber-700 mt-4">{{ i18n.understood.value }}</button>
+            </div>
+        </div>
+
+        <!-- Generic Minigame Modal -->
+        <div v-if="showMinigame" class="modal-overlay" style="z-index: 200;">
+            <div class="card w-full max-w-5xl h-[85vh] flex flex-col relative overflow-hidden p-0 border-4 border-slate-800 shadow-2xl" 
+                 :style="{ backgroundImage: `url('${minigameBackground}')`, backgroundSize: 'cover', backgroundPosition: 'center' }">
+                
+                <!-- Semi-transparent overlay -->
+                <div class="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-0"></div>
+
+                <!-- Header -->
+                <div class="bg-blue-600/90 p-4 text-white shrink-0 relative z-10 flex justify-between items-center shadow-lg backdrop-blur-md">
+                    <div class="flex items-center gap-4">
+                        <div class="bg-white/20 p-2 rounded-xl">
+                            <i class="w-8 h-8 text-white" :data-lucide="minigameIcon || 'gamepad-2'"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl font-black tracking-tight">{{ minigameTitle }}</h1>
+                            <p class="text-blue-100 font-medium text-sm opacity-90">{{ minigameSubtitle }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Component Loader -->
+                <div class="flex-grow relative z-10 overflow-hidden">
+                    <component 
+                        :is="activeGameComponent" 
+                        :scenario="activeGameScenario" 
+                        @complete="handleMinigameComplete">
+                    </component>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Task Menu -->
+        <div v-if="showTaskMenu" class="modal-overlay" @click.self="showTaskMenu = false">
+            <div class="card max-w-md bg-white">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-black text-slate-800">{{ i18n.recordMemoryTask.value }}</h3>
+                    <button @click="showTaskMenu = false" class="p-2 hover:bg-slate-100 rounded-full"><i data-lucide="x" class="w-6 h-6 text-slate-400"></i></button>
+                </div>
+                <div class="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto p-1">
+                    <button @click="performTask('Asthma Medication')" class="p-4 bg-blue-50 text-blue-800 rounded-xl font-bold text-sm text-left hover:bg-blue-100 transition-colors flex items-center gap-3">
+                        <i data-lucide="pill" class="w-4 h-4 opacity-50"></i> {{ i18n.taskAsthma.value }}
+                    </button>
+                    <button @click="performTask('Antibiotics')" class="p-4 bg-indigo-50 text-indigo-800 rounded-xl font-bold text-sm text-left hover:bg-indigo-100 transition-colors flex items-center gap-3">
+                        <i data-lucide="pill" class="w-4 h-4 opacity-50"></i> {{ i18n.taskAntibiotics.value }}
+                    </button>
+                    <button @click="performTask('Lung Test')" class="p-4 bg-red-50 text-red-800 rounded-xl font-bold text-sm text-left hover:bg-red-100 transition-colors flex items-center gap-3">
+                        <i data-lucide="wind" class="w-4 h-4 opacity-50"></i> {{ i18n.taskLungTest.value }}
+                    </button>
+                    <div class="h-px bg-slate-100 my-2"></div>
+                    <button @click="performTask('Dry Cleaning')" class="p-4 bg-emerald-50 text-emerald-800 rounded-xl font-bold text-sm text-left hover:bg-emerald-100 transition-colors flex items-center gap-3">
+                        <i data-lucide="shirt" class="w-4 h-4 opacity-50"></i> 送干洗
+                    </button>
+                    <button @click="performTask('Phone Bank')" class="p-4 bg-emerald-50 text-emerald-800 rounded-xl font-bold text-sm text-left hover:bg-emerald-100 transition-colors flex items-center gap-3">
+                        <i data-lucide="phone" class="w-4 h-4 opacity-50"></i> 预约银行
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Virtual Week 游戏主逻辑
+         * 代码结构: 常量 → API → 棋盘生成 → 小游戏注册 → Vue应用
+         */
+        const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
+
+        // ============================================================
+        // 常量定义
+        // ============================================================
+        const API_BASE = '/api';
+        const HOURS_PER_DAY = 15;
+        const START_HOUR = 7;
+        const START_MINUTES = START_HOUR * 60;
+        const DAY_MINUTES = HOURS_PER_DAY * 60;
+        const TOTAL_STEPS = 120;
+        const MINUTES_PER_STEP = DAY_MINUTES / TOTAL_STEPS;
+
+        // 动画时长 (毫秒)
+        const DICE_ANIMATION_MS = 800;
+        const TOKEN_MOVE_DELAY_MS = 400;
+        const MESSAGE_DISPLAY_MS = 1500;
+
+        // WebSocket 配置
+        const WS_CONFIG = {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 10
+        };
+
+        // ============================================================
+        // API 工具函数
+        // ============================================================
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const options = { method, headers: { 'Content-Type': 'application/json' } };
+                if (body) options.body = JSON.stringify(body);
+                const res = await fetch(`${API_BASE}${endpoint}`, options);
+                return await res.json();
+            } catch (e) {
+                console.error(`API Error (${endpoint}):`, e);
+                return null;
+            }
+        }
+
+        // ============================================================
+        // 棋盘路径生成
+        // ============================================================
+        function generatePath() {
+            // 棋盘 22x14，路径 120 步
+            // Path target: 8 steps per hour * 15 hours = 120 steps.
+            // Bumps extend towards center up to 3 units.
+            
+            let p = [];
+            let x = 21; 
+            let y = 13;
+            p.push({x, y}); // Start point
+
+            const move = (dx, dy) => {
+                x += dx;
+                y += dy;
+                p.push({x, y});
+            };
+
+            // Bump functions (Inward/Center-ward)
+            const bumpUp = (depth) => { // From Bottom
+                for(let i=0; i<depth; i++) move(0, -1);
+                move(-1, 0);
+                for(let i=0; i<depth; i++) move(0, 1);
+            };
+            const bumpRight = (depth) => { // From Left
+                for(let i=0; i<depth; i++) move(1, 0);
+                move(0, -1);
+                for(let i=0; i<depth; i++) move(-1, 0);
+            };
+            const bumpDown = (depth) => { // From Top
+                for(let i=0; i<depth; i++) move(0, 1);
+                move(1, 0);
+                for(let i=0; i<depth; i++) move(0, -1);
+            };
+            const bumpLeft = (depth) => { // From Right
+                for(let i=0; i<depth; i++) move(-1, 0);
+                move(0, 1);
+                for(let i=0; i<depth; i++) move(1, 0);
+            };
+
+            // 1. Bottom Edge (Right to Left)
+            // Sequence: 4 - B(3) - 5 - B(3) - 5 - B(3) - 4
+            for(let i=0; i<4; i++) move(-1, 0);
+            bumpUp(3);
+            for(let i=0; i<5; i++) move(-1, 0);
+            bumpUp(3);
+            for(let i=0; i<5; i++) move(-1, 0);
+            bumpUp(3);
+            for(let i=0; i<4; i++) move(-1, 0);
+
+            // 2. Left Edge (Bottom to Top)
+            // Sequence: 4 - B(3) - 4 - B(1) - 3
+            for(let i=0; i<4; i++) move(0, -1);
+            bumpRight(3);
+            for(let i=0; i<4; i++) move(0, -1);
+            bumpRight(1);
+            for(let i=0; i<3; i++) move(0, -1);
+
+            // 3. Top Edge (Left to Right)
+            // Sequence: 4 - B(3) - 5 - B(3) - 5 - B(3) - 4
+            for(let i=0; i<4; i++) move(1, 0);
+            bumpDown(3);
+            for(let i=0; i<5; i++) move(1, 0);
+            bumpDown(3);
+            for(let i=0; i<5; i++) move(1, 0);
+            bumpDown(3);
+            for(let i=0; i<4; i++) move(1, 0);
+
+            // 4. Right Edge (Top to Bottom)
+            // Sequence: 4 - B(3) - 4 - B(1) - 3
+            for(let i=0; i<4; i++) move(0, 1);
+            bumpLeft(3);
+            for(let i=0; i<4; i++) move(0, 1);
+            bumpLeft(1);
+            for(let i=0; i<3; i++) move(0, 1);
+
+            // Start point duplication check
+            if (p.length > 1 && p[p.length-1].x === 21 && p[p.length-1].y === 13) {
+                p.pop();
+            }
+
+            return p;
+        }
+
+        // Calculate Rotation for each cell to point to next
+        function calculateRotations(path) {
+            return path.map((curr, i) => {
+                const next = path[(i + 1) % path.length];
+                const dx = next.x - curr.x;
+                const dy = next.y - curr.y;
+                let deg = 0;
+                if (dx === 1) deg = 0;      // Right
+                else if (dx === -1) deg = 180; // Left
+                else if (dy === 1) deg = 90;   // Down
+                else if (dy === -1) deg = 270; // Up
+                return { ...curr, rotation: deg };
+            });
+        }
+
+        const rawPath = calculateRotations(generatePath());
+        const STEPS_PER_HOUR = rawPath.length / 15;
+        
+        // Game Registry: Maps event category to game components details
+        // ============================================================
+        // 小游戏注册表
+        // ============================================================
+        const GAME_REGISTRY = {
+            'Shopping': {
+                component: window.SupermarketGame,
+                title: '超市大采购',
+                subtitle: '请帮忙检查购物篮',
+                icon: 'shopping-cart',
+                background: 'pics/ah.png',
+                defaultScenario: {
+                    context: "准备做一份水果沙拉招待朋友",
+                    items: [
+                        { id: 101, name: "红苹果", emoji: "🍎", isReasonable: true },
+                        { id: 102, name: "甜香蕉", emoji: "🍌", isReasonable: true },
+                        { id: 103, name: "酸奶", emoji: "🥛", isReasonable: true },
+                        { id: 104, name: "大蒜头", emoji: "🧄", isReasonable: false },
+                        { id: 105, name: "大碗", emoji: "🥣", isReasonable: true },
+                        { id: 106, name: "葡萄", emoji: "🍇", isReasonable: true },
+                    ]
+                }
+            },
+            'PillBox': {
+                component: window.PillBoxGame,
+                title: '药盒检查',
+                subtitle: '判断药盒配置是否正确',
+                icon: 'pill',
+                background: '',
+                defaultScenario: null  // 使用组件内置默认值
+            },
+            'RouteChoice': {
+                component: window.RouteChoiceGame,
+                title: '路线选择',
+                subtitle: '选择更合适的路线',
+                icon: 'map',
+                background: '',
+                defaultScenario: null
+            },
+            'Schedule': {
+                component: window.ScheduleConflictGame,
+                title: '日程检查',
+                subtitle: '判断时间安排是否有冲突',
+                icon: 'calendar-clock',
+                background: '',
+                defaultScenario: null
+            },
+            'Priority': {
+                component: window.PriorityGame,
+                title: '优先级判断',
+                subtitle: '选择最应该先做的事',
+                icon: 'list-ordered',
+                background: '',
+                defaultScenario: null
+            },
+            'PhotoSpot': {
+                component: window.PhotoSpotGame,
+                title: '场景检查',
+                subtitle: '找出不对劲的地方',
+                icon: 'scan-search',
+                background: '',
+                defaultScenario: null
+            }
+        };
+
+        createApp({
+            setup() {
+                // --- WebSocket Connection ---
+                let socket = null;
+                let isSocketReady = ref(false);
+                
+                const initSocket = () => {
+                    return new Promise((resolve) => {
+                        socket = io('http://localhost:5001', {
+                            transports: ['websocket', 'polling'],
+                            reconnection: true,
+                            reconnectionDelay: 1000,
+                            reconnectionAttempts: 10
+                        });
+                        
+                        socket.on('connect', () => {
+                            console.log('[WebSocket] Connected:', socket.id);
+                            isSocketReady.value = true;
+                            
+                            // Join "all_games" room immediately (even before session starts)
+                            // This allows receiving language changes while waiting
+                            socket.emit('game:join_waiting');
+                            console.log('[WebSocket] 📢 Joined waiting room for language updates');
+                            
+                            resolve(socket);
+                        });
+                        
+                        socket.on('disconnect', () => {
+                            console.log('[WebSocket] Disconnected');
+                            isSocketReady.value = false;
+                        });
+                        
+                        socket.on('connected', (data) => {
+                            console.log('[WebSocket] Server confirmed connection:', data.sid);
+                        });
+                        
+                        socket.on('error', (error) => {
+                            console.error('[WebSocket] Connection error:', error);
+                        });
+                    });
+                };
+                
+                // --- I18n System (Safe Implementation) ---
+                const locales = ref({});
+                const currentLang = ref('zh');
+                
+                // Helper to get translated text with fallback
+                const getText = (key, params = {}) => {
+                    const lang = currentLang.value;
+                    if (!locales.value[lang]) return key;
+                    
+                    const keys = key.split('.');
+                    let value = locales.value[lang];
+                    for (const k of keys) {
+                        value = value?.[k];
+                        if (!value) return key;
+                    }
+                    
+                    // Replace {param} placeholders
+                    if (typeof value === 'string') {
+                        return value.replace(/\{(\w+)\}/g, (match, param) => params[param] || match);
+                    }
+                    return value || key;
+                };
+                
+                // Preload all locales
+                const loadAllLocales = async () => {
+                    try {
+                        const langs = ['zh', 'en', 'nl'];
+                        const results = await Promise.all(
+                            langs.map(async (lang) => {
+                                const res = await fetch(`/locales/${lang}.json`);
+                                return { lang, data: await res.json() };
+                            })
+                        );
+                        results.forEach(({ lang, data }) => {
+                            locales.value[lang] = data;
+                        });
+                        console.log('Locales loaded:', Object.keys(locales.value));
+                    } catch (e) {
+                        console.error('Failed to load locales:', e);
+                    }
+                };
+                
+                const boardCells = ref([]);
+                const playerPos = ref(0);
+                const currentDay = ref(1);
+                
+                // Game States
+                const phase = ref('loading');
+                const statusMessage = ref('连接服务器...');
+                const subMessage = ref('');
+                
+                const logFileName = ref(null);
+                const participantId = ref('guest_' + Math.floor(Math.random() * 1000));
+                const sessionId = ref(null); // Track current session ID
+
+                // UI Visibility
+                const showStartCard = ref(false); 
+                const showEventCard = ref(false);
+                const showTaskMenu = ref(false);
+                const currentEvent = ref({});
+                const requiredRollText = ref('');
+                
+                // Minigame State
+                const showMinigame = ref(false);
+                const activeGameComponent = ref(null);
+                const activeGameScenario = ref({}); 
+                const minigameTitle = ref('');
+                const minigameSubtitle = ref('');
+                const minigameIcon = ref('');
+                const minigameBackground = ref('');
+
+                // Rolling
+                const isRolling = ref(false);
+                const rollingDisplayValue = ref(1);
+                const rollingProgress = ref(0);
+                const diceResult = ref(0);
+
+                // Timers
+                const realTimeSeconds = ref(0);
+                let timerInterval = null;
+                
+                // Data
+                const dayScenario = ref({ irregularTasks: [], events: {} }); 
+                const diceSequence = ref([]);
+                const diceSequenceIndex = ref(0);
+                const isTrialMode = ref(false);
+                
+                // High-precision timing: Record session start time
+                const sessionStartTime = ref(0);
+                const sessionStartISO = ref('');
+                
+                // Initialize timing references when session starts
+                const initSessionTiming = () => {
+                    sessionStartTime.value = performance.now();
+                    sessionStartISO.value = new Date().toISOString();
+                    console.log('[Timing] Session start:', sessionStartISO.value, 'at', sessionStartTime.value.toFixed(3), 'ms');
+                };
+
+                // Tutorial
+                let tutorial = null;
+
+                // --- Initialization ---
+                onMounted(async () => {
+                    // Preload all locales first
+                    await loadAllLocales();
+                    
+                    lucide.createIcons();
+                    // Initialize Tutorial System
+                    if (window.TutorialSystem) {
+                        console.log("TutorialSystem found, initializing...");
+                        tutorial = new window.TutorialSystem();
+                    } else {
+                        console.error("TutorialSystem NOT found!");
+                    }
+                    await waitForSessionStart();
+                });
+
+                // Watchers for Tutorial
+                watch(phase, (newVal) => {
+                    if (!isTrialMode.value || !tutorial) return;
+
+                    if (newVal === 'start_card') {
+                        tutorial.focus('#btn-start-day', i18n.tutorialStartDay.value);
+                    } else if (newVal === 'idle') {
+                        tutorial.focus('#btn-roll-dice', i18n.tutorialRollDice.value);
+                    } else if (newVal === 'moving') {
+                        // tutorial.focus('.token', '您的棋子正在移动...'); // Optional: might be distracting
+                        // Clear focus during movement
+                         tutorial.focus('body', i18n.tutorialPleaseWait.value, 'bottom'); // Just to clear or move away
+                         tutorial.stop(); // Temporarily hide
+                    } else if (newVal === 'waiting_confirm') {
+                        // Re-enable tutorial if it was stopped
+                        tutorial.start();
+                        tutorial.focus('#btn-confirm-step', '很好！请点击这里继续下一步。');
+                    } else if (newVal === 'resolving_event') {
+                        tutorial.start();
+                        tutorial.focus('#btn-roll-event', '需要进行检定，请点击掷骰子。');
+                    }
+                });
+
+                // Additional watcher for Event Card visibility
+                watch(showEventCard, (val) => {
+                    if (!isTrialMode.value || !tutorial) return;
+                    if (val) {
+                         tutorial.start();
+                         // Target the choices container or the first option
+                         // We need to wait for DOM rendering of the card
+                         setTimeout(() => {
+                             tutorial.focus('#event-card-container', '发生了事件！请仔细阅读描述并点击一个选项。');
+                         }, 600);
+                    }
+                });
+
+                // Additional watcher for Minigame visibility
+                watch(showMinigame, (val) => {
+                     if (!isTrialMode.value || !tutorial) return;
+                     if (val) {
+                         tutorial.stop(); // Let them play the game without overlay
+                         // Or provide specific guidance if needed
+                     } else {
+                         tutorial.start();
+                     }
+                });
+
+                const waitForSessionStart = async () => {
+                    statusMessage.value = i18n.waiting.value;
+                    subMessage.value = i18n.pleaseWait.value;
+                    
+                    // Initialize WebSocket connection and wait for it to be ready
+                    socket = await initSocket();
+                    
+                    // Setup WebSocket event listeners IMMEDIATELY (before joining room)
+                    // This allows language changes to work even in waiting state
+                    socket.on('game:config_update', (config) => {
+                        console.log('[WebSocket] 🔧 Config update (waiting stage):', config);
+                        if (config.language && config.language !== currentLang.value) {
+                            console.log(`[WebSocket] 🌐 Language switched: ${currentLang.value} → ${config.language}`);
+                            currentLang.value = config.language;
+                            // Update status messages with new language
+                            statusMessage.value = i18n.waiting.value;
+                            subMessage.value = i18n.pleaseWait.value;
+                        }
+                    });
+                    
+                    socket.on('game:joined', () => {
+                        console.log('[WebSocket] ✅ Successfully joined game room');
+                    });
+                    
+                    socket.on('game:command', (command) => {
+                        console.log('[WebSocket] ⚡ Received admin command:', command);
+                        executeAdminCommand(command);
+                    });
+                    
+                    socket.on('game:session_reset', () => {
+                        console.warn('[WebSocket] 🔄 Session reset by admin, reloading...');
+                        sessionId.value = null; // Clear session ID
+                        window.location.reload();
+                    });
+                    
+                    socket.on('game:session_invalid', (data) => {
+                        console.error('[WebSocket] ❌ Session invalidated:', data.reason);
+                        alert('会话已失效，页面将重新加载 / Session invalidated, page will reload');
+                        sessionId.value = null;
+                        window.location.reload();
+                    });
+                    
+                    // 管理员触发小游戏测试
+                    socket.on('game:trigger_event', (eventData) => {
+                        console.log('[WebSocket] Admin triggered minigame:', eventData);
+                        const category = eventData.category;
+                        if (GAME_REGISTRY[category]) {
+                            startMinigame(category);
+                        } else {
+                            console.warn(`[Minigame] Unknown category: ${category}`);
+                        }
+                    });
+                    
+                    // Check session status ONCE (no more polling loop!)
+                    const checkStatus = async () => {
+                        try {
+                            const res = await fetch(`${API_BASE}/client/check`);
+                            const data = await res.json();
+                            
+                            if (data.status === 'RUNNING' && data.config.map_id) {
+                                // Session Started or Running
+                                participantId.value = data.config.participant_id;
+                                sessionId.value = data.config.session_id; // Store session ID
+                                currentDay.value = data.config.group_number || 1; // Set Day from group number
+                                
+                                console.log('[Session] Session ID stored:', sessionId.value);
+                                console.log('[Session] Group Number (Day):', currentDay.value);
+                                
+                                // Join game room via WebSocket (NOW socket is definitely connected)
+                                console.log('[WebSocket] 📡 Joining game room with participant:', data.config.participant_id);
+                                socket.emit('game:join', { participant_id: data.config.participant_id });
+                                
+                                // Switch language if specified
+                                if (data.config.language && locales.value[data.config.language]) {
+                                    currentLang.value = data.config.language;
+                                    console.log(`Language switched to: ${currentLang.value}`);
+                                }
+                                
+                                console.log("Session Status:", data.status, "Config:", data.config);
+                                
+                                if (data.game_state) {
+                                    console.log("Found persisted state, restoring...");
+                                    await restoreGameSession(data.config.map_id, data.game_state);
+                                } else {
+                                    console.log("No persisted state, starting new...");
+                                    await initGameSession(data.config.map_id);
+                                }
+                            } else {
+                                // Still waiting - check again in 2 seconds
+                                // But STOP after session starts (rely on WebSocket for everything else)
+                                setTimeout(checkStatus, 2000);
+                            }
+                        } catch(e) {
+                            console.error("Connection lost", e);
+                            // Retry in 2 seconds on error
+                            setTimeout(checkStatus, 2000);
+                        }
+                    };
+
+                    // Start initial check
+                    checkStatus();
+                };
+
+                // --- State Persistence via WebSocket ---
+                let saveStateTimeout = null;
+                const saveState = () => {
+                    if (phase.value === 'loading' || phase.value === 'finished') return;
+                    if (!socket || !socket.connected) return;
+                    
+                    // Debounce to reduce traffic
+                    if (saveStateTimeout) clearTimeout(saveStateTimeout);
+                    
+                    saveStateTimeout = setTimeout(() => {
+                        const state = {
+                            session_id: sessionId.value, // Include session ID for validation
+                            playerPos: playerPos.value,
+                            phase: phase.value,
+                            diceSequenceIndex: diceSequenceIndex.value,
+                            logFileName: logFileName.value,
+                            realTimeSeconds: realTimeSeconds.value,
+                            statusMessage: statusMessage.value,
+                            subMessage: subMessage.value,
+                            showStartCard: showStartCard.value,
+                            showEventCard: showEventCard.value,
+                            showMinigame: showMinigame.value,
+                            currentEvent: currentEvent.value,
+                            requiredRollText: requiredRollText.value
+                        };
+                        
+                        // Send state sync via WebSocket
+                        socket.emit('game:state_sync', state);
+                    }, 300); // Debounce by 300ms
+                };
+
+                // Watch critical state changes to trigger save
+                watch([playerPos, phase, showEventCard, showMinigame, showStartCard], () => {
+                    saveState();
+                });
+
+                // --- Admin Command Executor (called by WebSocket) ---
+                const executeAdminCommand = (cmd) => {
+                    if (!cmd || !cmd.type) return;
+                    
+                    console.log('[Admin] Executing command:', cmd.type, cmd);
+                    
+                    switch (cmd.type) {
+                        case 'SET_POSITION':
+                            if (typeof cmd.position === 'number') {
+                                playerPos.value = Math.max(0, Math.min(boardCells.value.length - 1, cmd.position));
+                                logAction('admin_position_change', { position: playerPos.value });
+                                console.log(`[Admin] Player position set to ${playerPos.value}`);
+                            }
+                            break;
+                        default:
+                            console.warn('[Admin] Unknown command type:', cmd.type);
+                    }
+                };
+
+                const restoreGameSession = async (mapId, savedState) => {
+                    // 1. Fetch Map Config (Same as init)
+                    statusMessage.value = i18n.restoring.value;
+                    const mapConfig = await apiCall(`/map/${mapId}`); 
+                    if (!mapConfig) {
+                        statusMessage.value = i18n.restoreFailed.value;
+                        return;
+                    }
+
+                    // 2. Setup Board Base
+                    isTrialMode.value = (mapId === 'trial');
+                    setupBoard(mapConfig); // This resets everything to default
+
+                    // 3. Apply Saved State
+                    if (savedState.logFileName) logFileName.value = savedState.logFileName;
+                    if (savedState.playerPos !== undefined) playerPos.value = savedState.playerPos;
+                    if (savedState.diceSequenceIndex !== undefined) diceSequenceIndex.value = savedState.diceSequenceIndex;
+                    if (savedState.realTimeSeconds !== undefined) realTimeSeconds.value = savedState.realTimeSeconds;
+                    
+                    if (savedState.currentEvent) currentEvent.value = savedState.currentEvent;
+                    if (savedState.requiredRollText) requiredRollText.value = savedState.requiredRollText;
+                    
+                    // Restore UI State
+                    showStartCard.value = savedState.showStartCard;
+                    showEventCard.value = savedState.showEventCard;
+                    showMinigame.value = savedState.showMinigame;
+                    
+                    phase.value = savedState.phase;
+                    statusMessage.value = savedState.statusMessage;
+                    subMessage.value = savedState.subMessage;
+
+                    // Restart timer if needed
+                    startTimer();
+                    
+                    // Check if tutorial needs to catch up (simple restart for now)
+                    if (isTrialMode.value && tutorial) {
+                        // Tutorial watches 'phase', so setting phase above might trigger it. 
+                        // But we might need to be careful not to trigger wrong cues.
+                        // For now, let the watchers handle it.
+                        tutorial.start(); 
+                    }
+                    
+                    console.log("Session restored!");
+                };
+
+                const initGameSession = async (mapId) => {
+                    // 1. Initialize Logging
+                    const logRes = await apiCall('/log/init', 'POST', {
+                        participant_id: participantId.value,
+                        session_id: 1
+                    });
+                    if (logRes && logRes.log_file) {
+                        logFileName.value = logRes.log_file;
+                        console.log("Logging to:", logFileName.value);
+                    }
+
+                    // 2. Fetch Map Config
+                    statusMessage.value = i18n.loading.value;
+                    const mapConfig = await apiCall(`/map/${mapId}`); 
+                    if (mapConfig) {
+                        // Strict check for trial map id
+                        isTrialMode.value = (mapId === 'trial'); 
+                        console.log(`Map loaded: ${mapId}, Trial Mode: ${isTrialMode.value}`);
+                        
+                        if (isTrialMode.value && tutorial) {
+                            console.log("Starting Tutorial Mode");
+                            // Wait a bit for DOM to be ready with new map
+                            setTimeout(() => tutorial.start(), 500);
+                        }
+                        setupBoard(mapConfig);
+                    } else {
+                        statusMessage.value = i18n.loadFailed.value;
+                        subMessage.value = i18n.cannotConnect.value;
+                    }
+                };
+
+                // --------------------------------------------------
+                // 5.8 棋盘设置
+                // --------------------------------------------------
+                const setupBoard = (config) => {
+                    // 解析事件配置
+                    const eventLocations = {};
+                    const eventsMap = {};
+                    
+                    if (config.events) {
+                        for (const [stepIdx, evt] of Object.entries(config.events)) {
+                            eventLocations[stepIdx] = { type: 'E', time: evt.time || '' };
+                            eventsMap[stepIdx] = evt;
+                        }
+                    }
+
+                    dayScenario.value = {
+                        irregularTasks: config.irregular_tasks || [],
+                        events: eventsMap
+                    };
+                    
+                    // 骰子序列
+                    if (Array.isArray(config.dice_sequence)) {
+                        diceSequence.value = config.dice_sequence;
+                        diceSequenceIndex.value = 0;
+                    } else {
+                        diceSequence.value = [];
+                    }
+
+                    // 构建棋盘格子
+                    const hourMarkers = {};
+                    for (let i = 0; i <= HOURS_PER_DAY; i++) {
+                        const idx = Math.min(Math.floor(i * STEPS_PER_HOUR), rawPath.length - 1);
+                        const hour = START_HOUR + i;
+                        const label = hour > 12 ? (hour - 12) + 'pm' : hour + (hour === 12 ? 'pm' : 'am');
+                        hourMarkers[idx] = label;
+                    }
+
+                    boardCells.value = rawPath.map((pos, index) => {
+                        let cell = { ...pos, type: '', label: '' };
+                        if (index === 0) {
+                            cell.type = 'Start';
+                        } else if (eventLocations[index]) {
+                            cell.type = 'E';
+                        } else if (hourMarkers[index]) {
+                            // 10pm is the end
+                            cell.type = hourMarkers[index] === '10pm' ? 'End' : 'Hour';
+                        }
+                        if (hourMarkers[index]) cell.hourMarker = hourMarkers[index];
+                        return cell;
+                    });
+
+                    initSessionTiming();
+                    showStartCard.value = true;
+                    phase.value = 'start_card';
+                    statusMessage.value = getText('cards.startTitle') || '阅读早安卡';
+                    subMessage.value = "";
+                    
+                    logAction('game_start', { map_id: config.map_id, session_start: sessionStartISO.value });
+                };
+
+                // --------------------------------------------------
+                // 5.9 日志与计时器
+                // --------------------------------------------------
+                const logAction = (type, details = {}) => {
+                    if (!logFileName.value || !socket) return;
+                    
+                    socket.emit('game:action', {
+                        log_file: logFileName.value,
+                        session_id: sessionId.value,
+                        client_timestamp: new Date().toISOString(),
+                        client_time_ms: performance.now().toFixed(3),
+                        event_type: type,
+                        details: typeof details === 'string' ? details : JSON.stringify(details),
+                        metadata: details
+                    });
+                };
+
+                const startTimer = () => {
+                    if (timerInterval) clearInterval(timerInterval);
+                    timerInterval = setInterval(() => { realTimeSeconds.value++; }, 1000);
+                    logAction('timer_start');
+                };
+                
+                const stopAllTimers = () => {
+                    if (timerInterval) clearInterval(timerInterval);
+                };
+
+                // --------------------------------------------------
+                // 5.10 游戏动作
+                // --------------------------------------------------
+                const dismissStartCard = () => {
+                    showStartCard.value = false;
+                    phase.value = 'idle';
+                    statusMessage.value = i18n.readyToGo.value;
+                    subMessage.value = i18n.clickDice.value;
+                    startTimer();
+                    logAction('start_card_dismissed');
+                };
+
+                const getNextDiceValue = () => {
+                    if (diceSequence.value.length > 0) {
+                        if (diceSequenceIndex.value >= diceSequence.value.length) {
+                            diceSequenceIndex.value = 0; // 循环使用
+                        }
+                        return diceSequence.value[diceSequenceIndex.value++];
+                    }
+                    return Math.floor(Math.random() * 6) + 1;
+                };
+
+                const rollDice = () => {
+                    if (isRolling.value) return;
+                    isRolling.value = true;
+                    statusMessage.value = i18n.rolling.value;
+                    subMessage.value = i18n.waitResult.value;
+                    rollingProgress.value = 0;
+                    logAction('dice_roll_start');
+
+                    const startTime = performance.now();
+
+                    const animate = (currentTime) => {
+                        const elapsed = currentTime - startTime;
+                        const progress = Math.min(elapsed / DICE_ANIMATION_MS, 1);
+                        
+                        rollingDisplayValue.value = Math.floor(Math.random() * 6) + 1;
+                        rollingProgress.value = progress * 100;
+                        
+                        if (progress < 1) {
+                            requestAnimationFrame(animate);
+                        } else {
+                            const finalResult = getNextDiceValue();
+                            rollingDisplayValue.value = finalResult;
+                            diceResult.value = finalResult;
+                            rollingProgress.value = 100;
+                            
+                            logAction('dice_roll_result', { result: finalResult });
+
+                            setTimeout(() => {
+                                isRolling.value = false;
+                                moveTokenWithPassCheck(finalResult);
+                            }, 500);
+                        }
+                    };
+                    
+                    requestAnimationFrame(animate);
+                };
+
+                const moveTokenWithPassCheck = async (steps) => {
+                    phase.value = 'moving';
+                    subMessage.value = i18n.moveForwardSteps.value(steps);
+
+                    // 移动所有步数
+                    for (let i = 0; i < steps; i++) {
+                        await new Promise(r => setTimeout(r, TOKEN_MOVE_DELAY_MS));
+                        playerPos.value++;
+                        
+                        if (playerPos.value >= boardCells.value.length - 1) {
+                            playerPos.value = boardCells.value.length - 1;
+                            handleDayEnd();
+                            return;
+                        }
+                    }
+
+                    // 移动结束后，检查是否精确停在事件格子上
+                    if (dayScenario.value.events[playerPos.value]) {
+                        statusMessage.value = i18n.eventTriggered.value;
+                        subMessage.value = i18n.pleaseHandle.value;
+                        
+                        logAction('event_trigger', { 
+                            pos: playerPos.value, 
+                            event_id: dayScenario.value.events[playerPos.value].id || 'unknown' 
+                        });
+
+                        await new Promise(r => setTimeout(r, 500));
+                        triggerEvent(dayScenario.value.events[playerPos.value]);
+                    } else {
+                        statusMessage.value = i18n.moveEnded.value;
+                        subMessage.value = i18n.waitContinue.value;
+                        phase.value = 'waiting_confirm';
+                        logAction('move_end', { pos: playerPos.value });
+                    }
+                };
+
+                const triggerEvent = (eventData) => {
+                    // Check if this event category maps to a minigame
+                    if (GAME_REGISTRY[eventData.category]) {
+                        startMinigame(eventData.category);
+                        return;
+                    }
+                    currentEvent.value = {
+                        category: eventData.category,
+                        text: eventData.description,
+                        choices: eventData.choices
+                    };
+                    showEventCard.value = true;
+                };
+
+                const startMinigame = (category) => {
+                    const gameConfig = GAME_REGISTRY[category];
+                    if (!gameConfig) return;
+
+                    activeGameComponent.value = gameConfig.component;
+                    activeGameScenario.value = gameConfig.defaultScenario; 
+                    minigameTitle.value = gameConfig.title;
+                    minigameSubtitle.value = gameConfig.subtitle;
+                    minigameIcon.value = gameConfig.icon;
+                    minigameBackground.value = gameConfig.background;
+                    
+                    showMinigame.value = true;
+                    Vue.nextTick(() => lucide.createIcons());
+                    logAction('minigame_start', { category });
+                };
+
+                // --------------------------------------------------
+                // 5.11 事件处理
+                // --------------------------------------------------
+                const handleMinigameComplete = (result) => {
+                    showMinigame.value = false;
+                    phase.value = 'waiting_confirm';
+                    statusMessage.value = i18n.taskComplete.value;
+                    logAction('minigame_complete', result);
+                };
+
+                const handleDayEnd = () => {
+                    statusMessage.value = "今日结束";
+                    subMessage.value = "通知实验员";
+                    phase.value = 'finished';
+                    stopAllTimers();
+                    logAction('day_end');
+                };
+
+                const selectEventChoice = (choice) => {
+                    showEventCard.value = false;
+                    phase.value = 'resolving_event';
+                    requiredRollText.value = choice.rollReq;
+                    statusMessage.value = "需要检定";
+                    subMessage.value = `目标: ${choice.rollReq}`;
+                    logAction('event_choice_selected', { choice: choice.text });
+                };
+
+                const closeEventCard = () => {
+                    showEventCard.value = false;
+                    phase.value = 'waiting_confirm';
+                    statusMessage.value = "事件完成";
+                    subMessage.value = "点击继续";
+                    logAction('event_closed');
+                };
+
+                const rollForEvent = () => {
+                    statusMessage.value = "判定中...";
+                    logAction('event_roll_start');
+                    
+                    setTimeout(() => {
+                        const roll = getNextDiceValue();
+                        statusMessage.value = `掷出了 ${roll}`; 
+                        subMessage.value = "判定完成";
+                        phase.value = 'waiting_confirm';
+                        logAction('event_roll_result', { result: roll });
+                    }, DICE_ANIMATION_MS);
+                };
+
+                const confirmContinue = () => {
+                    phase.value = 'idle';
+                    statusMessage.value = i18n.yourTurn.value;
+                    subMessage.value = i18n.clickDice.value;
+                    logAction('turn_continue');
+                };
+
+                const openTaskMenu = () => { 
+                    showTaskMenu.value = true; 
+                    logAction('task_menu_opened'); 
+                };
+                
+                const performTask = (task) => {
+                    showTaskMenu.value = false;
+                    const originalStatus = statusMessage.value;
+                    statusMessage.value = i18n.recorded.value;
+                    setTimeout(() => { statusMessage.value = originalStatus; }, MESSAGE_DISPLAY_MS);
+                    logAction('task_performed', { task });
+                };
+
+                // --------------------------------------------------
+                // 5.12 UI 辅助函数
+                // --------------------------------------------------
+                const getCellStyle = (cell) => ({
+                    gridColumnStart: cell.x + 1,
+                    gridRowStart: cell.y + 1
+                });
+                
+                const getCellClasses = (cell, index) => {
+                    const classes = ['cell'];
+                    if (cell.type === 'E') classes.push('event');
+                    else if (cell.type === 'Start') classes.push('start');
+                    else if (cell.type === 'End') classes.push('end');
+                    else if (cell.type === 'Hour') classes.push('hour');
+                    if (playerPos.value === index) classes.push('active-cell');
+                    if (cell.hourMarker) classes.push('has-marker');
+                    return classes.join(' ');
+                };
+
+                // --------------------------------------------------
+                // 5.13 计算属性
+                // --------------------------------------------------
+                const formattedVirtualTime = computed(() => {
+                    const currentTotalMins = START_MINUTES + (playerPos.value * MINUTES_PER_STEP);
+                    const h = Math.floor(currentTotalMins / 60) % 24;
+                    const m = Math.floor(currentTotalMins % 60);
+                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                });
+                
+                const formattedRealTime = computed(() => {
+                    const m = Math.floor(realTimeSeconds.value / 60);
+                    const s = realTimeSeconds.value % 60;
+                    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                });
+                
+                const isGameActive = computed(() => !showStartCard.value && !showEventCard.value && !showMinigame.value);
+
+                // --------------------------------------------------
+                // 5.14 国际化计算属性
+                // --------------------------------------------------
+                const i18n = {
+                    // UI 标签
+                    dayLabel: computed(() => {
+                        // Hide day label during loading/waiting phase
+                        if (phase.value === 'loading' || phase.value === 'waiting') {
+                            return '';
+                        }
+                        // For trial mode, show "Trial" instead of day number
+                        if (isTrialMode.value) {
+                            return getText('ui.trial') || 'Trial';
+                        }
+                        return getText('ui.day', { day: currentDay.value });
+                    }),
+                    weekdayLabel: computed(() => {
+                        // Hide weekday during loading/waiting phase
+                        if (phase.value === 'loading' || phase.value === 'waiting') {
+                            return '';
+                        }
+                        // For trial mode, always show Sunday
+                        if (isTrialMode.value) {
+                            return getText('ui.sunday');
+                        }
+                        // Map Day to Weekday: Day 1 = Mon, Day 2 = Tue, Day 3 = Wed
+                        const weekdays = ['ui.monday', 'ui.tuesday', 'ui.wednesday'];
+                        const key = weekdays[(currentDay.value - 1) % 3] || 'ui.monday';
+                        return getText(key);
+                    }),
+                    currentTimeLabel: computed(() => getText('ui.currentTime')),
+                    realTimeLabel: computed(() => getText('ui.realTime')),
+                    rollButton: computed(() => getText('hub.roll')),
+                    continueButton: computed(() => getText('common.clickContinue')),
+                    taskButton: computed(() => getText('ui.taskBtn')),
+                    infoLabel: computed(() => getText('ui.info')),
+                    infoContent: computed(() => getText('ui.infoContent')),
+                    ruleHint: computed(() => getText('ui.ruleHint')),
+                    eventPause: computed(() => getText('ui.eventPause')),
+                    
+                    // Status messages
+                    waiting: computed(() => getText('common.waiting')),
+                    pleaseWait: computed(() => getText('common.loading')),
+                    readyToGo: computed(() => getText('ui.readyToGo') || '准备出发'),
+                    clickDice: computed(() => getText('common.clickDice')),
+                    rolling: computed(() => getText('ui.rolling') || '掷骰子中...'),
+                    waitResult: computed(() => getText('ui.waitResult') || '等待结果...'),
+                    eventTriggered: computed(() => getText('ui.eventTriggered') || '事件触发'),
+                    pleaseHandle: computed(() => getText('ui.pleaseHandle') || '请处理'),
+                    taskComplete: computed(() => getText('ui.taskComplete') || '任务完成'),
+                    yourTurn: computed(() => getText('common.yourTurn')),
+                    recorded: computed(() => getText('common.recorded')),
+                    restoring: computed(() => getText('common.restoring')),
+                    restoreFailed: computed(() => getText('common.restoreFailed')),
+                    loading: computed(() => getText('common.loading')),
+                    loadFailed: computed(() => getText('ui.loadFailed') || '加载失败'),
+                    cannotConnect: computed(() => getText('ui.cannotConnect') || '无法连接服务器'),
+                    
+                    // Movement messages
+                    moveForwardSteps: computed(() => (steps) => {
+                        const template = getText('ui.moveForwardSteps') || '向前移动 {steps} 步';
+                        return template.replace('{steps}', steps);
+                    }),
+                    moveEnded: computed(() => getText('ui.moveEnded') || '移动结束'),
+                    waitContinue: computed(() => getText('ui.waitContinue') || '等待继续'),
+                    
+                    // Tutorial messages
+                    tutorialStartDay: computed(() => getText('tutorial.startDay') || '早安！请大声朗读今天的任务，然后点击这里开始。'),
+                    tutorialRollDice: computed(() => getText('tutorial.rollDice') || '轮到您了！请点击这个骰子向前移动。'),
+                    tutorialPleaseWait: computed(() => getText('tutorial.pleaseWait') || '请稍候...'),
+                    
+                    // Task menu
+                    recordMemoryTask: computed(() => getText('ui.recordMemoryTask') || '记录记忆任务'),
+                    
+                    // Start card
+                    mondayMorning: computed(() => getText('ui.mondayMorning') || '周一: 早安'),
+                    readTasksAloud: computed(() => getText('ui.readTasksAloud') || '请大声朗读以下任务'),
+                    todaysTasks: computed(() => getText('ui.todaysTasks') || '今日专属任务'),
+                    recurringTasks: computed(() => getText('ui.recurringTasks') || '常规重复任务'),
+                    asthma11am: computed(() => getText('tasks.asthma11am') || '11:00 AM 哮喘药'),
+                    asthma9pm: computed(() => getText('tasks.asthma9pm') || '9:00 PM 哮喘药'),
+                    antibioticsBreakfast: computed(() => getText('tasks.antibioticsBreakfast') || '早餐时 抗生素'),
+                    antibioticsDinner: computed(() => getText('tasks.antibioticsDinner') || '晚餐时 抗生素'),
+                    lungTestInfo: computed(() => getText('ui.lungTestInfo') || '真实时间 2:30 & 4:15 肺活量测试'),
+                    startDay: computed(() => getText('ui.startDay') || '开始这一天'),
+                    
+                    // Event card
+                    pleaseChooseAction: computed(() => getText('ui.pleaseChooseAction') || '请选择一个行动'),
+                    req: computed(() => getText('ui.req') || '需'),
+                    understood: computed(() => getText('common.understood') || '知道了'),
+                    
+                    // Task buttons
+                    taskAsthma: computed(() => getText('tasks.asthmaButton') || '哮喘药 (Asthma)'),
+                    taskAntibiotics: computed(() => getText('tasks.antibioticsButton') || '抗生素 (Antibiotics)'),
+                    taskLungTest: computed(() => getText('tasks.lungTestButton') || '肺活量测试 (Lung Test)'),
+                    
+                    // Dice and movement
+                    moving: computed(() => getText('ui.moving') || '移动中...'),
+                    checkTarget: computed(() => getText('ui.checkTarget') || '检定目标'),
+                    rollToCheck: computed(() => getText('ui.rollToCheck') || '掷骰子判定')
+                };
+
+                // --------------------------------------------------
+                // 5.15 返回值
+                // --------------------------------------------------
+                return {
+                    // 状态
+                    boardCells, playerPos, currentDay, phase, statusMessage, subMessage,
+                    showStartCard, showEventCard, showTaskMenu, showMinigame,
+                    activeGameComponent, activeGameScenario, minigameTitle, minigameSubtitle, minigameIcon, minigameBackground,
+                    currentEvent, isRolling, rollingDisplayValue, rollingProgress, diceResult,
+                    formattedVirtualTime, formattedRealTime, dayScenario, requiredRollText, isGameActive,
+                    // 动作
+                    dismissStartCard, rollDice, confirmContinue, handleMinigameComplete,
+                    openTaskMenu, closeEventCard, selectEventChoice, getCellStyle, performTask, rollForEvent,
+                    // 国际化
+                    currentLang, i18n
+                };
+            }
+        }).mount('#app');
+    </script>
