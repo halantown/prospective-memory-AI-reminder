@@ -5,5 +5,3 @@
 /docs
 __pycache__/
 *.pyc
-**node_modules/
-experiment.db
