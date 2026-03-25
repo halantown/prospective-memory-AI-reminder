@@ -133,3 +133,13 @@ def cancel_all_windows():
     _active_windows.clear()
     _room_sequences.clear()
     _active_triggers.clear()
+
+
+def cancel_all_windows_for_participant(participant_id: str):
+    """Cancel all active windows for a specific participant (disconnect cleanup)."""
+    keys_to_remove = [k for k in _active_windows if k.startswith(f"{participant_id}:")]
+    for key in keys_to_remove:
+        _active_windows[key].cancel()
+        del _active_windows[key]
+    _room_sequences.pop(participant_id, None)
+    _active_triggers.pop(participant_id, None)

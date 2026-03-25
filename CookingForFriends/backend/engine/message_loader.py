@@ -27,8 +27,12 @@ def load_message_pool(block_number: int) -> dict[str, dict]:
         logger.warning(f"No message pool found for block {block_number}")
         return {}
 
-    with open(path) as f:
-        data = json.load(f)
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        logger.error(f"Failed to load message pool from {path}: {e}")
+        return {}
 
     pool = {}
     for msg in data.get("messages", []):

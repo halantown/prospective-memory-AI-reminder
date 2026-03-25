@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
-import type { ActivePMTrial, PMTaskConfig, PhoneMessage } from '../types'
+import type { ActivePMTrial, PMTaskConfig, PhoneMessage, RoomId } from '../types'
 
 const HEARTBEAT_INTERVAL = 10_000
 const RECONNECT_BASE_MS = 500
@@ -12,6 +12,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
   const wsRef = useRef<WebSocket | null>(null)
   const retryCount = useRef(0)
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const robotSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Monotonically increasing connection id — only the latest connection should
   // attempt reconnects.  This prevents the race where a stale onclose handler
   // (whose closedByUser flag was already reset by the next effect run) spawns
@@ -43,12 +44,20 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
 
       case 'robot_speak':
         store.setRobotSpeaking(data.text as string)
-        setTimeout(() => store.clearRobotSpeech(), 5000)
+        if (robotSpeechTimerRef.current) clearTimeout(robotSpeechTimerRef.current)
+        robotSpeechTimerRef.current = setTimeout(() => store.clearRobotSpeech(), 5000)
         break
 
-      case 'robot_move':
-        store.setRobotRoom(data.to_room as any)
+      case 'robot_move': {
+        const VALID_ROOMS = ['kitchen', 'bedroom', 'living_room', 'study', 'bathroom']
+        const toRoom = data.to_room as string
+        if (VALID_ROOMS.includes(toRoom)) {
+          store.setRobotRoom(toRoom as RoomId)
+        } else {
+          console.warn('[WS] Invalid robot room:', toRoom)
+        }
         break
+      }
 
       case 'pm_trigger': {
         const receivedAt = Date.now() / 1000
@@ -118,13 +127,6 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         }
         store.addPhoneMessage(phoneMsg)
         store.setPhoneBanner(phoneMsg)
-        // Auto-dismiss banner after 3 seconds
-        setTimeout(() => {
-          const current = useGameStore.getState().phoneBanner
-          if (current && current.id === phoneMsg.id) {
-            useGameStore.getState().setPhoneBanner(null)
-          }
-        }, 3000)
         break
       }
 
@@ -231,6 +233,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
       // Bump connId so the closing WS won't attempt to reconnect
       connIdRef.current++
       if (heartbeatRef.current) clearInterval(heartbeatRef.current)
+      if (robotSpeechTimerRef.current) clearTimeout(robotSpeechTimerRef.current)
       if (wsRef.current) {
         wsRef.current.close()
         wsRef.current = null

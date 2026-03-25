@@ -126,6 +126,9 @@ def generate_block_timeline(
         )
         if is_reminded:
             reminder_time = max(60, trigger_time - REMINDER_LEAD_S)
+            # Ensure reminder fires strictly before its trigger
+            if reminder_time >= trigger_time:
+                reminder_time = max(1, trigger_time - 5)
             events.append({
                 "t": reminder_time,
                 "type": "robot_speak",

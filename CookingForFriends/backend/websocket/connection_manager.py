@@ -60,13 +60,18 @@ class ConnectionManager:
         if participant_id not in self._connections:
             logger.warning(f"[CM] No connections for participant {participant_id}, dropping {event_type}")
             return
+        # Critical events must not be silently dropped
+        critical = event_type in ('pm_trigger', 'block_end', 'pm_received', 'ongoing_task_event')
         conn_count = len(self._connections[participant_id])
         logger.debug(f"[CM] Sending {event_type} to {participant_id} ({conn_count} connections)")
         for ws, queue in self._connections[participant_id]:
             try:
-                await queue.put(msg)
+                if critical:
+                    await queue.put(msg)
+                else:
+                    queue.put_nowait(msg)
             except asyncio.QueueFull:
-                logger.warning(f"Queue full for {participant_id}, dropping event {event_type}")
+                logger.warning(f"Queue full for {participant_id}, dropping non-critical event {event_type}")
 
     async def broadcast_admin(self, data: dict):
         """Broadcast to all admin connections."""
@@ -112,4 +117,4 @@ async def ws_pump(queue: asyncio.Queue, ws: WebSocket):
     except WebSocketDisconnect:
         pass
     except Exception as e:
-        logger.debug(f"WS pump ended: {e}")
+        logger.debug(f"WS pump ended: {type(e).__name__}: {e}")

@@ -168,7 +168,7 @@ export default function PhoneSidebar() {
 
           {/* Status bar */}
           <div className="flex items-center justify-between px-6 py-1 text-[10px]">
-            <span className="text-white font-medium">{gameClock}</span>
+            <span className="text-white font-medium">{gameClock ?? '--:--'}</span>
             <div className="flex items-center gap-1">
               {unreadCount > 0 && (
                 <span className="bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
@@ -189,7 +189,7 @@ export default function PhoneSidebar() {
               {/* Clock + lock icon */}
               <div className="flex flex-col items-center mb-4">
                 <div className="text-2xl mb-1">🔒</div>
-                <div className="text-3xl font-extralight text-white tracking-wider">{gameClock}</div>
+                <div className="text-3xl font-extralight text-white tracking-wider">{gameClock ?? '--:--'}</div>
               </div>
 
               {/* Unread/unreplied message previews */}

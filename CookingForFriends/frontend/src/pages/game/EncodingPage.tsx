@@ -16,7 +16,7 @@ import type { PMEncodingCard } from '../../types'
 
 type QuestionType = 'trigger' | 'target' | 'action'
 
-const QUESTION_TYPES: QuestionType[] = ['trigger']
+const QUESTION_TYPES: QuestionType[] = ['trigger', 'target', 'action']
 
 /** Deterministic shuffle seeded by a number. */
 function seededShuffle<T>(arr: T[], seed: number): T[] {
@@ -46,6 +46,7 @@ export default function EncodingPage() {
   // Read timer
   const [readCountdown, setReadCountdown] = useState(10)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const quizTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
   // Quiz state
   const [quizMode, setQuizMode] = useState(false)
@@ -88,6 +89,14 @@ export default function EncodingPage() {
   }, [clearReadTimer])
 
   useEffect(() => clearReadTimer, [clearReadTimer])
+
+  // Clean up quiz timeouts on unmount
+  useEffect(() => {
+    return () => {
+      quizTimeoutsRef.current.forEach(t => clearTimeout(t))
+      quizTimeoutsRef.current = []
+    }
+  }, [])
 
   // ── Load encoding data ──
 
@@ -251,30 +260,30 @@ export default function EncodingPage() {
 
     if (isCorrect) {
       setFeedback('correct')
-      setTimeout(() => {
+      quizTimeoutsRef.current.push(setTimeout(() => {
         setFeedback(null)
         advanceQuestion()
-      }, 800)
+      }, 800))
     } else {
       setFeedback('wrong')
       const newFails = failCount + 1
       setFailCount(newFails)
       setAttemptNumber((a) => a + 1)
 
-      setTimeout(() => {
+      quizTimeoutsRef.current.push(setTimeout(() => {
         setFeedback(null)
         setSelected(null)
 
         if (newFails >= 2) {
           setAutoPassMessage(true)
-          setTimeout(() => advanceQuestion(), 1500)
+          quizTimeoutsRef.current.push(setTimeout(() => advanceQuestion(), 1500))
         } else {
           setReShowCard(true)
           setHighlightSection(qType)
           setQuizMode(false)
           startReadTimer()
         }
-      }, 1000)
+      }, 1000))
     }
   }
 

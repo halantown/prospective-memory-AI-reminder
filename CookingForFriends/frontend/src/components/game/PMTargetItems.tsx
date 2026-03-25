@@ -191,7 +191,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
   // Find the active PM trial for this room (at most one at a time)
   const activeTrial = useMemo(() => {
     return activePMTrials.find(
-      t => t.taskConfig.target_room.toLowerCase() === room.toLowerCase()
+      t => t.taskConfig?.target_room?.toLowerCase() === room.toLowerCase()
         && !completedPMTrialIds.has(t.triggerId)
     )
   }, [activePMTrials, completedPMTrialIds, room])
@@ -211,6 +211,13 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
       setPopupOpen(false)
     }
   }, [activeTrial, popupOpen])
+
+  // Reset state on room change
+  useEffect(() => {
+    setSelectedTarget(null)
+    setActionPhase('browse')
+    setPopupOpen(false)
+  }, [room])
 
   const handleItemClick = useCallback((itemId: string) => {
     if (actionPhase !== 'browse' || selectedTarget) return

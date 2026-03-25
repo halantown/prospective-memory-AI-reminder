@@ -1,11 +1,12 @@
 """Application configuration."""
 
+import os
 from pathlib import Path
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
-DB_PATH = BASE_DIR / "experiment.db"
+DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data")))
+DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "experiment.db")))
 
 # Server
 HOST = "0.0.0.0"
@@ -40,7 +41,7 @@ HEARTBEAT_TIMEOUT_S = 30
 # Development seed — set to None to disable
 # This participant is auto-created/reset on every startup; it always works.
 # Remove or set to None before production deployment.
-DEV_TOKEN: str | None = "ABC123"
+DEV_TOKEN: str | None = os.getenv("DEV_TOKEN", "ABC123")
 
 # Latin Square — 3 conditions, 6 possible orderings (3×3 Latin Square)
 LATIN_SQUARE = {

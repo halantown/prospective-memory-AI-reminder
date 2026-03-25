@@ -30,10 +30,10 @@ def score_pm_attempt(
     elapsed = attempt_time - trigger_fired_at
     response_time_ms = int(elapsed * 1000)
 
-    if elapsed > LATE_WINDOW_S:
+    if elapsed >= LATE_WINDOW_S:
         return 0, response_time_ms
 
-    if elapsed > EXECUTION_WINDOW_S:
+    if elapsed >= EXECUTION_WINDOW_S:
         return 1, response_time_ms
 
     # Within primary window — evaluate correctness

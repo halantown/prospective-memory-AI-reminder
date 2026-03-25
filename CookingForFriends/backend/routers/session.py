@@ -18,9 +18,16 @@ from models.schemas import (
 )
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
+from config import BLOCKS_PER_PARTICIPANT
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
+
+
+def _validate_block_num(block_num: int):
+    """Validate block number is within expected range."""
+    if not (1 <= block_num <= BLOCKS_PER_PARTICIPANT):
+        raise HTTPException(400, f"block_num must be 1-{BLOCKS_PER_PARTICIPANT}")
 
 
 @router.post("/session/start", response_model=SessionStartResponse)
@@ -96,6 +103,7 @@ async def get_session_status(session_id: str, db: AsyncSession = Depends(get_db)
 @router.get("/session/{session_id}/block/{block_num}/encoding", response_model=BlockEncodingResponse)
 async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = Depends(get_db)):
     """Get encoding card data for a block."""
+    _validate_block_num(block_num)
     result = await db.execute(
         select(Block).where(
             Block.participant_id == session_id,
@@ -159,6 +167,7 @@ async def submit_quiz(
     db: AsyncSession = Depends(get_db),
 ):
     """Submit encoding quiz answers — validates and records attempts."""
+    _validate_block_num(block_num)
     result = await db.execute(
         select(Block).where(
             Block.participant_id == session_id,
@@ -257,6 +266,7 @@ async def submit_nasa_tlx(
     db: AsyncSession = Depends(get_db),
 ):
     """Submit NASA-TLX for a micro-break."""
+    _validate_block_num(block_num)
     result = await db.execute(
         select(Block).where(
             Block.participant_id == session_id,

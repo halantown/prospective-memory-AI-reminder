@@ -1,6 +1,6 @@
 """Pydantic request/response schemas."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 
@@ -31,9 +31,9 @@ class BlockEncodingResponse(BaseModel):
 
 
 class NasaTLXRequest(BaseModel):
-    mental_demand: int  # 1-21
-    effort: int
-    frustration: int
+    mental_demand: int = Field(ge=1, le=21)
+    effort: int = Field(ge=1, le=21)
+    frustration: int = Field(ge=1, le=21)
 
 
 class DebriefRequest(BaseModel):

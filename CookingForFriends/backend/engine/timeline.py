@@ -56,8 +56,12 @@ def load_timeline(block_number: int, condition: str, **kwargs) -> dict:
     if not path.exists():
         logger.warning(f"No timeline template found for block {block_number}, using empty")
         return {"events": [], "duration_seconds": 600}
-    with open(path) as f:
-        return json.load(f)
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        logger.error(f"Failed to load timeline from {path}: {e}")
+        return {"events": [], "duration_seconds": 600}
 
 
 async def run_timeline(
