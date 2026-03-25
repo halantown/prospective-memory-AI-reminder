@@ -50,6 +50,16 @@ export default function BedroomRoom({ isActive }: { isActive: boolean }) {
     if (allComplete && diningPhase === 'active') {
       setShowComplete(true)
       if (wsSend) {
+        // Notify backend that table is fully set (for activity trigger detection)
+        wsSend({
+          type: 'task_action',
+          data: {
+            task: 'dining',
+            event: 'table_complete',
+            round: diningRound + 1,
+            timestamp: Date.now() / 1000,
+          },
+        })
         wsSend({
           type: 'task_action',
           data: { task: 'dining', action: 'round_complete', round: diningRound + 1, timestamp: Date.now() / 1000 },

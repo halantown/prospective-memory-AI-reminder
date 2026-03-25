@@ -191,6 +191,25 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
         updatePan(panId, { state: 'empty', placedAt: null })
         addKitchenScore(10)
         reportAction(panId, 'plate')
+        // Check if all pans are now empty (full cycle plated)
+        setTimeout(() => {
+          const currentPans = useGameStore.getState().pans
+          const allEmpty = currentPans.every(p => p.state === 'empty')
+          if (allEmpty) {
+            const send = useGameStore.getState().wsSend
+            if (send) {
+              send({
+                type: 'task_action',
+                data: {
+                  task: 'steak',
+                  event: 'steak_plated',
+                  all_plated: true,
+                  timestamp: Date.now() / 1000,
+                },
+              })
+            }
+          }
+        }, 50)
         break
       case 'burnt':
         clearTimer(`pan_${panId}`)
