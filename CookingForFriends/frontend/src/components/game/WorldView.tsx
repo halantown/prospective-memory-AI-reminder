@@ -3,7 +3,7 @@
  *  content is still rendered so the participant can monitor state from any room.
  */
 
-import { useCallback } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
 import KitchenRoom from './rooms/KitchenRoom'
@@ -59,14 +59,23 @@ export default function WorldView() {
   const avatarMoving = useGameStore((s) => s.avatarMoving)
   const setCurrentRoom = useGameStore((s) => s.setCurrentRoom)
   const setAvatarMoving = useGameStore((s) => s.setAvatarMoving)
+  const roomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (roomTimeoutRef.current) clearTimeout(roomTimeoutRef.current)
+    }
+  }, [])
 
   const handleRoomClick = useCallback((roomId: RoomId) => {
     if (roomId === currentRoom || avatarMoving) return
 
+    if (roomTimeoutRef.current) clearTimeout(roomTimeoutRef.current)
     setAvatarMoving(true)
-    setTimeout(() => {
+    roomTimeoutRef.current = setTimeout(() => {
       setCurrentRoom(roomId)
       setAvatarMoving(false)
+      roomTimeoutRef.current = null
     }, 800)
   }, [currentRoom, avatarMoving, setCurrentRoom, setAvatarMoving])
 

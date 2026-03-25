@@ -15,10 +15,11 @@ from database import get_db, async_session
 from models.experiment import Experiment, ExperimentStatus, Participant, ParticipantStatus
 from models.block import Block, BlockStatus, PMTrial, ReminderMessage
 from models.logging import InteractionLog
-from models.schemas import ParticipantCreateResponse
+from models.schemas import ParticipantCreateResponse, ReminderImportItem
 from engine.condition_assigner import assign_group, get_condition_order, generate_token, next_participant_id
 from engine.pm_tasks import (
     get_tasks_for_block, get_task, BLOCK_TRIGGER_ORDER, BLOCK_GUESTS,
+    task_def_to_config, task_def_to_encoding_card,
 )
 from websocket.connection_manager import manager
 from config import LATIN_SQUARE
@@ -118,8 +119,8 @@ async def create_participant(db: AsyncSession = Depends(get_db)):
                 trial_number=trial_idx + 1,
                 has_reminder=has_reminder,
                 is_filler=is_unreminded and condition != "CONTROL",
-                task_config=_task_def_to_config(task_def),
-                encoding_card=_task_def_to_encoding_card(task_def),
+                task_config=task_def_to_config(task_def),
+                encoding_card=task_def_to_encoding_card(task_def),
                 reminder_text=task_def.baseline_reminder if has_reminder else None,
                 reminder_condition=condition if has_reminder else None,
             )
@@ -141,41 +142,6 @@ async def create_participant(db: AsyncSession = Depends(get_db)):
         token=token,
         session_id=pid,
     )
-
-
-def _task_def_to_config(task_def) -> dict:
-    """Convert PMTaskDef to the task_config JSON stored in PMTrial."""
-    return {
-        "task_id": task_def.task_id,
-        "trigger_type": task_def.trigger_type,
-        "trigger_event": task_def.trigger_visual,
-        "target_room": task_def.target_room,
-        "target_object": task_def.target_name,
-        "target_action": task_def.action_description,
-        "distractor_object": task_def.distractor_name,
-        "action_destination": task_def.action_destination,
-        "discriminating_cue": task_def.discriminating_cue,
-    }
-
-
-def _task_def_to_encoding_card(task_def) -> dict:
-    """Convert PMTaskDef to encoding card JSON stored in PMTrial."""
-    return {
-        "trigger_description": task_def.trigger_event,
-        "target_room": task_def.target_room,
-        "target_description": task_def.target_name,
-        "target_image": f"/assets/pm/{task_def.target_image}",
-        "action_description": task_def.action_description,
-        "encoding_text": task_def.encoding_text,
-        "visual_cues": {
-            "target": task_def.target_visual_desc,
-            "distractor": task_def.distractor_visual_desc,
-            "cue": task_def.discriminating_cue,
-        },
-        "quiz_question": task_def.quiz_question,
-        "quiz_options": task_def.quiz_options,
-        "quiz_correct_index": task_def.quiz_correct_index,
-    }
 
 
 @router.get("/participants")
@@ -243,17 +209,17 @@ async def experiment_overview(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/reminders/import")
-async def import_reminders(reminders: list[dict], db: AsyncSession = Depends(get_db)):
+async def import_reminders(reminders: list[ReminderImportItem], db: AsyncSession = Depends(get_db)):
     """Batch import agent-generated reminders."""
     count = 0
     for r in reminders:
         msg = ReminderMessage(
-            task_type=r["task_type"],
-            condition=r["condition"],
-            context_activity=r.get("context_activity"),
-            text=r["text"],
-            audio_url=r.get("audio_url"),
-            extra_metadata=r.get("metadata"),
+            task_type=r.task_type,
+            condition=r.condition,
+            context_activity=r.context_activity,
+            text=r.text,
+            audio_url=r.audio_url,
+            extra_metadata=r.metadata,
             is_placeholder=False,
         )
         db.add(msg)

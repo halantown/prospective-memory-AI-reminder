@@ -1,7 +1,7 @@
 """Block, PMTrial, PMAttemptRecord, EncodingQuizAttempt, and ReminderMessage models."""
 
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
     Integer, String, Enum, DateTime, JSON, Float, Boolean, ForeignKey, Text,
     UniqueConstraint, Index,
@@ -97,7 +97,7 @@ class PMAttemptRecord(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     trial_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("pm_trials.id", ondelete="CASCADE"), nullable=False, index=True,
+        Integer, ForeignKey("pm_trials.id", ondelete="CASCADE"), nullable=False, unique=True, index=True,
     )
     participant_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("participants.id", ondelete="CASCADE"), nullable=False, index=True,
@@ -149,7 +149,7 @@ class EncodingQuizAttempt(Base):
     correct_answer: Mapped[str] = mapped_column(String(200), nullable=False)
     is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
     response_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     trial: Mapped["PMTrial"] = relationship("PMTrial", back_populates="quiz_attempts")
 
@@ -166,5 +166,5 @@ class ReminderMessage(Base):
     audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     extra_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     is_placeholder: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 

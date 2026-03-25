@@ -119,7 +119,7 @@ async def seed_dev_participant():
             from engine.pm_tasks import (
                 get_task, BLOCK_TRIGGER_ORDER, BLOCK_GUESTS,
             )
-            from routers.admin import _task_def_to_config, _task_def_to_encoding_card
+            from engine.pm_tasks import task_def_to_config, task_def_to_encoding_card
 
             for i, condition in enumerate(LATIN_SQUARE[group], start=1):
                 block = Block(
@@ -144,8 +144,8 @@ async def seed_dev_participant():
                         trial_number=trial_idx + 1,
                         has_reminder=has_reminder,
                         is_filler=(is_unreminded and condition != "CONTROL"),
-                        task_config=_task_def_to_config(task_def),
-                        encoding_card=_task_def_to_encoding_card(task_def),
+                        task_config=task_def_to_config(task_def),
+                        encoding_card=task_def_to_encoding_card(task_def),
                         reminder_text=(
                             task_def.baseline_reminder if has_reminder else None
                         ),

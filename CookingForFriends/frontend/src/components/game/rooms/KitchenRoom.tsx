@@ -74,7 +74,7 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const mountedRef = useRef(true)
 
-  const reportAction = (panId: number, action: string) => {
+  const reportAction = useCallback((panId: number, action: string) => {
     const send = useGameStore.getState().wsSend
     if (send) {
       send({
@@ -82,15 +82,15 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
         data: { task: 'steak', action, pan_id: panId, timestamp: Date.now() / 1000 },
       })
     }
-  }
+  }, [])
 
-  const clearTimer = (key: string) => {
+  const clearTimer = useCallback((key: string) => {
     const timer = timersRef.current.get(key)
     if (timer) {
       clearTimeout(timer)
       timersRef.current.delete(key)
     }
-  }
+  }, [])
 
   const setTimer = (key: string, fn: () => void, ms: number) => {
     clearTimer(key)
@@ -219,7 +219,7 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
       default:
         break
     }
-  }, [pans, updatePan, addKitchenScore, isActive])
+  }, [pans, updatePan, addKitchenScore, isActive, clearTimer, reportAction])
 
   useEffect(() => {
     mountedRef.current = true

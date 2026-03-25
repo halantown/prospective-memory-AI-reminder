@@ -174,10 +174,15 @@ export default function ConfigPage() {
 
   // Load config, tasks, reminders on mount
   useEffect(() => {
+    const safeFetch = (url: string) =>
+      fetch(url).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status} from ${url}`)
+        return r.json()
+      })
     Promise.all([
-      fetch('/api/admin/config').then((r) => r.json()),
-      fetch('/api/admin/tasks').then((r) => r.json()),
-      fetch('/api/admin/reminders').then((r) => r.json()),
+      safeFetch('/api/admin/config'),
+      safeFetch('/api/admin/tasks'),
+      safeFetch('/api/admin/reminders'),
     ])
       .then(([cfg, tsk, rem]) => {
         setConfig(cfg)
@@ -191,7 +196,10 @@ export default function ConfigPage() {
   const loadAssignments = useCallback(() => {
     if (assignmentsLoaded) return
     fetch('/api/admin/assignments')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then((data) => {
         setAssignments(data)
         setAssignmentsLoaded(true)
@@ -204,6 +212,7 @@ export default function ConfigPage() {
     setExporting(true)
     try {
       const res = await fetch('/api/admin/data/export')
+      if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`)
       const data = await res.json()
       const json = JSON.stringify(data, null, 2)
       const blob = new Blob([json], { type: 'application/json' })

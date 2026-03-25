@@ -26,7 +26,7 @@ async def handle_game_ws(
     db_factory,
 ):
     """Handle a game WebSocket connection for a participant block."""
-    queue = await manager.connect_participant(participant_id, ws)
+    queue, conn_id = await manager.connect_participant(participant_id, ws)
 
     # Create send function bound to this participant
     async def send_event(event_type: str, data: dict):
@@ -89,14 +89,19 @@ async def handle_game_ws(
         manager.disconnect_participant(participant_id, ws)
         pump_task.cancel()
         receiver_task.cancel()
-        # Cancel timeline and execution windows on disconnect
-        if timeline_task and not timeline_task.done():
-            timeline_task.cancel()
-        cancel_timeline(participant_id, block_number)
-        from engine.execution_window import cancel_all_windows_for_participant
-        cancel_all_windows_for_participant(participant_id)
-        # Mark participant offline
-        await _set_participant_offline(participant_id, db_factory)
+        # Only cancel timeline/windows if this connection is still the latest.
+        # A newer connection may have already started a new timeline.
+        if manager.is_latest_connection(participant_id, conn_id):
+            if timeline_task and not timeline_task.done():
+                timeline_task.cancel()
+            cancel_timeline(participant_id, block_number)
+            from engine.execution_window import cancel_all_windows_for_participant
+            cancel_all_windows_for_participant(participant_id)
+        else:
+            logger.info(f"Skipping timeline/window cleanup for {participant_id} — superseded by newer connection")
+        # Only mark offline if no active connections remain
+        if not manager.has_active_connections(participant_id):
+            await _set_participant_offline(participant_id, db_factory)
 
 
 async def _ws_receiver(
@@ -166,7 +171,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
     async with db_factory() as db:
         from sqlalchemy import select
         from models.block import Block, BlockStatus
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         result = await db.execute(
             select(Block).where(
@@ -187,7 +192,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
             return
 
         block.status = BlockStatus.PLAYING
-        block.started_at = block.started_at or datetime.utcnow()
+        block.started_at = block.started_at or datetime.now(timezone.utc)
         await db.commit()
         condition = block.condition
 
@@ -300,6 +305,10 @@ async def _handle_pm_attempt(participant_id, block_number, data, db_factory):
         logger.warning(f"Duplicate PM attempt from {participant_id}, ignoring")
         return
 
+    # Mark attempt as received immediately to prevent race with concurrent messages
+    if trigger:
+        trigger["attempt_received"] = True
+
     async with db_factory() as db:
         from sqlalchemy import select, update
         from models.block import Block
@@ -397,7 +406,6 @@ async def _handle_pm_attempt(participant_id, block_number, data, db_factory):
 
         # Mark trigger as PM-completed for resumption lag tracking
         if trigger:
-            trigger["attempt_received"] = True
             trigger["pm_completed"] = True
             trigger["pm_completed_at"] = data.get("action_completed_at", attempt_time)
 

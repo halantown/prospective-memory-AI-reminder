@@ -6,7 +6,7 @@
  * active block are shown.
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
 import { ROOM_ITEMS } from './items/RoomItems'
@@ -182,6 +182,13 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
   const [actionPhase, setActionPhase] = useState<'browse' | 'confirm' | 'done'>('browse')
   const [popupOpen, setPopupOpen] = useState(false)
   const [destinationMsg, setDestinationMsg] = useState<string | null>(null)
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current)
+    }
+  }, [])
 
   // Task groups for this room in the current block
   const roomTaskGroups = useMemo(() => {
@@ -255,11 +262,13 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
       setDestinationMsg(`Now bring it to the ${destLabel}!`)
     }
 
-    setTimeout(() => {
+    if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current)
+    confirmTimeoutRef.current = setTimeout(() => {
       completePMTrial(activeTrial.triggerId)
       setSelectedTarget(null)
       setActionPhase('browse')
       setPopupOpen(false)
+      confirmTimeoutRef.current = null
     }, 1500)
   }, [activeTrial, selectedTarget, wsSend, currentRoom, completePMTrial])
 

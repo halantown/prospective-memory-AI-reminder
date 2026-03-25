@@ -86,6 +86,16 @@ class QuizSubmitResponse(BaseModel):
     failed_trials: list[int]  # trial numbers that had wrong answers
 
 
+class ReminderImportItem(BaseModel):
+    """Schema for a single reminder in the batch import payload."""
+    task_type: str
+    condition: str
+    text: str
+    context_activity: Optional[str] = None
+    audio_url: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
 class StatusResponse(BaseModel):
     status: str
     current_block: Optional[int] = None

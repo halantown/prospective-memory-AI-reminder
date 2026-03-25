@@ -42,14 +42,16 @@ async def next_participant_id(db: AsyncSession) -> str:
     result = await db.execute(
         select(Participant.participant_id)
         .where(Participant.participant_id.like("P%"))
-        .order_by(Participant.participant_id.desc())
-        .limit(1)
     )
-    row = result.scalar_one_or_none()
-    if not row:
+    rows = result.scalars().all()
+    if not rows:
         return "P001"
-    try:
-        n = int(row[1:]) + 1
-    except ValueError:
-        n = 1
-    return f"P{n:03d}"
+    max_n = 0
+    for row in rows:
+        try:
+            n = int(row[1:])
+            if n > max_n:
+                max_n = n
+        except ValueError:
+            pass
+    return f"P{max_n + 1:03d}"

@@ -2,7 +2,7 @@
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
     Integer, String, Enum, DateTime, JSON, Float, Boolean, ForeignKey, Text,
 )
@@ -32,9 +32,9 @@ class Experiment(Base):
     status: Mapped[str] = mapped_column(
         Enum(ExperimentStatus), default=ExperimentStatus.DRAFT, nullable=False,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow,
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc),
     )
 
     participants: Mapped[list["Participant"]] = relationship(back_populates="experiment")
@@ -55,7 +55,7 @@ class Participant(Base):
         Enum(ParticipantStatus), default=ParticipantStatus.REGISTERED, nullable=False,
     )
     current_block: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     demographic_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)

@@ -63,17 +63,17 @@ export default function PhoneSidebar() {
     }
   }, [banner, setBanner])
 
-  const handleUnlock = () => {
+  const handleUnlock = useCallback(() => {
     setPhoneLocked(false)
     lastActivityRef.current = Date.now()
     if (wsSend) {
       wsSend({ type: 'phone_unlock', data: { timestamp: Date.now() / 1000 } })
     }
-  }
+  }, [setPhoneLocked, wsSend])
 
-  const handleInteraction = () => {
+  const handleInteraction = useCallback(() => {
     lastActivityRef.current = Date.now()
-  }
+  }, [])
 
   const handleBannerClick = useCallback(() => {
     if (locked) handleUnlock()
@@ -84,7 +84,7 @@ export default function PhoneSidebar() {
     setTimeout(() => {
       if (feedRef.current) feedRef.current.scrollTop = 0
     }, 100)
-  }, [locked, setBanner, wsSend, setPhoneLocked])
+  }, [locked, setBanner, handleUnlock, handleInteraction])
 
   const handleReadMessage = useCallback((msg: PhoneMessage) => {
     if (!msg.read) {

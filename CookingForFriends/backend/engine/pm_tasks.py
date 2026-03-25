@@ -513,3 +513,38 @@ def get_task_config(task_id: str) -> dict:
         "action_destination": t.action_destination,
         "discriminating_cue": t.discriminating_cue,
     }
+
+
+def task_def_to_config(task_def: PMTaskDef) -> dict:
+    """Convert PMTaskDef to the task_config JSON stored in PMTrial."""
+    return {
+        "task_id": task_def.task_id,
+        "trigger_type": task_def.trigger_type,
+        "trigger_event": task_def.trigger_visual,
+        "target_room": task_def.target_room,
+        "target_object": task_def.target_name,
+        "target_action": task_def.action_description,
+        "distractor_object": task_def.distractor_name,
+        "action_destination": task_def.action_destination,
+        "discriminating_cue": task_def.discriminating_cue,
+    }
+
+
+def task_def_to_encoding_card(task_def: PMTaskDef) -> dict:
+    """Convert PMTaskDef to encoding card JSON stored in PMTrial."""
+    return {
+        "trigger_description": task_def.trigger_event,
+        "target_room": task_def.target_room,
+        "target_description": task_def.target_name,
+        "target_image": f"/assets/pm/{task_def.target_image}",
+        "action_description": task_def.action_description,
+        "encoding_text": task_def.encoding_text,
+        "visual_cues": {
+            "target": task_def.target_visual_desc,
+            "distractor": task_def.distractor_visual_desc,
+            "cue": task_def.discriminating_cue,
+        },
+        "quiz_question": task_def.quiz_question,
+        "quiz_options": task_def.quiz_options,
+        "quiz_correct_index": task_def.quiz_correct_index,
+    }
