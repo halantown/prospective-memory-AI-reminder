@@ -207,6 +207,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
 
     ws.onclose = () => {
       useGameStore.getState().setWsConnected(false)
+      useGameStore.getState().setWsSend(null)
       if (heartbeatRef.current) clearInterval(heartbeatRef.current)
 
       // Only reconnect if this is still the latest connection attempt

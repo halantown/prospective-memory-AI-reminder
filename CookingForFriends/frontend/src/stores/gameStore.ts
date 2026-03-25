@@ -119,7 +119,7 @@ interface GameState {
 
   // WS
   setWsConnected: (connected: boolean) => void
-  setWsSend: (fn: (msg: Record<string, unknown>) => void) => void
+  setWsSend: (fn: ((msg: Record<string, unknown>) => void) | null) => void
 
   // Helpers
   getActivePMForRoom: (room: RoomId) => ActivePMTrial | undefined

@@ -133,20 +133,27 @@ export default function EncodingPage() {
       const seed = (card.trial_number * 7 + 42) + qIndex * 13
 
       if (qIndex === 0) {
-        const allTriggers = cards.map((c) => c.encoding_card.trigger_description)
+        const allTriggers = cards.map((c) => c.encoding_card.trigger_description).filter(Boolean)
+        if (allTriggers.length === 0) return { question: '', options: [] as string[], correct: '' }
         return {
           question: 'What event should trigger this task?',
           options: seededShuffle(allTriggers, seed),
           correct: ec.trigger_description,
         }
       } else if (qIndex === 1) {
+        const quizOpts = ec.quiz_options
+        if (!Array.isArray(quizOpts) || quizOpts.length === 0) {
+          return { question: '', options: [] as string[], correct: '' }
+        }
+        const correctIdx = Math.max(0, Math.min(ec.quiz_correct_index ?? 0, quizOpts.length - 1))
         return {
-          question: ec.quiz_question,
-          options: [...ec.quiz_options],
-          correct: ec.quiz_options[ec.quiz_correct_index],
+          question: ec.quiz_question || 'Which item should you find?',
+          options: seededShuffle([...quizOpts], seed),
+          correct: quizOpts[correctIdx] || '',
         }
       } else {
-        const allActions = cards.map((c) => c.encoding_card.action_description)
+        const allActions = cards.map((c) => c.encoding_card.action_description).filter(Boolean)
+        if (allActions.length === 0) return { question: '', options: [] as string[], correct: '' }
         return {
           question: 'What should you do with the item?',
           options: seededShuffle(allActions, seed),
@@ -187,6 +194,10 @@ export default function EncodingPage() {
   // ── Navigation helpers ──
 
   const advanceToNextCard = useCallback(() => {
+    // Clear pending quiz timeouts to prevent stale callbacks firing
+    quizTimeoutsRef.current.forEach(t => clearTimeout(t))
+    quizTimeoutsRef.current = []
+
     setQuizMode(false)
     setReShowCard(false)
     setHighlightSection(null)

@@ -73,9 +73,34 @@ export default function BedroomRoom({ isActive }: { isActive: boolean }) {
     }
   }, [allComplete, diningPhase, diningRound, completeDiningRound, wsSend])
 
+  const doPlace = useCallback((seatIndex: number, utensil: UtensilType | null) => {
+    if (!utensil || !isActive || diningPhase !== 'active') return
+
+    // Set the utensil in store then place it (Zustand updates are synchronous)
+    selectUtensil(utensil)
+    const placed = placeUtensil(seatIndex)
+    if (placed) {
+      setJustPlaced({ seat: seatIndex, utensil })
+      setTimeout(() => setJustPlaced(null), 400)
+      const send = useGameStore.getState().wsSend
+      if (send) {
+        send({
+          type: 'task_action',
+          data: {
+            task: 'dining',
+            action: 'place_utensil',
+            seat: seatIndex,
+            utensil,
+            timestamp: Date.now() / 1000,
+          },
+        })
+      }
+    }
+  }, [isActive, diningPhase, selectUtensil, placeUtensil])
+
   // Global mouse move/up for drag
   useEffect(() => {
-    if (!dragging) return
+    if (!dragging || !isActive) return
 
     const handleMove = (e: MouseEvent) => {
       setDragPos({ x: e.clientX, y: e.clientY })
@@ -108,32 +133,7 @@ export default function BedroomRoom({ isActive }: { isActive: boolean }) {
       window.removeEventListener('mousemove', handleMove)
       window.removeEventListener('mouseup', handleUp)
     }
-  }, [dragging])
-
-  const doPlace = useCallback((seatIndex: number, utensil: UtensilType | null) => {
-    if (!utensil || !isActive || diningPhase !== 'active') return
-
-    // Set the utensil in store then place it (Zustand updates are synchronous)
-    selectUtensil(utensil)
-    const placed = placeUtensil(seatIndex)
-    if (placed) {
-      setJustPlaced({ seat: seatIndex, utensil })
-      setTimeout(() => setJustPlaced(null), 400)
-      const send = useGameStore.getState().wsSend
-      if (send) {
-        send({
-          type: 'task_action',
-          data: {
-            task: 'dining',
-            action: 'place_utensil',
-            seat: seatIndex,
-            utensil,
-            timestamp: Date.now() / 1000,
-          },
-        })
-      }
-    }
-  }, [isActive, diningPhase, selectUtensil, placeUtensil])
+  }, [dragging, isActive, doPlace])
 
   const handleDragStart = useCallback((utensil: UtensilType, emoji: string, e: React.MouseEvent) => {
     if (!isActive || diningPhase !== 'active') return

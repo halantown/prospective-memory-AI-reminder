@@ -3,7 +3,7 @@
 import uuid
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, WebSocket
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,7 +48,7 @@ async def start_session(req: TokenStartRequest, db: AsyncSession = Depends(get_d
     # First-time start or re-join
     if participant.status == ParticipantStatus.REGISTERED:
         participant.status = ParticipantStatus.IN_PROGRESS
-        participant.started_at = datetime.utcnow()
+        participant.started_at = datetime.now(timezone.utc)
         participant.current_block = 1
         participant.is_online = True
         participant.last_heartbeat = time.time()
@@ -117,7 +117,7 @@ async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = 
     # Update block status to encoding (reset from any non-playing state)
     if block.status not in (BlockStatus.PLAYING,):
         block.status = BlockStatus.ENCODING
-        block.started_at = block.started_at or datetime.utcnow()
+        block.started_at = block.started_at or datetime.now(timezone.utc)
         await db.commit()
 
     # Get PM trials for this block
@@ -277,19 +277,23 @@ async def submit_nasa_tlx(
     if not block:
         raise HTTPException(404, "Block not found")
 
+    # Idempotency: prevent double submission
+    if block.nasa_tlx is not None:
+        raise HTTPException(400, "NASA-TLX already submitted for this block")
+
     block.nasa_tlx = req.model_dump()
     block.status = BlockStatus.COMPLETED
-    block.ended_at = datetime.utcnow()
+    block.ended_at = datetime.now(timezone.utc)
     await db.commit()
 
     # Advance to next block
     p_result = await db.execute(select(Participant).where(Participant.id == session_id))
     participant = p_result.scalar_one_or_none()
-    if participant and participant.current_block and participant.current_block < 3:
+    if participant and participant.current_block and participant.current_block < BLOCKS_PER_PARTICIPANT:
         participant.current_block += 1
         await db.commit()
 
-    return {"status": "ok", "next_block": block_num + 1 if block_num < 3 else None}
+    return {"status": "ok", "next_block": block_num + 1 if block_num < BLOCKS_PER_PARTICIPANT else None}
 
 
 @router.post("/session/{session_id}/debrief")
@@ -303,6 +307,10 @@ async def submit_debrief(
     if not participant:
         raise HTTPException(404, "Session not found")
 
+    # Idempotency: prevent double submission
+    if participant.status == ParticipantStatus.COMPLETED:
+        raise HTTPException(400, "Debrief already submitted")
+
     participant.demographic_data = req.demographic
     participant.debrief_data = {
         "preference": req.preference,
@@ -310,7 +318,7 @@ async def submit_debrief(
         "manipulation_check": req.manipulation_check,
     }
     participant.status = ParticipantStatus.COMPLETED
-    participant.completed_at = datetime.utcnow()
+    participant.completed_at = datetime.now(timezone.utc)
     await db.commit()
 
     return {"status": "completed"}
