@@ -1,284 +1,135 @@
 /** PM Target Items — scene-embedded interactive items for PM task execution.
  *
- * Renders target + distractor item pairs in each room. Items appear as subtle
- * decorations when inactive, and become interactive when a PM trial fires
- * for that task. Only items from the currently active block are shown.
+ * Renders target + 2 distractor items (3 per task) in each room using SVG
+ * components from RoomItems. Items appear as subtle decorations when inactive
+ * and become interactive when a PM trial fires. Only items from the currently
+ * active block are shown.
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
+import { ROOM_ITEMS } from './items/RoomItems'
+import type { RoomItemProps } from './items/RoomItems'
 import type { RoomId } from '../../types'
 
-// ── Item visual data for all 12 PM tasks ──
+// ── Item data for all 12 PM tasks (target + d1 + d2) ──
 
-interface TaskItemVisual {
+interface TaskItemInfo {
   id: string
+  type: 'target' | 'd1' | 'd2'
   label: string
   description: string
-  emoji: string
-  color: string
 }
 
-interface TaskItemPair {
+interface TaskItemGroup {
   taskId: string
   block: number
   room: RoomId
-  target: TaskItemVisual
-  distractor: TaskItemVisual
-  cue: string
+  items: TaskItemInfo[]
 }
 
-const TASK_ITEM_PAIRS: TaskItemPair[] = [
-  // ── Block 1 (Mei) ──
+const TASK_ITEMS: TaskItemGroup[] = [
+  // Block 1
   {
-    taskId: 'b1_book',
-    block: 1,
-    room: 'study',
-    target: {
-      id: 'b1_book_target',
-      label: 'Book (gold title)',
-      description: 'Red hardcover book with gold title',
-      emoji: '📕',
-      color: 'bg-amber-700',
-    },
-    distractor: {
-      id: 'b1_book_distractor',
-      label: 'Book (silver title)',
-      description: 'Red hardcover book with silver title',
-      emoji: '📕',
-      color: 'bg-slate-500',
-    },
-    cue: 'gold title lettering (not silver)',
+    taskId: 'b1_book', block: 1, room: 'study',
+    items: [
+      { id: 'b1_book_target', type: 'target', label: 'Red book (mountain)', description: 'Red paperback with mountain illustration — "Erta Ale"' },
+      { id: 'b1_book_d1', type: 'd1', label: 'Red book (ocean)', description: 'Red paperback with ocean illustration — "Blue Horizon"' },
+      { id: 'b1_book_d2', type: 'd2', label: 'Blue book (mountain)', description: 'Blue paperback with mountain illustration — "Erta Ale"' },
+    ]
   },
   {
-    taskId: 'b1_giftbag',
-    block: 1,
-    room: 'bedroom',
-    target: {
-      id: 'b1_giftbag_target',
-      label: 'Gift bag (ribbon)',
-      description: 'Red gift bag with ribbon handles',
-      emoji: '🎁',
-      color: 'bg-red-600',
-    },
-    distractor: {
-      id: 'b1_giftbag_distractor',
-      label: 'Gift bag (cord)',
-      description: 'Red gift bag with cord handles',
-      emoji: '🎁',
-      color: 'bg-red-400',
-    },
-    cue: 'ribbon handles (not cord)',
+    taskId: 'b1_giftbag', block: 1, room: 'bedroom',
+    items: [
+      { id: 'b1_giftbag_target', type: 'target', label: 'Small bag + bow', description: 'Small blue gift bag with bow decoration' },
+      { id: 'b1_giftbag_d1', type: 'd1', label: 'Small bag + ribbon', description: 'Small blue gift bag with ribbon decoration' },
+      { id: 'b1_giftbag_d2', type: 'd2', label: 'Medium bag + bow', description: 'Medium blue gift bag with bow decoration' },
+    ]
   },
   {
-    taskId: 'b1_dish',
-    block: 1,
-    room: 'living_room',
-    target: {
-      id: 'b1_dish_target',
-      label: 'Dish (oval)',
-      description: 'Oval white ceramic serving dish',
-      emoji: '🍽️',
-      color: 'bg-sky-100',
-    },
-    distractor: {
-      id: 'b1_dish_distractor',
-      label: 'Dish (round)',
-      description: 'Round white ceramic serving dish',
-      emoji: '🍽️',
-      color: 'bg-stone-200',
-    },
-    cue: 'oval (not round)',
+    taskId: 'b1_dish', block: 1, room: 'living_room',
+    items: [
+      { id: 'b1_dish_target', type: 'target', label: 'Oval + blue handles', description: 'Oval white ceramic dish with blue handles' },
+      { id: 'b1_dish_d1', type: 'd1', label: 'Round + blue handles', description: 'Round white ceramic dish with blue handles' },
+      { id: 'b1_dish_d2', type: 'd2', label: 'Oval + red handles', description: 'Oval white ceramic dish with red handles' },
+    ]
   },
   {
-    taskId: 'b1_soap',
-    block: 1,
-    room: 'bathroom',
-    target: {
-      id: 'b1_soap_target',
-      label: 'Soap (amber)',
-      description: 'Amber glass soap dispenser',
-      emoji: '🧴',
-      color: 'bg-amber-500',
-    },
-    distractor: {
-      id: 'b1_soap_distractor',
-      label: 'Soap (clear)',
-      description: 'Clear glass soap dispenser',
-      emoji: '🧴',
-      color: 'bg-gray-300',
-    },
-    cue: 'amber glass (not clear)',
+    taskId: 'b1_soap', block: 1, room: 'bathroom',
+    items: [
+      { id: 'b1_soap_target', type: 'target', label: 'Pump + lemon', description: 'White pump bottle with lemon label' },
+      { id: 'b1_soap_d1', type: 'd1', label: 'Flip-cap + lemon', description: 'White flip-cap bottle with lemon label' },
+      { id: 'b1_soap_d2', type: 'd2', label: 'Pump + mint', description: 'White pump bottle with mint label' },
+    ]
   },
-
-  // ── Block 2 (Lucas) ──
+  // Block 2
   {
-    taskId: 'b2_vinyl',
-    block: 2,
-    room: 'study',
-    target: {
-      id: 'b2_vinyl_target',
-      label: 'Vinyl (blue label)',
-      description: 'Vinyl record with blue label',
-      emoji: '💿',
-      color: 'bg-blue-600',
-    },
-    distractor: {
-      id: 'b2_vinyl_distractor',
-      label: 'Vinyl (red label)',
-      description: 'Vinyl record with red label',
-      emoji: '💿',
-      color: 'bg-red-500',
-    },
-    cue: 'blue label (not red)',
+    taskId: 'b2_vinyl', block: 2, room: 'study',
+    items: [
+      { id: 'b2_vinyl_target', type: 'target', label: 'Car + Night Drive', description: 'Vinyl sleeve with car illustration, titled "Night Drive"' },
+      { id: 'b2_vinyl_d1', type: 'd1', label: 'Car + Dark Side', description: 'Vinyl sleeve with car illustration, titled "Dark Side"' },
+      { id: 'b2_vinyl_d2', type: 'd2', label: 'Abstract + Night Drive', description: 'Vinyl sleeve with abstract art, titled "Night Drive"' },
+    ]
   },
   {
-    taskId: 'b2_napkinrings',
-    block: 2,
-    room: 'bedroom',
-    target: {
-      id: 'b2_napkinrings_target',
-      label: 'Rings (leaf)',
-      description: 'Silver napkin rings with leaf pattern',
-      emoji: '💍',
-      color: 'bg-emerald-600',
-    },
-    distractor: {
-      id: 'b2_napkinrings_distractor',
-      label: 'Rings (plain)',
-      description: 'Silver napkin rings with plain band',
-      emoji: '💍',
-      color: 'bg-zinc-400',
-    },
-    cue: 'leaf pattern (not plain)',
+    taskId: 'b2_napkinrings', block: 2, room: 'bedroom',
+    items: [
+      { id: 'b2_napkinrings_target', type: 'target', label: 'Wood + light oak', description: 'Wooden napkin rings, light oak color' },
+      { id: 'b2_napkinrings_d1', type: 'd1', label: 'Wood + dark', description: 'Wooden napkin rings, dark walnut color' },
+      { id: 'b2_napkinrings_d2', type: 'd2', label: 'Metal + light', description: 'Metal napkin rings, silver polished' },
+    ]
   },
   {
-    taskId: 'b2_pot',
-    block: 2,
-    room: 'living_room',
-    target: {
-      id: 'b2_pot_target',
-      label: 'Pot (terracotta rim)',
-      description: 'Short round ceramic pot with terracotta rim',
-      emoji: '🪴',
-      color: 'bg-orange-600',
-    },
-    distractor: {
-      id: 'b2_pot_distractor',
-      label: 'Pot (white rim)',
-      description: 'Short round ceramic pot with white rim',
-      emoji: '🪴',
-      color: 'bg-stone-100',
-    },
-    cue: 'terracotta rim (not white)',
+    taskId: 'b2_pot', block: 2, room: 'living_room',
+    items: [
+      { id: 'b2_pot_target', type: 'target', label: 'Medium + saucer', description: 'Medium terracotta pot with saucer' },
+      { id: 'b2_pot_d1', type: 'd1', label: 'Small + saucer', description: 'Small terracotta pot with saucer' },
+      { id: 'b2_pot_d2', type: 'd2', label: 'Medium + no saucer', description: 'Medium terracotta pot without saucer' },
+    ]
   },
   {
-    taskId: 'b2_softener',
-    block: 2,
-    room: 'bathroom',
-    target: {
-      id: 'b2_softener_target',
-      label: 'Softener (pink cap)',
-      description: 'Fabric softener with pink cap',
-      emoji: '🧴',
-      color: 'bg-pink-400',
-    },
-    distractor: {
-      id: 'b2_softener_distractor',
-      label: 'Softener (blue cap)',
-      description: 'Fabric softener with blue cap',
-      emoji: '🧴',
-      color: 'bg-blue-400',
-    },
-    cue: 'pink cap (not blue)',
+    taskId: 'b2_softener', block: 2, room: 'bathroom',
+    items: [
+      { id: 'b2_softener_target', type: 'target', label: 'Lavender + purple', description: 'Purple bottle with lavender label' },
+      { id: 'b2_softener_d1', type: 'd1', label: 'Eucalyptus + purple', description: 'Purple bottle with eucalyptus label' },
+      { id: 'b2_softener_d2', type: 'd2', label: 'Lavender + white', description: 'White bottle with lavender label' },
+    ]
   },
-
-  // ── Block 3 (Sophie) ──
+  // Block 3
   {
-    taskId: 'b3_hanger',
-    block: 3,
-    room: 'study',
-    target: {
-      id: 'b3_hanger_target',
-      label: 'Hanger (wide)',
-      description: 'Wide-shoulder wooden hanger',
-      emoji: '🪝',
-      color: 'bg-amber-600',
-    },
-    distractor: {
-      id: 'b3_hanger_distractor',
-      label: 'Hanger (narrow)',
-      description: 'Narrow-shoulder wooden hanger',
-      emoji: '🪝',
-      color: 'bg-yellow-700',
-    },
-    cue: 'wide shoulders (not narrow)',
+    taskId: 'b3_hanger', block: 3, room: 'study',
+    items: [
+      { id: 'b3_hanger_target', type: 'target', label: 'Wide + bar', description: 'Wooden hanger with wide shoulders and trouser bar' },
+      { id: 'b3_hanger_d1', type: 'd1', label: 'Wide + no bar', description: 'Wooden hanger with wide shoulders, no bar' },
+      { id: 'b3_hanger_d2', type: 'd2', label: 'Narrow + bar', description: 'Wooden hanger with narrow shoulders and trouser bar' },
+    ]
   },
   {
-    taskId: 'b3_speaker',
-    block: 3,
-    room: 'living_room',
-    target: {
-      id: 'b3_speaker_target',
-      label: 'Speaker (fabric)',
-      description: 'Round speaker with fabric cover',
-      emoji: '🔊',
-      color: 'bg-gray-500',
-    },
-    distractor: {
-      id: 'b3_speaker_distractor',
-      label: 'Speaker (rubber)',
-      description: 'Round speaker with rubber cover',
-      emoji: '🔊',
-      color: 'bg-gray-800',
-    },
-    cue: 'fabric (not rubber)',
+    taskId: 'b3_speaker', block: 3, room: 'living_room',
+    items: [
+      { id: 'b3_speaker_target', type: 'target', label: 'Fabric + round', description: 'Round Bluetooth speaker with fabric mesh cover' },
+      { id: 'b3_speaker_d1', type: 'd1', label: 'Rubber + round', description: 'Round Bluetooth speaker with rubber cover' },
+      { id: 'b3_speaker_d2', type: 'd2', label: 'Fabric + square', description: 'Square Bluetooth speaker with fabric mesh cover' },
+    ]
   },
   {
-    taskId: 'b3_vase',
-    block: 3,
-    room: 'bedroom',
-    target: {
-      id: 'b3_vase_target',
-      label: 'Vase (blue)',
-      description: 'Small blue glazed ceramic vase',
-      emoji: '🏺',
-      color: 'bg-blue-500',
-    },
-    distractor: {
-      id: 'b3_vase_distractor',
-      label: 'Vase (green)',
-      description: 'Small green glazed ceramic vase',
-      emoji: '🏺',
-      color: 'bg-green-500',
-    },
-    cue: 'blue (not green)',
+    taskId: 'b3_vase', block: 3, room: 'bedroom',
+    items: [
+      { id: 'b3_vase_target', type: 'target', label: 'Blue + small', description: 'Small ceramic vase with blue glaze' },
+      { id: 'b3_vase_d1', type: 'd1', label: 'Green + small', description: 'Small ceramic vase with green glaze' },
+      { id: 'b3_vase_d2', type: 'd2', label: 'Blue + large', description: 'Large ceramic vase with blue glaze' },
+    ]
   },
   {
-    taskId: 'b3_handcream',
-    block: 3,
-    room: 'bathroom',
-    target: {
-      id: 'b3_handcream_target',
-      label: 'Cream (lavender)',
-      description: 'Hand cream with lavender label',
-      emoji: '🧴',
-      color: 'bg-purple-400',
-    },
-    distractor: {
-      id: 'b3_handcream_distractor',
-      label: 'Cream (mint)',
-      description: 'Hand cream with mint label',
-      emoji: '🧴',
-      color: 'bg-green-400',
-    },
-    cue: 'lavender (not mint)',
+    taskId: 'b3_handcream', block: 3, room: 'bathroom',
+    items: [
+      { id: 'b3_handcream_target', type: 'target', label: 'Lavender + white', description: 'White tube with lavender label' },
+      { id: 'b3_handcream_d1', type: 'd1', label: 'Mint + white', description: 'White tube with mint label' },
+      { id: 'b3_handcream_d2', type: 'd2', label: 'Lavender + beige', description: 'Beige tube with lavender label' },
+    ]
   },
 ]
-
-// Lookup by task_id for quick access
-const TASK_ITEM_MAP = new Map(TASK_ITEM_PAIRS.map(p => [p.taskId, p]))
 
 // Room label lookup for destination messages
 const ROOM_LABELS: Record<string, string> = {
@@ -287,6 +138,23 @@ const ROOM_LABELS: Record<string, string> = {
   living_room: 'Living Room',
   study: 'Study',
   bathroom: 'Bathroom',
+}
+
+/** Deterministic shuffle: always produces the same order for a given taskId. */
+function deterministicShuffle<T>(arr: T[], seed: string): T[] {
+  const shuffled = [...arr]
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0
+  }
+  // Fisher-Yates with seeded PRNG
+  let s = Math.abs(hash)
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    s = (s * 1103515245 + 12345) & 0x7fffffff
+    const j = s % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
 }
 
 interface PMTargetItemsProps {
@@ -298,6 +166,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
   const completedPMTrialIds = useGameStore((s) => s.completedPMTrialIds)
   const completePMTrial = useGameStore((s) => s.completePMTrial)
   const wsSend = useGameStore((s) => s.wsSend)
+  const currentRoom = useGameStore((s) => s.currentRoom)
   const blockNumber = useGameStore((s) => s.blockNumber)
 
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null)
@@ -305,9 +174,9 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [destinationMsg, setDestinationMsg] = useState<string | null>(null)
 
-  // Items for this room in the current block
-  const roomItems = useMemo(() => {
-    return TASK_ITEM_PAIRS.filter(p => p.room === room && p.block === blockNumber)
+  // Task groups for this room in the current block
+  const roomTaskGroups = useMemo(() => {
+    return TASK_ITEMS.filter(g => g.room === room && g.block === blockNumber)
   }, [room, blockNumber])
 
   // Find the active PM trial for this room (at most one at a time)
@@ -318,22 +187,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
     )
   }, [activePMTrials, completedPMTrialIds, room])
 
-  // The task_id of the currently active trial (if any)
   const activeTaskId = activeTrial?.taskConfig.task_id ?? null
-
-  // Build renderable items: all room items as decorations, active ones interactive
-  const renderItems = useMemo(() => {
-    return roomItems.flatMap(pair => {
-      const isActive = pair.taskId === activeTaskId
-      // Deterministic order shuffle based on taskId
-      const hash = pair.taskId.charCodeAt(pair.taskId.length - 1)
-      const items = [
-        { ...pair.target, isCorrect: true, taskId: pair.taskId, isActive },
-        { ...pair.distractor, isCorrect: false, taskId: pair.taskId, isActive },
-      ]
-      return hash % 2 === 0 ? items : items.reverse()
-    })
-  }, [roomItems, activeTaskId])
 
   // Auto-clear destination message after 3s
   useEffect(() => {
@@ -353,8 +207,6 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
 
     const now = Date.now() / 1000
     const cfg = activeTrial.taskConfig
-    const pair = TASK_ITEM_MAP.get(cfg.task_id)
-    const isCorrect = pair ? selectedTarget === pair.target.id : false
 
     if (wsSend) {
       wsSend({
@@ -363,7 +215,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
           action: 'pm_execute',
           action_step: cfg.target_action,
           target_selected: selectedTarget,
-          room,
+          room: currentRoom,
           timestamp: now,
           target_selected_at: now,
           action_completed_at: now,
@@ -374,6 +226,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
     setActionPhase('done')
 
     // Show destination message for correct target selection
+    const isCorrect = selectedTarget.endsWith('_target')
     if (isCorrect && cfg.action_destination) {
       const destLabel = ROOM_LABELS[cfg.action_destination] || cfg.action_destination
       setDestinationMsg(`Now bring it to the ${destLabel}!`)
@@ -384,14 +237,14 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
       setSelectedTarget(null)
       setActionPhase('browse')
     }, 1500)
-  }, [activeTrial, selectedTarget, wsSend, room, completePMTrial])
+  }, [activeTrial, selectedTarget, wsSend, currentRoom, completePMTrial])
 
   const handleCancelSelection = useCallback(() => {
     setSelectedTarget(null)
     setActionPhase('browse')
   }, [])
 
-  if (renderItems.length === 0) return null
+  if (roomTaskGroups.length === 0) return null
 
   const actionLabel = activeTrial
     ? activeTrial.taskConfig.target_action
@@ -399,134 +252,142 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
 
   return (
     <div className="mt-2 space-y-2">
-      <div className="flex gap-3 items-end flex-wrap">
-        <AnimatePresence>
-          {renderItems.map((item, idx) => {
-            const isSelected = selectedTarget === item.id
-            const isOther = selectedTarget && !isSelected
-            const isDone = actionPhase === 'done' && isSelected
-            const isActive = item.isActive
+      {roomTaskGroups.map(taskGroup => {
+        const isActive = taskGroup.taskId === activeTaskId
+        const itemGroup = ROOM_ITEMS[taskGroup.taskId]
+        if (!itemGroup) return null
 
-            return (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                exit={{ opacity: 0, y: 10 }}
-                transition={{ delay: idx * 0.05 }}
-                className="relative"
-                onMouseEnter={() => isActive ? setHoveredItem(item.id) : undefined}
-                onMouseLeave={() => setHoveredItem(null)}
-              >
-                <button
-                  onClick={() => isActive ? handleItemClick(item.id) : undefined}
-                  disabled={
-                    !isActive
-                    || actionPhase === 'done'
-                    || (actionPhase === 'confirm' && !isSelected)
-                  }
-                  className={`
-                    relative flex flex-col items-center justify-center
-                    rounded-lg border-2 transition-all duration-200
-                    ${isActive
-                      ? isDone
-                        ? 'w-16 h-16 border-green-400 bg-green-900/40 scale-105'
-                        : isSelected
-                        ? 'w-16 h-16 border-cooking-400 bg-cooking-900/30 scale-105 ring-2 ring-cooking-400/50'
-                        : isOther
-                        ? 'w-16 h-16 border-slate-600 bg-slate-800/60 opacity-40'
-                        : 'w-16 h-16 border-slate-500 bg-slate-700/60 hover:border-slate-400 hover:bg-slate-600/60 cursor-pointer'
-                      : 'w-10 h-10 border-slate-700/40 bg-slate-800/30 opacity-50 cursor-default'
-                    }
-                  `}
-                >
-                  {/* Color accent dot */}
-                  <span className={`
-                    absolute -top-1 -left-1 rounded-full
-                    ${isActive ? 'w-2.5 h-2.5' : 'w-1.5 h-1.5'}
-                    ${item.color}
-                  `} />
+        // Build renderable item list with SVG components
+        const components: Array<{
+          id: string
+          type: 'target' | 'd1' | 'd2'
+          info: TaskItemInfo
+          Component: React.FC<RoomItemProps>
+        }> = [
+          { id: `${taskGroup.taskId}_target`, type: 'target', info: taskGroup.items[0], Component: itemGroup.target },
+          { id: `${taskGroup.taskId}_d1`, type: 'd1', info: taskGroup.items[1], Component: itemGroup.d1 },
+          { id: `${taskGroup.taskId}_d2`, type: 'd2', info: taskGroup.items[2], Component: itemGroup.d2 },
+        ]
 
-                  <span className={isActive ? 'text-xl' : 'text-sm'}>
-                    {item.emoji}
-                  </span>
-                  {isActive && (
-                    <span className="text-[8px] text-slate-300 mt-0.5 truncate max-w-[56px]">
-                      {item.label}
-                    </span>
-                  )}
+        const shuffled = deterministicShuffle(components, taskGroup.taskId)
 
-                  {/* Pulse ring when active and browsing */}
-                  {isActive && actionPhase === 'browse' && !selectedTarget && (
-                    <span className="absolute inset-0 rounded-lg border-2 border-cooking-400/40 animate-pulse pointer-events-none" />
-                  )}
-
-                  {isDone && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full
-                                 flex items-center justify-center text-white text-[8px]"
-                    >
-                      ✓
-                    </motion.div>
-                  )}
-                </button>
-
-                {/* Tooltip on hover (active items only) */}
-                <AnimatePresence>
-                  {hoveredItem === item.id && isActive && actionPhase === 'browse' && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2
-                                 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5
-                                 text-[10px] text-slate-200 whitespace-nowrap z-30 shadow-lg"
-                    >
-                      {item.description}
-                      <div className="absolute top-full left-1/2 -translate-x-1/2
-                                      border-4 border-transparent border-t-slate-800" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            )
-          })}
-        </AnimatePresence>
-
-        {/* Action confirmation */}
-        <AnimatePresence>
-          {actionPhase === 'confirm' && selectedTarget && (
-            <motion.div
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              className="flex gap-1.5"
+        return (
+          <div key={taskGroup.taskId} className="flex gap-2 items-end flex-wrap">
+            {/* SVG item container */}
+            <svg
+              viewBox="0 0 240 80"
+              className={`max-w-[360px] ${isActive ? 'w-full' : 'w-[180px] opacity-50'}`}
             >
-              <button
-                onClick={handleConfirmAction}
-                className="px-2 py-1.5 bg-cooking-500 hover:bg-cooking-600
-                           text-white text-[10px] font-bold rounded-lg
-                           transition-colors cursor-pointer whitespace-nowrap"
-              >
-                {actionLabel}
-              </button>
-              <button
-                onClick={handleCancelSelection}
-                className="px-1.5 py-1.5 bg-slate-600 hover:bg-slate-500
-                           text-slate-200 text-[10px] rounded-lg
-                           transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              {shuffled.map((item, i) => {
+                const isSelected = selectedTarget === item.id
+                const isDone = actionPhase === 'done' && isSelected
+
+                return (
+                  <g key={item.id}>
+                    {/* Selection highlight ring */}
+                    {isActive && isSelected && (
+                      <rect
+                        x={6 + i * 80} y={1}
+                        width={68} height={78}
+                        rx={8}
+                        fill="none"
+                        stroke={isDone ? '#4ade80' : '#f59e0b'}
+                        strokeWidth={2}
+                        opacity={0.8}
+                      />
+                    )}
+                    {/* Pulse indicator when browsing */}
+                    {isActive && actionPhase === 'browse' && !selectedTarget && (
+                      <rect
+                        x={6 + i * 80} y={1}
+                        width={68} height={78}
+                        rx={8}
+                        fill="none"
+                        stroke="#f59e0b"
+                        strokeWidth={1}
+                        opacity={0.3}
+                        className="animate-pulse"
+                      />
+                    )}
+                    <item.Component
+                      x={10 + i * 80}
+                      y={5}
+                      scale={isActive ? 0.9 : 0.6}
+                      clickable={isActive && actionPhase === 'browse'}
+                      onClick={() => handleItemClick(item.id)}
+                    />
+                    {/* Done checkmark */}
+                    {isDone && (
+                      <>
+                        <circle cx={68 + i * 80} cy={8} r={6} fill="#22c55e" />
+                        <text x={68 + i * 80} y={11} textAnchor="middle" fontSize={8} fill="white">✓</text>
+                      </>
+                    )}
+                  </g>
+                )
+              })}
+            </svg>
+
+            {/* Tooltip on hover (active items only) */}
+            <AnimatePresence>
+              {isActive && hoveredItem && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5
+                             text-[10px] text-slate-200 whitespace-nowrap z-30 shadow-lg"
+                >
+                  {taskGroup.items.find(it => it.id === hoveredItem)?.description}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Hover detection layer — positioned over SVG items */}
+            {isActive && (
+              <div className="absolute" style={{ pointerEvents: 'none' }}>
+                {shuffled.map((item) => (
+                  <div
+                    key={`hover_${item.id}`}
+                    style={{ pointerEvents: 'auto', position: 'absolute' }}
+                    onMouseEnter={() => setHoveredItem(item.id)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Action confirmation */}
+            <AnimatePresence>
+              {isActive && actionPhase === 'confirm' && selectedTarget && (
+                <motion.div
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="flex gap-1.5"
+                >
+                  <button
+                    onClick={handleConfirmAction}
+                    className="px-2 py-1.5 bg-cooking-500 hover:bg-cooking-600
+                               text-white text-[10px] font-bold rounded-lg
+                               transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    {actionLabel}
+                  </button>
+                  <button
+                    onClick={handleCancelSelection}
+                    className="px-1.5 py-1.5 bg-slate-600 hover:bg-slate-500
+                               text-slate-200 text-[10px] rounded-lg
+                               transition-colors cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )
+      })}
 
       {/* Destination message after correct target selection */}
       <AnimatePresence>
