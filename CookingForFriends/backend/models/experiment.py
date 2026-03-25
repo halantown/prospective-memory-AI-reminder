@@ -44,7 +44,9 @@ class Participant(Base):
     __tablename__ = "participants"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))  # UUID
-    experiment_id: Mapped[int] = mapped_column(Integer, ForeignKey("experiments.id"), nullable=False)
+    experiment_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("experiments.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
     participant_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)  # P001
     token: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
     latin_square_group: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -62,4 +64,4 @@ class Participant(Base):
     last_heartbeat: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     experiment: Mapped["Experiment"] = relationship(back_populates="participants")
-    blocks: Mapped[list["Block"]] = relationship("Block", back_populates="participant")
+    blocks: Mapped[list["Block"]] = relationship("Block", back_populates="participant", cascade="all, delete-orphan")

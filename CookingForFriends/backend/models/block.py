@@ -4,6 +4,7 @@ import enum
 from datetime import datetime
 from sqlalchemy import (
     Integer, String, Enum, DateTime, JSON, Float, Boolean, ForeignKey, Text,
+    UniqueConstraint, Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from models.base import Base
@@ -19,9 +20,15 @@ class BlockStatus(str, enum.Enum):
 
 class Block(Base):
     __tablename__ = "blocks"
+    __table_args__ = (
+        UniqueConstraint('participant_id', 'block_number', name='uq_participant_block'),
+        Index('ix_block_participant_number', 'participant_id', 'block_number'),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    participant_id: Mapped[str] = mapped_column(String(36), ForeignKey("participants.id"), nullable=False)
+    participant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("participants.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
     block_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-3
     condition: Mapped[str] = mapped_column(String(20), nullable=False)  # CONTROL / AF / AFCB
     day_story: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -34,15 +41,20 @@ class Block(Base):
     nasa_tlx: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     participant: Mapped["Participant"] = relationship("Participant", back_populates="blocks")
-    pm_trials: Mapped[list["PMTrial"]] = relationship("PMTrial", back_populates="block")
-    ongoing_scores: Mapped[list["OngoingTaskScore"]] = relationship("OngoingTaskScore", back_populates="block")
+    pm_trials: Mapped[list["PMTrial"]] = relationship("PMTrial", back_populates="block", cascade="all, delete-orphan")
+    ongoing_scores: Mapped[list["OngoingTaskScore"]] = relationship("OngoingTaskScore", back_populates="block", cascade="all, delete-orphan")
 
 
 class PMTrial(Base):
     __tablename__ = "pm_trials"
+    __table_args__ = (
+        UniqueConstraint('block_id', 'trial_number', name='uq_block_trial'),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    block_id: Mapped[int] = mapped_column(Integer, ForeignKey("blocks.id"), nullable=False)
+    block_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("blocks.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
     trial_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-4
     has_reminder: Mapped[bool] = mapped_column(Boolean, nullable=False)
     is_filler: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -72,10 +84,10 @@ class PMTrial(Base):
 
     block: Mapped["Block"] = relationship("Block", back_populates="pm_trials")
     attempt: Mapped["PMAttemptRecord | None"] = relationship(
-        "PMAttemptRecord", back_populates="trial", uselist=False,
+        "PMAttemptRecord", back_populates="trial", uselist=False, cascade="all, delete-orphan",
     )
     quiz_attempts: Mapped[list["EncodingQuizAttempt"]] = relationship(
-        "EncodingQuizAttempt", back_populates="trial",
+        "EncodingQuizAttempt", back_populates="trial", cascade="all, delete-orphan",
     )
 
 
@@ -84,9 +96,15 @@ class PMAttemptRecord(Base):
     __tablename__ = "pm_attempt_records"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    trial_id: Mapped[int] = mapped_column(Integer, ForeignKey("pm_trials.id"), nullable=False)
-    participant_id: Mapped[str] = mapped_column(String(36), ForeignKey("participants.id"), nullable=False)
-    block_id: Mapped[int] = mapped_column(Integer, ForeignKey("blocks.id"), nullable=False)
+    trial_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("pm_trials.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    participant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("participants.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    block_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("blocks.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
 
     # Timing — all in epoch seconds
     trigger_fired_at: Mapped[float] = mapped_column(Float, nullable=False)
@@ -118,8 +136,12 @@ class EncodingQuizAttempt(Base):
     __tablename__ = "encoding_quiz_attempts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    trial_id: Mapped[int] = mapped_column(Integer, ForeignKey("pm_trials.id"), nullable=False)
-    participant_id: Mapped[str] = mapped_column(String(36), ForeignKey("participants.id"), nullable=False)
+    trial_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("pm_trials.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    participant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("participants.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
 
     question_type: Mapped[str] = mapped_column(String(20), nullable=False)  # trigger / target / action
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 1, 2, ...

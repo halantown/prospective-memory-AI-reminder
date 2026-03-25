@@ -299,6 +299,11 @@ export default function EncodingPage() {
   }
 
   const handleStartGame = () => {
+    // Clean up pending quiz/read timeouts before phase transition
+    quizTimeoutsRef.current.forEach(t => clearTimeout(t))
+    quizTimeoutsRef.current = []
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+
     if (wsSend) {
       wsSend({ type: 'start_game', data: { block_number: blockNumber } })
     }

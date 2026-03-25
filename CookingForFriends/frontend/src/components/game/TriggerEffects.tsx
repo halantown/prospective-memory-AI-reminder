@@ -132,6 +132,8 @@ export default function TriggerEffects() {
 
   // Play audio when new trigger effects appear and schedule auto-clear
   useEffect(() => {
+    const timeoutIds: ReturnType<typeof setTimeout>[] = []
+
     for (const effect of activeTriggerEffects) {
       const key = `${effect.triggerEvent}_${effect.timestamp}`
       if (playedRef.current.has(key)) continue
@@ -144,11 +146,13 @@ export default function TriggerEffects() {
 
       // Fake triggers use their own duration; real triggers default to 4s
       const clearDelay = (effect.isFake && effect.duration ? effect.duration : 4) * 1000
-      setTimeout(() => {
-        clearTriggerEffect(effect.triggerEvent)
+      timeoutIds.push(setTimeout(() => {
+        clearTriggerEffect(effect.triggerEvent, effect.timestamp)
         playedRef.current.delete(key)
-      }, clearDelay)
+      }, clearDelay))
     }
+
+    return () => timeoutIds.forEach(id => clearTimeout(id))
   }, [activeTriggerEffects, clearTriggerEffect])
 
   // Render notification banners for active trigger effects

@@ -29,6 +29,27 @@ function GameShell() {
   const setPhase = useGameStore((s) => s.setPhase)
   const setBlockNumber = useGameStore((s) => s.setBlockNumber)
 
+  // Prevent browser back-button during experiment
+  useEffect(() => {
+    if (phase === 'welcome' || phase === 'complete') return
+    window.history.pushState(null, '', window.location.href)
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href)
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [phase])
+
+  // Warn before tab close during active gameplay
+  useEffect(() => {
+    if (phase !== 'playing' && phase !== 'encoding') return
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [phase])
+
   // Recover session from sessionStorage on mount
   useEffect(() => {
     if (sessionId) return

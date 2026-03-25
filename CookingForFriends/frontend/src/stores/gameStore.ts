@@ -108,7 +108,7 @@ interface GameState {
 
   // Trigger effects
   addTriggerEffect: (triggerEvent: string, opts?: { isFake?: boolean; duration?: number }) => void
-  clearTriggerEffect: (triggerEvent: string) => void
+  clearTriggerEffect: (triggerEvent: string, timestamp?: number) => void
 
   // Game clock
   setGameClock: (clock: string) => void
@@ -324,10 +324,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       { triggerEvent, timestamp: Date.now(), ...opts },
     ],
   })),
-  clearTriggerEffect: (triggerEvent) => set((s) => ({
-    activeTriggerEffects: s.activeTriggerEffects.filter(
-      e => e.triggerEvent !== triggerEvent
-    ),
+  clearTriggerEffect: (triggerEvent, timestamp) => set((s) => ({
+    activeTriggerEffects: s.activeTriggerEffects.filter(e => {
+      if (e.triggerEvent !== triggerEvent) return true
+      if (timestamp !== undefined) return e.timestamp !== timestamp
+      return false
+    }),
   })),
 
   // Game clock
