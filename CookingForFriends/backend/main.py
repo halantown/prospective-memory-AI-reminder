@@ -98,6 +98,15 @@ async def health():
 # Serve frontend static files if built (MUST be last — catch-all route)
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 if FRONTEND_DIST.exists():
+    # SPA fallback: serve index.html for admin routes
+    from fastapi.responses import FileResponse
+
+    @app.get("/dashboard{rest:path}")
+    @app.get("/config{rest:path}")
+    @app.get("/admin{rest:path}")
+    async def spa_fallback(rest: str = ""):
+        return FileResponse(str(FRONTEND_DIST / "index.html"))
+
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
 
 

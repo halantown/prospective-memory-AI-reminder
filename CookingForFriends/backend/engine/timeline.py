@@ -83,13 +83,22 @@ async def run_timeline(
     if key in _active_timelines:
         _active_timelines[key].cancel()
 
-    timeline = load_timeline(block_number, condition)
+    # Use provided or global db_factory
+    factory = db_factory or _db_factory
+
+    # Look up unreminded task_id for correct reminder generation (C2 fix)
+    unreminded_task_id = None
+    if factory and condition != "CONTROL":
+        unreminded_task_id = await _get_unreminded_task_id(
+            participant_id, block_number, factory
+        )
+
+    timeline = load_timeline(
+        block_number, condition, unreminded_task_id=unreminded_task_id
+    )
     events = timeline.get("events", [])
     duration = timeline.get("duration_seconds", 600)
     logger.info(f"[TIMELINE] Loaded timeline for {key}: {len(events)} events, {duration}s duration")
-
-    # Use provided or global db_factory
-    factory = db_factory or _db_factory
 
     async def _run():
         try:
@@ -239,7 +248,9 @@ async def run_timeline(
                 await asyncio.sleep(1.0)
                 remaining = duration - (time.time() - start_time)
 
-            await send_fn("block_end", {})
+            # Send block_end only if not already fired as part of timeline events
+            if not any(e.get("type") == "block_end" for e in events):
+                await send_fn("block_end", {})
             logger.info(f"[TIMELINE] Timeline completed: {key}")
 
             if on_complete:
@@ -314,6 +325,39 @@ async def _record_trigger_fired(trial_id: int, trigger_time: float, db_factory):
             )
         )
         await db.commit()
+
+
+async def _get_unreminded_task_id(
+    participant_id: str, block_number: int, db_factory,
+) -> str | None:
+    """Look up the task_id of the unreminded (filler) trial for a block."""
+    from sqlalchemy import select
+    from models.block import Block, PMTrial
+
+    try:
+        async with db_factory() as db:
+            result = await db.execute(
+                select(Block).where(
+                    Block.participant_id == participant_id,
+                    Block.block_number == block_number,
+                )
+            )
+            block = result.scalar_one_or_none()
+            if not block:
+                return None
+            result = await db.execute(
+                select(PMTrial).where(
+                    PMTrial.block_id == block.id,
+                    PMTrial.is_filler == True,
+                    PMTrial.has_reminder == False,
+                ).limit(1)
+            )
+            trial = result.scalar_one_or_none()
+            if trial and trial.task_config:
+                return trial.task_config.get("task_id")
+    except Exception as e:
+        logger.warning(f"[TIMELINE] Failed to look up unreminded task: {e}")
+    return None
 
 
 async def _on_window_expire(
@@ -473,7 +517,7 @@ async def _fire_activity_trigger(watcher_key: str, send_fn, trial_lookup: dict, 
     participant_id = watcher["participant_id"]
 
     try:
-        from engine.pm_tasks import get_task
+        from engine.pm_tasks import get_task, get_task_config
         task_def = get_task(task_id)
     except KeyError:
         logger.error(f"[ACTIVITY_WATCHER] Unknown task: {task_id}")
@@ -481,7 +525,7 @@ async def _fire_activity_trigger(watcher_key: str, send_fn, trial_lookup: dict, 
 
     trigger_time = time.time()
 
-    # Build trigger event data matching pm_trigger format
+    # Build trigger event data matching pm_trigger format (with task_config for frontend)
     event_data = {
         "trigger_id": task_id,
         "trigger_event": task_def.trigger_visual,
@@ -492,6 +536,7 @@ async def _fire_activity_trigger(watcher_key: str, send_fn, trial_lookup: dict, 
             "visual": task_def.trigger_visual,
         },
         "server_trigger_ts": trigger_time,
+        "task_config": get_task_config(task_id),
     }
 
     # Start execution window if trial exists

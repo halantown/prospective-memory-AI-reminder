@@ -11,6 +11,7 @@ import random
 from pathlib import Path
 from engine.pm_tasks import (
     get_task,
+    get_task_config,
     get_tasks_for_block,
     BLOCK_TRIGGER_ORDER,
     BLOCK_TRIGGER_TIMES,
@@ -116,6 +117,7 @@ def generate_block_timeline(
                         "audio": task_def.trigger_audio,
                         "visual": task_def.trigger_visual,
                     },
+                    "task_config": get_task_config(task_id),
                 },
             })
 

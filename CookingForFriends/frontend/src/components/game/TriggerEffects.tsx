@@ -47,6 +47,14 @@ const TRIGGER_EFFECTS: Record<string, {
     icon: '🍽️',
     label: 'Dishwasher finished!',
   },
+  oven_indicator_green: {
+    sourceRoom: 'kitchen',
+    audioFreq: 660,
+    audioDuration: 0.2,
+    audioPattern: 'triple',
+    icon: '🫕',
+    label: 'Oven is ready!',
+  },
   washer_indicator_done: {
     sourceRoom: 'bathroom',
     audioFreq: 660,
@@ -72,7 +80,7 @@ const TRIGGER_EFFECTS: Record<string, {
     icon: '🥩',
     label: 'All steaks are plated!',
   },
-  table_all_set: {
+  table_complete: {
     sourceRoom: 'bedroom',
     audioFreq: 440,
     audioDuration: 0.3,

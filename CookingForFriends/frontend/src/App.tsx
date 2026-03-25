@@ -10,13 +10,17 @@ import GamePage from './pages/game/GamePage'
 import MicroBreakPage from './pages/game/MicroBreakPage'
 import DebriefPage from './pages/game/DebriefPage'
 import AdminDashboard from './pages/admin/DashboardPage'
+import ConfigPage from './pages/admin/ConfigPage'
 
 export default function App() {
   const path = window.location.pathname
 
   // Admin routes
-  if (path.startsWith('/admin')) {
+  if (path.startsWith('/dashboard') || path.startsWith('/admin')) {
     return <AdminDashboard />
+  }
+  if (path.startsWith('/config')) {
+    return <ConfigPage />
   }
 
   // Game routes — phase-based rendering

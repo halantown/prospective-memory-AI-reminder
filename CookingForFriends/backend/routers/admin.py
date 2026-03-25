@@ -319,4 +319,232 @@ async def list_assignments(db: AsyncSession = Depends(get_db)):
     return assignments
 
 
+@router.get("/participant/{session_id}/detail")
+async def get_participant_detail(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Full detail for one participant: blocks → trials → attempts."""
+    result = await db.execute(select(Participant).where(Participant.id == session_id))
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, "Participant not found")
+
+    blocks_result = await db.execute(
+        select(Block).where(Block.participant_id == session_id).order_by(Block.block_number)
+    )
+    blocks = blocks_result.scalars().all()
+
+    block_list = []
+    for b in blocks:
+        trials_result = await db.execute(
+            select(PMTrial).where(PMTrial.block_id == b.id).order_by(PMTrial.trial_number)
+        )
+        trials = trials_result.scalars().all()
+        trial_list = []
+        for t in trials:
+            cfg = t.task_config or {}
+            trial_list.append({
+                "id": t.id,
+                "trial_number": t.trial_number,
+                "task_id": cfg.get("task_id", ""),
+                "has_reminder": t.has_reminder,
+                "is_filler": t.is_filler,
+                "score": t.score,
+                "trigger_fired_at": t.trigger_fired_at,
+                "responded_at": t.responded_at,
+                "task_config": cfg,
+            })
+        block_list.append({
+            "block_number": b.block_number,
+            "condition": b.condition,
+            "status": b.status.value if hasattr(b.status, "value") else b.status,
+            "day_story": b.day_story,
+            "trials": trial_list,
+        })
+
+    return {
+        "session_id": p.id,
+        "participant_id": p.participant_id,
+        "group": p.latin_square_group,
+        "condition_order": p.condition_order,
+        "status": p.status.value if isinstance(p.status, ParticipantStatus) else p.status,
+        "current_block": p.current_block,
+        "token": p.token,
+        "is_online": p.is_online,
+        "created_at": p.created_at.isoformat() if p.created_at else None,
+        "blocks": block_list,
+    }
+
+
+@router.post("/participant/{session_id}/reset")
+async def reset_participant(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Reset participant back to REGISTERED, clear all block progress."""
+    from sqlalchemy import update as sql_update
+
+    result = await db.execute(select(Participant).where(Participant.id == session_id))
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, "Participant not found")
+
+    # Reset participant status
+    p.status = ParticipantStatus.REGISTERED
+    p.current_block = None
+
+    # Reset all blocks to PENDING and clear trial runtime data
+    blocks_result = await db.execute(
+        select(Block).where(Block.participant_id == session_id)
+    )
+    blocks = blocks_result.scalars().all()
+    for b in blocks:
+        b.status = BlockStatus.PENDING
+        await db.execute(
+            sql_update(PMTrial).where(PMTrial.block_id == b.id).values(
+                score=None,
+                trigger_fired_at=None,
+                responded_at=None,
+                exec_window_start=None,
+            )
+        )
+
+    await db.commit()
+    logger.info(f"[ADMIN] Reset participant {p.participant_id} ({session_id})")
+    return {"status": "reset", "participant_id": p.participant_id}
+
+
+@router.post("/participant/{session_id}/drop")
+async def drop_participant(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Mark participant as dropped."""
+    result = await db.execute(select(Participant).where(Participant.id == session_id))
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, "Participant not found")
+
+    p.status = ParticipantStatus.DROPPED
+    await db.commit()
+    logger.info(f"[ADMIN] Dropped participant {p.participant_id} ({session_id})")
+    return {"status": "dropped", "participant_id": p.participant_id}
+
+
+@router.get("/config")
+async def get_config():
+    """Return current experiment configuration."""
+    from config import (
+        BLOCKS_PER_PARTICIPANT, PM_TASKS_PER_BLOCK, BLOCK_DURATION_S,
+        EXECUTION_WINDOW_S, LATE_WINDOW_S, REMINDER_LEAD_S,
+        PHONE_LOCK_TIMEOUT_S, MOUSE_SAMPLE_INTERVAL_MS, MOUSE_BATCH_INTERVAL_S,
+        SNAPSHOT_INTERVAL_S, HEARTBEAT_INTERVAL_S, HEARTBEAT_TIMEOUT_S,
+        LATIN_SQUARE, GROUPS, TOKEN_LENGTH,
+    )
+    return {
+        "experiment": {
+            "blocks_per_participant": BLOCKS_PER_PARTICIPANT,
+            "pm_tasks_per_block": PM_TASKS_PER_BLOCK,
+            "block_duration_s": BLOCK_DURATION_S,
+            "execution_window_s": EXECUTION_WINDOW_S,
+            "late_window_s": LATE_WINDOW_S,
+            "reminder_lead_s": REMINDER_LEAD_S,
+        },
+        "phone": {
+            "lock_timeout_s": PHONE_LOCK_TIMEOUT_S,
+        },
+        "mouse_tracking": {
+            "sample_interval_ms": MOUSE_SAMPLE_INTERVAL_MS,
+            "batch_interval_s": MOUSE_BATCH_INTERVAL_S,
+        },
+        "system": {
+            "snapshot_interval_s": SNAPSHOT_INTERVAL_S,
+            "heartbeat_interval_s": HEARTBEAT_INTERVAL_S,
+            "heartbeat_timeout_s": HEARTBEAT_TIMEOUT_S,
+            "token_length": TOKEN_LENGTH,
+        },
+        "latin_square": LATIN_SQUARE,
+        "groups": GROUPS,
+    }
+
+
+@router.get("/tasks")
+async def list_pm_tasks():
+    """Return the full PM task registry grouped by block."""
+    from engine.pm_tasks import (
+        BLOCK_TRIGGER_ORDER, BLOCK_TRIGGER_TIMES, ACTIVITY_WATCH_CONFIG,
+        get_task, get_task_config,
+    )
+    blocks = {}
+    for block_num in (1, 2, 3):
+        tasks = []
+        for task_id in BLOCK_TRIGGER_ORDER[block_num]:
+            task_def = get_task(task_id)
+            cfg = get_task_config(task_id)
+            trigger_time = BLOCK_TRIGGER_TIMES.get(block_num, {}).get(task_id)
+            watch = ACTIVITY_WATCH_CONFIG.get(task_id)
+            tasks.append({
+                **cfg,
+                "trigger_time": trigger_time,
+                "trigger_audio": task_def.trigger_audio,
+                "trigger_visual": task_def.trigger_visual,
+                "encoding_text": task_def.encoding_text,
+                "activity_watch": watch,
+            })
+        blocks[str(block_num)] = tasks
+    return blocks
+
+
+@router.get("/data/export")
+async def export_data(db: AsyncSession = Depends(get_db)):
+    """Export all experiment data as JSON."""
+    participants_result = await db.execute(
+        select(Participant).order_by(Participant.created_at)
+    )
+    participants = participants_result.scalars().all()
+
+    export = []
+    for p in participants:
+        blocks_result = await db.execute(
+            select(Block).where(Block.participant_id == p.id).order_by(Block.block_number)
+        )
+        blocks = blocks_result.scalars().all()
+
+        block_data = []
+        for b in blocks:
+            trials_result = await db.execute(
+                select(PMTrial).where(PMTrial.block_id == b.id).order_by(PMTrial.trial_number)
+            )
+            trials = trials_result.scalars().all()
+            trial_data = []
+            for t in trials:
+                trial_data.append({
+                    "trial_number": t.trial_number,
+                    "task_config": t.task_config,
+                    "has_reminder": t.has_reminder,
+                    "is_filler": t.is_filler,
+                    "score": t.score,
+                    "trigger_fired_at": t.trigger_fired_at,
+                    "responded_at": t.responded_at,
+                })
+            block_data.append({
+                "block_number": b.block_number,
+                "condition": b.condition,
+                "status": b.status.value if hasattr(b.status, "value") else b.status,
+                "trials": trial_data,
+            })
+
+        logs_result = await db.execute(
+            select(InteractionLog)
+            .where(InteractionLog.participant_id == p.id)
+            .order_by(InteractionLog.timestamp)
+        )
+        logs = logs_result.scalars().all()
+
+        export.append({
+            "participant_id": p.participant_id,
+            "session_id": p.id,
+            "group": p.latin_square_group,
+            "condition_order": p.condition_order,
+            "status": p.status.value if isinstance(p.status, ParticipantStatus) else p.status,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "blocks": block_data,
+            "log_count": len(logs),
+        })
+
+    return {"participants": export, "count": len(export)}
+
+
 # WebSocket endpoint moved to main.py (no /api prefix needed)

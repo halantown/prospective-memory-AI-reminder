@@ -25,7 +25,7 @@ LATE_WINDOW_S = 60
 REMINDER_LEAD_S = 120  # Reminder fires ~120s before trigger
 
 # Phone
-PHONE_LOCK_TIMEOUT_S = 30
+PHONE_LOCK_TIMEOUT_S = 15  # Must match frontend LOCK_TIMEOUT (15s)
 
 # Mouse tracking
 MOUSE_SAMPLE_INTERVAL_MS = 200

@@ -497,3 +497,19 @@ def get_task_as_dict(task_id: str) -> dict:
     """Return a task as a plain dict (for JSON serialization)."""
     from dataclasses import asdict
     return asdict(get_task(task_id))
+
+
+def get_task_config(task_id: str) -> dict:
+    """Return task_config dict matching the PMTrial.task_config format."""
+    t = get_task(task_id)
+    return {
+        "task_id": t.task_id,
+        "trigger_type": t.trigger_type,
+        "trigger_event": t.trigger_visual,
+        "target_room": t.target_room,
+        "target_object": t.target_name,
+        "target_action": t.action_description,
+        "distractor_object": t.distractor_name,
+        "action_destination": t.action_destination,
+        "discriminating_cue": t.discriminating_cue,
+    }

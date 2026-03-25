@@ -1,9 +1,68 @@
-/** Minimal admin dashboard — participant list, create, live status. */
+/** Feature-rich admin dashboard — overview, sortable table, expandable rows, actions. */
 
-import { useState, useEffect, useCallback } from 'react'
-import { createParticipant, listParticipants, getExperimentOverview } from '../../services/api'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  RotateCcw,
+  XCircle,
+  RefreshCw,
+  Users,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  Wifi,
+  WifiOff,
+  Plus,
+  Download,
+} from 'lucide-react'
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
 interface ParticipantRow {
+  session_id: string
+  participant_id: string
+  group: string
+  condition_order: string[]
+  status: 'registered' | 'in_progress' | 'completed' | 'dropped'
+  current_block: number | null
+  token: string
+  is_online: boolean
+  created_at: string | null
+}
+
+interface Overview {
+  total_participants: number
+  completed: number
+  in_progress: number
+  latin_square: unknown
+}
+
+interface Trial {
+  id: number
+  trial_number: number
+  task_id: string
+  has_reminder: boolean
+  is_filler: boolean
+  score: number | null
+  trigger_fired_at: number | null
+  responded_at: number | null
+  task_config: Record<string, unknown>
+}
+
+interface Block {
+  block_number: number
+  condition: string
+  status: string
+  day_story: string
+  trials: Trial[]
+}
+
+interface ParticipantDetail {
   session_id: string
   participant_id: string
   group: string
@@ -13,21 +72,318 @@ interface ParticipantRow {
   token: string
   is_online: boolean
   created_at: string | null
+  blocks: Block[]
 }
+
+type SortKey = 'status' | 'created_at' | 'participant_id'
+type SortDir = 'asc' | 'desc'
+
+interface ConfirmAction {
+  kind: 'reset' | 'drop'
+  participant: ParticipantRow
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+const STATUS_ORDER: Record<string, number> = {
+  in_progress: 0,
+  registered: 1,
+  completed: 2,
+  dropped: 3,
+}
+
+const conditionColor = (c: string) => {
+  if (c === 'CONTROL') return 'bg-slate-100 text-slate-600'
+  if (c === 'AF') return 'bg-blue-100 text-blue-700'
+  return 'bg-purple-100 text-purple-700'
+}
+
+const statusBadge = (s: string) => {
+  if (s === 'completed') return 'bg-green-100 text-green-700'
+  if (s === 'in_progress') return 'bg-blue-100 text-blue-700'
+  if (s === 'dropped') return 'bg-red-100 text-red-700'
+  return 'bg-slate-100 text-slate-600'
+}
+
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    const el = document.createElement('textarea')
+    el.value = text
+    document.body.appendChild(el)
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Confirmation Modal                                                 */
+/* ------------------------------------------------------------------ */
+
+function ConfirmModal({
+  action,
+  onConfirm,
+  onCancel,
+}: {
+  action: ConfirmAction
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const isReset = action.kind === 'reset'
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onCancel}
+      >
+        <motion.div
+          className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4"
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            {isReset ? (
+              <RotateCcw className="w-6 h-6 text-amber-500" />
+            ) : (
+              <XCircle className="w-6 h-6 text-red-500" />
+            )}
+            <h3 className="text-lg font-semibold text-slate-800">
+              {isReset ? 'Reset Participant?' : 'Drop Participant?'}
+            </h3>
+          </div>
+          <p className="text-sm text-slate-600 mb-1">
+            Participant:{' '}
+            <span className="font-mono font-medium">{action.participant.participant_id}</span>
+          </p>
+          <p className="text-sm text-slate-500 mb-6">
+            {isReset
+              ? 'This will reset the participant back to REGISTERED status. All progress will be cleared.'
+              : 'This will mark the participant as DROPPED. This action should only be used for participants who cannot continue.'}
+          </p>
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
+                isReset
+                  ? 'bg-amber-500 hover:bg-amber-600'
+                  : 'bg-red-500 hover:bg-red-600'
+              }`}
+            >
+              {isReset ? 'Reset' : 'Drop'}
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Stat Card                                                          */
+/* ------------------------------------------------------------------ */
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  color,
+  badge,
+}: {
+  label: string
+  value: number
+  icon: React.ElementType
+  color: string
+  badge?: number
+}) {
+  return (
+    <div className="bg-white rounded-xl shadow border border-slate-200 p-5 flex items-center gap-4">
+      <div className={`p-3 rounded-xl ${color}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="flex-1">
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
+        <div className="flex items-baseline gap-2">
+          <p className="text-2xl font-bold text-slate-800">{value}</p>
+          {badge !== undefined && badge > 0 && (
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1">
+              <Wifi className="w-3 h-3" />
+              {badge} online
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Expanded Detail View                                               */
+/* ------------------------------------------------------------------ */
+
+function ParticipantDetailView({ sessionId }: { sessionId: string }) {
+  const [detail, setDetail] = useState<ParticipantDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetch(`/api/admin/participant/${sessionId}/detail`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then((d) => {
+        if (!cancelled) {
+          setDetail(d)
+          setLoading(false)
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e.message)
+          setLoading(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [sessionId])
+
+  if (loading)
+    return (
+      <div className="p-6 text-sm text-slate-400 flex items-center gap-2">
+        <RefreshCw className="w-4 h-4 animate-spin" /> Loading details…
+      </div>
+    )
+  if (error)
+    return (
+      <div className="p-6 text-sm text-red-500 flex items-center gap-2">
+        <AlertCircle className="w-4 h-4" /> Failed to load: {error}
+      </div>
+    )
+  if (!detail) return null
+
+  return (
+    <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+      {detail.blocks.map((block) => (
+        <div
+          key={block.block_number}
+          className="bg-slate-50 rounded-xl border border-slate-200 p-4"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold text-slate-700">
+              Block {block.block_number}
+            </h4>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${conditionColor(block.condition)}`}>
+                {block.condition}
+              </span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusBadge(block.status)}`}>
+                {block.status}
+              </span>
+            </div>
+          </div>
+          {block.day_story && (
+            <p className="text-xs text-slate-500 mb-3 italic truncate" title={block.day_story}>
+              {block.day_story}
+            </p>
+          )}
+          <div className="space-y-1.5">
+            {block.trials.map((trial) => (
+              <div
+                key={trial.id}
+                className="flex items-center gap-2 text-xs bg-white rounded-lg border border-slate-100 px-3 py-2"
+              >
+                <span className="font-mono font-medium text-slate-700 w-24 truncate" title={trial.task_id}>
+                  {trial.task_id}
+                </span>
+                {trial.has_reminder && (
+                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">
+                    PM
+                  </span>
+                )}
+                {trial.is_filler && (
+                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">
+                    filler
+                  </span>
+                )}
+                <span className="ml-auto font-medium text-slate-600">
+                  {trial.score !== null ? trial.score : '—'}
+                </span>
+                {trial.responded_at !== null ? (
+                  <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                ) : trial.trigger_fired_at !== null ? (
+                  <Clock className="w-3.5 h-3.5 text-amber-500" />
+                ) : (
+                  <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-200" />
+                )}
+              </div>
+            ))}
+            {block.trials.length === 0 && (
+              <p className="text-xs text-slate-400 italic py-2">No trials yet</p>
+            )}
+          </div>
+        </div>
+      ))}
+      {detail.blocks.length === 0 && (
+        <div className="col-span-3 text-center py-6 text-sm text-slate-400">
+          No blocks recorded yet.
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main Dashboard                                                     */
+/* ------------------------------------------------------------------ */
 
 export default function AdminDashboard() {
   const [participants, setParticipants] = useState<ParticipantRow[]>([])
-  const [overview, setOverview] = useState<{ total_participants: number; completed: number; in_progress: number } | null>(null)
+  const [overview, setOverview] = useState<Overview | null>(null)
   const [creating, setCreating] = useState(false)
-  const [lastCreated, setLastCreated] = useState<{ participant_id: string; token: string } | null>(null)
+  const [lastCreated, setLastCreated] = useState<{
+    participant_id: string
+    token: string
+  } | null>(null)
+  const [copiedToken, setCopiedToken] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey>('created_at')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [refreshing, setRefreshing] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+
+  /* ---------- data fetching ---------- */
 
   const refresh = useCallback(async () => {
+    setRefreshing(true)
     try {
-      const [p, o] = await Promise.all([listParticipants(), getExperimentOverview()])
-      setParticipants(p)
-      setOverview(o)
+      const [pRes, oRes] = await Promise.all([
+        fetch('/api/admin/participants'),
+        fetch('/api/admin/experiment/overview'),
+      ])
+      if (pRes.ok) setParticipants(await pRes.json())
+      if (oRes.ok) setOverview(await oRes.json())
     } catch (err) {
       console.error('Failed to load admin data:', err)
+    } finally {
+      setRefreshing(false)
     }
   }, [])
 
@@ -37,10 +393,52 @@ export default function AdminDashboard() {
     return () => clearInterval(interval)
   }, [refresh])
 
+  /* ---------- derived counts ---------- */
+
+  const droppedCount = useMemo(
+    () => participants.filter((p) => p.status === 'dropped').length,
+    [participants],
+  )
+  const onlineCount = useMemo(
+    () => participants.filter((p) => p.is_online).length,
+    [participants],
+  )
+
+  /* ---------- sorting ---------- */
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
+
+  const sorted = useMemo(() => {
+    const copy = [...participants]
+    copy.sort((a, b) => {
+      let cmp = 0
+      if (sortKey === 'status') {
+        cmp = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)
+      } else if (sortKey === 'created_at') {
+        cmp = (a.created_at ?? '').localeCompare(b.created_at ?? '')
+      } else {
+        cmp = a.participant_id.localeCompare(b.participant_id)
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return copy
+  }, [participants, sortKey, sortDir])
+
+  /* ---------- actions ---------- */
+
   const handleCreate = async () => {
     setCreating(true)
     try {
-      const result = await createParticipant()
+      const res = await fetch('/api/admin/participant/create', { method: 'POST' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const result = await res.json()
       setLastCreated({ participant_id: result.participant_id, token: result.token })
       refresh()
     } catch (err) {
@@ -50,128 +448,351 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleCopyToken = async (token: string) => {
+    await copyToClipboard(token)
+    setCopiedToken(token)
+    setTimeout(() => setCopiedToken(null), 2000)
+  }
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return
+    const { kind, participant } = confirmAction
+    const url = `/api/admin/participant/${participant.session_id}/${kind}`
+    try {
+      const res = await fetch(url, { method: 'POST' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      refresh()
+    } catch (err) {
+      console.error(`Failed to ${kind} participant:`, err)
+    } finally {
+      setConfirmAction(null)
+    }
+  }
+
+  const handleExport = async () => {
+    try {
+      const res = await fetch('/api/admin/data/export')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `experiment-export-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Export failed:', err)
+    }
+  }
+
+  /* ---------- column sort header helper ---------- */
+
+  const SortHeader = ({
+    label,
+    sortKeyName,
+    className = '',
+  }: {
+    label: string
+    sortKeyName: SortKey
+    className?: string
+  }) => (
+    <th
+      className={`text-left px-4 py-3 font-medium text-slate-600 cursor-pointer select-none hover:text-slate-800 transition-colors ${className}`}
+      onClick={() => toggleSort(sortKeyName)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {sortKey === sortKeyName &&
+          (sortDir === 'asc' ? (
+            <ChevronUp className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5" />
+          ))}
+      </span>
+    </th>
+  )
+
+  /* ---------- render ---------- */
+
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">🍳 Cooking for Friends — Admin</h1>
-            <p className="text-sm text-slate-500">Experiment Management Dashboard</p>
+    <div className="min-h-screen bg-slate-50">
+      {/* ---- Header ---- */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <h1 className="text-xl font-bold text-slate-800">
+              🍳 Cooking for Friends — Dashboard
+            </h1>
+            <nav className="flex gap-1">
+              <button className="px-3 py-1.5 text-sm font-medium rounded-lg bg-cooking-100 text-cooking-700">
+                Dashboard
+              </button>
+              <button
+                onClick={() => (window.location.href = '/config')}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                Config
+              </button>
+            </nav>
           </div>
-          <button
-            onClick={handleCreate}
-            disabled={creating}
-            className="px-6 py-2 bg-cooking-500 hover:bg-cooking-600 disabled:bg-cooking-200
-                       text-white font-medium rounded-xl transition-colors"
-          >
-            {creating ? 'Creating...' : '+ New Participant'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={creating}
+              className="flex items-center gap-2 px-5 py-2 bg-cooking-500 hover:bg-cooking-600 disabled:bg-cooking-200
+                         text-white font-medium rounded-lg transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              {creating ? 'Creating…' : 'New Participant'}
+            </button>
+            <RefreshCw
+              className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`}
+            />
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        {/* ---- Created token banner ---- */}
+        <AnimatePresence>
+          {lastCreated && (
+            <motion.div
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              className="bg-green-50 border border-green-200 rounded-xl p-5 flex items-center justify-between"
+            >
+              <div>
+                <p className="text-green-800 font-semibold">
+                  ✓ Created: {lastCreated.participant_id}
+                </p>
+                <p className="text-green-600 text-sm">
+                  Give this token to the participant
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-3xl font-mono font-bold text-green-700 tracking-widest select-all">
+                  {lastCreated.token}
+                </span>
+                <button
+                  onClick={() => handleCopyToken(lastCreated.token)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-200 hover:bg-green-300 text-green-800 rounded-lg transition-colors"
+                >
+                  <Copy className="w-4 h-4" />
+                  {copiedToken === lastCreated.token ? 'Copied!' : 'Copy Token'}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ---- Overview cards ---- */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard
+            label="Total"
+            value={overview?.total_participants ?? participants.length}
+            icon={Users}
+            color="bg-slate-100 text-slate-600"
+          />
+          <StatCard
+            label="In Progress"
+            value={overview?.in_progress ?? 0}
+            icon={Clock}
+            color="bg-blue-100 text-blue-600"
+            badge={onlineCount}
+          />
+          <StatCard
+            label="Completed"
+            value={overview?.completed ?? 0}
+            icon={CheckCircle}
+            color="bg-green-100 text-green-600"
+          />
+          <StatCard
+            label="Dropped"
+            value={droppedCount}
+            icon={AlertCircle}
+            color="bg-red-100 text-red-600"
+          />
         </div>
 
-        {/* Token display */}
-        {lastCreated && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center justify-between">
-            <div>
-              <p className="text-green-800 font-medium">
-                Created: {lastCreated.participant_id}
-              </p>
-              <p className="text-green-600 text-sm">
-                Give this token to the participant
-              </p>
-            </div>
-            <div className="text-3xl font-mono font-bold text-green-700 tracking-widest">
-              {lastCreated.token}
-            </div>
-          </div>
-        )}
-
-        {/* Overview cards */}
-        {overview && (
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <StatCard label="Total" value={overview.total_participants} />
-            <StatCard label="In Progress" value={overview.in_progress} color="text-blue-600" />
-            <StatCard label="Completed" value={overview.completed} color="text-green-600" />
-          </div>
-        )}
-
-        {/* Participant table */}
+        {/* ---- Participant table ---- */}
         <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-4 py-3 font-medium text-slate-600">ID</th>
+                <th className="w-8" />
+                <SortHeader label="ID" sortKeyName="participant_id" />
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Token</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Group</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Conditions</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Status</th>
+                <SortHeader label="Status" sortKeyName="status" />
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Block</th>
                 <th className="text-center px-4 py-3 font-medium text-slate-600">Online</th>
+                <SortHeader label="Created" sortKeyName="created_at" />
+                <th className="text-center px-4 py-3 font-medium text-slate-600">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {participants.length === 0 ? (
+              {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-slate-400">
-                    No participants yet. Click "+ New Participant" to create one.
+                  <td colSpan={10} className="text-center py-16 text-slate-400">
+                    <Users className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+                    <p className="font-medium">No participants yet</p>
+                    <p className="text-xs mt-1">
+                      Click "New Participant" to create one.
+                    </p>
                   </td>
                 </tr>
               ) : (
-                participants.map((p) => (
-                  <tr key={p.session_id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium">{p.participant_id}</td>
-                    <td className="px-4 py-3 font-mono tracking-wider text-cooking-600">{p.token}</td>
-                    <td className="px-4 py-3">{p.group}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        {p.condition_order.map((c, i) => (
+                sorted.map((p) => {
+                  const isExpanded = expandedId === p.session_id
+                  return (
+                    <motion.tbody key={p.session_id} layout>
+                      {/* Main row */}
+                      <tr
+                        className={`border-b border-slate-100 cursor-pointer transition-colors ${
+                          isExpanded ? 'bg-cooking-50' : 'hover:bg-slate-50'
+                        }`}
+                        onClick={() =>
+                          setExpandedId(isExpanded ? null : p.session_id)
+                        }
+                      >
+                        <td className="pl-3 pr-1 py-3 text-slate-400">
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {p.participant_id}
+                        </td>
+                        <td className="px-4 py-3 font-mono tracking-wider text-cooking-600 text-xs">
+                          {p.token}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{p.group}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1">
+                            {p.condition_order.map((c, i) => (
+                              <span
+                                key={i}
+                                className={`text-xs px-1.5 py-0.5 rounded font-medium ${conditionColor(c)}`}
+                              >
+                                {c}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
                           <span
-                            key={i}
-                            className={`text-xs px-1.5 py-0.5 rounded ${
-                              c === 'CONTROL' ? 'bg-slate-100 text-slate-600' :
-                              c === 'AF' ? 'bg-blue-100 text-blue-700' :
-                              'bg-purple-100 text-purple-700'
-                            }`}
+                            className={`text-xs font-medium px-2 py-1 rounded-full ${statusBadge(p.status)}`}
                           >
-                            {c}
+                            {p.status}
                           </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        p.status === 'completed' ? 'bg-green-100 text-green-700' :
-                        p.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                        p.status === 'dropped' ? 'bg-red-100 text-red-700' :
-                        'bg-slate-100 text-slate-600'
-                      }`}>
-                        {p.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">{p.current_block || '—'}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`w-2.5 h-2.5 rounded-full inline-block ${
-                        p.is_online ? 'bg-green-400' : 'bg-slate-300'
-                      }`} />
-                    </td>
-                  </tr>
-                ))
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {p.current_block ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {p.is_online ? (
+                            <Wifi className="w-4 h-4 text-green-500 mx-auto" />
+                          ) : (
+                            <WifiOff className="w-4 h-4 text-slate-300 mx-auto" />
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500">
+                          {p.created_at
+                            ? new Date(p.created_at).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div
+                            className="flex items-center justify-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              title="Copy Token"
+                              onClick={() => handleCopyToken(p.token)}
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+                            >
+                              {copiedToken === p.token ? (
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <Copy className="w-4 h-4" />
+                              )}
+                            </button>
+                            <button
+                              title="Reset"
+                              onClick={() =>
+                                setConfirmAction({ kind: 'reset', participant: p })
+                              }
+                              className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </button>
+                            {p.status !== 'dropped' && p.status !== 'completed' && (
+                              <button
+                                title="Drop"
+                                onClick={() =>
+                                  setConfirmAction({ kind: 'drop', participant: p })
+                                }
+                                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expanded detail */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={10} className="p-0">
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.25 }}
+                                className="overflow-hidden border-b border-slate-200 bg-slate-50/50"
+                              >
+                                <ParticipantDetailView sessionId={p.session_id} />
+                              </motion.div>
+                            </td>
+                          </tr>
+                        )}
+                      </AnimatePresence>
+                    </motion.tbody>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
-  )
-}
+      </main>
 
-function StatCard({ label, value, color = 'text-slate-800' }: {
-  label: string; value: number; color?: string
-}) {
-  return (
-    <div className="bg-white rounded-xl shadow border border-slate-200 p-4">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      {/* ---- Confirmation Modal ---- */}
+      {confirmAction && (
+        <ConfirmModal
+          action={confirmAction}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
     </div>
   )
 }

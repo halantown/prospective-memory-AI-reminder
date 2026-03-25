@@ -84,7 +84,7 @@ export default function PhoneSidebar() {
     setTimeout(() => {
       if (feedRef.current) feedRef.current.scrollTop = 0
     }, 100)
-  }, [locked, setBanner])
+  }, [locked, setBanner, wsSend, setPhoneLocked])
 
   const handleReadMessage = useCallback((msg: PhoneMessage) => {
     if (!msg.read) {
