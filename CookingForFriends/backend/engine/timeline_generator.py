@@ -6,7 +6,9 @@ utterances, fake triggers, and ongoing task events properly spaced according
 to the experimental design rules.
 """
 
+import json
 import random
+from pathlib import Path
 from engine.pm_tasks import (
     get_task,
     get_tasks_for_block,
@@ -177,17 +179,25 @@ def generate_block_timeline(
             },
         })
 
-    # ── Phone messages (from message pool, loaded by timeline engine) ──
-    # These are loaded from the messages JSON file by the existing engine
-    # We include scheduled message IDs here
-    msg_times = list(range(30, 590, 25))  # ~22 messages
-    for i, t in enumerate(msg_times):
-        msg_id = f"msg_{i+1:03d}" if i < 18 else f"ad_{i-17:03d}"
-        events.append({
-            "t": t,
-            "type": "phone_message",
-            "data": {"message_id": msg_id},
-        })
+    # ── Phone messages (from message pool JSON) ──
+    # Load actual message IDs and times from the pool file
+    messages_path = Path(__file__).parent.parent / "data" / "messages" / f"messages_day{block_number}.json"
+    if not messages_path.exists():
+        messages_path = Path(__file__).parent.parent / "data" / "messages" / "messages_day1.json"
+
+    if messages_path.exists():
+        with open(messages_path) as f:
+            msg_data = json.load(f)
+
+        for msg in msg_data.get("messages", []):
+            msg_id = msg.get("id", "")
+            msg_t = msg.get("t", 0)
+            if msg_id and msg.get("type") != "pm_trigger":
+                events.append({
+                    "t": msg_t,
+                    "type": "phone_message",
+                    "data": {"message_id": msg_id},
+                })
 
     # ── Block end ──
     events.append({"t": 600, "type": "block_end", "data": {}})
