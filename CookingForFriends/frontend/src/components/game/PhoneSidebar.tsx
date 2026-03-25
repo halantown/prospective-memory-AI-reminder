@@ -195,9 +195,28 @@ export default function PhoneSidebar() {
               {/* Unread/unreplied message previews */}
               <LockScreenPreviews messages={messages} onUnlock={handleUnlock} />
 
-              <p className="text-slate-500 text-[10px] text-center mt-auto animate-pulse cursor-pointer">
-                Tap to unlock
-              </p>
+              {/* Tap to unlock — large and clear like a real phone */}
+              <div className="mt-auto flex flex-col items-center gap-1.5 cursor-pointer">
+                {/* Animated finger-tap icon */}
+                <svg
+                  width="36" height="36" viewBox="0 0 48 48" fill="none"
+                  className="animate-bounce"
+                >
+                  <circle cx="24" cy="14" r="6" fill="white" opacity="0.3" />
+                  <circle cx="24" cy="14" r="3.5" fill="white" opacity="0.5" />
+                  <path
+                    d="M24 20 L24 34 M24 34 L20 30 M24 34 L28 30"
+                    stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    opacity="0.7"
+                  />
+                  {/* Tap ripple rings */}
+                  <circle cx="24" cy="14" r="10" stroke="white" strokeWidth="1" opacity="0.15" />
+                  <circle cx="24" cy="14" r="14" stroke="white" strokeWidth="0.8" opacity="0.08" />
+                </svg>
+                <p className="text-white/70 text-sm font-medium tracking-wide animate-pulse">
+                  Tap to unlock
+                </p>
+              </div>
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">

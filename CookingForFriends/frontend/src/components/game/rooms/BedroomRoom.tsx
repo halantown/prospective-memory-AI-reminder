@@ -180,7 +180,7 @@ export default function BedroomRoom({ isActive }: { isActive: boolean }) {
             Waiting for table to be ready...
           </span>
         </div>
-        <div className="absolute z-10" style={{ left: '3%', bottom: '3%', width: '50%' }}>
+        <div className="absolute z-10" style={{ left: '3%', bottom: '5%' }}>
           <PMTargetItems room="bedroom" />
         </div>
       </div>
@@ -329,8 +329,8 @@ export default function BedroomRoom({ isActive }: { isActive: boolean }) {
         )}
       </AnimatePresence>
 
-      {/* PM targets */}
-      <div className="absolute z-10" style={{ left: '3%', bottom: '3%', width: '50%' }}>
+      {/* PM furniture button near the cabinet */}
+      <div className="absolute z-10" style={{ left: '3%', bottom: '5%' }}>
         <PMTargetItems room="bedroom" />
       </div>
     </div>

@@ -253,7 +253,8 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
         ))}
       </div>
 
-      <div className="absolute z-10" style={{ left: '3%', bottom: '4%', width: '55%' }}>
+      {/* PM furniture button near the shelf */}
+      <div className="absolute z-10" style={{ left: '3%', bottom: '5%' }}>
         <PMTargetItems room="kitchen" />
       </div>
     </div>

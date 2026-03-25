@@ -157,6 +157,15 @@ function deterministicShuffle<T>(arr: T[], seed: string): T[] {
   return shuffled
 }
 
+/** Furniture labels and emoji for each room — clicking these opens the PM item popup. */
+const ROOM_FURNITURE: Record<string, { label: string; emoji: string }> = {
+  study: { label: 'Bookshelf', emoji: '📚' },
+  bedroom: { label: 'Cabinet', emoji: '🗄️' },
+  living_room: { label: 'Shelf', emoji: '📖' },
+  bathroom: { label: 'Supply Shelf', emoji: '🧴' },
+  kitchen: { label: 'Kitchen Shelf', emoji: '🍶' },
+}
+
 interface PMTargetItemsProps {
   room: RoomId
 }
@@ -171,7 +180,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
 
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null)
   const [actionPhase, setActionPhase] = useState<'browse' | 'confirm' | 'done'>('browse')
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const [popupOpen, setPopupOpen] = useState(false)
   const [destinationMsg, setDestinationMsg] = useState<string | null>(null)
 
   // Task groups for this room in the current block
@@ -195,6 +204,13 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
     const timer = setTimeout(() => setDestinationMsg(null), 3000)
     return () => clearTimeout(timer)
   }, [destinationMsg])
+
+  // Auto-close popup when trial completes
+  useEffect(() => {
+    if (!activeTrial && popupOpen) {
+      setPopupOpen(false)
+    }
+  }, [activeTrial, popupOpen])
 
   const handleItemClick = useCallback((itemId: string) => {
     if (actionPhase !== 'browse' || selectedTarget) return
@@ -236,6 +252,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
       completePMTrial(activeTrial.triggerId)
       setSelectedTarget(null)
       setActionPhase('browse')
+      setPopupOpen(false)
     }, 1500)
   }, [activeTrial, selectedTarget, wsSend, currentRoom, completePMTrial])
 
@@ -244,150 +261,176 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
     setActionPhase('browse')
   }, [])
 
+  const handleFurnitureClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setPopupOpen(prev => !prev)
+    setSelectedTarget(null)
+    setActionPhase('browse')
+  }, [])
+
+  const handleClosePopup = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setPopupOpen(false)
+    setSelectedTarget(null)
+    setActionPhase('browse')
+  }, [])
+
   if (roomTaskGroups.length === 0) return null
 
-  const actionLabel = activeTrial
-    ? activeTrial.taskConfig.target_action
-    : ''
+  const furniture = ROOM_FURNITURE[room] || { label: 'Storage', emoji: '📦' }
+  const hasActiveTask = !!activeTrial
+  const actionLabel = activeTrial ? activeTrial.taskConfig.target_action : ''
 
   return (
-    <div className="mt-2 space-y-2">
-      {roomTaskGroups.map(taskGroup => {
-        const isActive = taskGroup.taskId === activeTaskId
-        const itemGroup = ROOM_ITEMS[taskGroup.taskId]
-        if (!itemGroup) return null
+    <div className="relative">
+      {/* Clickable furniture button */}
+      <button
+        onClick={handleFurnitureClick}
+        className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-medium
+          transition-all border cursor-pointer select-none ${
+            hasActiveTask
+              ? 'bg-amber-900/40 border-amber-500/60 text-amber-200 animate-pulse shadow-md shadow-amber-500/20'
+              : 'bg-slate-800/50 border-slate-600/50 text-slate-300 hover:bg-slate-700/50'
+          }`}
+      >
+        <span className="text-sm">{furniture.emoji}</span>
+        <span>{furniture.label}</span>
+        {hasActiveTask && <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" />}
+      </button>
 
-        // Build renderable item list with SVG components
-        const components: Array<{
-          id: string
-          type: 'target' | 'd1' | 'd2'
-          info: TaskItemInfo
-          Component: React.FC<RoomItemProps>
-        }> = [
-          { id: `${taskGroup.taskId}_target`, type: 'target', info: taskGroup.items[0], Component: itemGroup.target },
-          { id: `${taskGroup.taskId}_d1`, type: 'd1', info: taskGroup.items[1], Component: itemGroup.d1 },
-          { id: `${taskGroup.taskId}_d2`, type: 'd2', info: taskGroup.items[2], Component: itemGroup.d2 },
-        ]
-
-        const shuffled = deterministicShuffle(components, taskGroup.taskId)
-
-        return (
-          <div key={taskGroup.taskId} className="flex gap-2 items-end flex-wrap">
-            {/* SVG item container */}
-            <svg
-              viewBox="0 0 240 80"
-              className={`max-w-[360px] ${isActive ? 'w-full' : 'w-[180px] opacity-50'}`}
-            >
-              {shuffled.map((item, i) => {
-                const isSelected = selectedTarget === item.id
-                const isDone = actionPhase === 'done' && isSelected
-
-                return (
-                  <g key={item.id}>
-                    {/* Selection highlight ring */}
-                    {isActive && isSelected && (
-                      <rect
-                        x={6 + i * 80} y={1}
-                        width={68} height={78}
-                        rx={8}
-                        fill="none"
-                        stroke={isDone ? '#4ade80' : '#f59e0b'}
-                        strokeWidth={2}
-                        opacity={0.8}
-                      />
-                    )}
-                    {/* Pulse indicator when browsing */}
-                    {isActive && actionPhase === 'browse' && !selectedTarget && (
-                      <rect
-                        x={6 + i * 80} y={1}
-                        width={68} height={78}
-                        rx={8}
-                        fill="none"
-                        stroke="#f59e0b"
-                        strokeWidth={1}
-                        opacity={0.3}
-                        className="animate-pulse"
-                      />
-                    )}
-                    <item.Component
-                      x={10 + i * 80}
-                      y={5}
-                      scale={isActive ? 0.9 : 0.6}
-                      clickable={isActive && actionPhase === 'browse'}
-                      onClick={() => handleItemClick(item.id)}
-                    />
-                    {/* Done checkmark */}
-                    {isDone && (
-                      <>
-                        <circle cx={68 + i * 80} cy={8} r={6} fill="#22c55e" />
-                        <text x={68 + i * 80} y={11} textAnchor="middle" fontSize={8} fill="white">✓</text>
-                      </>
-                    )}
-                  </g>
-                )
-              })}
-            </svg>
-
-            {/* Tooltip on hover (active items only) */}
-            <AnimatePresence>
-              {isActive && hoveredItem && (
-                <motion.div
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5
-                             text-[10px] text-slate-200 whitespace-nowrap z-30 shadow-lg"
+      {/* Popup overlay — appears above/near the furniture */}
+      <AnimatePresence>
+        {popupOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            className="absolute bottom-full left-0 mb-2 z-[20]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-slate-900/95 backdrop-blur-md border border-slate-600/80 rounded-xl shadow-2xl
+                            p-3 min-w-[260px] max-w-[320px]">
+              {/* Popup header */}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-slate-200">
+                  {furniture.emoji} {furniture.label}
+                </span>
+                <button
+                  onClick={handleClosePopup}
+                  className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded
+                             hover:bg-slate-700 transition-colors"
                 >
-                  {taskGroup.items.find(it => it.id === hoveredItem)?.description}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Hover detection layer — positioned over SVG items */}
-            {isActive && (
-              <div className="absolute" style={{ pointerEvents: 'none' }}>
-                {shuffled.map((item) => (
-                  <div
-                    key={`hover_${item.id}`}
-                    style={{ pointerEvents: 'auto', position: 'absolute' }}
-                    onMouseEnter={() => setHoveredItem(item.id)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                  />
-                ))}
+                  ✕
+                </button>
               </div>
-            )}
 
-            {/* Action confirmation */}
-            <AnimatePresence>
-              {isActive && actionPhase === 'confirm' && selectedTarget && (
-                <motion.div
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  className="flex gap-1.5"
-                >
-                  <button
-                    onClick={handleConfirmAction}
-                    className="px-2 py-1.5 bg-cooking-500 hover:bg-cooking-600
-                               text-white text-[10px] font-bold rounded-lg
-                               transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    {actionLabel}
-                  </button>
-                  <button
-                    onClick={handleCancelSelection}
-                    className="px-1.5 py-1.5 bg-slate-600 hover:bg-slate-500
-                               text-slate-200 text-[10px] rounded-lg
-                               transition-colors cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </motion.div>
+              {!hasActiveTask ? (
+                <p className="text-[10px] text-slate-500 text-center py-3">
+                  Nothing to select right now.
+                </p>
+              ) : (
+                <>
+                  {roomTaskGroups.map(taskGroup => {
+                    const isActive = taskGroup.taskId === activeTaskId
+                    if (!isActive) return null
+
+                    const itemGroup = ROOM_ITEMS[taskGroup.taskId]
+                    if (!itemGroup) return null
+
+                    const components: Array<{
+                      id: string
+                      type: 'target' | 'd1' | 'd2'
+                      info: TaskItemInfo
+                      Component: React.FC<RoomItemProps>
+                    }> = [
+                      { id: `${taskGroup.taskId}_target`, type: 'target', info: taskGroup.items[0], Component: itemGroup.target },
+                      { id: `${taskGroup.taskId}_d1`, type: 'd1', info: taskGroup.items[1], Component: itemGroup.d1 },
+                      { id: `${taskGroup.taskId}_d2`, type: 'd2', info: taskGroup.items[2], Component: itemGroup.d2 },
+                    ]
+
+                    const shuffled = deterministicShuffle(components, taskGroup.taskId)
+
+                    return (
+                      <div key={taskGroup.taskId}>
+                        <p className="text-[9px] text-slate-400 mb-1.5">
+                          Choose the correct item:
+                        </p>
+
+                        {/* Items displayed as cards in the popup */}
+                        <div className="flex gap-2 justify-center">
+                          {shuffled.map((item) => {
+                            const isSelected = selectedTarget === item.id
+                            const isDone = actionPhase === 'done' && isSelected
+
+                            return (
+                              <button
+                                key={item.id}
+                                onClick={() => handleItemClick(item.id)}
+                                disabled={actionPhase !== 'browse' && !isSelected}
+                                className={`relative flex flex-col items-center rounded-lg border-2 p-1.5
+                                  transition-all cursor-pointer ${
+                                    isDone
+                                      ? 'border-green-400 bg-green-900/30'
+                                      : isSelected
+                                        ? 'border-amber-400 bg-amber-900/30 scale-105'
+                                        : 'border-slate-600 bg-slate-800/60 hover:border-slate-400 hover:bg-slate-700/60'
+                                  }`}
+                              >
+                                <svg viewBox="0 0 60 70" className="w-[60px] h-[70px]">
+                                  <item.Component x={5} y={5} scale={0.85} clickable={false} />
+                                </svg>
+                                <span className="text-[8px] text-slate-300 mt-0.5 text-center leading-tight max-w-[70px]">
+                                  {item.info.label}
+                                </span>
+                                {isDone && (
+                                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-green-500 rounded-full
+                                                  flex items-center justify-center text-white text-[10px] font-bold">
+                                    ✓
+                                  </div>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        {/* Action confirmation */}
+                        <AnimatePresence>
+                          {actionPhase === 'confirm' && selectedTarget && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 5 }}
+                              className="flex gap-1.5 mt-2 justify-center"
+                            >
+                              <button
+                                onClick={handleConfirmAction}
+                                className="px-3 py-1.5 bg-cooking-500 hover:bg-cooking-600
+                                           text-white text-[10px] font-bold rounded-lg
+                                           transition-colors cursor-pointer whitespace-nowrap"
+                              >
+                                {actionLabel}
+                              </button>
+                              <button
+                                onClick={handleCancelSelection}
+                                className="px-2 py-1.5 bg-slate-600 hover:bg-slate-500
+                                           text-slate-200 text-[10px] rounded-lg
+                                           transition-colors cursor-pointer"
+                              >
+                                ✕ Cancel
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )
+                  })}
+                </>
               )}
-            </AnimatePresence>
-          </div>
-        )
-      })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Destination message after correct target selection */}
       <AnimatePresence>
@@ -396,9 +439,9 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-900/60
+            className="absolute bottom-full left-0 mb-1 flex items-center gap-2 px-3 py-1.5 bg-emerald-900/60
                        border border-emerald-500/40 rounded-lg text-emerald-200
-                       text-xs font-medium w-fit"
+                       text-xs font-medium w-fit whitespace-nowrap"
           >
             <span className="text-base">➡️</span>
             {destinationMsg}

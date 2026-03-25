@@ -1,4 +1,4 @@
-/** Living room — PM target items + visitors on sofa. */
+/** Living room — PM items via bookshelf popup + visitors on sofa. */
 
 import { useGameStore } from '../../../stores/gameStore'
 import PMTargetItems from '../PMTargetItems'
@@ -32,8 +32,8 @@ export default function LivingRoom({ isActive: _isActive }: { isActive: boolean 
         </div>
       )}
 
-      {/* PM targets positioned near bookshelf (right side) */}
-      <div className="absolute z-10" style={{ right: '3%', top: '30%', width: '30%' }}>
+      {/* PM furniture button positioned near the bookshelf (right side) */}
+      <div className="absolute z-10" style={{ right: '5%', top: '25%' }}>
         <PMTargetItems room="living_room" />
       </div>
     </div>

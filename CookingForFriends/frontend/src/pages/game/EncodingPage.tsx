@@ -391,228 +391,272 @@ export default function EncodingPage() {
   // ── Render: card + quiz ──
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col items-center justify-center p-6">
-      {/* Header */}
-      <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold text-slate-800">Block {blockNumber}</h1>
-        <p className="text-slate-600 mt-1">{dayStory}</p>
-        <p className="text-sm text-slate-400 mt-2">
+    <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col overflow-hidden">
+      {/* Compact Header */}
+      <div className="shrink-0 px-6 pt-4 pb-2 text-center">
+        <div className="flex items-center justify-center gap-3 mb-1">
+          <h1 className="text-xl font-bold text-slate-800">Block {blockNumber}</h1>
+          <span className="text-slate-400">·</span>
+          <p className="text-slate-600 text-sm">{dayStory}</p>
+        </div>
+        <p className="text-xs text-slate-400">
           Please remember the following tasks. You will need to do them during the game.
         </p>
+        {/* Progress dots */}
+        <div className="flex gap-2 justify-center mt-2">
+          {cards.map((_, i) => (
+            <div
+              key={i}
+              className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                i < currentCardIndex
+                  ? 'bg-green-400'
+                  : i === currentCardIndex
+                    ? 'bg-blue-500'
+                    : 'bg-slate-200'
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Progress dots */}
-      <div className="flex gap-2 mb-4">
-        {cards.map((_, i) => (
-          <div
-            key={i}
-            className={`w-3 h-3 rounded-full ${
-              i < currentCardIndex
-                ? 'bg-green-400'
-                : i === currentCardIndex
-                  ? 'bg-blue-500'
-                  : 'bg-slate-200'
-            }`}
-          />
-        ))}
-      </div>
-
-      {/* Card + Quiz area */}
+      {/* Card + Quiz area — fills remaining space */}
       {card && ec && (
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-              Task {currentCardIndex + 1} of {cards.length}
-            </span>
-            {highlightSection && (
-              <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                ⚠ Pay attention to the highlighted section
+        <div className="flex-1 min-h-0 px-6 pb-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl mx-auto h-full flex flex-col p-5">
+            {/* Top bar */}
+            <div className="flex items-center justify-between mb-3 shrink-0">
+              <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                Task {currentCardIndex + 1} of {cards.length}
               </span>
-            )}
-          </div>
+              {highlightSection && (
+                <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                  ⚠ Pay attention to the highlighted section
+                </span>
+              )}
+            </div>
 
-          {!quizMode ? (
-            <>
-              {/* Target illustration */}
-              {ec && (
-                <div className="flex justify-center mb-1">
+            {!quizMode ? (
+              /* ── Two-column encoding card layout ── */
+              <div className="flex-1 min-h-0 flex gap-6">
+                {/* LEFT column: text content */}
+                <div className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-2">
+                  {/* Encoding story — structured with color breaks */}
+                  <EncodingStoryBlock text={ec.encoding_text} />
+
+                  {/* Info boxes — compact grid */}
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    {/* Trigger */}
+                    <div
+                      className={`rounded-lg p-3 border transition-all ${
+                        highlightSection === 'trigger'
+                          ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-300'
+                          : 'bg-amber-50 border-amber-200'
+                      }`}
+                    >
+                      <p className="text-xs font-medium text-amber-800 mb-0.5">🔔 When this happens:</p>
+                      <p className="text-sm text-amber-900 font-semibold">{ec.trigger_description}</p>
+                    </div>
+
+                    {/* Target room */}
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-xs font-medium text-green-800 mb-0.5">📍 Go to:</p>
+                      <p className="text-sm text-green-900 font-semibold">{ec.target_room}</p>
+                    </div>
+
+                    {/* Target item + visual cues */}
+                    <div
+                      className={`rounded-lg p-3 border transition-all ${
+                        highlightSection === 'target'
+                          ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-300'
+                          : 'bg-purple-50 border-purple-200'
+                      }`}
+                    >
+                      <p className="text-xs font-medium text-purple-800 mb-0.5">🔍 Find this item:</p>
+                      <p className="text-sm text-purple-900 font-semibold">{ec.target_description}</p>
+                      {ec.visual_cues?.cue && (
+                        <p className="mt-1 text-xs font-medium text-purple-700 bg-purple-100 px-2 py-1 rounded inline-block">
+                          👁 <span className="font-bold">{ec.visual_cues.cue}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Action */}
+                    <div
+                      className={`rounded-lg p-3 border transition-all ${
+                        highlightSection === 'action'
+                          ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-300'
+                          : 'bg-blue-50 border-blue-200'
+                      }`}
+                    >
+                      <p className="text-xs font-medium text-blue-800 mb-0.5">✋ Do this:</p>
+                      <p className="text-sm text-blue-900 font-semibold">{ec.action_description}</p>
+                    </div>
+                  </div>
+
+                  {/* Read timer / proceed button */}
+                  <button
+                    onClick={reShowCard ? handleReReadDone : handleMemorized}
+                    disabled={readCountdown > 0}
+                    className={`w-full py-2.5 font-bold rounded-xl transition-colors mt-3 shrink-0 ${
+                      readCountdown > 0
+                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    }`}
+                  >
+                    {readCountdown > 0
+                      ? `Read carefully... (${readCountdown}s)`
+                      : reShowCard
+                        ? "I've reviewed it — Test me again"
+                        : "I've memorized this ✓"}
+                  </button>
+                </div>
+
+                {/* RIGHT column: icon centered */}
+                <div className="w-[40%] shrink-0 flex flex-col items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
                   <img
                     src={`/assets/encoding/${card.task_config.task_id}.svg`}
                     alt="Target item"
                     className={reShowCard
-                      ? 'w-[160px] h-[190px] object-contain rounded-lg mx-auto opacity-90'
-                      : 'w-[240px] h-[280px] object-contain rounded-xl shadow-md'
+                      ? 'max-w-[200px] max-h-[240px] object-contain rounded-lg opacity-90'
+                      : 'max-w-[280px] max-h-[340px] object-contain rounded-xl shadow-md'
                     }
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
-                </div>
-              )}
-
-              {/* Encoding story paragraph */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                <p className="text-slate-700 leading-relaxed text-[15px] text-left">
-                  {ec.encoding_text}
-                </p>
-              </div>
-
-              {/* Info boxes */}
-              <div className="space-y-3">
-                {/* Trigger */}
-                <div
-                  className={`rounded-xl p-4 border transition-all ${
-                    highlightSection === 'trigger'
-                      ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-300'
-                      : 'bg-amber-50 border-amber-200'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-amber-800 mb-1">🔔 When this happens:</p>
-                  <p className="text-amber-900 font-semibold">{ec.trigger_description}</p>
-                </div>
-
-                {/* Target room */}
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                  <p className="text-sm font-medium text-green-800 mb-1">📍 Go to:</p>
-                  <p className="text-green-900 font-semibold">{ec.target_room}</p>
-                </div>
-
-                {/* Target item + visual cues */}
-                <div
-                  className={`rounded-xl p-4 border transition-all ${
-                    highlightSection === 'target'
-                      ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-300'
-                      : 'bg-purple-50 border-purple-200'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-purple-800 mb-1">🔍 Find this item:</p>
-                  <p className="text-purple-900 font-semibold">{ec.target_description}</p>
-                  {ec.visual_cues?.cue && (
-                    <p className="mt-2 text-sm font-medium text-purple-700 bg-purple-100 px-3 py-1.5 rounded-lg inline-block">
-                      👁 Look for: <span className="font-bold">{ec.visual_cues.cue}</span>
-                    </p>
-                  )}
-                </div>
-
-                {/* Action */}
-                <div
-                  className={`rounded-xl p-4 border transition-all ${
-                    highlightSection === 'action'
-                      ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-300'
-                      : 'bg-blue-50 border-blue-200'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-blue-800 mb-1">✋ Do this:</p>
-                  <p className="text-blue-900 font-semibold">{ec.action_description}</p>
+                  <p className="text-xs text-slate-400 mt-3 text-center px-4">
+                    Remember what this item looks like — you'll need to find it!
+                  </p>
                 </div>
               </div>
+            ) : (
+              /* ── Quiz mode (centered, narrower) ── */
+              <div className="flex-1 flex items-center justify-center">
+                {(() => {
+                  const qData = getQuestionData(currentQuestionIndex)
+                  const qType = QUESTION_TYPES[currentQuestionIndex]
 
-              {/* Read timer / proceed button */}
-              <button
-                onClick={reShowCard ? handleReReadDone : handleMemorized}
-                disabled={readCountdown > 0}
-                className={`w-full py-3 font-bold rounded-xl transition-colors ${
-                  readCountdown > 0
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    : 'bg-blue-500 hover:bg-blue-600 text-white'
-                }`}
-              >
-                {readCountdown > 0
-                  ? `Read carefully... (${readCountdown}s)`
-                  : reShowCard
-                    ? "I've reviewed it — Test me again"
-                    : "I've memorized this ✓"}
-              </button>
-            </>
-          ) : (
-            <>
-              {/* Multi-question quiz */}
-              {(() => {
-                const qData = getQuestionData(currentQuestionIndex)
-                const qType = QUESTION_TYPES[currentQuestionIndex]
+                  return (
+                    <div className="space-y-4 w-full max-w-lg">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-slate-800">Quick Check</h3>
+                        <span className="text-xs text-slate-400">
+                          Question {currentQuestionIndex + 1} of 3
+                        </span>
+                      </div>
 
-                return (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-slate-800">Quick Check</h3>
-                      <span className="text-xs text-slate-400">
-                        Question {currentQuestionIndex + 1} of 3
-                      </span>
-                    </div>
-
-                    {/* Question type badge */}
-                    <span
-                      className={`text-xs font-medium px-2 py-1 rounded-full inline-block ${
-                        qType === 'trigger'
-                          ? 'bg-amber-50 text-amber-700'
-                          : qType === 'target'
-                            ? 'bg-purple-50 text-purple-700'
-                            : 'bg-blue-50 text-blue-700'
-                      }`}
-                    >
-                      {qType === 'trigger'
-                        ? '🔔 Trigger'
-                        : qType === 'target'
-                          ? '🔍 Target'
-                          : '✋ Action'}
-                    </span>
-
-                    <p className="text-slate-600 font-medium">{qData.question}</p>
-
-                    <div className="space-y-2">
-                      {qData.options.map((opt, idx) => {
-                        const isSelected = selected === opt
-                        const showWrong = feedback === 'wrong' && isSelected
-                        const showCorrect = feedback === 'correct' && isSelected
-
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => handleSelectOption(opt)}
-                            disabled={!!feedback}
-                            className={`w-full text-left px-4 py-3 rounded-xl border transition-all
-                              ${
-                                showCorrect
-                                  ? 'bg-green-100 border-green-400 text-green-800'
-                                  : showWrong
-                                    ? 'bg-red-100 border-red-400 text-red-800'
-                                    : isSelected
-                                      ? 'bg-blue-100 border-blue-400 text-blue-800'
-                                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                              }
-                              ${feedback ? 'cursor-default' : 'cursor-pointer'}
-                            `}
-                          >
-                            {opt}
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    {feedback === 'wrong' && (
-                      <p className="text-red-600 text-sm font-medium">
-                        ✗ Incorrect. Let's review the task card again.
-                      </p>
-                    )}
-                    {feedback === 'correct' && (
-                      <p className="text-green-600 text-sm font-medium">✓ Correct!</p>
-                    )}
-
-                    {!feedback && (
-                      <button
-                        onClick={handleConfirmAnswer}
-                        disabled={!selected}
-                        className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-200
-                                   text-white font-bold rounded-xl transition-colors"
+                      <span
+                        className={`text-xs font-medium px-2 py-1 rounded-full inline-block ${
+                          qType === 'trigger'
+                            ? 'bg-amber-50 text-amber-700'
+                            : qType === 'target'
+                              ? 'bg-purple-50 text-purple-700'
+                              : 'bg-blue-50 text-blue-700'
+                        }`}
                       >
-                        Confirm
-                      </button>
-                    )}
-                  </div>
-                )
-              })()}
-            </>
-          )}
+                        {qType === 'trigger'
+                          ? '🔔 Trigger'
+                          : qType === 'target'
+                            ? '🔍 Target'
+                            : '✋ Action'}
+                      </span>
+
+                      <p className="text-slate-600 font-medium">{qData.question}</p>
+
+                      <div className="space-y-2">
+                        {qData.options.map((opt, idx) => {
+                          const isSelected = selected === opt
+                          const showWrong = feedback === 'wrong' && isSelected
+                          const showCorrect = feedback === 'correct' && isSelected
+
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => handleSelectOption(opt)}
+                              disabled={!!feedback}
+                              className={`w-full text-left px-4 py-3 rounded-xl border transition-all
+                                ${
+                                  showCorrect
+                                    ? 'bg-green-100 border-green-400 text-green-800'
+                                    : showWrong
+                                      ? 'bg-red-100 border-red-400 text-red-800'
+                                      : isSelected
+                                        ? 'bg-blue-100 border-blue-400 text-blue-800'
+                                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                                }
+                                ${feedback ? 'cursor-default' : 'cursor-pointer'}
+                              `}
+                            >
+                              {opt}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {feedback === 'wrong' && (
+                        <p className="text-red-600 text-sm font-medium">
+                          ✗ Incorrect. Let's review the task card again.
+                        </p>
+                      )}
+                      {feedback === 'correct' && (
+                        <p className="text-green-600 text-sm font-medium">✓ Correct!</p>
+                      )}
+
+                      {!feedback && (
+                        <button
+                          onClick={handleConfirmAnswer}
+                          disabled={!selected}
+                          className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-200
+                                     text-white font-bold rounded-xl transition-colors"
+                        >
+                          Confirm
+                        </button>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+          </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Renders encoding text as structured, color-coded segments instead of a wall of gray text. */
+function EncodingStoryBlock({ text }: { text: string }) {
+  // Split text into sentences for visual breaks
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text]
+
+  // Color cycle for alternating sentence groups
+  const styles = [
+    { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-900', accent: 'border-l-indigo-400' },
+    { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-900', accent: 'border-l-teal-400' },
+    { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-900', accent: 'border-l-rose-400' },
+    { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-900', accent: 'border-l-amber-400' },
+  ]
+
+  // Group into pairs of sentences for visual rhythm
+  const groups: string[][] = []
+  for (let i = 0; i < sentences.length; i += 2) {
+    groups.push(sentences.slice(i, i + 2))
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">📖 Story</p>
+      {groups.map((group, i) => {
+        const s = styles[i % styles.length]
+        return (
+          <div
+            key={i}
+            className={`${s.bg} ${s.border} ${s.accent} border border-l-4 rounded-lg px-3 py-2`}
+          >
+            <p className={`${s.text} text-[13px] leading-relaxed`}>
+              {group.join('').trim()}
+            </p>
+          </div>
+        )
+      })}
     </div>
   )
 }
