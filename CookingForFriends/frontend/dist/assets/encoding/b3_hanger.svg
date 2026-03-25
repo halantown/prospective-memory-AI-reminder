@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 320" width="280" height="320">
+  <rect width="280" height="320" rx="12" fill="#F8F7F4"/>
+  
+  <!-- Hook -->
+  <path d="M140,40 Q140,55 148,60 Q156,65 156,75" fill="none" stroke="#95A5A6" stroke-width="2.5" stroke-linecap="round"/>
+  
+  <!-- Hanger body - wide shoulders with curve -->
+  <path d="M56,130 Q60,90 140,78 Q220,90 224,130" fill="none" stroke="#C19A6B" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Wood grain on hanger -->
+  <path d="M70,110 Q140,95 210,110" fill="none" stroke="#B8860B" stroke-width="0.5" opacity="0.25"/>
+  <path d="M65,118 Q140,103 215,118" fill="none" stroke="#B8860B" stroke-width="0.5" opacity="0.2"/>
+  
+  <!-- Wide shoulder indicators -->
+  <line x1="56" y1="140" x2="100" y2="140" stroke="#BDC3C7" stroke-width="0.8"/>
+  <line x1="56" y1="137" x2="56" y2="143" stroke="#BDC3C7" stroke-width="0.8"/>
+  <line x1="100" y1="137" x2="100" y2="143" stroke="#BDC3C7" stroke-width="0.8"/>
+  <text x="78" y="155" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="8" fill="#95A5A6">WIDE</text>
+  
+  <!-- Trouser bar -->
+  <line x1="85" y1="175" x2="195" y2="175" stroke="#C19A6B" stroke-width="4" stroke-linecap="round"/>
+  <!-- Bar wood grain -->
+  <line x1="90" y1="174" x2="190" y2="174" stroke="#B8860B" stroke-width="0.3" opacity="0.3"/>
+  
+  <!-- Bar callout -->
+  <line x1="197" y1="175" x2="225" y2="185" stroke="#BDC3C7" stroke-width="0.8"/>
+  <text x="228" y="185" font-family="Helvetica, Arial, sans-serif" font-size="9" fill="#95A5A6">with bar ✓</text>
+  
+  <!-- Material label -->
+  <text x="140" y="205" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#95A5A6" font-weight="500" letter-spacing="1">WOODEN</text>
+  
+  <!-- Label -->
+  <text x="140" y="252" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#2C3E50" font-weight="600">Wide shoulders — With bar</text>
+  <text x="140" y="272" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#7F8C8D">Wooden hanger · Closet left side</text>
+  <text x="140" y="292" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#BDC3C7">Study</text>
+</svg>

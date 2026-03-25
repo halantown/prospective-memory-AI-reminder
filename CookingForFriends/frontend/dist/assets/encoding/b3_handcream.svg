@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 320" width="280" height="320">
+  <rect width="280" height="320" rx="12" fill="#F8F7F4"/>
+  
+  <!-- Tube body (lying at slight angle) -->
+  <g transform="rotate(-8 140 130)">
+    <!-- Main tube -->
+    <rect x="75" y="95" width="150" height="55" rx="18" fill="#FDFEFE" stroke="#D5D8DC" stroke-width="0.8"/>
+    
+    <!-- Cap -->
+    <rect x="215" y="103" width="28" height="39" rx="8" fill="#E8E8E8" stroke="#D5D8DC" stroke-width="0.5"/>
+    <line x1="230" y1="108" x2="230" y2="137" stroke="#BDC3C7" stroke-width="0.5"/>
+    
+    <!-- Crimped end -->
+    <rect x="68" y="108" width="14" height="29" rx="2" fill="#E8E8E8" stroke="#D5D8DC" stroke-width="0.5"/>
+    <line x1="72" y1="115" x2="78" y2="115" stroke="#BDC3C7" stroke-width="0.4"/>
+    <line x1="72" y1="119" x2="78" y2="119" stroke="#BDC3C7" stroke-width="0.4"/>
+    <line x1="72" y1="123" x2="78" y2="123" stroke="#BDC3C7" stroke-width="0.4"/>
+    
+    <!-- Lavender label area -->
+    <rect x="100" y="103" width="100" height="39" rx="4" fill="#E8DAEF" stroke="#D2B4DE" stroke-width="0.5"/>
+    
+    <!-- Small lavender sprigs -->
+    <line x1="125" y1="135" x2="125" y2="112" stroke="#27AE60" stroke-width="1" stroke-linecap="round"/>
+    <ellipse cx="125" cy="114" rx="3" ry="2" fill="#8E44AD"/>
+    <ellipse cx="123" cy="118" rx="3" ry="2" fill="#9B59B6"/>
+    <ellipse cx="127" cy="118" rx="3" ry="2" fill="#9B59B6"/>
+    <ellipse cx="122" cy="122" rx="2.5" ry="2" fill="#AF7AC5"/>
+    <ellipse cx="128" cy="122" rx="2.5" ry="2" fill="#AF7AC5"/>
+    
+    <!-- Label text -->
+    <text x="160" y="119" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="7" fill="#6C3483" font-weight="600" letter-spacing="0.5">LAVENDER</text>
+    <text x="160" y="131" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="6" fill="#8E44AD">Hand Cream</text>
+  </g>
+  
+  <!-- Tube color indicator -->
+  <text x="140" y="55" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#95A5A6" font-weight="500" letter-spacing="1">WHITE TUBE</text>
+  
+  <!-- Label -->
+  <text x="140" y="222" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#2C3E50" font-weight="600">White tube — Lavender label</text>
+  <text x="140" y="242" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#7F8C8D">Hand cream · Shelf above sink</text>
+  <text x="140" y="262" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#BDC3C7">Bathroom</text>
+</svg>
