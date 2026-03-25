@@ -433,6 +433,21 @@ export default function EncodingPage() {
 
           {!quizMode ? (
             <>
+              {/* Target illustration */}
+              {ec && (
+                <div className="flex justify-center mb-1">
+                  <img
+                    src={`/assets/encoding/${card.task_config.task_id}.svg`}
+                    alt="Target item"
+                    className={reShowCard
+                      ? 'w-[160px] h-[190px] object-contain rounded-lg mx-auto opacity-90'
+                      : 'w-[240px] h-[280px] object-contain rounded-xl shadow-md'
+                    }
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  />
+                </div>
+              )}
+
               {/* Encoding story paragraph */}
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                 <p className="text-slate-700 leading-relaxed text-[15px] text-left">
