@@ -1,0 +1,423 @@
+{
+  "block": 1,
+  "messages": [
+    {
+      "id": "msg_001",
+      "t": 30,
+      "sender": "Alice",
+      "avatar": "A",
+      "text": "Can't wait for dinner tonight! Should I bring anything?",
+      "type": "social",
+      "replies": [
+        {"id": "r1", "text": "Just yourself!", "correct": true},
+        {"id": "r2", "text": "Some dessert would be great", "correct": true},
+        {"id": "r3", "text": "Bring extra chairs, we're short", "correct": true}
+      ]
+    },
+    {
+      "id": "msg_002",
+      "t": 50,
+      "sender": "Emma",
+      "avatar": "E",
+      "text": "I bought 3 bottles of wine. You said you have 2 already, right? So how many do we have total?",
+      "type": "arithmetic",
+      "replies": [
+        {"id": "r1", "text": "4 bottles", "correct": false},
+        {"id": "r2", "text": "5 bottles", "correct": true},
+        {"id": "r3", "text": "6 bottles", "correct": false}
+      ]
+    },
+    {
+      "id": "ad_001",
+      "t": 70,
+      "sender": "🍕 PizzaHut",
+      "avatar": "🍕",
+      "text": "50% off all large pizzas tonight! Order now!",
+      "type": "ad",
+      "replies": null
+    },
+    {
+      "id": "msg_003",
+      "t": 90,
+      "sender": "Tom",
+      "avatar": "T",
+      "text": "Should I put the white wine in the fridge or leave it on the counter?",
+      "type": "commonsense",
+      "replies": [
+        {"id": "r1", "text": "Fridge, serve it cold", "correct": true},
+        {"id": "r2", "text": "Counter is fine", "correct": false},
+        {"id": "r3", "text": "Doesn't matter", "correct": false}
+      ]
+    },
+    {
+      "id": "msg_004",
+      "t": 110,
+      "sender": "Jake",
+      "avatar": "J",
+      "text": "There's 6 of us tonight. If each pie serves 4 people, how many pies should I grab?",
+      "type": "arithmetic",
+      "replies": [
+        {"id": "r1", "text": "1 pie", "correct": false},
+        {"id": "r2", "text": "2 pies", "correct": true},
+        {"id": "r3", "text": "3 pies", "correct": false}
+      ]
+    },
+    {
+      "id": "msg_005",
+      "t": 125,
+      "sender": "Alice",
+      "avatar": "A",
+      "text": "I'm bringing 8 cupcakes for 6 people. Will everyone get at least one?",
+      "type": "arithmetic",
+      "replies": [
+        {"id": "r1", "text": "Yes, with some left over", "correct": true},
+        {"id": "r2", "text": "No, not enough", "correct": false},
+        {"id": "r3", "text": "Exactly enough", "correct": false}
+      ]
+    },
+    {
+      "id": "ad_002",
+      "t": 140,
+      "sender": "📰 DailyNews",
+      "avatar": "📰",
+      "text": "Breaking: New restaurant opens downtown with 5-star reviews!",
+      "type": "ad",
+      "replies": null
+    },
+    {
+      "id": "msg_006",
+      "t": 155,
+      "sender": "Emma",
+      "avatar": "E",
+      "text": "Can I microwave the chocolate cake to warm it up, or will that ruin it?",
+      "type": "commonsense",
+      "replies": [
+        {"id": "r1", "text": "10 seconds is fine", "correct": true},
+        {"id": "r2", "text": "Never microwave cake", "correct": false},
+        {"id": "r3", "text": "5 minutes should do it", "correct": false}
+      ]
+    },
+    {
+      "id": "msg_007",
+      "t": 170,
+      "sender": "Jake",
+      "avatar": "J",
+      "text": "Is it okay if I bring my girlfriend? She's really nice!",
+      "type": "social",
+      "replies": [
+        {"id": "r1", "text": "Of course, the more the merrier!", "correct": true},
+        {"id": "r2", "text": "Maybe next time?", "correct": true},
+        {"id": "r3", "text": "Sure, but we might need more food", "correct": true}
+      ]
+    },
+    {
+      "id": "msg_008",
+      "t": 190,
+      "sender": "Tom",
+      "avatar": "T",
+      "text": "I have 4 steaks and each person eats half a steak. How many people can that feed?",
+      "type": "arithmetic",
+      "replies": [
+        {"id": "r1", "text": "6 people", "correct": false},
+        {"id": "r2", "text": "8 people", "correct": true},
+        {"id": "r3", "text": "4 people", "correct": false}
+      ]
+    },
+    {
+      "id": "ad_003",
+      "t": 205,
+      "sender": "🛒 FreshMart",
+      "avatar": "🛒",
+      "text": "Weekend special: Buy 2 get 1 free on all organic veggies!",
+      "type": "ad",
+      "replies": null
+    },
+    {
+      "id": "msg_009",
+      "t": 220,
+      "sender": "Alice",
+      "avatar": "A",
+      "text": "Should we eat the salad before or after the main course?",
+      "type": "commonsense",
+      "replies": [
+        {"id": "r1", "text": "Before, as a starter", "correct": true},
+        {"id": "r2", "text": "After, as a palate cleanser", "correct": false},
+        {"id": "r3", "text": "Doesn't matter at all", "correct": false}
+      ]
+    },
+    {
+      "id": "pm_trigger_001",
+      "t": 240,
+      "sender": "Bob",
+      "avatar": "B",
+      "text": "Hey! I just parked the car, coming up now!",
+      "type": "pm_trigger",
+      "trigger_id": "pm_b1_t1",
+      "replies": null
+    },
+    {
+      "id": "msg_010",
+      "t": 260,
+      "sender": "Emma",
+      "avatar": "E",
+      "text": "Do you think we need to set out butter knives too, or just regular ones?",
+      "type": "commonsense",
+      "replies": [
+        {"id": "r1", "text": "Just regular knives", "correct": false},
+        {"id": "r2", "text": "Both, for the bread", "correct": true},
+        {"id": "r3", "text": "No knives needed", "correct": false}
+      ]
+    },
+    {
+      "id": "msg_011",
+      "t": 280,
+      "sender": "Jake",
+      "avatar": "J",
+      "text": "I grabbed 2 bags of chips. Each bag has about 10 servings. Is that enough for 6 of us?",
+      "type": "arithmetic",
+      "replies": [
+        {"id": "r1", "text": "Yes, way more than enough", "correct": true},
+        {"id": "r2", "text": "No, get another bag", "correct": false},
+        {"id": "r3", "text": "Barely enough", "correct": false}
+      ]
+    },
+    {
+      "id": "chat_001",
+      "t": 295,
+      "sender": "Tom",
+      "avatar": "T",
+      "text": "Just left the house, traffic looks okay. See you soon! 🚗",
+      "type": "chat",
+      "replies": null
+    },
+    {
+      "id": "msg_012",
+      "t": 310,
+      "sender": "Alice",
+      "avatar": "A",
+      "text": "Is sparkling water better served room temp or chilled?",
+      "type": "commonsense",
+      "replies": [
+        {"id": "r1", "text": "Chilled, definitely", "correct": true},
+        {"id": "r2", "text": "Room temperature", "correct": false},
+        {"id": "r3", "text": "Warm it up slightly", "correct": false}
+      ]
+    },
+    {
+      "id": "ad_004",
+      "t": 325,
+      "sender": "🎵 Spotify",
+      "avatar": "🎵",
+      "text": "Create the perfect dinner playlist! Try Premium free for 30 days.",
+      "type": "ad",
+      "replies": null
+    },
+    {
+      "id": "msg_013",
+      "t": 340,
+      "sender": "Emma",
+      "avatar": "E",
+      "text": "If dinner starts at 7 and it takes 45 minutes to cook, when should we start?",
+      "type": "arithmetic",
+      "replies": [
+        {"id": "r1", "text": "6:00", "correct": false},
+        {"id": "r2", "text": "6:15", "correct": true},
+        {"id": "r3", "text": "6:30", "correct": false}
+      ]
+    },
+    {
+      "id": "msg_014",
+      "t": 360,
+      "sender": "Tom",
+      "avatar": "T",
+      "text": "Red or white wine with steak?",
+      "type": "commonsense",
+      "replies": [
+        {"id": "r1", "text": "Red wine pairs best", "correct": true},
+        {"id": "r2", "text": "White wine is better", "correct": false},
+        {"id": "r3", "text": "Beer is the only option", "correct": false}
+      ]
+    },
+    {
+      "id": "msg_015",
+      "t": 375,
+      "sender": "Jake",
+      "avatar": "J",
+      "text": "Any dietary restrictions I should know about? I'm picking up dessert.",
+      "type": "social",
+      "replies": [
+        {"id": "r1", "text": "Nope, anything goes!", "correct": true},
+        {"id": "r2", "text": "Alice is vegetarian", "correct": true},
+        {"id": "r3", "text": "Just no nuts please", "correct": true}
+      ]
+    },
+    {
+      "id": "ad_005",
+      "t": 390,
+      "sender": "📱 AppStore",
+      "avatar": "📱",
+      "text": "Kitchen Timer Pro — Never burn dinner again! Download now.",
+      "type": "ad",
+      "replies": null
+    },
+    {
+      "id": "msg_016",
+      "t": 405,
+      "sender": "Alice",
+      "avatar": "A",
+      "text": "I have 12 napkins. If each person needs 2, is that enough for 6 of us?",
+      "type": "arithmetic",
+      "replies": [
+        {"id": "r1", "text": "Yes, exactly enough", "correct": true},
+        {"id": "r2", "text": "No, we need more", "correct": false},
+        {"id": "r3", "text": "Way too many", "correct": false}
+      ]
+    },
+    {
+      "id": "msg_017",
+      "t": 420,
+      "sender": "Emma",
+      "avatar": "E",
+      "text": "Should I leave the steak out to rest after cooking, or serve it right away?",
+      "type": "commonsense",
+      "replies": [
+        {"id": "r1", "text": "Let it rest 5 minutes", "correct": true},
+        {"id": "r2", "text": "Serve immediately", "correct": false},
+        {"id": "r3", "text": "Put it back in the pan", "correct": false}
+      ]
+    },
+    {
+      "id": "chat_002",
+      "t": 435,
+      "sender": "Jake",
+      "avatar": "J",
+      "text": "Almost there! Can already smell something cooking from the parking lot 😄",
+      "type": "chat",
+      "replies": null
+    },
+    {
+      "id": "msg_018",
+      "t": 450,
+      "sender": "Tom",
+      "avatar": "T",
+      "text": "The recipe says 200°C. Is that about 400°F?",
+      "type": "arithmetic",
+      "replies": [
+        {"id": "r1", "text": "Yes, roughly 400°F", "correct": true},
+        {"id": "r2", "text": "No, it's about 300°F", "correct": false},
+        {"id": "r3", "text": "No, it's about 500°F", "correct": false}
+      ]
+    },
+    {
+      "id": "ad_006",
+      "t": 465,
+      "sender": "🍷 WineClub",
+      "avatar": "🍷",
+      "text": "Join our monthly wine subscription! First box 50% off.",
+      "type": "ad",
+      "replies": null
+    },
+    {
+      "id": "msg_019",
+      "t": 480,
+      "sender": "Alice",
+      "avatar": "A",
+      "text": "Should we use the fancy china or the everyday plates?",
+      "type": "social",
+      "replies": [
+        {"id": "r1", "text": "Fancy china, it's a special night!", "correct": true},
+        {"id": "r2", "text": "Everyday plates are fine", "correct": true},
+        {"id": "r3", "text": "Paper plates to save washing up", "correct": true}
+      ]
+    },
+    {
+      "id": "msg_020",
+      "t": 495,
+      "sender": "Emma",
+      "avatar": "E",
+      "text": "If the roast takes 20 min per pound and it's 3 pounds, how long total?",
+      "type": "arithmetic",
+      "replies": [
+        {"id": "r1", "text": "40 minutes", "correct": false},
+        {"id": "r2", "text": "60 minutes", "correct": true},
+        {"id": "r3", "text": "80 minutes", "correct": false}
+      ]
+    },
+    {
+      "id": "chat_003",
+      "t": 510,
+      "sender": "Alice",
+      "avatar": "A",
+      "text": "Yay, just saw Tom pull up! This is going to be so fun! 🎉",
+      "type": "chat",
+      "replies": null
+    },
+    {
+      "id": "msg_021",
+      "t": 525,
+      "sender": "Tom",
+      "avatar": "T",
+      "text": "Can you put raw meat next to cooked food on the same cutting board?",
+      "type": "commonsense",
+      "replies": [
+        {"id": "r1", "text": "No, use separate boards", "correct": true},
+        {"id": "r2", "text": "Sure, it's fine", "correct": false},
+        {"id": "r3", "text": "Only if you rinse it first", "correct": false}
+      ]
+    },
+    {
+      "id": "pm_trigger_002",
+      "t": 540,
+      "sender": "Jake",
+      "avatar": "J",
+      "text": "Hey, I can hear your washing machine beeping from outside! Everything ok?",
+      "type": "pm_trigger",
+      "trigger_id": "pm_b1_t3",
+      "replies": null
+    },
+    {
+      "id": "msg_022",
+      "t": 555,
+      "sender": "Emma",
+      "avatar": "E",
+      "text": "What's the best way to tell if the steak is medium-rare? Touch test or thermometer?",
+      "type": "commonsense",
+      "replies": [
+        {"id": "r1", "text": "Thermometer, 57°C", "correct": true},
+        {"id": "r2", "text": "Just cut it open", "correct": false},
+        {"id": "r3", "text": "Cook it until it stops bleeding", "correct": false}
+      ]
+    },
+    {
+      "id": "ad_007",
+      "t": 570,
+      "sender": "🏠 HomeChef",
+      "avatar": "🏠",
+      "text": "Get restaurant-quality meal kits delivered! Use code DINNER20.",
+      "type": "ad",
+      "replies": null
+    },
+    {
+      "id": "msg_023",
+      "t": 580,
+      "sender": "Jake",
+      "avatar": "J",
+      "text": "Should I take my shoes off at the door or is it okay to keep them on?",
+      "type": "social",
+      "replies": [
+        {"id": "r1", "text": "Shoes off please!", "correct": true},
+        {"id": "r2", "text": "Keep them on, no worries", "correct": true},
+        {"id": "r3", "text": "Up to you!", "correct": true}
+      ]
+    },
+    {
+      "id": "chat_004",
+      "t": 592,
+      "sender": "Tom",
+      "avatar": "T",
+      "text": "What a feast! This looks absolutely amazing. Thanks for hosting! 🍽️",
+      "type": "chat",
+      "replies": null
+    }
+  ]
+}
