@@ -61,6 +61,17 @@ class QuizSubmitRequest(BaseModel):
     answers: list[QuizAnswerItem]
 
 
+class EncodingQuizAttemptRequest(BaseModel):
+    """Single quiz attempt during encoding — sent per question."""
+    trial_number: int
+    question_type: str  # "trigger" | "target" | "action"
+    attempt_number: int
+    selected_answer: str
+    correct_answer: str
+    is_correct: bool
+    response_time_ms: Optional[int] = None
+
+
 class QuizResultItem(BaseModel):
     trial_number: int
     question_type: str

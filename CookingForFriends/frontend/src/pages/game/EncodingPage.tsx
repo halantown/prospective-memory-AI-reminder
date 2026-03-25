@@ -184,8 +184,8 @@ export default function EncodingPage() {
         correct_answer: correctAnswer,
         is_correct: isCorrect,
         response_time_ms: responseTimeMs,
-      }).catch(() => {
-        // Non-critical — endpoint may not exist yet
+      }).catch((err: unknown) => {
+        console.warn('[Encoding] Quiz attempt logging failed:', err instanceof Error ? err.message : err)
       })
     },
     [sessionId, blockNumber, card],

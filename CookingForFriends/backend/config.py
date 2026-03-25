@@ -9,8 +9,8 @@ DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data")))
 DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "experiment.db")))
 
 # Server
-HOST = "0.0.0.0"
-PORT = 5000
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = int(os.getenv("PORT", "5000"))
 
 # Session tokens
 TOKEN_LENGTH = 6
@@ -38,10 +38,9 @@ SNAPSHOT_INTERVAL_S = 15
 HEARTBEAT_INTERVAL_S = 10
 HEARTBEAT_TIMEOUT_S = 30
 
-# Development seed — set to None to disable
-# This participant is auto-created/reset on every startup; it always works.
-# Remove or set to None before production deployment.
-DEV_TOKEN: str | None = os.getenv("DEV_TOKEN", "ABC123")
+# Development seed — set DEV_TOKEN env var to enable dev participant.
+# When set, a dev participant is auto-created/reset on every startup.
+DEV_TOKEN: str | None = os.getenv("DEV_TOKEN", None)
 
 # Latin Square — 3 conditions, 6 possible orderings (3×3 Latin Square)
 LATIN_SQUARE = {

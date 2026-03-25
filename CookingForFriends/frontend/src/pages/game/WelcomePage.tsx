@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { startSession, getSessionStatus } from '../../services/api'
+import type { Condition } from '../../types'
 
 export default function WelcomePage() {
   const [token, setToken] = useState('')
@@ -31,7 +32,7 @@ export default function WelcomePage() {
         session_id: data.session_id,
         participant_id: data.participant_id,
         group: data.group,
-        condition_order: data.condition_order as any,
+        condition_order: data.condition_order as Condition[],
         current_block: data.current_block,
       })
       // Persist session for page refresh recovery
@@ -59,9 +60,9 @@ export default function WelcomePage() {
       } catch {
         setPhase('encoding')
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Welcome] Failed:', err)
-      setError(err.message || 'Failed to start session')
+      setError(err instanceof Error ? err.message : 'Failed to start session')
     } finally {
       setLoading(false)
     }

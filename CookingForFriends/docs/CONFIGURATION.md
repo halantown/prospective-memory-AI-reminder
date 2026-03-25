@@ -16,10 +16,10 @@
 
 ### Server
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `HOST` | `0.0.0.0` | Server bind address |
-| `PORT` | `5000` | Server port |
+| Constant | Default | Env Var | Description |
+|----------|---------|---------|-------------|
+| `HOST` | `0.0.0.0` | `HOST` | Server bind address |
+| `PORT` | `5000` | `PORT` | Server port |
 
 ### Session & Tokens
 
@@ -27,7 +27,7 @@
 |----------|-------|-------------|
 | `TOKEN_LENGTH` | `6` | Participant login token length |
 | `TOKEN_CHARSET` | `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` | Charset (no 0/O/1/I ambiguity) |
-| `DEV_TOKEN` | `ABC123` (env: `DEV_TOKEN`) | Auto-seeded dev participant. Set empty for production. |
+| `DEV_TOKEN` | `None` (env: `DEV_TOKEN`) | Dev participant auto-seed. Set `DEV_TOKEN=ABC123` to enable. |
 
 ### Experiment Timing
 

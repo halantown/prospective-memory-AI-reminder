@@ -5,6 +5,7 @@ Entry point for FastAPI application.
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -102,4 +103,5 @@ if FRONTEND_DIST.exists():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host=HOST, port=PORT, reload=True)
+    reload = os.getenv("ENVIRONMENT", "development") == "development"
+    uvicorn.run("main:app", host=HOST, port=PORT, reload=reload)

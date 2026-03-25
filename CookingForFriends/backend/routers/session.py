@@ -15,6 +15,7 @@ from models.schemas import (
     TokenStartRequest, SessionStartResponse, BlockEncodingResponse,
     NasaTLXRequest, DebriefRequest, StatusResponse,
     QuizSubmitRequest, QuizSubmitResponse, QuizResultItem,
+    EncodingQuizAttemptRequest,
 )
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
@@ -159,6 +160,49 @@ async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = 
         day_story=block.day_story,
         cards=pm_tasks,
     )
+
+
+@router.post("/session/{session_id}/block/{block_num}/encoding/quiz")
+async def submit_encoding_quiz_attempt(
+    session_id: str, block_num: int, req: EncodingQuizAttemptRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Record a single encoding quiz attempt (fire-and-forget from frontend)."""
+    _validate_block_num(block_num)
+    result = await db.execute(
+        select(Block).where(
+            Block.participant_id == session_id,
+            Block.block_number == block_num,
+        )
+    )
+    block = result.scalar_one_or_none()
+    if not block:
+        raise HTTPException(404, "Block not found")
+
+    # Find trial by number
+    result = await db.execute(
+        select(PMTrial).where(
+            PMTrial.block_id == block.id,
+            PMTrial.trial_number == req.trial_number,
+        )
+    )
+    trial = result.scalar_one_or_none()
+    if not trial:
+        raise HTTPException(404, "Trial not found")
+
+    quiz_attempt = EncodingQuizAttempt(
+        trial_id=trial.id,
+        participant_id=session_id,
+        question_type=req.question_type,
+        attempt_number=req.attempt_number,
+        selected_answer=req.selected_answer,
+        correct_answer=req.correct_answer,
+        is_correct=req.is_correct,
+        response_time_ms=req.response_time_ms,
+    )
+    db.add(quiz_attempt)
+    await db.commit()
+    return {"status": "recorded"}
 
 
 @router.post("/session/{session_id}/block/{block_num}/quiz", response_model=QuizSubmitResponse)

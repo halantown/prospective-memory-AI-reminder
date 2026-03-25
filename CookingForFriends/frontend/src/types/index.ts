@@ -68,11 +68,12 @@ export interface BlockEncoding {
 
 export interface PMTaskConfig {
   task_id: string
-  trigger_event: string
+  trigger_event?: string
+  trigger_type?: string
   target_room: string
-  target_object: string
-  target_action: string
-  distractor_object: string
+  target_object?: string
+  target_action?: string
+  distractor_object?: string
   action_destination?: string
   discriminating_cue?: string
 }

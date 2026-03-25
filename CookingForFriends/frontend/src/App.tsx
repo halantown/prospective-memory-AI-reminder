@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useGameStore } from './stores/gameStore'
 import { getSessionStatus } from './services/api'
+import type { Phase } from './types'
 import WelcomePage from './pages/game/WelcomePage'
 import EncodingPage from './pages/game/EncodingPage'
 import GamePage from './pages/game/GamePage'
@@ -66,18 +67,18 @@ function GameShell() {
         .then((status) => {
           if (status.current_block) setBlockNumber(status.current_block)
           // Map backend status/phase to frontend phase
-          const phaseMap: Record<string, string> = {
+          const phaseMap: Record<string, Phase> = {
             pending: 'encoding',
             encoding: 'encoding',
             playing: 'playing',
             microbreak: 'microbreak',
             completed: 'encoding', // next block starts with encoding
           }
-          const resolvedPhase = phaseMap[status.phase || ''] || 'welcome'
+          const resolvedPhase: Phase = phaseMap[status.phase || ''] || 'welcome'
           if (status.status === 'completed') {
             setPhase('complete')
           } else if (status.status === 'in_progress') {
-            setPhase(resolvedPhase as any)
+            setPhase(resolvedPhase)
           }
         })
         .catch(() => {
