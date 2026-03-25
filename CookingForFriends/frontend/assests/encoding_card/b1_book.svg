@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 320" width="280" height="320">
+  <!-- Background -->
+  <rect width="280" height="320" rx="12" fill="#F8F7F4"/>
+  
+  <!-- Book body -->
+  <rect x="75" y="40" width="130" height="190" rx="6" fill="#C0392B"/>
+  <!-- Spine -->
+  <rect x="75" y="40" width="14" height="190" rx="3" fill="#922B21"/>
+  <!-- Spine detail lines -->
+  <line x1="82" y1="55" x2="82" y2="65" stroke="#7B241C" stroke-width="1" stroke-linecap="round"/>
+  <line x1="82" y1="200" x2="82" y2="215" stroke="#7B241C" stroke-width="1" stroke-linecap="round"/>
+  
+  <!-- Cover illustration area -->
+  <rect x="100" y="58" width="92" height="110" rx="3" fill="#1C2833" opacity="0.15"/>
+  
+  <!-- Mountain illustration -->
+  <polygon points="115,168 146,88 177,168" fill="#2C3E50"/>
+  <polygon points="130,168 155,100 180,168" fill="#34495E"/>
+  <polygon points="138,168 162,110 186,168" fill="#5D6D7E"/>
+  <!-- Snow caps -->
+  <polygon points="140,105 146,88 152,105" fill="white" opacity="0.9"/>
+  <polygon points="149,115 155,100 161,115" fill="white" opacity="0.85"/>
+  <!-- Sky hint -->
+  <circle cx="170" cy="75" r="8" fill="#F9E79F" opacity="0.7"/>
+  
+  <!-- Title on book -->
+  <text x="146" y="195" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#F5B7B1" font-weight="700" letter-spacing="1">Erta Ale</text>
+  
+  <!-- Author placeholder -->
+  <line x1="120" y1="207" x2="172" y2="207" stroke="#F5B7B1" stroke-width="0.8" opacity="0.5"/>
+  
+  <!-- Pages edge -->
+  <rect x="203" y="46" width="4" height="178" rx="1" fill="#FAF0E6" stroke="#E8DACC" stroke-width="0.5"/>
+  
+  <!-- Label below -->
+  <text x="140" y="262" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#2C3E50" font-weight="600">Red book — Mountain cover</text>
+  <text x="140" y="282" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#7F8C8D">"Erta Ale" · Second shelf</text>
+  <text x="140" y="302" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#BDC3C7">Study · Bookcase</text>
+</svg>

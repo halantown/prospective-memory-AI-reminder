@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 320" width="280" height="320">
+  <rect width="280" height="320" rx="12" fill="#F8F7F4"/>
+  
+  <!-- Vinyl sleeve -->
+  <rect x="60" y="40" width="160" height="160" rx="4" fill="#1C1C1C"/>
+  
+  <!-- Cover art area -->
+  <rect x="72" y="52" width="136" height="100" rx="2" fill="#2C3E50"/>
+  
+  <!-- Night sky gradient effect -->
+  <rect x="72" y="52" width="136" height="40" rx="2" fill="#1A2836"/>
+  <!-- Stars -->
+  <circle cx="90" cy="62" r="1" fill="white" opacity="0.7"/>
+  <circle cx="120" cy="58" r="0.8" fill="white" opacity="0.5"/>
+  <circle cx="170" cy="65" r="1.2" fill="white" opacity="0.6"/>
+  <circle cx="195" cy="57" r="0.8" fill="white" opacity="0.4"/>
+  
+  <!-- Road -->
+  <path d="M72,152 L108,110 L172,110 L208,152" fill="#34495E"/>
+  <line x1="140" y1="152" x2="140" y2="112" stroke="#F9E79F" stroke-width="1" stroke-dasharray="4 3" opacity="0.7"/>
+  
+  <!-- Car (simple side view) -->
+  <path d="M110,128 L118,115 L162,115 L170,128 Z" fill="#E74C3C"/>
+  <rect x="108" y="128" width="64" height="14" rx="3" fill="#C0392B"/>
+  <!-- Windows -->
+  <path d="M120,128 L125,118 L145,118 L145,128 Z" fill="#5DADE2" opacity="0.6"/>
+  <rect x="148" y="118" width="16" height="10" rx="1" fill="#5DADE2" opacity="0.6"/>
+  <!-- Wheels -->
+  <circle cx="122" cy="143" r="6" fill="#1C1C1C" stroke="#333" stroke-width="1"/>
+  <circle cx="122" cy="143" r="2.5" fill="#555"/>
+  <circle cx="158" cy="143" r="6" fill="#1C1C1C" stroke="#333" stroke-width="1"/>
+  <circle cx="158" cy="143" r="2.5" fill="#555"/>
+  <!-- Headlights glow -->
+  <ellipse cx="174" cy="134" rx="8" ry="4" fill="#F9E79F" opacity="0.3"/>
+  
+  <!-- Title on sleeve -->
+  <text x="140" y="178" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#ECF0F1" font-weight="700" letter-spacing="2">NIGHT DRIVE</text>
+  <text x="140" y="192" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="8" fill="#7F8C8D" letter-spacing="1">VINYL RECORD</text>
+  
+  <!-- Record peeking out right -->
+  <circle cx="205" cy="130" r="45" fill="#111" stroke="#333" stroke-width="0.5" opacity="0.3"/>
+  <circle cx="205" cy="130" r="12" fill="#222" opacity="0.3"/>
+  
+  <!-- Label -->
+  <text x="140" y="252" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#2C3E50" font-weight="600">Car cover — Night Drive</text>
+  <text x="140" y="272" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#7F8C8D">Vinyl record · On the desk</text>
+  <text x="140" y="292" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#BDC3C7">Study</text>
+</svg>
