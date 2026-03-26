@@ -156,7 +156,7 @@ export default function PhoneSidebar() {
           className="relative flex flex-col flex-1 rounded-[40px] border-[3px] border-slate-600
                       bg-gradient-to-b from-slate-800 to-slate-900 shadow-2xl shadow-black/50
                       overflow-hidden"
-          onClick={handleInteraction}
+          onPointerDownCapture={handleInteraction}
         >
           {/* Dynamic Island / Notch */}
           <div className="flex justify-center pt-2 pb-1 relative z-10">
