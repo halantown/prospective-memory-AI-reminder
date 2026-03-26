@@ -212,9 +212,12 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
     return () => clearTimeout(timer)
   }, [destinationMsg])
 
-  // Auto-close popup when trial completes
+  // Auto-close popup only when an active trial transitions to completed
+  const prevActiveTrialRef = useRef(activeTrial)
   useEffect(() => {
-    if (!activeTrial && popupOpen) {
+    const hadTrial = !!prevActiveTrialRef.current
+    prevActiveTrialRef.current = activeTrial
+    if (hadTrial && !activeTrial && popupOpen) {
       setPopupOpen(false)
     }
   }, [activeTrial, popupOpen])
