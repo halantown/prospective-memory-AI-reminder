@@ -5,7 +5,7 @@ import json
 import time
 import logging
 from pathlib import Path
-from config import DATA_DIR
+from config import DATA_DIR, MESSAGE_COOLDOWN_S
 from engine.execution_window import start_window
 from engine.message_loader import load_message_pool, build_ws_payload, get_message
 
@@ -113,6 +113,9 @@ async def run_timeline(
             # Track last emitted game-clock tick
             last_tick_num = -1
 
+            # Track last phone message send time for runtime cooldown
+            last_msg_sent_at: float = 0.0
+
             for event in events:
                 if asyncio.current_task().cancelled():
                     break
@@ -160,6 +163,13 @@ async def run_timeline(
 
                 # Handle phone_message events — load full message, push rich payload
                 if event_type == "phone_message":
+                    # Runtime cooldown: wait if previous message was sent too recently
+                    if MESSAGE_COOLDOWN_S > 0 and last_msg_sent_at > 0:
+                        cooldown_remaining = MESSAGE_COOLDOWN_S - (time.time() - last_msg_sent_at)
+                        if cooldown_remaining > 0:
+                            logger.debug(f"[TIMELINE] Message cooldown: waiting {cooldown_remaining:.1f}s")
+                            await asyncio.sleep(cooldown_remaining)
+
                     message_id = event_data.get("message_id", "")
                     msg = get_message(block_number, message_id)
                     if msg:
@@ -172,6 +182,7 @@ async def run_timeline(
                             )
                         try:
                             await send_fn("phone_message", ws_payload)
+                            last_msg_sent_at = time.time()
                         except Exception as e:
                             logger.error(f"[TIMELINE] Failed to send phone_message: {e}")
                         continue  # phone_message is fully handled here

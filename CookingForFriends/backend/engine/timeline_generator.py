@@ -20,7 +20,7 @@ from engine.pm_tasks import (
     NEUTRAL_UTTERANCES,
     PMTaskDef,
 )
-from config import REMINDER_LEAD_S
+from config import REMINDER_LEAD_S, MESSAGE_COOLDOWN_S
 
 
 # Steak placement cadence: every 20s, 3 pans cycling
@@ -194,15 +194,26 @@ def generate_block_timeline(
         with open(messages_path) as f:
             msg_data = json.load(f)
 
+        msg_events: list[dict] = []
         for msg in msg_data.get("messages", []):
             msg_id = msg.get("id", "")
             msg_t = msg.get("t", 0)
             if msg_id and msg.get("type") != "pm_trigger":
-                events.append({
+                msg_events.append({
                     "t": msg_t,
                     "type": "phone_message",
                     "data": {"message_id": msg_id},
                 })
+
+        # Enforce minimum cooldown between consecutive messages
+        if MESSAGE_COOLDOWN_S > 0 and len(msg_events) > 1:
+            msg_events.sort(key=lambda e: e["t"])
+            for i in range(1, len(msg_events)):
+                gap = msg_events[i]["t"] - msg_events[i - 1]["t"]
+                if gap < MESSAGE_COOLDOWN_S:
+                    msg_events[i]["t"] = msg_events[i - 1]["t"] + MESSAGE_COOLDOWN_S
+
+        events.extend(msg_events)
 
     # ── Block end ──
     events.append({"t": 600, "type": "block_end", "data": {}})

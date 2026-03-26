@@ -399,7 +399,8 @@ async def get_config():
     from config import (
         BLOCKS_PER_PARTICIPANT, PM_TASKS_PER_BLOCK, BLOCK_DURATION_S,
         EXECUTION_WINDOW_S, LATE_WINDOW_S, REMINDER_LEAD_S,
-        PHONE_LOCK_TIMEOUT_S, MOUSE_SAMPLE_INTERVAL_MS, MOUSE_BATCH_INTERVAL_S,
+        PHONE_LOCK_TIMEOUT_S, MESSAGE_COOLDOWN_S,
+        MOUSE_SAMPLE_INTERVAL_MS, MOUSE_BATCH_INTERVAL_S,
         SNAPSHOT_INTERVAL_S, HEARTBEAT_INTERVAL_S, HEARTBEAT_TIMEOUT_S,
         LATIN_SQUARE, GROUPS, TOKEN_LENGTH,
     )
@@ -414,6 +415,7 @@ async def get_config():
         },
         "phone": {
             "lock_timeout_s": PHONE_LOCK_TIMEOUT_S,
+            "message_cooldown_s": MESSAGE_COOLDOWN_S,
         },
         "mouse_tracking": {
             "sample_interval_ms": MOUSE_SAMPLE_INTERVAL_MS,

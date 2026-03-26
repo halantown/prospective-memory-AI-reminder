@@ -25,7 +25,7 @@ interface ExperimentConfig {
     late_window_s: number
     reminder_lead_s: number
   }
-  phone: { lock_timeout_s: number }
+  phone: { lock_timeout_s: number; message_cooldown_s: number }
   mouse_tracking: { sample_interval_ms: number; batch_interval_s: number }
   system: {
     snapshot_interval_s: number
@@ -295,6 +295,7 @@ export default function ConfigPage() {
             ]} />
             <ParamCard title="Phone" icon={Clock} params={[
               ['Lock Timeout', formatSeconds(phone.lock_timeout_s)],
+              ['Message Cooldown', formatSeconds(phone.message_cooldown_s)],
             ]} />
             <ParamCard title="Mouse Tracking" icon={Grid3X3} params={[
               ['Sample Interval', formatMs(mouse_tracking.sample_interval_ms)],

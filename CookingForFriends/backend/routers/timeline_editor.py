@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from config import DATA_DIR
+from config import DATA_DIR, MESSAGE_COOLDOWN_S
 from engine.timeline import load_timeline
 from engine.timeline_generator import generate_block_timeline
 from engine.pm_tasks import BLOCK_TRIGGER_ORDER, BLOCK_TRIGGER_TIMES, BLOCK_GUESTS
@@ -230,6 +230,7 @@ async def get_event_schema():
             },
         },
         "duration_default": 600,
+        "message_cooldown_s": MESSAGE_COOLDOWN_S,
         "blocks": [1, 2, 3],
         "conditions": ["CONTROL", "AF", "AFCB"],
     }
@@ -261,6 +262,17 @@ def _validate_events(events: list[dict], duration: int) -> list[str]:
     block_starts = [e for e in events if e["type"] == "block_start"]
     if block_starts and block_starts[0]["t"] != 0:
         errors.append(f"block_start should be at t=0 (found at t={block_starts[0]['t']})")
+
+    # Warn about phone messages violating cooldown
+    if MESSAGE_COOLDOWN_S > 0:
+        msg_times = sorted(e["t"] for e in events if e["type"] == "phone_message")
+        for i in range(1, len(msg_times)):
+            gap = msg_times[i] - msg_times[i - 1]
+            if gap < MESSAGE_COOLDOWN_S:
+                errors.append(
+                    f"Phone messages at t={msg_times[i-1]}s and t={msg_times[i]}s "
+                    f"are {gap:.0f}s apart (min cooldown: {MESSAGE_COOLDOWN_S}s)"
+                )
 
     return errors
 
