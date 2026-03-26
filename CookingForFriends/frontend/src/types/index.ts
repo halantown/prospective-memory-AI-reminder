@@ -109,7 +109,7 @@ export interface ClientMessage {
 
 // ── Kitchen / Ongoing Tasks ──
 
-export type SteakState = 'empty' | 'raw' | 'cooking' | 'ready_to_flip' | 'cooking_side2' | 'ready_to_plate' | 'done' | 'burnt'
+export type SteakState = 'empty' | 'raw' | 'cooking' | 'ready_to_flip' | 'cooking_side2' | 'ready_to_plate' | 'done' | 'burnt' | 'ash'
 
 // ── Dining ──
 

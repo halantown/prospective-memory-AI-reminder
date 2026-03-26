@@ -230,10 +230,11 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
   }, [room])
 
   const handleItemClick = useCallback((itemId: string) => {
-    if (actionPhase !== 'browse' || selectedTarget) return
+    if (actionPhase === 'done') return
+    // Allow switching selection in both browse and confirm phases
     setSelectedTarget(itemId)
     setActionPhase('confirm')
-  }, [actionPhase, selectedTarget])
+  }, [actionPhase])
 
   const handleConfirmAction = useCallback(() => {
     if (!activeTrial || !selectedTarget) return
@@ -325,7 +326,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 10 }}
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            className="absolute bottom-full left-0 mb-2 z-[20]"
+            className="absolute bottom-full left-0 mb-2 z-[60]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-slate-900/95 backdrop-blur-md border border-slate-600/80 rounded-xl shadow-2xl
@@ -386,7 +387,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
                               <button
                                 key={item.id}
                                 onClick={() => handleItemClick(item.id)}
-                                disabled={actionPhase !== 'browse' && !isSelected}
+                                disabled={actionPhase === 'done' && !isSelected}
                                 className={`relative flex flex-col items-center rounded-lg border-2 p-1.5
                                   transition-all cursor-pointer ${
                                     isDone

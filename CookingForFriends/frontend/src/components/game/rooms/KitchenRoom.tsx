@@ -20,6 +20,7 @@ const COOK_SIDE1_DURATION = 30_000
 const FLIP_WINDOW = 10_000
 const COOK_SIDE2_DURATION = 25_000
 const PLATE_WINDOW = 10_000
+const BURNT_DECAY_DURATION = 15_000  // burnt steak turns to ash after 15s if not cleared
 
 const STEAK_COLORS = {
   raw: '#E8A0A0',
@@ -162,12 +163,44 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
         }, PLATE_WINDOW)
       }
 
+      // Burnt steak auto-decays to ash if not manually cleared
+      if (pan.state === 'burnt' && !timersRef.current.has(timerKey)) {
+        timerStateRef.current.set(timerKey, 'burnt')
+        setTimer(timerKey, () => {
+          timersRef.current.delete(timerKey)
+          timerStateRef.current.delete(timerKey)
+          if (!mountedRef.current) return
+          const p = useGameStore.getState().pans.find(p => p.id === pan.id)
+          if (p && p.state === 'burnt') {
+            updatePan(pan.id, { state: 'ash' })
+            reportAction(pan.id, 'burnt_to_ash')
+          }
+        }, BURNT_DECAY_DURATION)
+      }
+
+      // Ash auto-clears to empty after a brief moment
+      if (pan.state === 'ash' && !timersRef.current.has(timerKey)) {
+        timerStateRef.current.set(timerKey, 'ash')
+        setTimer(timerKey, () => {
+          timersRef.current.delete(timerKey)
+          timerStateRef.current.delete(timerKey)
+          if (!mountedRef.current) return
+          const p = useGameStore.getState().pans.find(p => p.id === pan.id)
+          if (p && p.state === 'ash') {
+            updatePan(pan.id, { state: 'empty', placedAt: null })
+            reportAction(pan.id, 'ash_cleared')
+          }
+        }, 3000)
+      }
+
       // Terminal states: clear any leftover timer
       if (
         pan.state !== 'cooking' &&
         pan.state !== 'ready_to_flip' &&
         pan.state !== 'cooking_side2' &&
-        pan.state !== 'ready_to_plate'
+        pan.state !== 'ready_to_plate' &&
+        pan.state !== 'burnt' &&
+        pan.state !== 'ash'
       ) {
         clearTimer(timerKey)
         timerStateRef.current.delete(timerKey)
@@ -273,6 +306,7 @@ function PanComponent({
   const isUrgent = pan.state === 'ready_to_flip' || pan.state === 'ready_to_plate'
   const isEmpty = pan.state === 'empty'
   const isBurnt = pan.state === 'burnt'
+  const isAsh = pan.state === 'ash'
   const isCooking = pan.state === 'cooking' || pan.state === 'cooking_side2'
 
   const [progress, setProgress] = useState(0)
@@ -297,6 +331,8 @@ function PanComponent({
     ? 'border-green-400 pan-glow-plate steak-urgent'
     : isBurnt
     ? 'border-red-500 pan-glow-burnt'
+    : isAsh
+    ? 'border-slate-600/40'
     : 'border-slate-500/60'
 
   return (
@@ -309,11 +345,16 @@ function PanComponent({
                   ${panBorderClass}
                   ${isEmpty ? 'bg-slate-700/50 border-dashed' : 'bg-slate-800/70'}
                   ${isUrgent ? 'steak-urgent' : ''}`}
-      animate={isUrgent ? { scale: [1, 1.05, 1] } : {}}
-      transition={isUrgent ? { repeat: Infinity, duration: 1 } : {}}
+      animate={isUrgent ? { scale: [1, 1.05, 1] } : isAsh ? { opacity: [0.6, 0.3, 0.6] } : {}}
+      transition={isUrgent ? { repeat: Infinity, duration: 1 } : isAsh ? { repeat: Infinity, duration: 2 } : {}}
     >
       {isEmpty ? (
         <span className="text-[9px] text-slate-500 font-medium">Empty</span>
+      ) : isAsh ? (
+        <div className="flex flex-col items-center">
+          <span className="text-lg opacity-50">🫥</span>
+          <span className="text-[7px] text-slate-500">ash</span>
+        </div>
       ) : (
         <div
           className={`steak-shape w-[50px] h-[38px] ${isBurnt ? 'steak-smoke' : ''}`}
