@@ -1,6 +1,6 @@
 /** Feature-rich admin dashboard — overview, sortable table, expandable rows, actions. */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown,
@@ -625,7 +625,7 @@ export default function AdminDashboard() {
 
         {/* ---- Participant table ---- */}
         <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="w-8" />
@@ -655,7 +655,7 @@ export default function AdminDashboard() {
                 sorted.map((p) => {
                   const isExpanded = expandedId === p.session_id
                   return (
-                    <motion.tbody key={p.session_id} layout>
+                    <React.Fragment key={p.session_id}>
                       {/* Main row */}
                       <tr
                         className={`border-b border-slate-100 cursor-pointer transition-colors ${
@@ -776,7 +776,7 @@ export default function AdminDashboard() {
                           </tr>
                         )}
                       </AnimatePresence>
-                    </motion.tbody>
+                    </React.Fragment>
                   )
                 })
               )}

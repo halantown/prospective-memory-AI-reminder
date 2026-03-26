@@ -315,7 +315,7 @@ async def get_participant_detail(session_id: str, db: AsyncSession = Depends(get
                 "is_filler": t.is_filler,
                 "score": t.score,
                 "trigger_fired_at": t.trigger_fired_at,
-                "responded_at": t.responded_at,
+                "responded_at": t.exec_window_end,
                 "task_config": cfg,
             })
         block_list.append({
@@ -365,8 +365,12 @@ async def reset_participant(session_id: str, db: AsyncSession = Depends(get_db))
             sql_update(PMTrial).where(PMTrial.block_id == b.id).values(
                 score=None,
                 trigger_fired_at=None,
-                responded_at=None,
                 exec_window_start=None,
+                exec_window_end=None,
+                user_actions=None,
+                response_time_ms=None,
+                resumption_lag_ms=None,
+                reminder_played_at=None,
             )
         )
 
@@ -483,7 +487,7 @@ async def export_data(db: AsyncSession = Depends(get_db)):
                     "is_filler": t.is_filler,
                     "score": t.score,
                     "trigger_fired_at": t.trigger_fired_at,
-                    "responded_at": t.responded_at,
+                    "responded_at": t.exec_window_end,
                 })
             block_data.append({
                 "block_number": b.block_number,
