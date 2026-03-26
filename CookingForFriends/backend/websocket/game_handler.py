@@ -196,6 +196,26 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         await db.commit()
         condition = block.condition
 
+    async def _on_block_complete():
+        """Mark block as completed when timeline finishes normally."""
+        try:
+            async with db_factory() as db:
+                from sqlalchemy import select
+                from models.block import Block, BlockStatus
+                result = await db.execute(
+                    select(Block).where(
+                        Block.participant_id == participant_id,
+                        Block.block_number == block_number,
+                    )
+                )
+                blk = result.scalar_one_or_none()
+                if blk and blk.status in (BlockStatus.PLAYING, "playing"):
+                    blk.status = BlockStatus.COMPLETED
+                    await db.commit()
+                    logger.info(f"[GAME_HANDLER] Block {block_number} completed for {participant_id}")
+        except Exception as e:
+            logger.error(f"[GAME_HANDLER] Failed to mark block complete: {e}")
+
     # Start the timeline
     logger.info(f"[GAME_HANDLER] Creating TimelineEngine for {participant_id} block {block_number} ({condition})")
     task = await run_timeline(
@@ -203,6 +223,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         block_number=block_number,
         condition=condition,
         send_fn=send_fn,
+        on_complete=_on_block_complete,
         db_factory=db_factory,
     )
     logger.info(f"[GAME_HANDLER] Timeline task created: {task}")

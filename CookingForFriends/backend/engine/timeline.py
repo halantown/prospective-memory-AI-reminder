@@ -144,14 +144,19 @@ async def run_timeline(
                     await asyncio.sleep(wait)
 
                 event_type = event.get("type", "unknown")
-                event_data = event.get("data", {})
+                event_data = dict(event.get("data", {}))  # shallow copy to avoid mutating template
 
                 # Resolve reminder placeholders
                 if event_type == "robot_speak" and "text" in event_data:
                     text = event_data["text"]
                     if text.startswith("{{reminder:"):
                         task_id = text.strip("{}").split(":")[1]
-                        event_data["text"] = _resolve_reminder(task_id, condition)
+                        resolved = _resolve_reminder(task_id, condition)
+                        if resolved is None:
+                            # CONTROL condition — skip sending this reminder entirely
+                            logger.debug(f"[TIMELINE] Skipping reminder for {task_id} (CONTROL)")
+                            continue
+                        event_data["text"] = resolved
 
                 # Handle phone_message events — load full message, push rich payload
                 if event_type == "phone_message":
@@ -601,13 +606,15 @@ def cancel_activity_watchers(participant_id: str | None = None):
         logger.info(f"[ACTIVITY_WATCHER] Cancelled {len(keys_to_remove)} watchers")
 
 
-def _resolve_reminder(task_id: str, condition: str) -> str:
+def _resolve_reminder(task_id: str, condition: str) -> str | None:
     """Resolve a reminder placeholder to actual text.
 
-    For CONTROL condition, returns None (no reminder).
+    For CONTROL condition, returns None (no reminder should be sent).
     For AF/AFCB, tries to look up from ReminderMessage DB table,
     falls back to baseline reminder from task registry.
     """
+    if condition == "CONTROL":
+        return None
     try:
         from engine.pm_tasks import get_task
         task_def = get_task(task_id)

@@ -59,9 +59,11 @@ app.add_middleware(
 # Routers
 from routers.session import router as session_router
 from routers.admin import router as admin_router
+from routers.timeline_editor import router as timeline_editor_router
 
 app.include_router(session_router)
 app.include_router(admin_router)
+app.include_router(timeline_editor_router)
 
 # --- WebSocket endpoints (at /ws/*, no /api prefix) ---
 from fastapi import WebSocket as _WebSocket
@@ -104,6 +106,7 @@ if FRONTEND_DIST.exists():
     @app.get("/dashboard{rest:path}")
     @app.get("/config{rest:path}")
     @app.get("/admin{rest:path}")
+    @app.get("/timeline-editor{rest:path}")
     async def spa_fallback(rest: str = ""):
         return FileResponse(str(FRONTEND_DIST / "index.html"))
 
