@@ -12,11 +12,16 @@ import DebriefPage from './pages/game/DebriefPage'
 import AdminDashboard from './pages/admin/DashboardPage'
 import ConfigPage from './pages/admin/ConfigPage'
 import TimelineEditorPage from './pages/admin/TimelineEditorPage'
+import ParticipantControlPage from './pages/admin/ParticipantControlPage'
 
 export default function App() {
   const path = window.location.pathname
 
-  // Admin routes
+  // Admin routes — specific routes before generic /admin catch-all
+  if (path.startsWith('/admin/participant/')) {
+    const participantId = path.split('/admin/participant/')[1]?.split('/')[0]
+    if (participantId) return <ParticipantControlPage participantId={participantId} />
+  }
   if (path.startsWith('/dashboard') || path.startsWith('/admin')) {
     return <AdminDashboard />
   }

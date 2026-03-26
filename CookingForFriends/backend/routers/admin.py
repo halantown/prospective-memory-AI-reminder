@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db, async_session
 from models.experiment import Experiment, ExperimentStatus, Participant, ParticipantStatus
-from models.block import Block, BlockStatus, PMTrial, ReminderMessage
-from models.logging import InteractionLog
+from models.block import Block, BlockStatus, PMTrial, PMAttemptRecord, ReminderMessage
+from models.logging import InteractionLog, PhoneMessageLog, GameStateSnapshot
 from models.schemas import ParticipantCreateResponse, ReminderImportItem
 from engine.condition_assigner import assign_group, get_condition_order, generate_token, next_participant_id
 from engine.pm_tasks import (
@@ -517,6 +517,212 @@ async def export_data(db: AsyncSession = Depends(get_db)):
         })
 
     return {"participants": export, "count": len(export)}
+
+
+# ── Participant Detail Endpoints (for control page) ──
+
+
+@router.get("/participant/{session_id}/phone-logs")
+async def get_phone_logs(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Get phone message logs for a participant."""
+    result = await db.execute(
+        select(PhoneMessageLog)
+        .where(PhoneMessageLog.participant_id == session_id)
+        .order_by(PhoneMessageLog.sent_at)
+    )
+    logs = result.scalars().all()
+    return [
+        {
+            "id": log.id,
+            "block_id": log.block_id,
+            "message_id": log.message_id,
+            "sender": log.sender,
+            "message_type": log.message_type,
+            "sent_at": log.sent_at,
+            "read_at": log.read_at,
+            "replied_at": log.replied_at,
+            "reply_selected": log.reply_selected,
+            "reply_correct": log.reply_correct,
+        }
+        for log in logs
+    ]
+
+
+@router.get("/participant/{session_id}/snapshots")
+async def get_snapshots(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Get game state snapshots (latest per block)."""
+    result = await db.execute(
+        select(GameStateSnapshot)
+        .where(GameStateSnapshot.participant_id == session_id)
+        .order_by(GameStateSnapshot.timestamp.desc())
+    )
+    snaps = result.scalars().all()
+    # Return latest 20 snapshots (can be large)
+    return [
+        {
+            "id": s.id,
+            "block_id": s.block_id,
+            "timestamp": s.timestamp,
+            "state": s.state,
+        }
+        for s in snaps[:20]
+    ]
+
+
+@router.get("/participant/{session_id}/pm-attempts")
+async def get_pm_attempts(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Get detailed PM attempt records for a participant."""
+    result = await db.execute(
+        select(PMAttemptRecord)
+        .where(PMAttemptRecord.participant_id == session_id)
+        .order_by(PMAttemptRecord.trigger_fired_at)
+    )
+    attempts = result.scalars().all()
+    return [
+        {
+            "id": a.id,
+            "trial_id": a.trial_id,
+            "block_id": a.block_id,
+            "trigger_fired_at": a.trigger_fired_at,
+            "trigger_received_at": a.trigger_received_at,
+            "first_action_time": a.first_action_time,
+            "first_room_switch_at": a.first_room_switch_at,
+            "first_pm_room_entered_at": a.first_pm_room_entered_at,
+            "target_selected_at": a.target_selected_at,
+            "action_completed_at": a.action_completed_at,
+            "room_sequence": a.room_sequence,
+            "room": a.room,
+            "target_selected": a.target_selected,
+            "action_performed": a.action_performed,
+            "action_correct": a.action_correct,
+            "total_elapsed_ms": a.total_elapsed_ms,
+            "score": a.score,
+        }
+        for a in attempts
+    ]
+
+
+@router.post("/participant/{session_id}/force-trigger")
+async def force_trigger(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Force-fire the next pending PM trigger for a participant."""
+    # Find the current playing block
+    result = await db.execute(
+        select(Block)
+        .where(Block.participant_id == session_id, Block.status == BlockStatus.playing)
+    )
+    block = result.scalar_one_or_none()
+    if not block:
+        raise HTTPException(400, "No active (playing) block found")
+
+    # Find the next un-triggered trial
+    trials_result = await db.execute(
+        select(PMTrial)
+        .where(PMTrial.block_id == block.id, PMTrial.trigger_fired_at == None)
+        .order_by(PMTrial.trial_number)
+    )
+    trial = trials_result.scalars().first()
+    if not trial:
+        raise HTTPException(400, "No pending PM trials to trigger")
+
+    cfg = trial.task_config or {}
+    now = time.time()
+
+    # Record trigger fired
+    trial.trigger_fired_at = now
+    trial.exec_window_start = now
+    await db.commit()
+
+    # Send trigger event to participant via WS
+    trigger_data = {
+        "trigger_id": cfg.get("task_id", f"trial_{trial.id}"),
+        "trigger_event": cfg.get("trigger_event", "Admin forced trigger"),
+        "trigger_type": cfg.get("trigger_type", "visitor"),
+        "task_id": cfg.get("task_id", ""),
+        "signal": cfg.get("signal", {}),
+        "server_trigger_ts": now,
+        "task_config": cfg,
+    }
+    try:
+        await manager.send_to_participant(session_id, "pm_trigger", trigger_data)
+    except Exception as e:
+        logger.warning(f"Failed to send forced trigger via WS: {e}")
+
+    return {
+        "status": "triggered",
+        "trial_id": trial.id,
+        "trial_number": trial.trial_number,
+        "task_id": cfg.get("task_id", ""),
+    }
+
+
+@router.post("/participant/{session_id}/send-message")
+async def admin_send_message(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Send a system message to the participant's phone."""
+    now = time.time()
+    msg_payload = {
+        "id": f"admin_{int(now)}",
+        "sender": "🔧 Experimenter",
+        "text": "System check — please continue the experiment.",
+        "type": "chat",
+        "server_ts": now,
+    }
+    try:
+        await manager.send_to_participant(session_id, "phone_message", msg_payload)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to send message: {e}")
+    return {"status": "sent", "message_id": msg_payload["id"]}
+
+
+@router.post("/participant/{session_id}/advance-block")
+async def advance_block(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Force-complete current block and advance to next."""
+    from engine.timeline import cancel_timeline
+
+    result = await db.execute(select(Participant).where(Participant.id == session_id))
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, "Participant not found")
+
+    # Find current playing block
+    blocks_result = await db.execute(
+        select(Block)
+        .where(Block.participant_id == session_id, Block.status == BlockStatus.playing)
+    )
+    block = blocks_result.scalar_one_or_none()
+    if not block:
+        raise HTTPException(400, "No active block to advance from")
+
+    # Cancel running timeline
+    cancel_timeline(session_id, block.block_number)
+
+    # Mark block completed
+    block.status = BlockStatus.completed
+    block.ended_at = datetime.utcnow()
+
+    # Advance participant to next block
+    next_block_num = block.block_number + 1
+    if next_block_num <= 3:
+        p.current_block = next_block_num
+    else:
+        p.status = ParticipantStatus.completed
+        p.completed_at = datetime.utcnow()
+
+    await db.commit()
+
+    # Notify client
+    try:
+        await manager.send_to_participant(session_id, "block_end", {
+            "block_number": block.block_number,
+            "forced": True,
+        })
+    except Exception:
+        pass
+
+    return {
+        "status": "advanced",
+        "completed_block": block.block_number,
+        "next_block": next_block_num if next_block_num <= 3 else None,
+    }
 
 
 # WebSocket endpoint moved to main.py (no /api prefix needed)

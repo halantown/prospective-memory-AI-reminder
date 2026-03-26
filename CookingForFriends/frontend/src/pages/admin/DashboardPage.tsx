@@ -17,6 +17,7 @@ import {
   WifiOff,
   Plus,
   Download,
+  ExternalLink,
 } from 'lucide-react'
 
 /* ------------------------------------------------------------------ */
@@ -733,6 +734,13 @@ export default function AdminDashboard() {
                               ) : (
                                 <Copy className="w-4 h-4" />
                               )}
+                            </button>
+                            <button
+                              title="Open Detail Page"
+                              onClick={() => (window.location.href = `/admin/participant/${p.session_id}`)}
+                              className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition-colors"
+                            >
+                              <ExternalLink className="w-4 h-4" />
                             </button>
                             <button
                               title="Reset"
