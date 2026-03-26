@@ -15,6 +15,7 @@ import { motion } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
 import type { SteakState } from '../../../types'
 import PMTargetItems from '../PMTargetItems'
+import { useSoundEffects } from '../../../hooks/useSoundEffects'
 
 const COOK_SIDE1_DURATION = 30_000
 const FLIP_WINDOW = 10_000
@@ -74,6 +75,7 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
   const addKitchenScore = useGameStore((s) => s.addKitchenScore)
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const mountedRef = useRef(true)
+  const play = useSoundEffects()
 
   const reportAction = useCallback((panId: number, action: string) => {
     const send = useGameStore.getState().wsSend
@@ -134,6 +136,7 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
             updatePan(pan.id, { state: 'burnt' })
             addKitchenScore(-5)
             reportAction(pan.id, 'burnt_missed_flip')
+            play('burnBuzz')
           }
         }, FLIP_WINDOW)
       }
@@ -159,6 +162,7 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
             updatePan(pan.id, { state: 'burnt' })
             addKitchenScore(-5)
             reportAction(pan.id, 'burnt_missed_plate')
+            play('burnBuzz')
           }
         }, PLATE_WINDOW)
       }
@@ -174,6 +178,7 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
           if (p && p.state === 'burnt') {
             updatePan(pan.id, { state: 'ash' })
             reportAction(pan.id, 'burnt_to_ash')
+            play('ashCrumble')
           }
         }, BURNT_DECAY_DURATION)
       }
@@ -218,12 +223,14 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
         clearTimer(`pan_${panId}`)
         updatePan(panId, { state: 'cooking_side2', placedAt: Date.now() })
         reportAction(panId, 'flip')
+        play('sizzle')
         break
       case 'ready_to_plate':
         clearTimer(`pan_${panId}`)
         updatePan(panId, { state: 'empty', placedAt: null })
         addKitchenScore(10)
         reportAction(panId, 'plate')
+        play('plateDing')
         // Check if all pans are now empty (full cycle plated)
         setTimeout(() => {
           const currentPans = useGameStore.getState().pans

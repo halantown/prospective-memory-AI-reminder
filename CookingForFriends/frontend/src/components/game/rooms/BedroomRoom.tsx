@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
 import type { UtensilType } from '../../../types'
 import PMTargetItems from '../PMTargetItems'
+import { useSoundEffects } from '../../../hooks/useSoundEffects'
 
 const UTENSILS: { type: UtensilType; emoji: string; label: string }[] = [
   { type: 'plate', emoji: '🍽️', label: 'Plate' },
@@ -30,6 +31,7 @@ export default function BedroomRoom({ isActive }: { isActive: boolean }) {
   const completeDiningRound = useGameStore((s) => s.completeDiningRound)
   const wsSend = useGameStore((s) => s.wsSend)
   const [showComplete, setShowComplete] = useState(false)
+  const play = useSoundEffects()
 
   // Drag state
   const [dragging, setDragging] = useState<UtensilType | null>(null)
@@ -49,6 +51,7 @@ export default function BedroomRoom({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     if (allComplete && diningPhase === 'active') {
       setShowComplete(true)
+      play('tableComplete')
       if (wsSend) {
         // Notify backend that table is fully set (for activity trigger detection)
         wsSend({
@@ -71,7 +74,7 @@ export default function BedroomRoom({ isActive }: { isActive: boolean }) {
       }, 1500)
       return () => clearTimeout(timer)
     }
-  }, [allComplete, diningPhase, diningRound, completeDiningRound, wsSend])
+  }, [allComplete, diningPhase, diningRound, completeDiningRound, wsSend, play])
 
   const doPlace = useCallback((seatIndex: number, utensil: UtensilType | null) => {
     if (!utensil || !isActive || diningPhase !== 'active') return

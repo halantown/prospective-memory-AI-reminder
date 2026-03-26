@@ -8,6 +8,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
 import type { PhoneMessage } from '../../types'
+import { useSoundEffects } from '../../hooks/useSoundEffects'
 
 const LOCK_TIMEOUT = 15_000 // 15s
 const BANNER_DURATION = 3_000 // 3s
@@ -26,6 +27,7 @@ export default function PhoneSidebar() {
   const lastActivityRef = useRef(Date.now())
   const feedRef = useRef<HTMLDivElement>(null)
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const play = useSoundEffects()
 
   // All messages newest-first, no priority sorting
   const sortedMessages = useMemo(() => {
@@ -53,6 +55,7 @@ export default function PhoneSidebar() {
   // Auto-dismiss banner after 3s
   useEffect(() => {
     if (banner) {
+      play('phoneMessage')
       if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current)
       bannerTimerRef.current = setTimeout(() => {
         setBanner(null)
@@ -61,7 +64,7 @@ export default function PhoneSidebar() {
     return () => {
       if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current)
     }
-  }, [banner, setBanner])
+  }, [banner, setBanner, play])
 
   const handleUnlock = useCallback(() => {
     setPhoneLocked(false)

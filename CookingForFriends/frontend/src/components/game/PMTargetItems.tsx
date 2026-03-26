@@ -12,6 +12,7 @@ import { useGameStore } from '../../stores/gameStore'
 import { ROOM_ITEMS } from './items/RoomItems'
 import type { RoomItemProps } from './items/RoomItems'
 import type { RoomId } from '../../types'
+import { useSoundEffects } from '../../hooks/useSoundEffects'
 
 // ── Item data for all 12 PM tasks (target + d1 + d2) ──
 
@@ -183,6 +184,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
   const [popupOpen, setPopupOpen] = useState(false)
   const [destinationMsg, setDestinationMsg] = useState<string | null>(null)
   const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const play = useSoundEffects()
 
   useEffect(() => {
     return () => {
@@ -234,7 +236,8 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
     // Allow switching selection in both browse and confirm phases
     setSelectedTarget(itemId)
     setActionPhase('confirm')
-  }, [actionPhase])
+    play('pmSelect')
+  }, [actionPhase, play])
 
   const handleConfirmAction = useCallback(() => {
     if (!activeTrial || !selectedTarget) return
@@ -258,7 +261,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
     }
 
     setActionPhase('done')
-
+    play('pmConfirm')
     // Show destination message for correct target selection
     const isCorrect = selectedTarget.endsWith('_target')
     if (isCorrect && cfg.action_destination) {
@@ -274,7 +277,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
       setPopupOpen(false)
       confirmTimeoutRef.current = null
     }, 1500)
-  }, [activeTrial, selectedTarget, wsSend, currentRoom, completePMTrial])
+  }, [activeTrial, selectedTarget, wsSend, currentRoom, completePMTrial, play])
 
   const handleCancelSelection = useCallback(() => {
     setSelectedTarget(null)
