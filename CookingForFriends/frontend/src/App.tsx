@@ -11,6 +11,7 @@ import MicroBreakPage from './pages/game/MicroBreakPage'
 import DebriefPage from './pages/game/DebriefPage'
 import AdminDashboard from './pages/admin/DashboardPage'
 import ConfigPage from './pages/admin/ConfigPage'
+import TimelineEditorPage from './pages/admin/TimelineEditorPage'
 
 export default function App() {
   const path = window.location.pathname
@@ -21,6 +22,9 @@ export default function App() {
   }
   if (path.startsWith('/config')) {
     return <ConfigPage />
+  }
+  if (path.startsWith('/timeline-editor')) {
+    return <TimelineEditorPage />
   }
 
   // Game routes — phase-based rendering
