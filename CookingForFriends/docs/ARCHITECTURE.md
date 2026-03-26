@@ -21,7 +21,7 @@
 │              ↕                        ↕                                 │
 │         /api/*                  /ws/game/{session}/{block}              │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  Backend  (FastAPI + SQLAlchemy Async + SQLite)                         │
+│  Backend  (FastAPI + SQLAlchemy Async + PostgreSQL)                     │
 │  ├── routers/session.py    — token login, encoding, quiz, NASA-TLX     │
 │  ├── routers/admin.py      — participant CRUD, assignment, monitoring   │
 │  ├── websocket/             — game_handler, connection_manager          │
@@ -222,6 +222,9 @@ Some PM triggers fire on game-state conditions (e.g., "all steaks plated"):
 
 ### Development
 ```bash
+# Database (Docker)
+cd CookingForFriends && cp .env.example .env && docker compose up -d
+
 # Backend (Python 3.11+)
 conda activate thesis_server
 cd CookingForFriends/backend && uvicorn main:app --reload --port 5000
@@ -240,14 +243,14 @@ cd CookingForFriends/backend && uvicorn main:app  # Serves API + static dist/
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATA_DIR` | `backend/data` | Path to data directory |
-| `DB_PATH` | `backend/experiment.db` | SQLite database path |
+| `DATABASE_URL` | `postgresql+asyncpg://cff:cff_dev_pass@localhost:5432/cooking_for_friends` | PostgreSQL connection URL |
 | `DEV_TOKEN` | `ABC123` | Dev participant token (set empty for production) |
 
 ---
 
 ## 10. Key Design Decisions
 
-1. **SQLite** — Single-user lab experiment. Simplifies deployment, no DB server needed.
+1. **PostgreSQL via Docker** — Robust, production-grade database with connection pooling. Auto-initialized via `db/init.sql`.
 2. **Silent execution windows** — Frontend never knows about PM scoring deadlines, preserving ecological validity.
 3. **Furniture popup for PM items** — Items hidden behind room furniture (bookshelf, cabinet) to require intentional search.
 4. **Phone as continuous distractor** — Lock screen, messages, replies create ongoing task competition.

@@ -1,12 +1,10 @@
-"""Database engine and session factory (async SQLAlchemy + aiosqlite)."""
+"""Database engine and session factory (async SQLAlchemy + asyncpg)."""
 
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from config import DB_PATH
+from config import DATABASE_URL
 
-DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
-
-engine = create_async_engine(DATABASE_URL, echo=False, future=True)
+engine = create_async_engine(DATABASE_URL, echo=False, future=True, pool_size=5, max_overflow=10)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 

@@ -6,7 +6,12 @@ from pathlib import Path
 # Paths
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data")))
-DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "experiment.db")))
+
+# Database — PostgreSQL via asyncpg
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://cff:cff_dev_pass@localhost:5432/cooking_for_friends",
+)
 
 # Server
 HOST = os.getenv("HOST", "0.0.0.0")

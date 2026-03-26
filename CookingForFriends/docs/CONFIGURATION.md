@@ -6,13 +6,13 @@
 
 ## Backend Configuration (`backend/config.py`)
 
-### Paths
+### Paths & Database
 
 | Constant | Default | Env Var | Description |
 |----------|---------|---------|-------------|
 | `BASE_DIR` | `Path(__file__).parent` | — | Backend root directory |
 | `DATA_DIR` | `BASE_DIR/data` | `DATA_DIR` | Phone messages, timelines, assets |
-| `DB_PATH` | `BASE_DIR/experiment.db` | `DB_PATH` | SQLite database file |
+| `DATABASE_URL` | `postgresql+asyncpg://cff:cff_dev_pass@localhost:5432/cooking_for_friends` | `DATABASE_URL` | PostgreSQL connection URL |
 
 ### Server
 
@@ -197,6 +197,23 @@ data/
 
 | Setting | Value | Description |
 |---------|-------|-------------|
-| Engine | `sqlite+aiosqlite` | Async SQLite driver |
+| Engine | `postgresql+asyncpg` | Async PostgreSQL driver |
+| `pool_size` | `5` | Connection pool size |
+| `max_overflow` | `10` | Extra connections beyond pool_size |
 | `expire_on_commit` | `False` | Objects accessible after commit |
 | Auto-seed | On startup if `DEV_TOKEN` set | Creates/resets dev participant |
+
+### Docker Setup
+
+```bash
+cp .env.example .env          # adjust credentials if needed
+docker compose up -d           # starts PostgreSQL 16 on port 5432
+```
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `POSTGRES_DB` | `cooking_for_friends` | Database name |
+| `POSTGRES_USER` | `cff` | Database user |
+| `POSTGRES_PASSWORD` | `cff_dev_pass` | Database password |
+| `POSTGRES_PORT` | `5432` | Host port mapping |
+| `DATABASE_URL` | `postgresql+asyncpg://cff:cff_dev_pass@localhost:5432/cooking_for_friends` | Full connection URL |

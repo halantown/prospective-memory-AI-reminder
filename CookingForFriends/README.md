@@ -6,10 +6,14 @@ A browser-based 2D prospective memory (PM) experiment where participants cook st
 
 ```
 CookingForFriends/
-├── backend/                 # FastAPI + SQLAlchemy + SQLite
+├── docker-compose.yml       # PostgreSQL service (Docker)
+├── .env.example             # Environment variable template
+├── db/
+│   └── init.sql             # PostgreSQL initialization script
+├── backend/                 # FastAPI + SQLAlchemy + PostgreSQL
 │   ├── main.py             # App entry point (port 5000)
 │   ├── config.py           # All configuration constants
-│   ├── database.py         # Async SQLAlchemy engine
+│   ├── database.py         # Async SQLAlchemy engine (asyncpg)
 │   ├── models/             # SQLAlchemy ORM models
 │   │   ├── experiment.py   # Experiment, Participant
 │   │   ├── block.py        # Block, PMTrial, PMAttemptRecord, EncodingQuizAttempt
@@ -44,7 +48,15 @@ CookingForFriends/
 
 ## Quick Start
 
-### Backend
+### 1. Start PostgreSQL (Docker)
+
+```bash
+cd CookingForFriends
+cp .env.example .env        # adjust credentials if needed
+docker compose up -d        # starts PostgreSQL on port 5432
+```
+
+### 2. Backend
 
 ```bash
 conda activate thesis_server
@@ -54,8 +66,9 @@ python main.py
 ```
 
 Backend runs on **port 5000**. API docs at `http://localhost:5000/docs`.
+Tables are auto-created on first startup via SQLAlchemy `create_all()`.
 
-### Frontend (Development)
+### 3. Frontend (Development)
 
 ```bash
 cd CookingForFriends/frontend
@@ -240,10 +253,10 @@ All PM-related timestamps are recorded:
 
 | Component | Technology |
 |-----------|-----------|
-| Backend | Python 3.12, FastAPI, SQLAlchemy (async), aiosqlite |
+| Backend | Python 3.12, FastAPI, SQLAlchemy (async), asyncpg |
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS, Zustand, Framer Motion |
 | Communication | WebSocket (bidirectional) |
-| Database | SQLite (prototype; migration-ready for MySQL) |
+| Database | PostgreSQL 16 (Docker) |
 | State Management | Zustand (frontend), SQLAlchemy models (backend) |
 | Audio | Web Audio API (placeholder tones for trigger effects) |
 
@@ -268,4 +281,5 @@ All PM-related timestamps are recorded:
 
 - **Conda environment**: `thesis_server` (Python 3.12)
 - **Node.js**: v18+ required for Vite
-- **Database**: SQLite at `backend/experiment.db` (auto-created on first run)
+- **Database**: PostgreSQL 16 via Docker (`docker compose up -d`)
+- **Config**: Copy `.env.example` → `.env` and adjust as needed
