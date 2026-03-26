@@ -36,8 +36,8 @@ class Block(Base):
     status: Mapped[str] = mapped_column(
         Enum(BlockStatus), default=BlockStatus.PENDING, nullable=False,
     )
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     nasa_tlx: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     participant: Mapped["Participant"] = relationship("Participant", back_populates="blocks")
@@ -149,7 +149,7 @@ class EncodingQuizAttempt(Base):
     correct_answer: Mapped[str] = mapped_column(String(200), nullable=False)
     is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
     response_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     trial: Mapped["PMTrial"] = relationship("PMTrial", back_populates="quiz_attempts")
 
@@ -166,5 +166,5 @@ class ReminderMessage(Base):
     audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     extra_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     is_placeholder: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

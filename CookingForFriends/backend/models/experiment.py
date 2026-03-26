@@ -32,9 +32,9 @@ class Experiment(Base):
     status: Mapped[str] = mapped_column(
         Enum(ExperimentStatus), default=ExperimentStatus.DRAFT, nullable=False,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc),
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc),
     )
 
     participants: Mapped[list["Participant"]] = relationship(back_populates="experiment")
@@ -55,9 +55,9 @@ class Participant(Base):
         Enum(ParticipantStatus), default=ParticipantStatus.REGISTERED, nullable=False,
     )
     current_block: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     demographic_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     debrief_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
