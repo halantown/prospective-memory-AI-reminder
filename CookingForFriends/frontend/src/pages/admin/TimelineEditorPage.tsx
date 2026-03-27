@@ -28,6 +28,10 @@ interface TimelineEvent {
   data: Record<string, unknown>
 }
 
+interface IndexedTimelineEvent extends TimelineEvent {
+  _origIndex: number
+}
+
 interface TimelineData {
   block_number?: number
   condition?: string
@@ -275,7 +279,7 @@ export default function TimelineEditorPage() {
 
   const sortedEvents = useMemo(() => {
     if (!timeline) return []
-    const evts = timeline.events.map((e, i) => ({ ...e, _origIndex: i }))
+    const evts: IndexedTimelineEvent[] = timeline.events.map((e, i) => ({ ...e, _origIndex: i }))
     evts.sort((a, b) => a.t - b.t)
     if (filterType === 'all') return evts
     return evts.filter(e => e.type === filterType)
@@ -559,7 +563,7 @@ export default function TimelineEditorPage() {
                 </thead>
                 <tbody>
                   {sortedEvents.map((evt, displayIdx) => {
-                    const origIndex = (evt as any)._origIndex as number
+                    const origIndex = evt._origIndex
                     const isExpanded = expandedEvent === origIndex
                     return (
                       <EventRow

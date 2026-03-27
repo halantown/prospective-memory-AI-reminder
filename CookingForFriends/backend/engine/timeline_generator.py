@@ -213,6 +213,11 @@ def generate_block_timeline(
                 if gap < MESSAGE_COOLDOWN_S:
                     msg_events[i]["t"] = msg_events[i - 1]["t"] + MESSAGE_COOLDOWN_S
 
+        # Cap message times to stay within block duration
+        for msg_event in msg_events:
+            if msg_event["t"] >= 600:
+                msg_event["t"] = 599
+
         events.extend(msg_events)
 
     # ── Block end ──

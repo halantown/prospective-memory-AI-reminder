@@ -47,10 +47,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow all origins for development
+# CORS — restrict origins via config (default "*" for dev, set CORS_ORIGINS in production)
+from config import CORS_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,7 +81,13 @@ async def websocket_game(ws: _WebSocket, session_id: str, block_num: int):
 
 @app.websocket("/ws/monitor")
 async def admin_monitor_ws(ws: _WebSocket):
-    """Admin real-time monitoring WebSocket."""
+    """Admin real-time monitoring WebSocket (requires admin API key as query param)."""
+    from config import ADMIN_API_KEY
+    if ADMIN_API_KEY:
+        key = ws.query_params.get("key", "")
+        if key != ADMIN_API_KEY:
+            await ws.close(code=4003, reason="Unauthorized")
+            return
     queue = await manager.connect_admin(ws)
     pump_task = asyncio.create_task(ws_pump(queue, ws))
     try:

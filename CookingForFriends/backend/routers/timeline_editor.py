@@ -5,16 +5,26 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 
-from config import DATA_DIR, MESSAGE_COOLDOWN_S
+from config import DATA_DIR, MESSAGE_COOLDOWN_S, ADMIN_API_KEY
 from engine.timeline import load_timeline
 from engine.timeline_generator import generate_block_timeline
 from engine.pm_tasks import BLOCK_TRIGGER_ORDER, BLOCK_TRIGGER_TIMES, BLOCK_GUESTS
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/admin/timelines")
+
+
+async def _verify_admin(x_admin_key: str | None = Header(None, alias="X-Admin-Key")):
+    """Verify admin API key if configured."""
+    if not ADMIN_API_KEY:
+        return
+    if x_admin_key != ADMIN_API_KEY:
+        raise HTTPException(401, "Invalid or missing admin API key")
+
+
+router = APIRouter(prefix="/api/admin/timelines", dependencies=[Depends(_verify_admin)])
 
 TIMELINES_DIR = DATA_DIR / "timelines"
 
@@ -99,10 +109,12 @@ async def list_timelines():
 @router.get("/file/{filename}")
 async def get_timeline_file(filename: str):
     """Get a static timeline JSON file by filename."""
+    # Reject filenames with path separators before constructing path
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(403, "Invalid filename")
     path = TIMELINES_DIR / filename
     if not path.exists() or not path.suffix == ".json":
         raise HTTPException(404, f"Timeline file not found: {filename}")
-    # Prevent path traversal
     if not path.resolve().is_relative_to(TIMELINES_DIR.resolve()):
         raise HTTPException(403, "Invalid path")
     try:
@@ -116,6 +128,8 @@ async def get_timeline_file(filename: str):
 @router.put("/file/{filename}")
 async def save_timeline_file(filename: str, body: TimelineSaveRequest):
     """Save/update a static timeline JSON file."""
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(403, "Invalid filename")
     path = TIMELINES_DIR / filename
     if not path.suffix == ".json":
         raise HTTPException(400, "Filename must end with .json")

@@ -81,7 +81,12 @@ async def run_timeline(
 
     # Cancel any existing timeline for this slot
     if key in _active_timelines:
-        _active_timelines[key].cancel()
+        old_task = _active_timelines.pop(key)
+        old_task.cancel()
+        try:
+            await old_task
+        except (asyncio.CancelledError, Exception):
+            pass
 
     # Use provided or global db_factory
     factory = db_factory or _db_factory
@@ -412,8 +417,8 @@ def cancel_timeline(participant_id: str, block_number: int):
     """Cancel a running timeline."""
     key = _timeline_key(participant_id, block_number)
     if key in _active_timelines:
-        _active_timelines[key].cancel()
-        del _active_timelines[key]
+        task = _active_timelines.pop(key)
+        task.cancel()
         logger.info(f"Timeline cancelled: {key}")
 
 

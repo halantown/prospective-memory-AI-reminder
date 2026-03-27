@@ -7,6 +7,9 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data")))
 
+# Environment
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
 # Database — PostgreSQL via asyncpg
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -16,6 +19,12 @@ DATABASE_URL = os.getenv(
 # Server
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "5000"))
+
+# CORS — restrict in production
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+
+# Admin API key — required for admin endpoints
+ADMIN_API_KEY: str | None = os.getenv("ADMIN_API_KEY", None)
 
 # Session tokens
 TOKEN_LENGTH = 6
@@ -46,7 +55,13 @@ HEARTBEAT_TIMEOUT_S = 30
 
 # Development seed — set DEV_TOKEN env var to enable dev participant.
 # When set, a dev participant is auto-created/reset on every startup.
+# Only allowed in development mode.
 DEV_TOKEN: str | None = os.getenv("DEV_TOKEN", None)
+if DEV_TOKEN and ENVIRONMENT == "production":
+    raise RuntimeError(
+        "DEV_TOKEN must not be set in production! "
+        "Unset the DEV_TOKEN environment variable."
+    )
 
 # Latin Square — 3 conditions, 6 possible orderings (3×3 Latin Square)
 LATIN_SQUARE = {

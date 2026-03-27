@@ -18,4 +18,3 @@ async def save_snapshot(db: AsyncSession, participant_id: str, block_id: int, st
         state=state,
     )
     db.add(snapshot)
-    await db.commit()

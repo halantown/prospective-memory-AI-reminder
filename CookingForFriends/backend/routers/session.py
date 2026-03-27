@@ -3,8 +3,9 @@
 import uuid
 import time
 import logging
+import collections
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, Request
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +25,11 @@ from config import BLOCKS_PER_PARTICIPANT
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
+# Simple in-memory rate limiter for token attempts
+_token_attempts: dict[str, list[float]] = collections.defaultdict(list)
+_RATE_LIMIT_WINDOW = 60  # seconds
+_RATE_LIMIT_MAX = 10     # max attempts per window
+
 
 def _validate_block_num(block_num: int):
     """Validate block number is within expected range."""
@@ -32,8 +38,18 @@ def _validate_block_num(block_num: int):
 
 
 @router.post("/session/start", response_model=SessionStartResponse)
-async def start_session(req: TokenStartRequest, db: AsyncSession = Depends(get_db)):
+async def start_session(req: TokenStartRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Start a session by presenting the 6-char token."""
+    # Rate limit by client IP
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    attempts = _token_attempts[client_ip]
+    # Prune old attempts outside the window
+    _token_attempts[client_ip] = [t for t in attempts if now - t < _RATE_LIMIT_WINDOW]
+    if len(_token_attempts[client_ip]) >= _RATE_LIMIT_MAX:
+        raise HTTPException(429, "Too many attempts — please wait before trying again")
+    _token_attempts[client_ip].append(now)
+
     token = req.token.strip().upper()
     result = await db.execute(
         select(Participant).where(Participant.token == token)

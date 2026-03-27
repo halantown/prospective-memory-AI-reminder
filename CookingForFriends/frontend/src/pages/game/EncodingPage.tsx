@@ -262,6 +262,10 @@ export default function EncodingPage() {
   const handleConfirmAnswer = () => {
     if (!selected || !card || !sessionId) return
 
+    // Clear any pending quiz timeouts to prevent stale callbacks
+    quizTimeoutsRef.current.forEach(t => clearTimeout(t))
+    quizTimeoutsRef.current = []
+
     const elapsed = Date.now() - quizStartTime
     const qData = getQuestionData(currentQuestionIndex)
     const qType = QUESTION_TYPES[currentQuestionIndex]

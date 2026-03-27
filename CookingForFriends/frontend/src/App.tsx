@@ -72,7 +72,7 @@ function GameShell() {
 
     try {
       const data = JSON.parse(saved)
-      if (!data.session_id) return
+      if (!data.session_id || !data.participant_id || !data.group || !data.condition_order) return
 
       // Restore session and fetch current status
       setSession(data)

@@ -18,6 +18,9 @@ from models.block import PMTrial, PMAttemptRecord
 
 logger = logging.getLogger(__name__)
 
+# Per-participant locks for PM attempt deduplication
+_pm_attempt_locks: dict[str, asyncio.Lock] = {}
+
 
 async def handle_game_ws(
     ws: WebSocket,
@@ -26,6 +29,28 @@ async def handle_game_ws(
     db_factory,
 ):
     """Handle a game WebSocket connection for a participant block."""
+    from config import BLOCKS_PER_PARTICIPANT
+
+    # Validate block_number range
+    if not (1 <= block_number <= BLOCKS_PER_PARTICIPANT):
+        await ws.close(code=4001, reason=f"Invalid block_number: {block_number}")
+        return
+
+    # Validate participant exists before accepting connection
+    try:
+        async with db_factory() as db:
+            from sqlalchemy import select
+            from models.experiment import Participant
+            result = await db.execute(
+                select(Participant.id).where(Participant.id == participant_id)
+            )
+            if not result.scalar_one_or_none():
+                await ws.close(code=4004, reason="Unknown session")
+                return
+    except Exception:
+        await ws.close(code=4000, reason="Validation failed")
+        return
+
     queue, conn_id = await manager.connect_participant(participant_id, ws)
 
     # Create send function bound to this participant
@@ -48,7 +73,7 @@ async def handle_game_ws(
             )
             block = result.scalar_one_or_none()
 
-            if block and block.status in (BlockStatus.PLAYING, "playing"):
+            if block and block.status == BlockStatus.PLAYING:
                 # Resume timeline for reconnecting client
                 condition = block.condition
                 logger.info(f"[GAME_HANDLER] Auto-starting timeline (block already PLAYING) for {participant_id} block {block_number}")
@@ -187,7 +212,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         logger.info(f"[GAME_HANDLER] Block found: id={block.id} status={block.status} condition={block.condition}")
 
         # Only start if block is in encoding or pending state
-        if block.status not in (BlockStatus.PENDING, BlockStatus.ENCODING, "pending", "encoding"):
+        if block.status not in (BlockStatus.PENDING, BlockStatus.ENCODING):
             logger.info(f"[GAME_HANDLER] start_game: block already in state {block.status}, skipping timeline start")
             return
 
@@ -209,7 +234,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
                     )
                 )
                 blk = result.scalar_one_or_none()
-                if blk and blk.status in (BlockStatus.PLAYING, "playing"):
+                if blk and blk.status == BlockStatus.PLAYING:
                     blk.status = BlockStatus.COMPLETED
                     await db.commit()
                     logger.info(f"[GAME_HANDLER] Block {block_number} completed for {participant_id}")
@@ -320,120 +345,121 @@ async def _handle_interaction(participant_id, block_number, event_type, data, db
 
 async def _handle_pm_attempt(participant_id, block_number, data, db_factory):
     """Process a PM attempt — build detailed record and score silently."""
-    # Duplicate guard: check active trigger state first
-    trigger = get_active_trigger(participant_id)
-    if trigger and trigger.get("attempt_received"):
-        logger.warning(f"Duplicate PM attempt from {participant_id}, ignoring")
-        return
-
-    # Mark attempt as received immediately to prevent race with concurrent messages
-    if trigger:
-        trigger["attempt_received"] = True
-
-    async with db_factory() as db:
-        from sqlalchemy import select, update
-        from models.block import Block
-
-        result = await db.execute(
-            select(Block).where(
-                Block.participant_id == participant_id,
-                Block.block_number == block_number,
-            )
-        )
-        block = result.scalar_one_or_none()
-        if not block:
+    # Per-participant lock to prevent concurrent duplicate scoring
+    lock = _pm_attempt_locks.setdefault(participant_id, asyncio.Lock())
+    async with lock:
+        trigger = get_active_trigger(participant_id)
+        if trigger and trigger.get("attempt_received"):
+            logger.warning(f"Duplicate PM attempt from {participant_id}, ignoring")
             return
 
-        # Find the active PM trial (most recently triggered, unscored)
-        result = await db.execute(
-            select(PMTrial).where(
-                PMTrial.block_id == block.id,
-                PMTrial.trigger_fired_at.isnot(None),
-                PMTrial.score.is_(None),
-            ).order_by(PMTrial.trigger_fired_at.desc()).limit(1)
-        )
-        trial = result.scalar_one_or_none()
-        if not trial:
-            logger.debug(f"PM attempt: no unscored trial found for {participant_id}")
-            return
-
-        # Cancel the execution window timer
-        cancel_window(participant_id, trial.id)
-
-        # Gather timing data
-        room_seq = get_room_sequence(participant_id)
-        first_pm_room_ts = get_first_pm_room_entry(participant_id)
-        first_room_switch_ts = room_seq[0]["timestamp"] if room_seq else None
-
-        attempt_time = data.get("timestamp", time.time())
-        action_step = data.get("action_step", data.get("action", ""))
-        target_selected = data.get("target_selected", "")
-        attempt_room = data.get("room", "")
-
-        # Score using the new scorer
-        score, rt_ms = score_pm_attempt(
-            trigger_fired_at=trial.trigger_fired_at,
-            attempt_time=attempt_time,
-            room=attempt_room,
-            target_selected=target_selected,
-            action_performed=action_step,
-            task_config=trial.task_config or {},
-        )
-
-        # Determine action correctness
-        correct_action = trial.task_config.get("target_action", "")
-        action_correct = action_step.lower() == correct_action.lower() if action_step else False
-
-        # Create detailed attempt record
-        attempt_record = PMAttemptRecord(
-            trial_id=trial.id,
-            participant_id=participant_id,
-            block_id=block.id,
-            trigger_fired_at=trial.trigger_fired_at,
-            trigger_received_at=(
-                trigger.get("trigger_received_at") if trigger else None
-            ),
-            first_action_time=attempt_time,
-            first_room_switch_at=first_room_switch_ts,
-            first_pm_room_entered_at=first_pm_room_ts,
-            target_selected_at=data.get("target_selected_at"),
-            action_completed_at=data.get("action_completed_at", attempt_time),
-            room_sequence=[e["room"] for e in room_seq],
-            room=attempt_room,
-            target_selected=target_selected,
-            action_performed=action_step,
-            action_correct=action_correct,
-            total_elapsed_ms=rt_ms,
-            score=score,
-        )
-        db.add(attempt_record)
-
-        # Atomic update: only score if still unscored (prevents race with window expiry)
-        update_result = await db.execute(
-            update(PMTrial)
-            .where(PMTrial.id == trial.id, PMTrial.score.is_(None))
-            .values(
-                user_actions=[data],
-                score=score,
-                response_time_ms=rt_ms,
-                exec_window_end=attempt_time,
-            )
-        )
-        if update_result.rowcount == 0:
-            logger.warning(f"PM attempt: trial {trial.id} already scored (race condition prevented)")
-            await db.rollback()
-            return
-        await db.commit()
-
-        # Mark trigger as PM-completed for resumption lag tracking
         if trigger:
-            trigger["pm_completed"] = True
-            trigger["pm_completed_at"] = data.get("action_completed_at", attempt_time)
+            trigger["attempt_received"] = True
 
-        logger.info(
-            f"PM scored: participant={participant_id} trial={trial.id} "
-            f"score={score} rt={rt_ms}ms"
-        )
+        async with db_factory() as db:
+            from sqlalchemy import select, update
+            from models.block import Block
+
+            result = await db.execute(
+                select(Block).where(
+                    Block.participant_id == participant_id,
+                    Block.block_number == block_number,
+                )
+            )
+            block = result.scalar_one_or_none()
+            if not block:
+                return
+
+            # Find the active PM trial (most recently triggered, unscored)
+            result = await db.execute(
+                select(PMTrial).where(
+                    PMTrial.block_id == block.id,
+                    PMTrial.trigger_fired_at.isnot(None),
+                    PMTrial.score.is_(None),
+                ).order_by(PMTrial.trigger_fired_at.desc()).limit(1)
+            )
+            trial = result.scalar_one_or_none()
+            if not trial:
+                logger.debug(f"PM attempt: no unscored trial found for {participant_id}")
+                return
+
+            # Cancel the execution window timer
+            cancel_window(participant_id, trial.id)
+
+            # Gather timing data
+            room_seq = get_room_sequence(participant_id)
+            first_pm_room_ts = get_first_pm_room_entry(participant_id)
+            first_room_switch_ts = room_seq[0]["timestamp"] if room_seq else None
+
+            attempt_time = data.get("timestamp", time.time())
+            action_step = data.get("action_step", data.get("action", ""))
+            target_selected = data.get("target_selected", "")
+            attempt_room = data.get("room", "")
+
+            # Score using the new scorer
+            score, rt_ms = score_pm_attempt(
+                trigger_fired_at=trial.trigger_fired_at,
+                attempt_time=attempt_time,
+                room=attempt_room,
+                target_selected=target_selected,
+                action_performed=action_step,
+                task_config=trial.task_config or {},
+            )
+
+            # Determine action correctness
+            correct_action = trial.task_config.get("target_action", "")
+            action_correct = action_step.lower() == correct_action.lower() if action_step else False
+
+            # Create detailed attempt record
+            attempt_record = PMAttemptRecord(
+                trial_id=trial.id,
+                participant_id=participant_id,
+                block_id=block.id,
+                trigger_fired_at=trial.trigger_fired_at,
+                trigger_received_at=(
+                    trigger.get("trigger_received_at") if trigger else None
+                ),
+                first_action_time=attempt_time,
+                first_room_switch_at=first_room_switch_ts,
+                first_pm_room_entered_at=first_pm_room_ts,
+                target_selected_at=data.get("target_selected_at"),
+                action_completed_at=data.get("action_completed_at", attempt_time),
+                room_sequence=[e["room"] for e in room_seq],
+                room=attempt_room,
+                target_selected=target_selected,
+                action_performed=action_step,
+                action_correct=action_correct,
+                total_elapsed_ms=rt_ms,
+                score=score,
+            )
+            db.add(attempt_record)
+
+            # Atomic update: only score if still unscored (prevents race with window expiry)
+            update_result = await db.execute(
+                update(PMTrial)
+                .where(PMTrial.id == trial.id, PMTrial.score.is_(None))
+                .values(
+                    user_actions=[data],
+                    score=score,
+                    response_time_ms=rt_ms,
+                    exec_window_end=attempt_time,
+                )
+            )
+            if update_result.rowcount == 0:
+                logger.warning(f"PM attempt: trial {trial.id} already scored (race condition prevented)")
+                await db.rollback()
+                return
+            await db.commit()
+
+            # Mark trigger as PM-completed for resumption lag tracking
+            if trigger:
+                trigger["pm_completed"] = True
+                trigger["pm_completed_at"] = data.get("action_completed_at", attempt_time)
+
+            logger.info(
+                f"PM scored: participant={participant_id} trial={trial.id} "
+                f"score={score} rt={rt_ms}ms"
+            )
 
 
 async def _record_resumption_lag(trial_id: int, lag_ms: int, db_factory):
@@ -544,6 +570,12 @@ async def _handle_phone_read(participant_id, block_number, data, db_factory):
 
 async def _handle_mouse(participant_id, block_number, data, db_factory):
     """Store mouse tracking batch."""
+    MAX_MOUSE_BATCH = 5000
+    samples = data if isinstance(data, list) else [data]
+    if len(samples) > MAX_MOUSE_BATCH:
+        logger.warning(f"Mouse batch too large ({len(samples)}), truncating to {MAX_MOUSE_BATCH}")
+        samples = samples[:MAX_MOUSE_BATCH]
+
     async with db_factory() as db:
         from sqlalchemy import select
         from models.block import Block
@@ -560,7 +592,7 @@ async def _handle_mouse(participant_id, block_number, data, db_factory):
         track = MouseTrack(
             participant_id=participant_id,
             block_id=block_id,
-            data=data if isinstance(data, list) else [data],
+            data=samples,
         )
         db.add(track)
         await db.commit()

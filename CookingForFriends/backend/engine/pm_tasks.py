@@ -449,7 +449,7 @@ BLOCK_TRIGGER_TIMES: dict[int, dict[str, int]] = {
 ACTIVITY_WATCH_CONFIG: dict[str, dict] = {
     "b1_soap":        {"watch_from": 440, "fallback": 530, "condition": "all_steaks_plated"},
     "b2_napkinrings": {"watch_from": 430, "fallback": 520, "condition": "table_full_set"},
-    "b3_speaker":     {"watch_from": 450, "fallback": 540, "condition": "message_batch_end"},
+    "b3_speaker":     {"watch_from": 450, "fallback": 525, "condition": "message_batch_end"},
 }
 
 # Guest names per block

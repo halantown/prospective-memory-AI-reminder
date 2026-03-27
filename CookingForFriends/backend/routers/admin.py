@@ -6,8 +6,8 @@ import time
 import random
 import logging
 from dataclasses import asdict
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, WebSocket
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, Header
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,10 +22,18 @@ from engine.pm_tasks import (
     task_def_to_config, task_def_to_encoding_card,
 )
 from websocket.connection_manager import manager
-from config import LATIN_SQUARE
+from config import LATIN_SQUARE, ADMIN_API_KEY
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/admin")
+router = APIRouter(prefix="/api/admin", dependencies=[Depends(verify_admin)])
+
+
+async def verify_admin(x_admin_key: str | None = Header(None, alias="X-Admin-Key")):
+    """Verify admin API key if configured."""
+    if not ADMIN_API_KEY:
+        return  # No key configured — skip auth (development mode)
+    if x_admin_key != ADMIN_API_KEY:
+        raise HTTPException(401, "Invalid or missing admin API key")
 
 # Day stories per block, using the real guest names
 DAY_STORIES = {
@@ -608,7 +616,7 @@ async def force_trigger(session_id: str, db: AsyncSession = Depends(get_db)):
     # Find the current playing block
     result = await db.execute(
         select(Block)
-        .where(Block.participant_id == session_id, Block.status == BlockStatus.playing)
+        .where(Block.participant_id == session_id, Block.status == BlockStatus.PLAYING)
     )
     block = result.scalar_one_or_none()
     if not block:
@@ -617,7 +625,7 @@ async def force_trigger(session_id: str, db: AsyncSession = Depends(get_db)):
     # Find the next un-triggered trial
     trials_result = await db.execute(
         select(PMTrial)
-        .where(PMTrial.block_id == block.id, PMTrial.trigger_fired_at == None)
+        .where(PMTrial.block_id == block.id, PMTrial.trigger_fired_at.is_(None))
         .order_by(PMTrial.trial_number)
     )
     trial = trials_result.scalars().first()
@@ -686,7 +694,7 @@ async def advance_block(session_id: str, db: AsyncSession = Depends(get_db)):
     # Find current playing block
     blocks_result = await db.execute(
         select(Block)
-        .where(Block.participant_id == session_id, Block.status == BlockStatus.playing)
+        .where(Block.participant_id == session_id, Block.status == BlockStatus.PLAYING)
     )
     block = blocks_result.scalar_one_or_none()
     if not block:
@@ -696,16 +704,16 @@ async def advance_block(session_id: str, db: AsyncSession = Depends(get_db)):
     cancel_timeline(session_id, block.block_number)
 
     # Mark block completed
-    block.status = BlockStatus.completed
-    block.ended_at = datetime.utcnow()
+    block.status = BlockStatus.COMPLETED
+    block.ended_at = datetime.now(timezone.utc)
 
     # Advance participant to next block
     next_block_num = block.block_number + 1
     if next_block_num <= 3:
         p.current_block = next_block_num
     else:
-        p.status = ParticipantStatus.completed
-        p.completed_at = datetime.utcnow()
+        p.status = ParticipantStatus.COMPLETED
+        p.completed_at = datetime.now(timezone.utc)
 
     await db.commit()
 

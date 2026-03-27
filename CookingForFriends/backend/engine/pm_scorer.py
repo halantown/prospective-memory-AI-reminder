@@ -53,8 +53,6 @@ def score_pm_attempt(
             target_correct = True
         elif task_id and sel == f"{task_id}_target":
             target_correct = True
-        elif task_id and sel.endswith("_target") and sel.startswith(task_id):
-            target_correct = True
 
     action_correct = (
         action_performed is not None

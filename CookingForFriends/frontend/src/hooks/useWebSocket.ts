@@ -23,7 +23,8 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
     let msg: { event: string; data: Record<string, unknown>; server_ts?: number }
     try {
       msg = JSON.parse(event.data)
-    } catch {
+    } catch (e) {
+      console.error('[WS] Failed to parse message:', e, event.data?.slice?.(0, 200))
       return
     }
 

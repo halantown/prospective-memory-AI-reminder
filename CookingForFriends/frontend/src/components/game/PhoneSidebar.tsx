@@ -337,7 +337,7 @@ function MessageBubble({
       {/* Reply buttons — vertical stack, full width */}
       {hasReplies && !msg.replied && (
         <div className="px-3 pb-3 flex flex-col gap-1.5">
-          {msg.replies!.map((reply) => (
+          {msg.replies?.map((reply) => (
             <button
               key={reply.id}
               onClick={(e) => {
