@@ -220,6 +220,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         block.started_at = block.started_at or datetime.now(timezone.utc)
         await db.commit()
         condition = block.condition
+        block_id = block.id
 
     async def _on_block_complete():
         """Mark block as completed when timeline finishes normally."""
@@ -241,17 +242,29 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         except Exception as e:
             logger.error(f"[GAME_HANDLER] Failed to mark block complete: {e}")
 
-    # Start the timeline
+    # Start the timeline — rollback block status on failure
     logger.info(f"[GAME_HANDLER] Creating TimelineEngine for {participant_id} block {block_number} ({condition})")
-    task = await run_timeline(
-        participant_id=participant_id,
-        block_number=block_number,
-        condition=condition,
-        send_fn=send_fn,
-        on_complete=_on_block_complete,
-        db_factory=db_factory,
-    )
-    logger.info(f"[GAME_HANDLER] Timeline task created: {task}")
+    try:
+        task = await run_timeline(
+            participant_id=participant_id,
+            block_number=block_number,
+            condition=condition,
+            send_fn=send_fn,
+            on_complete=_on_block_complete,
+            db_factory=db_factory,
+        )
+        logger.info(f"[GAME_HANDLER] Timeline task created: {task}")
+    except Exception as e:
+        logger.error(f"[GAME_HANDLER] Timeline start failed, rolling back block status: {e}")
+        async with db_factory() as db:
+            from sqlalchemy import update as sql_update
+            await db.execute(
+                sql_update(Block)
+                .where(Block.id == block_id)
+                .values(status=BlockStatus.ENCODING)
+            )
+            await db.commit()
+        raise
 
 
 async def _handle_heartbeat(participant_id: str, db_factory):

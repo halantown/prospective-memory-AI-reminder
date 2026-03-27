@@ -79,9 +79,11 @@ class ConnectionManager:
         for ws, queue in self._connections[participant_id]:
             try:
                 if critical:
-                    await queue.put(msg)
+                    await asyncio.wait_for(queue.put(msg), timeout=5.0)
                 else:
                     queue.put_nowait(msg)
+            except asyncio.TimeoutError:
+                logger.error(f"Queue put timed out for {participant_id}, dropping critical event {event_type}")
             except asyncio.QueueFull:
                 logger.warning(f"Queue full for {participant_id}, dropping non-critical event {event_type}")
 

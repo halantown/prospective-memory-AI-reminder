@@ -1,6 +1,6 @@
 """Condition assignment via Latin Square (3 levels, 6 groups)."""
 
-import random
+import secrets
 import string
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +28,7 @@ def get_condition_order(group: str) -> list[str]:
 async def generate_token(db: AsyncSession) -> str:
     """Generate a unique 6-character token."""
     for _ in range(50):
-        token = "".join(random.choices(TOKEN_CHARSET, k=TOKEN_LENGTH))
+        token = "".join(secrets.choice(TOKEN_CHARSET) for _ in range(TOKEN_LENGTH))
         existing = await db.execute(
             select(Participant).where(Participant.token == token)
         )

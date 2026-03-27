@@ -6,6 +6,7 @@ Entry point for FastAPI application.
 import asyncio
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from config import HOST, PORT
+from config import HOST, PORT, HEARTBEAT_TIMEOUT_S
 from database import init_db, seed_dev_participant
 from engine.timeline import cancel_all
 
@@ -22,6 +23,34 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+async def _heartbeat_monitor():
+    """Periodically mark participants as offline if their heartbeat has expired."""
+    from sqlalchemy import update
+    from models.experiment import Participant
+    from database import async_session
+
+    while True:
+        try:
+            await asyncio.sleep(HEARTBEAT_TIMEOUT_S)
+            cutoff = time.time() - HEARTBEAT_TIMEOUT_S
+            async with async_session() as db:
+                result = await db.execute(
+                    update(Participant)
+                    .where(
+                        Participant.is_online.is_(True),
+                        Participant.last_heartbeat < cutoff,
+                    )
+                    .values(is_online=False)
+                )
+                await db.commit()
+                if result.rowcount > 0:
+                    logger.info(f"Heartbeat monitor: marked {result.rowcount} stale participant(s) offline")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error(f"Heartbeat monitor error: {e}")
 
 
 @asynccontextmanager
@@ -36,8 +65,16 @@ async def lifespan(app: FastAPI):
     from engine.timeline import set_db_factory
     set_db_factory(async_session)
 
+    # Background task: mark stale participants as offline
+    heartbeat_task = asyncio.create_task(_heartbeat_monitor())
+
     yield
     logger.info("Shutting down...")
+    heartbeat_task.cancel()
+    try:
+        await heartbeat_task
+    except asyncio.CancelledError:
+        pass
     cancel_all()
 
 

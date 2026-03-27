@@ -399,9 +399,10 @@ async def _on_window_expire(
         return
 
     async with factory() as db:
-        await db.execute(
+        # Only score if still unscored — prevents race with manual PM attempt
+        result = await db.execute(
             update(PMTrial)
-            .where(PMTrial.id == trial_id)
+            .where(PMTrial.id == trial_id, PMTrial.score.is_(None))
             .values(
                 score=0,
                 exec_window_end=time.time(),
@@ -410,7 +411,10 @@ async def _on_window_expire(
         await db.commit()
 
     clear_active_trigger(participant_id)
-    logger.info(f"Auto-scored expired trial: trial={trial_id} score=0")
+    if result.rowcount > 0:
+        logger.info(f"Auto-scored expired trial: trial={trial_id} score=0")
+    else:
+        logger.info(f"Skipped auto-score for trial {trial_id} — already scored (race avoided)")
 
 
 def cancel_timeline(participant_id: str, block_number: int):
@@ -496,8 +500,10 @@ def _register_activity_watcher(
     async def _fallback():
         """Fire the trigger if condition not met by deadline."""
         wait = fallback_at - time.time()
+        # Cap wait time to prevent extremely long sleeps from clock adjustments
+        max_wait = 900  # 15 minutes absolute maximum
         if wait > 0:
-            await asyncio.sleep(wait)
+            await asyncio.sleep(min(wait, max_wait))
 
         if watcher_key not in _activity_watchers:
             return  # already fired by condition
