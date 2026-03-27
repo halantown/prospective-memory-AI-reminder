@@ -124,6 +124,8 @@ async def handle_game_ws(
             cancel_all_windows_for_participant(participant_id)
         else:
             logger.info(f"Skipping timeline/window cleanup for {participant_id} — superseded by newer connection")
+        # Clean up per-participant PM attempt lock
+        _pm_attempt_locks.pop(participant_id, None)
         # Only mark offline if no active connections remain
         if not manager.has_active_connections(participant_id):
             await _set_participant_offline(participant_id, db_factory)

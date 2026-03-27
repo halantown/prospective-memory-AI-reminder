@@ -25,7 +25,6 @@ from websocket.connection_manager import manager
 from config import LATIN_SQUARE, ADMIN_API_KEY
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/admin", dependencies=[Depends(verify_admin)])
 
 
 async def verify_admin(x_admin_key: str | None = Header(None, alias="X-Admin-Key")):
@@ -34,6 +33,9 @@ async def verify_admin(x_admin_key: str | None = Header(None, alias="X-Admin-Key
         return  # No key configured — skip auth (development mode)
     if x_admin_key != ADMIN_API_KEY:
         raise HTTPException(401, "Invalid or missing admin API key")
+
+
+router = APIRouter(prefix="/api/admin", dependencies=[Depends(verify_admin)])
 
 # Day stories per block, using the real guest names
 DAY_STORIES = {
@@ -613,6 +615,9 @@ async def get_pm_attempts(session_id: str, db: AsyncSession = Depends(get_db)):
 @router.post("/participant/{session_id}/force-trigger")
 async def force_trigger(session_id: str, db: AsyncSession = Depends(get_db)):
     """Force-fire the next pending PM trigger for a participant."""
+    from engine.execution_window import start_window
+    from engine.timeline import _on_window_expire
+
     # Find the current playing block
     result = await db.execute(
         select(Block)
@@ -639,6 +644,16 @@ async def force_trigger(session_id: str, db: AsyncSession = Depends(get_db)):
     trial.trigger_fired_at = now
     trial.exec_window_start = now
     await db.commit()
+
+    # Start silent execution window so unanswered forced triggers auto-score as 0
+    start_window(
+        participant_id=session_id,
+        trial_id=trial.id,
+        block_id=block.id,
+        trigger_time=now,
+        task_config=cfg,
+        on_expire=_on_window_expire,
+    )
 
     # Send trigger event to participant via WS
     trigger_data = {

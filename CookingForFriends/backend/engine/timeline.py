@@ -409,9 +409,10 @@ async def _on_window_expire(
             )
         )
         await db.commit()
+        rows_updated = result.rowcount
 
     clear_active_trigger(participant_id)
-    if result.rowcount > 0:
+    if rows_updated > 0:
         logger.info(f"Auto-scored expired trial: trial={trial_id} score=0")
     else:
         logger.info(f"Skipped auto-score for trial {trial_id} — already scored (race avoided)")

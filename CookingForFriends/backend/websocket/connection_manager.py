@@ -92,7 +92,7 @@ class ConnectionManager:
         msg = json.dumps({"event": "admin_update", "data": data, "server_ts": time.time()})
         for ws, queue in self._admin_connections:
             try:
-                await queue.put(msg)
+                queue.put_nowait(msg)
             except asyncio.QueueFull:
                 pass
 
