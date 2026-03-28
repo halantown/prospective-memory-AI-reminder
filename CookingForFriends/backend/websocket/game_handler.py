@@ -491,20 +491,20 @@ async def _record_resumption_lag(trial_id: int, lag_ms: int, db_factory):
 
 
 async def _handle_phone_reply(participant_id, block_number, data, db_factory):
-    """Handle a phone message True/False answer — validate and log."""
+    """Handle a phone message answer — validate choice index and log."""
     from engine.message_loader import get_message, check_answer
     from sqlalchemy import select, update
 
     message_id = data.get("message_id", "")
-    user_choice = data.get("user_choice")  # boolean: True or False
+    choice_index = data.get("choice_index")  # int: 0 or 1
     timestamp = data.get("timestamp", time.time())
 
-    if not message_id or user_choice is None:
+    if not message_id or choice_index is None:
         return
 
     # Check correctness from the message pool
     message = get_message(block_number, message_id)
-    is_correct = check_answer(message, bool(user_choice)) if message else None
+    is_correct = check_answer(message, int(choice_index)) if message else None
 
     async with db_factory() as db:
         from models.block import Block
@@ -540,7 +540,7 @@ async def _handle_phone_reply(participant_id, block_number, data, db_factory):
             )
             .values(
                 replied_at=timestamp,
-                user_choice=bool(user_choice),
+                user_choice=int(choice_index),
                 reply_correct=is_correct,
                 response_time_ms=response_time_ms,
                 status=status,

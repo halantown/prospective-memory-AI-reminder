@@ -7,7 +7,6 @@ import type { ActivePMTrial, PMTaskConfig, RoomId } from '../types'
 const HEARTBEAT_INTERVAL = 10_000
 const RECONNECT_BASE_MS = 500
 const RECONNECT_MAX_MS = 5_000
-const PHONE_MESSAGE_EXPIRY_MS = 20_000
 
 export function useWebSocket(sessionId: string | null, blockNumber: number) {
   const wsRef = useRef<WebSocket | null>(null)
@@ -123,9 +122,9 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
           avatar: (data.avatar as string) || '💬',
           text: data.text as string,
           category: category as 'question' | 'notification',
-          correctAnswer: data.correct_answer as boolean | undefined,
+          choices: data.choices as string[] | undefined,
+          correctIndex: data.correct_index as number | undefined,
           timestamp: now,
-          expiresAt: now + PHONE_MESSAGE_EXPIRY_MS,
           status: 'active' as const,
           read: false,
         }

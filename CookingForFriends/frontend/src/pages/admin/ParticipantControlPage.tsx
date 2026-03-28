@@ -57,8 +57,8 @@ interface PhoneLog {
   sent_at: number
   read_at: number | null
   replied_at: number | null
-  user_choice: boolean | null
-  correct_answer: boolean | null
+  user_choice: number | null
+  correct_answer: number | null
   reply_correct: boolean | null
   response_time_ms: number | null
   status: string | null
@@ -596,7 +596,7 @@ function PhoneTab({ logs }: { logs: PhoneLog[] }) {
                   {log.replied_at ? fmtEpoch(log.replied_at) : <span className="text-slate-300">—</span>}
                 </td>
                 <td className="px-3 py-1.5 text-slate-600 truncate">
-                  {log.user_choice === true ? 'True' : log.user_choice === false ? 'False' : '—'}
+                  {log.user_choice !== null ? `Choice ${log.user_choice}` : '—'}
                 </td>
                 <td className="px-3 py-1.5 text-center">
                   {log.reply_correct === true ? '✅' : log.reply_correct === false ? '❌' : '—'}

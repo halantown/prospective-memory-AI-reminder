@@ -146,13 +146,13 @@ export interface PhoneMessage {
   avatar: string
   text: string
   category: 'question' | 'notification'
-  correctAnswer?: boolean
+  choices?: string[]
+  correctIndex?: number
   timestamp: number
-  expiresAt: number
-  status: 'active' | 'answered_correct' | 'answered_incorrect' | 'expired'
+  status: 'active' | 'answered_correct' | 'answered_incorrect' | 'dismissed'
   read: boolean
   respondedAt?: number
-  userChoice?: boolean
+  userChoice?: number
 }
 
 /** @deprecated Use PhoneMessage instead — kept for backward compat with old phone_notification events */

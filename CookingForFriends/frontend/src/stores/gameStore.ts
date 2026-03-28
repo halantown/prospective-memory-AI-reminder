@@ -8,8 +8,8 @@ import type {
 
 const EMPTY_SEAT: SeatState = { plate: false, knife: false, fork: false, glass: false }
 
-/** Max visible phone messages at any time. */
-const MAX_PHONE_MESSAGES = 3
+/** Max visible phone messages — when a new one arrives and we're at max, oldest gets dismissed. */
+const MAX_PHONE_MESSAGES = 5
 
 interface GameState {
   // ── Session ──
@@ -94,7 +94,7 @@ interface GameState {
   setPhoneLocked: (locked: boolean) => void
   markNotificationRead: (id: string) => void
   markMessageRead: (id: string) => void
-  answerPhoneMessage: (messageId: string, userChoice: boolean) => void
+  answerPhoneMessage: (messageId: string, choiceIndex: number) => void
   expirePhoneMessage: (id: string) => void
   removePhoneMessage: (id: string) => void
   setPhoneBanner: (msg: PhoneMessage | null) => void
@@ -259,12 +259,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   // Phone
   addPhoneMessage: (msg) => set((s) => {
     let messages = [...s.phoneMessages, msg]
-    // Enforce max visible: force-expire oldest active if over limit
+    // Enforce max visible: dismiss oldest active if over limit
     const active = messages.filter(m => m.status === 'active')
     if (active.length > MAX_PHONE_MESSAGES) {
       const oldest = active[0]
       messages = messages.map(m =>
-        m.id === oldest.id ? { ...m, status: 'expired' as const } : m
+        m.id === oldest.id ? { ...m, status: 'dismissed' as const } : m
       )
     }
     return { phoneMessages: messages }
@@ -283,21 +283,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       m.id === id ? { ...m, read: true } : m
     ),
   })),
-  answerPhoneMessage: (messageId, userChoice) => set((s) => ({
+  answerPhoneMessage: (messageId, choiceIndex) => set((s) => ({
     phoneMessages: s.phoneMessages.map((m) => {
       if (m.id !== messageId || m.status !== 'active') return m
-      const isCorrect = m.correctAnswer !== undefined && userChoice === m.correctAnswer
+      const isCorrect = m.correctIndex !== undefined && choiceIndex === m.correctIndex
       return {
         ...m,
         status: (isCorrect ? 'answered_correct' : 'answered_incorrect') as PhoneMessage['status'],
-        userChoice,
+        userChoice: choiceIndex,
         respondedAt: Date.now(),
       }
     }),
   })),
   expirePhoneMessage: (id) => set((s) => ({
     phoneMessages: s.phoneMessages.map((m) =>
-      m.id === id && m.status === 'active' ? { ...m, status: 'expired' as const } : m
+      m.id === id && m.status === 'active' ? { ...m, status: 'dismissed' as const } : m
     ),
   })),
   removePhoneMessage: (id) => set((s) => ({

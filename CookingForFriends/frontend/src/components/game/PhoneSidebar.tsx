@@ -1,11 +1,12 @@
-/** Phone sidebar — iPhone shell with message system (v2).
+/** Phone sidebar — iPhone shell with message system (v3).
  *
  *  Three visual categories, one card layout:
- *    1. Question  → factual statement + True / False buttons
+ *    1. Question  → life-context message + two choice buttons
  *    2. Notification → text only, no buttons
  *    3. PM trigger  → identical to notification (frontend never knows)
  *
- *  Every card has a 20 s countdown bar. Max 3 visible. No scrolling.
+ *  Messages stay visible until pushed off by newer messages.
+ *  Card height adapts to content. No countdown bar.
  *  Correct/incorrect answers flash green/red then fade out.
  */
 
@@ -17,14 +18,8 @@ import { useSoundEffects } from '../../hooks/useSoundEffects'
 
 const LOCK_TIMEOUT = 15_000
 const BANNER_DURATION = 3_000
-const PHONE_MESSAGE_EXPIRY_MS = 20_000
-const EXPIRY_CHECK_INTERVAL = 100
 const FEEDBACK_FLASH_MS = 200
 const FADE_OUT_MS = 300
-
-/* ─── Card height: all three categories share one fixed size ─── */
-const CARD_HEIGHT = 172         // px — fits sender + text + buttons + bar
-const CARD_GAP = 8              // px between cards
 
 export default function PhoneSidebar() {
   const messages = useGameStore((s) => s.phoneMessages)
@@ -32,7 +27,6 @@ export default function PhoneSidebar() {
   const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
   const markMessageRead = useGameStore((s) => s.markMessageRead)
   const answerPhoneMessage = useGameStore((s) => s.answerPhoneMessage)
-  const expirePhoneMessage = useGameStore((s) => s.expirePhoneMessage)
   const removePhoneMessage = useGameStore((s) => s.removePhoneMessage)
   const gameClock = useGameStore((s) => s.gameClock)
   const wsSend = useGameStore((s) => s.wsSend)
@@ -44,37 +38,22 @@ export default function PhoneSidebar() {
   const play = useSoundEffects()
   const [panelPulse, setPanelPulse] = useState(false)
 
-  // Active messages (newest at bottom, max 3)
+  // Active messages (newest at bottom)
   const activeMessages = useMemo(() => {
     return messages
       .filter(m => m.status === 'active')
       .sort((a, b) => a.timestamp - b.timestamp)
-      .slice(-3)
   }, [messages])
 
-  // ── Expiry check: runs every 100ms ──
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now()
-      const store = useGameStore.getState()
-      for (const msg of store.phoneMessages) {
-        if (msg.status === 'active' && now >= msg.expiresAt) {
-          store.expirePhoneMessage(msg.id)
-        }
-      }
-    }, EXPIRY_CHECK_INTERVAL)
-    return () => clearInterval(interval)
-  }, [])
-
-  // ── Remove messages after fade-out animation completes ──
+  // Remove messages after fade-out animation completes
   useEffect(() => {
     const fading = messages.filter(m =>
-      m.status === 'expired' || m.status === 'answered_correct' || m.status === 'answered_incorrect'
+      m.status === 'dismissed' || m.status === 'answered_correct' || m.status === 'answered_incorrect'
     )
     if (fading.length === 0) return
 
     const timers = fading.map(msg => {
-      const delay = msg.status === 'expired'
+      const delay = msg.status === 'dismissed'
         ? FADE_OUT_MS
         : FEEDBACK_FLASH_MS + FADE_OUT_MS
       return setTimeout(() => removePhoneMessage(msg.id), delay)
@@ -82,7 +61,7 @@ export default function PhoneSidebar() {
     return () => timers.forEach(clearTimeout)
   }, [messages, removePhoneMessage])
 
-  // ── Auto-lock after timeout ──
+  // Auto-lock after timeout
   useEffect(() => {
     if (locked) return
     const interval = setInterval(() => {
@@ -93,12 +72,11 @@ export default function PhoneSidebar() {
     return () => clearInterval(interval)
   }, [locked, setPhoneLocked])
 
-  // ── Banner: play chime, pulse panel, auto-dismiss ──
+  // Banner: play chime, pulse panel, auto-dismiss
   useEffect(() => {
     if (banner) {
       play('phoneMessage')
 
-      // Panel border pulse
       setPanelPulse(true)
       const pulseTimer = setTimeout(() => setPanelPulse(false), 150)
 
@@ -143,16 +121,16 @@ export default function PhoneSidebar() {
     }
   }, [markMessageRead, wsSend])
 
-  const handleAnswer = useCallback((msg: PhoneMessage, userChoice: boolean) => {
+  const handleAnswer = useCallback((msg: PhoneMessage, choiceIndex: number) => {
     if (msg.status !== 'active' || msg.category !== 'question') return
-    answerPhoneMessage(msg.id, userChoice)
+    answerPhoneMessage(msg.id, choiceIndex)
     lastActivityRef.current = Date.now()
     if (wsSend) {
       wsSend({
         type: 'phone_reply',
         data: {
           message_id: msg.id,
-          user_choice: userChoice,
+          choice_index: choiceIndex,
           timestamp: Date.now() / 1000,
         },
       })
@@ -275,11 +253,8 @@ export default function PhoneSidebar() {
                 </button>
               </div>
 
-              {/* Message card area — exactly 3 slots, no scroll */}
-              <div
-                className="flex-1 flex flex-col justify-end px-3 py-2 overflow-hidden"
-                style={{ gap: `${CARD_GAP}px` }}
-              >
+              {/* Message list — scrollable overflow hidden, newest at bottom */}
+              <div className="flex-1 flex flex-col justify-end px-3 py-2 gap-2 overflow-hidden">
                 {activeMessages.length === 0 && messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-slate-500">
                     <span className="text-3xl mb-2">📭</span>
@@ -288,15 +263,14 @@ export default function PhoneSidebar() {
                 ) : (
                   <AnimatePresence mode="popLayout">
                     {messages
-                      .filter(m => m.status !== 'expired' || true)  // show all for animation
+                      .filter(m => m.status === 'active' || m.status === 'answered_correct' || m.status === 'answered_incorrect' || m.status === 'dismissed')
                       .sort((a, b) => a.timestamp - b.timestamp)
-                      .slice(-3)
                       .map((msg) => (
                         <MessageCard
                           key={msg.id}
                           msg={msg}
                           onRead={() => handleReadMessage(msg)}
-                          onAnswer={(choice) => handleAnswer(msg, choice)}
+                          onAnswer={(choiceIndex) => handleAnswer(msg, choiceIndex)}
                         />
                       ))}
                   </AnimatePresence>
@@ -317,7 +291,7 @@ export default function PhoneSidebar() {
 
 
 /* ═══════════════════════════════════════════════════════════════
-   MessageCard — unified layout for all categories
+   MessageCard — unified layout, dynamic height, choice buttons
    ═══════════════════════════════════════════════════════════════ */
 
 function MessageCard({
@@ -327,10 +301,8 @@ function MessageCard({
 }: {
   msg: PhoneMessage
   onRead: () => void
-  onAnswer: (choice: boolean) => void
+  onAnswer: (choiceIndex: number) => void
 }) {
-  const [progress, setProgress] = useState(1) // 1 → 0 over expiry window
-
   // Mark as read after brief visibility
   useEffect(() => {
     if (!msg.read && msg.status === 'active') {
@@ -339,21 +311,9 @@ function MessageCard({
     }
   }, [msg.read, msg.status, onRead])
 
-  // Countdown progress bar
-  useEffect(() => {
-    if (msg.status !== 'active') return
-    const tick = () => {
-      const remaining = msg.expiresAt - Date.now()
-      setProgress(Math.max(0, remaining / PHONE_MESSAGE_EXPIRY_MS))
-    }
-    tick()
-    const interval = setInterval(tick, 50)
-    return () => clearInterval(interval)
-  }, [msg.expiresAt, msg.status])
-
   const isAnswered = msg.status === 'answered_correct' || msg.status === 'answered_incorrect'
-  const isExpired = msg.status === 'expired'
-  const isFading = isAnswered || isExpired
+  const isDismissed = msg.status === 'dismissed'
+  const isFading = isAnswered || isDismissed
 
   // Border color for feedback flash
   const borderColor =
@@ -380,12 +340,11 @@ function MessageCard({
         borderColor: { duration: 0.1 },
         layout: { type: 'spring', stiffness: 300, damping: 30 },
       }}
-      style={{ height: CARD_HEIGHT, minHeight: CARD_HEIGHT, maxHeight: CARD_HEIGHT }}
-      className="rounded-2xl border-2 overflow-hidden bg-slate-800/40 flex flex-col"
+      className="rounded-2xl border-2 overflow-hidden bg-slate-800/40 flex flex-col shrink-0"
     >
       {/* Header: avatar + sender */}
-      <div className="p-3 pb-1">
-        <div className="flex items-center gap-2 mb-1.5">
+      <div className="px-3 pt-2.5 pb-1">
+        <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-blue-600/50 flex items-center justify-center
                           text-xs font-bold text-blue-200 flex-shrink-0">
             {msg.avatar}
@@ -394,45 +353,30 @@ function MessageCard({
         </div>
       </div>
 
-      {/* Message body — flex-1 to fill remaining space */}
-      <div className="flex-1 px-3 flex items-start">
+      {/* Message body */}
+      <div className="px-3 pb-2">
         <p className="text-[12px] leading-relaxed text-slate-200 pl-9">
           {msg.text}
         </p>
       </div>
 
-      {/* True / False buttons — only for questions with active status */}
-      {msg.category === 'question' && msg.status === 'active' && (
-        <div className="px-3 pb-2 flex gap-2">
-          <button
-            onClick={(e) => { e.stopPropagation(); onAnswer(true) }}
-            className="flex-1 h-[34px] text-[12px] font-semibold rounded-lg
-                       bg-emerald-600/20 text-emerald-300 border border-emerald-500/30
-                       hover:bg-emerald-600/40 hover:border-emerald-400/50
-                       transition-colors active:scale-95"
-          >
-            True
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onAnswer(false) }}
-            className="flex-1 h-[34px] text-[12px] font-semibold rounded-lg
-                       bg-red-600/20 text-red-300 border border-red-500/30
-                       hover:bg-red-600/40 hover:border-red-400/50
-                       transition-colors active:scale-95"
-          >
-            False
-          </button>
+      {/* Choice buttons — only for questions with active status */}
+      {msg.category === 'question' && msg.status === 'active' && msg.choices && (
+        <div className="px-3 pb-2.5 flex gap-2">
+          {msg.choices.map((choice, idx) => (
+            <button
+              key={idx}
+              onClick={(e) => { e.stopPropagation(); onAnswer(idx) }}
+              className="flex-1 py-2 px-2 text-[11px] font-medium rounded-xl
+                         bg-blue-600/15 text-blue-200 border border-blue-500/25
+                         hover:bg-blue-600/30 hover:border-blue-400/40
+                         transition-colors active:scale-95 leading-tight"
+            >
+              {choice}
+            </button>
+          ))}
         </div>
       )}
-
-      {/* Countdown progress bar — all categories */}
-      <div className="h-[3px] bg-slate-700/30 w-full mt-auto">
-        <motion.div
-          className="h-full bg-blue-500/60 origin-left"
-          style={{ scaleX: progress }}
-          transition={{ duration: 0.05, ease: 'linear' }}
-        />
-      </div>
     </motion.div>
   )
 }

@@ -468,7 +468,7 @@ async def _log_phone_message_sent(
                 sender=message.get("sender", ""),
                 message_type=msg_type,
                 category=category,
-                correct_answer=message.get("correct_answer") if msg_type == "question" else None,
+                correct_answer=message.get("correct_index") if msg_type == "question" else None,
                 sent_at=sent_at,
             )
             db.add(log)

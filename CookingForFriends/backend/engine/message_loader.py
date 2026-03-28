@@ -73,8 +73,7 @@ def build_ws_payload(message: dict) -> dict:
 
     Sends 'category' (question | notification) — frontend never sees
     the raw type field. PM trigger messages appear as notifications.
-    For questions, includes correct_answer so the frontend can give
-    immediate True/False feedback.
+    For questions, includes choices and correct_index for answer buttons.
     """
     msg_type = message.get("type", "notification")
     category = _msg_category(msg_type)
@@ -87,19 +86,20 @@ def build_ws_payload(message: dict) -> dict:
         "category": category,
     }
 
-    # Questions need the answer for immediate client-side feedback
+    # Questions need the choices for answer buttons
     if msg_type == "question":
-        payload["correct_answer"] = message.get("correct_answer", True)
+        payload["choices"] = message.get("choices", [])
+        payload["correct_index"] = message.get("correct_index", 0)
 
     return payload
 
 
-def check_answer(message: dict, user_choice: bool) -> bool | None:
-    """Check if a True/False answer is correct. Returns None for non-questions."""
-    correct = message.get("correct_answer")
+def check_answer(message: dict, choice_index: int) -> bool | None:
+    """Check if a choice index matches the correct answer. Returns None for non-questions."""
+    correct = message.get("correct_index")
     if correct is None:
         return None
-    return user_choice == correct
+    return choice_index == correct
 
 
 def clear_cache():
