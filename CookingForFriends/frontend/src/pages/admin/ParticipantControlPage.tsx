@@ -53,11 +53,15 @@ interface PhoneLog {
   message_id: string
   sender: string
   message_type: string
+  category: string
   sent_at: number
   read_at: number | null
   replied_at: number | null
-  reply_selected: string | null
+  user_choice: boolean | null
+  correct_answer: boolean | null
   reply_correct: boolean | null
+  response_time_ms: number | null
+  status: string | null
 }
 
 interface PMAttempt {
@@ -577,9 +581,8 @@ function PhoneTab({ logs }: { logs: PhoneLog[] }) {
                 <td className="px-3 py-1.5 text-slate-700 truncate">{log.sender}</td>
                 <td className="px-3 py-1.5">
                   <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${
-                    log.message_type === 'arithmetic' ? 'bg-blue-50 text-blue-700' :
+                    log.message_type === 'question' ? 'bg-blue-50 text-blue-700' :
                     log.message_type === 'pm_trigger' ? 'bg-purple-50 text-purple-700' :
-                    log.message_type === 'ad' ? 'bg-amber-50 text-amber-700' :
                     'bg-slate-50 text-slate-700'
                   }`}>
                     {log.message_type}
@@ -592,7 +595,9 @@ function PhoneTab({ logs }: { logs: PhoneLog[] }) {
                 <td className="px-3 py-1.5 font-mono text-slate-500">
                   {log.replied_at ? fmtEpoch(log.replied_at) : <span className="text-slate-300">—</span>}
                 </td>
-                <td className="px-3 py-1.5 text-slate-600 truncate">{log.reply_selected || '—'}</td>
+                <td className="px-3 py-1.5 text-slate-600 truncate">
+                  {log.user_choice === true ? 'True' : log.user_choice === false ? 'False' : '—'}
+                </td>
                 <td className="px-3 py-1.5 text-center">
                   {log.reply_correct === true ? '✅' : log.reply_correct === false ? '❌' : '—'}
                 </td>

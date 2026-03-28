@@ -140,22 +140,19 @@ export interface Pan {
 
 // ── Phone ──
 
-export interface PhoneReplyOption {
-  id: string
-  text: string
-}
-
 export interface PhoneMessage {
   id: string
   sender: string
   avatar: string
   text: string
-  is_ad: boolean
-  replies: PhoneReplyOption[] | null
+  category: 'question' | 'notification'
+  correctAnswer?: boolean
   timestamp: number
+  expiresAt: number
+  status: 'active' | 'answered_correct' | 'answered_incorrect' | 'expired'
   read: boolean
-  replied: boolean
-  replySelected: string | null
+  respondedAt?: number
+  userChoice?: boolean
 }
 
 /** @deprecated Use PhoneMessage instead — kept for backward compat with old phone_notification events */

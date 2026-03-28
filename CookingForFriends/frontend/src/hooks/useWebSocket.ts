@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
-import type { ActivePMTrial, PMTaskConfig, PhoneMessage, RoomId } from '../types'
+import type { ActivePMTrial, PMTaskConfig, RoomId } from '../types'
 
 const HEARTBEAT_INTERVAL = 10_000
 const RECONNECT_BASE_MS = 500
 const RECONNECT_MAX_MS = 5_000
+const PHONE_MESSAGE_EXPIRY_MS = 20_000
 
 export function useWebSocket(sessionId: string | null, blockNumber: number) {
   const wsRef = useRef<WebSocket | null>(null)
@@ -114,17 +115,19 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
       }
 
       case 'phone_message': {
+        const now = Date.now()
+        const category = (data.category as string) || 'notification'
         const phoneMsg = {
           id: data.id as string,
           sender: data.sender as string,
-          avatar: data.avatar as string || '💬',
+          avatar: (data.avatar as string) || '💬',
           text: data.text as string,
-          is_ad: data.is_ad as boolean,
-          replies: (data.replies as Array<{id: string; text: string}>) || null,
-          timestamp: Date.now(),
+          category: category as 'question' | 'notification',
+          correctAnswer: data.correct_answer as boolean | undefined,
+          timestamp: now,
+          expiresAt: now + PHONE_MESSAGE_EXPIRY_MS,
+          status: 'active' as const,
           read: false,
-          replied: false,
-          replySelected: null,
         }
         store.addPhoneMessage(phoneMsg)
         store.setPhoneBanner(phoneMsg)

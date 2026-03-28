@@ -548,11 +548,15 @@ async def get_phone_logs(session_id: str, db: AsyncSession = Depends(get_db)):
             "message_id": log.message_id,
             "sender": log.sender,
             "message_type": log.message_type,
+            "category": log.category,
             "sent_at": log.sent_at,
             "read_at": log.read_at,
             "replied_at": log.replied_at,
-            "reply_selected": log.reply_selected,
+            "user_choice": log.user_choice,
+            "correct_answer": log.correct_answer,
             "reply_correct": log.reply_correct,
+            "response_time_ms": log.response_time_ms,
+            "status": log.status,
         }
         for log in logs
     ]

@@ -1,4 +1,10 @@
-"""Message pool loader — loads day-specific message JSON files for the phone system."""
+"""Message pool loader — loads day-specific message JSON files for the phone system.
+
+Message taxonomy (v2):
+  - "question"     → True/False factual statement, frontend shows T/F buttons
+  - "notification" → Informational one-liner, no interaction required
+  - "pm_trigger"   → Visually identical to notification, backend-only tag for PM scoring
+"""
 
 import json
 import logging
@@ -51,48 +57,49 @@ def get_message(block_number: int, message_id: str) -> dict | None:
     return pool.get(message_id)
 
 
+def _msg_category(msg_type: str) -> str:
+    """Map raw message type to frontend category.
+
+    Frontend only sees 'question' or 'notification'.
+    PM triggers are rendered identically to notifications.
+    """
+    if msg_type == "question":
+        return "question"
+    return "notification"
+
+
 def build_ws_payload(message: dict) -> dict:
     """Build the WebSocket payload for a phone message.
 
-    Strips internal fields (type for pm_trigger) so the frontend
-    cannot distinguish PM triggers from regular chat messages.
+    Sends 'category' (question | notification) — frontend never sees
+    the raw type field. PM trigger messages appear as notifications.
+    For questions, includes correct_answer so the frontend can give
+    immediate True/False feedback.
     """
-    msg_type = message.get("type", "chat")
-    is_ad = msg_type == "ad"
+    msg_type = message.get("type", "notification")
+    category = _msg_category(msg_type)
 
     payload = {
         "id": message["id"],
         "sender": message["sender"],
         "avatar": message.get("avatar", "?"),
         "text": message["text"],
-        "is_ad": is_ad,
+        "category": category,
     }
 
-    # Include reply options for messages that have them
-    replies = message.get("replies")
-    if replies:
-        # Strip the 'correct' field — frontend doesn't need to know answers
-        payload["replies"] = [
-            {"id": r["id"], "text": r["text"]}
-            for r in replies
-        ]
-
-    # For pm_trigger messages, we intentionally do NOT include any
-    # pm_trigger or trigger_id fields. The frontend sees it as a
-    # normal chat message with no replies.
+    # Questions need the answer for immediate client-side feedback
+    if msg_type == "question":
+        payload["correct_answer"] = message.get("correct_answer", True)
 
     return payload
 
 
-def get_correct_reply(message: dict, reply_id: str) -> bool | None:
-    """Check if a reply is correct. Returns None if message has no replies."""
-    replies = message.get("replies")
-    if not replies:
+def check_answer(message: dict, user_choice: bool) -> bool | None:
+    """Check if a True/False answer is correct. Returns None for non-questions."""
+    correct = message.get("correct_answer")
+    if correct is None:
         return None
-    for r in replies:
-        if r["id"] == reply_id:
-            return r.get("correct", False)
-    return False
+    return user_choice == correct
 
 
 def clear_cache():

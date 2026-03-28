@@ -41,6 +41,7 @@ REMINDER_LEAD_S = 120  # Reminder fires ~120s before trigger
 # Phone
 PHONE_LOCK_TIMEOUT_S = 15  # Must match frontend LOCK_TIMEOUT (15s)
 MESSAGE_COOLDOWN_S = int(os.getenv("MESSAGE_COOLDOWN_S", "10"))  # Min gap between messages
+PHONE_MESSAGE_EXPIRY_MS = 20_000  # Per-message expiry (20s), must match frontend constant
 
 # Mouse tracking
 MOUSE_SAMPLE_INTERVAL_MS = 200

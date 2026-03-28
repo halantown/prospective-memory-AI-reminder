@@ -8,6 +8,9 @@ import type {
 
 const EMPTY_SEAT: SeatState = { plate: false, knife: false, fork: false, glass: false }
 
+/** Max visible phone messages at any time. */
+const MAX_PHONE_MESSAGES = 3
+
 interface GameState {
   // ── Session ──
   sessionId: string | null
@@ -42,7 +45,6 @@ interface GameState {
   phoneLocked: boolean
   phoneLastActivity: number
   phoneBanner: PhoneMessage | null
-  phoneMessageScore: { correct: number; wrong: number; missed: number }
 
   // ── Robot ──
   robot: RobotState
@@ -92,7 +94,9 @@ interface GameState {
   setPhoneLocked: (locked: boolean) => void
   markNotificationRead: (id: string) => void
   markMessageRead: (id: string) => void
-  replyToMessage: (messageId: string, replyId: string, replyText: string) => void
+  answerPhoneMessage: (messageId: string, userChoice: boolean) => void
+  expirePhoneMessage: (id: string) => void
+  removePhoneMessage: (id: string) => void
   setPhoneBanner: (msg: PhoneMessage | null) => void
 
   // Robot actions
@@ -170,7 +174,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   phoneLocked: true,
   phoneLastActivity: Date.now(),
   phoneBanner: null,
-  phoneMessageScore: { correct: 0, wrong: 0, missed: 0 },
 
   // ── Robot ──
   robot: { room: 'kitchen', speaking: false, text: '', visible: true },
@@ -254,9 +257,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   })),
 
   // Phone
-  addPhoneMessage: (msg) => set((s) => ({
-    phoneMessages: [...s.phoneMessages, msg],
-  })),
+  addPhoneMessage: (msg) => set((s) => {
+    let messages = [...s.phoneMessages, msg]
+    // Enforce max visible: force-expire oldest active if over limit
+    const active = messages.filter(m => m.status === 'active')
+    if (active.length > MAX_PHONE_MESSAGES) {
+      const oldest = active[0]
+      messages = messages.map(m =>
+        m.id === oldest.id ? { ...m, status: 'expired' as const } : m
+      )
+    }
+    return { phoneMessages: messages }
+  }),
   addPhoneNotification: (notif) => set((s) => ({
     phoneNotifications: [...s.phoneNotifications, notif],
   })),
@@ -271,10 +283,25 @@ export const useGameStore = create<GameState>((set, get) => ({
       m.id === id ? { ...m, read: true } : m
     ),
   })),
-  replyToMessage: (messageId, replyId, replyText) => set((s) => ({
+  answerPhoneMessage: (messageId, userChoice) => set((s) => ({
+    phoneMessages: s.phoneMessages.map((m) => {
+      if (m.id !== messageId || m.status !== 'active') return m
+      const isCorrect = m.correctAnswer !== undefined && userChoice === m.correctAnswer
+      return {
+        ...m,
+        status: (isCorrect ? 'answered_correct' : 'answered_incorrect') as PhoneMessage['status'],
+        userChoice,
+        respondedAt: Date.now(),
+      }
+    }),
+  })),
+  expirePhoneMessage: (id) => set((s) => ({
     phoneMessages: s.phoneMessages.map((m) =>
-      m.id === messageId ? { ...m, replied: true, replySelected: replyText } : m
+      m.id === id && m.status === 'active' ? { ...m, status: 'expired' as const } : m
     ),
+  })),
+  removePhoneMessage: (id) => set((s) => ({
+    phoneMessages: s.phoneMessages.filter((m) => m.id !== id),
   })),
   setPhoneBanner: (msg) => set({ phoneBanner: msg }),
 
@@ -400,7 +427,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     phoneNotifications: [],
     phoneLocked: true,
     phoneBanner: null,
-    phoneMessageScore: { correct: 0, wrong: 0, missed: 0 },
     robot: { room: 'kitchen', speaking: false, text: '', visible: true },
     activePMTrials: [],
     completedPMTrialIds: new Set(),

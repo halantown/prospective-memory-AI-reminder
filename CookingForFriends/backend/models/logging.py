@@ -68,7 +68,11 @@ class GameStateSnapshot(Base):
 
 
 class PhoneMessageLog(Base):
-    """Tracks every phone message sent and participant replies."""
+    """Tracks every phone message sent, participant answers, and expiry status.
+
+    Categories:  question | notification | pm_trigger
+    Status values:  answered_correct | answered_incorrect | expired | seen
+    """
     __tablename__ = "phone_message_logs"
     __table_args__ = (
         Index('ix_phonemsg_participant_block', 'participant_id', 'block_id'),
@@ -83,10 +87,14 @@ class PhoneMessageLog(Base):
     )
     message_id: Mapped[str] = mapped_column(String(50), nullable=False)
     sender: Mapped[str] = mapped_column(String(100), nullable=False)
-    message_type: Mapped[str] = mapped_column(String(30), nullable=False)  # arithmetic / commonsense / social / ad / chat / pm_trigger
-    sent_at: Mapped[float] = mapped_column(Float, nullable=False)
-    read_at: Mapped[float | None] = mapped_column(Float, nullable=True)
-    replied_at: Mapped[float | None] = mapped_column(Float, nullable=True)
-    reply_selected: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    message_type: Mapped[str] = mapped_column(String(30), nullable=False)  # question / notification / pm_trigger
+    category: Mapped[str] = mapped_column(String(30), nullable=False, default="notification")  # question | notification | pm_trigger
+    sent_at: Mapped[float] = mapped_column(Float, nullable=False)  # arrivedAt
+    read_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # seen
+    replied_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # respondedAt
+    response_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    user_choice: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # True/False answer
+    correct_answer: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     reply_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    status: Mapped[str | None] = mapped_column(String(30), nullable=True)  # answered_correct | answered_incorrect | expired | seen
 

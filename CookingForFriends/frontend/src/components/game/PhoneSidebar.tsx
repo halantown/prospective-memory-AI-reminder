@@ -1,7 +1,12 @@
-/** Phone sidebar — iPhone shell with interactive message system.
- *  Messages include Q&A with reply buttons, ads, chat, and PM triggers.
- *  PM triggers look identical to regular chat messages (no special styling).
- *  Auto-locks after 15s of inactivity.
+/** Phone sidebar — iPhone shell with message system (v2).
+ *
+ *  Three visual categories, one card layout:
+ *    1. Question  → factual statement + True / False buttons
+ *    2. Notification → text only, no buttons
+ *    3. PM trigger  → identical to notification (frontend never knows)
+ *
+ *  Every card has a 20 s countdown bar. Max 3 visible. No scrolling.
+ *  Correct/incorrect answers flash green/red then fade out.
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
@@ -10,31 +15,74 @@ import { useGameStore } from '../../stores/gameStore'
 import type { PhoneMessage } from '../../types'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
 
-const LOCK_TIMEOUT = 15_000 // 15s
-const BANNER_DURATION = 3_000 // 3s
+const LOCK_TIMEOUT = 15_000
+const BANNER_DURATION = 3_000
+const PHONE_MESSAGE_EXPIRY_MS = 20_000
+const EXPIRY_CHECK_INTERVAL = 100
+const FEEDBACK_FLASH_MS = 200
+const FADE_OUT_MS = 300
+
+/* ─── Card height: all three categories share one fixed size ─── */
+const CARD_HEIGHT = 172         // px — fits sender + text + buttons + bar
+const CARD_GAP = 8              // px between cards
 
 export default function PhoneSidebar() {
   const messages = useGameStore((s) => s.phoneMessages)
   const locked = useGameStore((s) => s.phoneLocked)
   const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
   const markMessageRead = useGameStore((s) => s.markMessageRead)
-  const replyToMessage = useGameStore((s) => s.replyToMessage)
+  const answerPhoneMessage = useGameStore((s) => s.answerPhoneMessage)
+  const expirePhoneMessage = useGameStore((s) => s.expirePhoneMessage)
+  const removePhoneMessage = useGameStore((s) => s.removePhoneMessage)
   const gameClock = useGameStore((s) => s.gameClock)
   const wsSend = useGameStore((s) => s.wsSend)
   const banner = useGameStore((s) => s.phoneBanner)
   const setBanner = useGameStore((s) => s.setPhoneBanner)
 
   const lastActivityRef = useRef(Date.now())
-  const feedRef = useRef<HTMLDivElement>(null)
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const play = useSoundEffects()
+  const [panelPulse, setPanelPulse] = useState(false)
 
-  // All messages newest-first, no priority sorting
-  const sortedMessages = useMemo(() => {
-    return [...messages].sort((a, b) => b.timestamp - a.timestamp)
+  // Active messages (newest at bottom, max 3)
+  const activeMessages = useMemo(() => {
+    return messages
+      .filter(m => m.status === 'active')
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(-3)
   }, [messages])
 
-  // Auto-lock after timeout
+  // ── Expiry check: runs every 100ms ──
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now()
+      const store = useGameStore.getState()
+      for (const msg of store.phoneMessages) {
+        if (msg.status === 'active' && now >= msg.expiresAt) {
+          store.expirePhoneMessage(msg.id)
+        }
+      }
+    }, EXPIRY_CHECK_INTERVAL)
+    return () => clearInterval(interval)
+  }, [])
+
+  // ── Remove messages after fade-out animation completes ──
+  useEffect(() => {
+    const fading = messages.filter(m =>
+      m.status === 'expired' || m.status === 'answered_correct' || m.status === 'answered_incorrect'
+    )
+    if (fading.length === 0) return
+
+    const timers = fading.map(msg => {
+      const delay = msg.status === 'expired'
+        ? FADE_OUT_MS
+        : FEEDBACK_FLASH_MS + FADE_OUT_MS
+      return setTimeout(() => removePhoneMessage(msg.id), delay)
+    })
+    return () => timers.forEach(clearTimeout)
+  }, [messages, removePhoneMessage])
+
+  // ── Auto-lock after timeout ──
   useEffect(() => {
     if (locked) return
     const interval = setInterval(() => {
@@ -45,24 +93,22 @@ export default function PhoneSidebar() {
     return () => clearInterval(interval)
   }, [locked, setPhoneLocked])
 
-  // Auto-scroll to top (newest) when new messages arrive
-  useEffect(() => {
-    if (feedRef.current && !locked) {
-      feedRef.current.scrollTop = 0
-    }
-  }, [messages.length, locked])
-
-  // Auto-dismiss banner after 3s
+  // ── Banner: play chime, pulse panel, auto-dismiss ──
   useEffect(() => {
     if (banner) {
       play('phoneMessage')
+
+      // Panel border pulse
+      setPanelPulse(true)
+      const pulseTimer = setTimeout(() => setPanelPulse(false), 150)
+
       if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current)
-      bannerTimerRef.current = setTimeout(() => {
-        setBanner(null)
-      }, BANNER_DURATION)
-    }
-    return () => {
-      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current)
+      bannerTimerRef.current = setTimeout(() => setBanner(null), BANNER_DURATION)
+
+      return () => {
+        clearTimeout(pulseTimer)
+        if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current)
+      }
     }
   }, [banner, setBanner, play])
 
@@ -83,10 +129,6 @@ export default function PhoneSidebar() {
     handleInteraction()
     if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current)
     setBanner(null)
-    // Scroll to top after unlocking (newest/unreplied will be at top)
-    setTimeout(() => {
-      if (feedRef.current) feedRef.current.scrollTop = 0
-    }, 100)
   }, [locked, setBanner, handleUnlock, handleInteraction])
 
   const handleReadMessage = useCallback((msg: PhoneMessage) => {
@@ -101,29 +143,29 @@ export default function PhoneSidebar() {
     }
   }, [markMessageRead, wsSend])
 
-  const handleReply = useCallback((msg: PhoneMessage, replyId: string, replyText: string) => {
-    if (msg.replied) return
-    replyToMessage(msg.id, replyId, replyText)
+  const handleAnswer = useCallback((msg: PhoneMessage, userChoice: boolean) => {
+    if (msg.status !== 'active' || msg.category !== 'question') return
+    answerPhoneMessage(msg.id, userChoice)
     lastActivityRef.current = Date.now()
     if (wsSend) {
       wsSend({
         type: 'phone_reply',
         data: {
           message_id: msg.id,
-          reply_id: replyId,
+          user_choice: userChoice,
           timestamp: Date.now() / 1000,
         },
       })
     }
-  }, [replyToMessage, wsSend])
+  }, [answerPhoneMessage, wsSend])
 
-  const unreadCount = messages.filter(m => !m.read && !m.is_ad).length
+  const unreadCount = messages.filter(m => m.status === 'active' && !m.read).length
 
   return (
     <div className="h-full flex items-center justify-center bg-slate-900 p-3">
       {/* iPhone shell */}
       <div className="relative flex flex-col w-full max-w-[320px] h-full max-h-[680px]">
-        {/* Notification Banner — shows on top even when locked */}
+        {/* Notification Banner */}
         <AnimatePresence>
           {banner && (
             <motion.div
@@ -154,14 +196,18 @@ export default function PhoneSidebar() {
           )}
         </AnimatePresence>
 
-        {/* Outer bezel */}
+        {/* Outer bezel — pulse glow on new message */}
         <div
-          className="relative flex flex-col flex-1 rounded-[40px] border-[3px] border-slate-600
+          className={`relative flex flex-col flex-1 rounded-[40px] border-[3px]
                       bg-gradient-to-b from-slate-800 to-slate-900 shadow-2xl shadow-black/50
-                      overflow-hidden"
+                      overflow-hidden transition-all duration-150
+                      ${panelPulse
+                        ? 'border-blue-400 shadow-blue-500/40'
+                        : 'border-slate-600'
+                      }`}
           onPointerDownCapture={handleInteraction}
         >
-          {/* Dynamic Island / Notch */}
+          {/* Dynamic Island */}
           <div className="flex justify-center pt-2 pb-1 relative z-10">
             <div className="w-[90px] h-[25px] bg-black rounded-full flex items-center justify-center gap-2">
               <div className="w-[8px] h-[8px] rounded-full bg-slate-700 ring-1 ring-slate-600" />
@@ -189,18 +235,14 @@ export default function PhoneSidebar() {
               className="flex-1 phone-locked flex flex-col px-4 pt-3 pb-4"
               onClick={(e) => { e.stopPropagation(); handleUnlock() }}
             >
-              {/* Clock + lock icon */}
               <div className="flex flex-col items-center mb-4">
                 <div className="text-2xl mb-1">🔒</div>
                 <div className="text-3xl font-extralight text-white tracking-wider">{gameClock ?? '--:--'}</div>
               </div>
 
-              {/* Unread/unreplied message previews */}
-              <LockScreenPreviews messages={messages} onUnlock={handleUnlock} />
+              <LockScreenPreviews messages={activeMessages} onUnlock={handleUnlock} />
 
-              {/* Tap to unlock — large and clear like a real phone */}
               <div className="mt-auto flex flex-col items-center gap-1.5 cursor-pointer">
-                {/* Animated finger-tap icon */}
                 <svg
                   width="36" height="36" viewBox="0 0 48 48" fill="none"
                   className="animate-bounce"
@@ -212,7 +254,6 @@ export default function PhoneSidebar() {
                     stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                     opacity="0.7"
                   />
-                  {/* Tap ripple rings */}
                   <circle cx="24" cy="14" r="10" stroke="white" strokeWidth="1" opacity="0.15" />
                   <circle cx="24" cy="14" r="14" stroke="white" strokeWidth="0.8" opacity="0.08" />
                 </svg>
@@ -234,23 +275,30 @@ export default function PhoneSidebar() {
                 </button>
               </div>
 
-              {/* Message feed */}
-              <div ref={feedRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
-                {sortedMessages.length === 0 ? (
+              {/* Message card area — exactly 3 slots, no scroll */}
+              <div
+                className="flex-1 flex flex-col justify-end px-3 py-2 overflow-hidden"
+                style={{ gap: `${CARD_GAP}px` }}
+              >
+                {activeMessages.length === 0 && messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-slate-500">
                     <span className="text-3xl mb-2">📭</span>
                     <p className="text-xs">No messages yet</p>
                   </div>
                 ) : (
-                  <AnimatePresence>
-                    {sortedMessages.map((msg) => (
-                      <MessageBubble
-                        key={msg.id}
-                        msg={msg}
-                        onRead={() => handleReadMessage(msg)}
-                        onReply={(replyId, replyText) => handleReply(msg, replyId, replyText)}
-                      />
-                    ))}
+                  <AnimatePresence mode="popLayout">
+                    {messages
+                      .filter(m => m.status !== 'expired' || true)  // show all for animation
+                      .sort((a, b) => a.timestamp - b.timestamp)
+                      .slice(-3)
+                      .map((msg) => (
+                        <MessageCard
+                          key={msg.id}
+                          msg={msg}
+                          onRead={() => handleReadMessage(msg)}
+                          onAnswer={(choice) => handleAnswer(msg, choice)}
+                        />
+                      ))}
                   </AnimatePresence>
                 )}
               </div>
@@ -268,106 +316,131 @@ export default function PhoneSidebar() {
 }
 
 
-function MessageBubble({
+/* ═══════════════════════════════════════════════════════════════
+   MessageCard — unified layout for all categories
+   ═══════════════════════════════════════════════════════════════ */
+
+function MessageCard({
   msg,
   onRead,
-  onReply,
+  onAnswer,
 }: {
   msg: PhoneMessage
   onRead: () => void
-  onReply: (replyId: string, replyText: string) => void
+  onAnswer: (choice: boolean) => void
 }) {
+  const [progress, setProgress] = useState(1) // 1 → 0 over expiry window
+
+  // Mark as read after brief visibility
   useEffect(() => {
-    if (!msg.read) {
+    if (!msg.read && msg.status === 'active') {
       const timer = setTimeout(onRead, 300)
       return () => clearTimeout(timer)
     }
-  }, [msg.read, onRead])
+  }, [msg.read, msg.status, onRead])
 
-  const isAd = msg.is_ad
-  const hasReplies = msg.replies && msg.replies.length > 0
+  // Countdown progress bar
+  useEffect(() => {
+    if (msg.status !== 'active') return
+    const tick = () => {
+      const remaining = msg.expiresAt - Date.now()
+      setProgress(Math.max(0, remaining / PHONE_MESSAGE_EXPIRY_MS))
+    }
+    tick()
+    const interval = setInterval(tick, 50)
+    return () => clearInterval(interval)
+  }, [msg.expiresAt, msg.status])
+
+  const isAnswered = msg.status === 'answered_correct' || msg.status === 'answered_incorrect'
+  const isExpired = msg.status === 'expired'
+  const isFading = isAnswered || isExpired
+
+  // Border color for feedback flash
+  const borderColor =
+    msg.status === 'answered_correct' ? '#4ade80' :
+    msg.status === 'answered_incorrect' ? '#f87171' :
+    'rgba(51,65,85,0.5)' // slate-700/50
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: msg.replied ? 0.55 : 1, y: 0 }}
-      className={`rounded-2xl border overflow-hidden ${
-        isAd
-          ? 'bg-slate-800/30 border-slate-700/30'
-          : msg.replied
-          ? 'bg-slate-800/30 border-slate-700/30'
-          : msg.read
-          ? 'bg-slate-800/40 border-slate-700/50'
-          : 'bg-blue-950/30 border-blue-800/40'
-      }`}
+      layout
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{
+        opacity: isFading ? 0 : 1,
+        y: 0,
+        scale: 1,
+        borderColor,
+      }}
+      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+      transition={{
+        opacity: {
+          duration: isFading ? FADE_OUT_MS / 1000 : 0.2,
+          delay: isAnswered ? FEEDBACK_FLASH_MS / 1000 : 0,
+        },
+        borderColor: { duration: 0.1 },
+        layout: { type: 'spring', stiffness: 300, damping: 30 },
+      }}
+      style={{ height: CARD_HEIGHT, minHeight: CARD_HEIGHT, maxHeight: CARD_HEIGHT }}
+      className="rounded-2xl border-2 overflow-hidden bg-slate-800/40 flex flex-col"
     >
-      {/* Message header + content */}
-      <div className="p-3">
-        <div className="flex items-center gap-2 mb-1">
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
-            ${isAd ? 'bg-slate-700/50 text-slate-400' : 'bg-blue-600/50 text-blue-200'}`}>
+      {/* Header: avatar + sender */}
+      <div className="p-3 pb-1">
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className="w-7 h-7 rounded-full bg-blue-600/50 flex items-center justify-center
+                          text-xs font-bold text-blue-200 flex-shrink-0">
             {msg.avatar}
           </div>
-          <div className="flex-1 min-w-0 flex items-center gap-1.5">
-            <span className={`text-[11px] font-semibold ${
-              isAd ? 'text-slate-500' : 'text-blue-300'
-            }`}>
-              {msg.sender}
-            </span>
-            {isAd && (
-              <span className="text-[8px] bg-slate-600/50 text-slate-400 px-1.5 py-0.5 rounded font-medium">
-                AD
-              </span>
-            )}
-          </div>
-          {!msg.read && !isAd && (
-            <span className="w-2 h-2 bg-blue-400 rounded-full flex-shrink-0" />
-          )}
-          {msg.replied && (
-            <span className="text-[10px] text-green-400">✓</span>
-          )}
+          <span className="text-[11px] font-semibold text-blue-300">{msg.sender}</span>
         </div>
-        <p className={`text-[11px] leading-relaxed pl-9 ${
-          isAd ? 'text-slate-500' : 'text-slate-300'
-        }`}>
+      </div>
+
+      {/* Message body — flex-1 to fill remaining space */}
+      <div className="flex-1 px-3 flex items-start">
+        <p className="text-[12px] leading-relaxed text-slate-200 pl-9">
           {msg.text}
         </p>
       </div>
 
-      {/* Reply buttons — vertical stack, full width */}
-      {hasReplies && !msg.replied && (
-        <div className="px-3 pb-3 flex flex-col gap-1.5">
-          {msg.replies?.map((reply) => (
-            <button
-              key={reply.id}
-              onClick={(e) => {
-                e.stopPropagation()
-                onReply(reply.id, reply.text)
-              }}
-              style={{ height: '36px' }}
-              className="w-full text-[11px] px-3 rounded-lg bg-blue-600/20 text-blue-200
-                         border border-blue-500/30 hover:bg-blue-600/40 hover:border-blue-400/50
-                         transition-colors active:scale-95 text-center"
-            >
-              {reply.text}
-            </button>
-          ))}
+      {/* True / False buttons — only for questions with active status */}
+      {msg.category === 'question' && msg.status === 'active' && (
+        <div className="px-3 pb-2 flex gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); onAnswer(true) }}
+            className="flex-1 h-[34px] text-[12px] font-semibold rounded-lg
+                       bg-emerald-600/20 text-emerald-300 border border-emerald-500/30
+                       hover:bg-emerald-600/40 hover:border-emerald-400/50
+                       transition-colors active:scale-95"
+          >
+            True
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onAnswer(false) }}
+            className="flex-1 h-[34px] text-[12px] font-semibold rounded-lg
+                       bg-red-600/20 text-red-300 border border-red-500/30
+                       hover:bg-red-600/40 hover:border-red-400/50
+                       transition-colors active:scale-95"
+          >
+            False
+          </button>
         </div>
       )}
 
-      {/* Selected reply — right-aligned blue bubble */}
-      {msg.replied && msg.replySelected && (
-        <div className="px-3 pb-2.5 flex justify-end">
-          <div className="bg-blue-600/50 text-blue-100 text-[11px] px-3 py-1.5 rounded-2xl rounded-br-sm
-                          max-w-[75%] flex items-center gap-1.5">
-            <span>{msg.replySelected}</span>
-            <span className="text-green-300 text-[10px]">✓</span>
-          </div>
-        </div>
-      )}
+      {/* Countdown progress bar — all categories */}
+      <div className="h-[3px] bg-slate-700/30 w-full mt-auto">
+        <motion.div
+          className="h-full bg-blue-500/60 origin-left"
+          style={{ scaleX: progress }}
+          transition={{ duration: 0.05, ease: 'linear' }}
+        />
+      </div>
     </motion.div>
   )
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Lock screen previews — show latest active messages
+   ═══════════════════════════════════════════════════════════════ */
 
 const MAX_LOCK_PREVIEWS = 3
 
@@ -378,14 +451,9 @@ function LockScreenPreviews({
   messages: PhoneMessage[]
   onUnlock: () => void
 }) {
-  // Latest 4 unread non-ad messages, newest first
   const previews = [...messages]
-    .filter(m => !m.is_ad && !m.read)
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, MAX_LOCK_PREVIEWS)
-
-  const total = messages.filter(m => !m.is_ad && !m.read).length
-  const overflow = total - MAX_LOCK_PREVIEWS
 
   if (previews.length === 0) return null
 
@@ -418,12 +486,6 @@ function LockScreenPreviews({
           </motion.div>
         ))}
       </AnimatePresence>
-
-      {overflow > 0 && (
-        <p className="text-[9px] text-slate-500 text-center mt-0.5">
-          +{overflow} more message{overflow > 1 ? 's' : ''}
-        </p>
-      )}
     </div>
   )
 }

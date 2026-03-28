@@ -491,28 +491,20 @@ async def _record_resumption_lag(trial_id: int, lag_ms: int, db_factory):
 
 
 async def _handle_phone_reply(participant_id, block_number, data, db_factory):
-    """Handle a phone message reply — validate and log."""
-    from engine.message_loader import get_message, get_correct_reply
+    """Handle a phone message True/False answer — validate and log."""
+    from engine.message_loader import get_message, check_answer
     from sqlalchemy import select, update
 
     message_id = data.get("message_id", "")
-    reply_id = data.get("reply_id", "")
+    user_choice = data.get("user_choice")  # boolean: True or False
     timestamp = data.get("timestamp", time.time())
 
-    if not message_id or not reply_id:
+    if not message_id or user_choice is None:
         return
 
     # Check correctness from the message pool
     message = get_message(block_number, message_id)
-    is_correct = get_correct_reply(message, reply_id) if message else None
-
-    # Find the reply text
-    reply_text = ""
-    if message and message.get("replies"):
-        for r in message["replies"]:
-            if r["id"] == reply_id:
-                reply_text = r.get("text", "")
-                break
+    is_correct = check_answer(message, bool(user_choice)) if message else None
 
     async with db_factory() as db:
         from models.block import Block
@@ -526,7 +518,19 @@ async def _handle_phone_reply(participant_id, block_number, data, db_factory):
         if block_id is None:
             return
 
-        # Update the existing PhoneMessageLog with reply data
+        # Compute response time from sent_at
+        sent_row = await db.execute(
+            select(PhoneMessageLog.sent_at).where(
+                PhoneMessageLog.participant_id == participant_id,
+                PhoneMessageLog.block_id == block_id,
+                PhoneMessageLog.message_id == message_id,
+            )
+        )
+        sent_at = sent_row.scalar_one_or_none()
+        response_time_ms = int((timestamp - sent_at) * 1000) if sent_at else None
+
+        status = "answered_correct" if is_correct else "answered_incorrect"
+
         await db.execute(
             update(PhoneMessageLog)
             .where(
@@ -536,13 +540,15 @@ async def _handle_phone_reply(participant_id, block_number, data, db_factory):
             )
             .values(
                 replied_at=timestamp,
-                reply_selected=reply_text,
+                user_choice=bool(user_choice),
                 reply_correct=is_correct,
+                response_time_ms=response_time_ms,
+                status=status,
             )
         )
         await db.commit()
 
-    logger.debug(f"Phone reply: {participant_id} msg={message_id} reply={reply_id} correct={is_correct}")
+    logger.debug(f"Phone reply: {participant_id} msg={message_id} choice={user_choice} correct={is_correct}")
 
     # Also log as generic interaction
     await _handle_interaction(participant_id, block_number, "phone_reply", data, db_factory)

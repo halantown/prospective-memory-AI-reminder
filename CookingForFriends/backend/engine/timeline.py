@@ -444,6 +444,7 @@ async def _log_phone_message_sent(
     from sqlalchemy import select
     from models.block import Block
     from models.logging import PhoneMessageLog
+    from engine.message_loader import _msg_category
 
     try:
         async with db_factory() as db:
@@ -457,12 +458,17 @@ async def _log_phone_message_sent(
             if block_id is None:
                 return
 
+            msg_type = message.get("type", "notification")
+            category = _msg_category(msg_type)
+
             log = PhoneMessageLog(
                 participant_id=participant_id,
                 block_id=block_id,
                 message_id=message.get("id", ""),
                 sender=message.get("sender", ""),
-                message_type=message.get("type", "chat"),
+                message_type=msg_type,
+                category=category,
+                correct_answer=message.get("correct_answer") if msg_type == "question" else None,
                 sent_at=sent_at,
             )
             db.add(log)
