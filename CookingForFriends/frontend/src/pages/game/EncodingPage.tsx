@@ -420,7 +420,7 @@ export default function EncodingPage() {
   // ── Render: card + quiz ──
 
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col justify-center overflow-hidden">
       {/* Compact Header */}
       <div className="shrink-0 px-6 pt-4 pb-2 text-center">
         <div className="flex items-center justify-center gap-3 mb-1">
@@ -448,9 +448,9 @@ export default function EncodingPage() {
         </div>
       </div>
 
-      {/* Card + Quiz area — fills remaining space */}
+      {/* Card + Quiz area — vertically centered with header */}
       {card && ec && (
-        <div className="flex-1 min-h-0 px-6 pb-4">
+        <div className="min-h-0 px-6 pb-4" style={{ maxHeight: '78vh' }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl mx-auto h-full flex flex-col p-5">
             {/* Top bar */}
             <div className="flex items-center justify-between mb-3 shrink-0">

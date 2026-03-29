@@ -91,24 +91,31 @@ export default function WorldView() {
           return (
             <div
               key={room.id}
-              className="absolute cursor-pointer"
+              className={`absolute cursor-pointer room-card-transition ${
+                isActive ? 'z-20' : 'z-[1]'
+              }`}
               style={{
                 left: room.x, top: room.y,
                 width: room.w, height: room.h,
+                transform: isActive ? 'scale(1.04)' : 'scale(0.96)',
+                transformOrigin: 'center center',
+                filter: isActive
+                  ? 'brightness(1.05) saturate(1.1)'
+                  : 'brightness(0.5) saturate(0.6)',
               }}
               onClick={() => handleRoomClick(room.id)}
             >
               <motion.div
-                className={`relative w-full h-full rounded-xl border-2 overflow-hidden
+                className={`relative w-full h-full rounded-xl border-2
                   transition-all duration-400 ${
                     isActive
-                      ? 'border-cooking-400 shadow-lg shadow-cooking-400/20 room-active'
-                      : 'border-slate-600 hover:border-slate-500'
+                      ? 'border-cooking-400 shadow-[0_0_20px_4px_rgba(251,146,60,0.25)] ring-1 ring-cooking-400/20 room-active'
+                      : 'border-slate-700/60 hover:border-slate-500'
                   }`}
                 whileHover={!isActive ? { scale: 1.01 } : {}}
               >
-                {/* Floor background + furniture (always visible) */}
-                <div className="absolute inset-0" style={floor}>
+                {/* Floor background + furniture — clipped to rounded corners */}
+                <div className="absolute inset-0 rounded-[inherit] overflow-hidden" style={floor}>
                   <FurnitureComp />
                 </div>
 
@@ -131,8 +138,8 @@ export default function WorldView() {
                   </div>
                 </div>
 
-                {/* Room content — ALWAYS rendered. Inactive rooms are dimmed
-                    and non-interactive but still visible for monitoring. */}
+                {/* Room content — ALWAYS rendered. Inactive rooms are
+                    non-interactive but still visible for monitoring. */}
                 <div
                   className={`absolute inset-0 z-[3] transition-opacity duration-400 ${
                     isActive ? '' : 'room-inactive-content'

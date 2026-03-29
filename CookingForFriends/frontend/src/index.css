@@ -14,18 +14,23 @@
   transition: filter 0.4s ease;
 }
 
-/* Inactive room content: dimmed but visible, non-interactive */
-.room-inactive-content {
-  opacity: 0.45;
-  pointer-events: none;
-  transition: opacity 0.4s ease;
+/* Room card focus: smooth transition for scale, filter, z-index */
+.room-card-transition {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              filter 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              z-index 0s;
 }
 
-/* Urgent steak states pierce through the inactive room dimming.
-   These elements get full opacity and a pulsing glow even when the
-   room is inactive, so the participant can see the kitchen needs attention. */
+/* Inactive room content: non-interactive but visible.
+   Card-level brightness filter handles dimming the whole room. */
+.room-inactive-content {
+  pointer-events: none;
+}
+
+/* Urgent steak states remain prominent even in inactive rooms.
+   The card-level brightness filter dims the whole room, but the pulsing
+   glow animation still draws attention to urgent steaks. */
 .room-inactive-content .steak-urgent {
-  opacity: 1;
   position: relative;
   z-index: 5;
 }
