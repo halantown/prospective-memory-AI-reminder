@@ -20,6 +20,7 @@ from reminder_agent.stage2.quality_gate import (
     check,
     check_batch,
     check_cb_consistency,
+    check_cue_priority_compliance,
     check_duplicate,
     check_entity_present,
     check_forbidden_keywords,
@@ -424,3 +425,55 @@ class TestCheckBatch:
         ]
         result = check_batch(variants, "AF_CB", cb_similarity_threshold=0.60)
         assert not result.passed
+
+
+# ===================================================================
+# 9. Cue priority compliance
+# ===================================================================
+
+class TestCuePriorityCompliance:
+    """Test cue priority compliance check with diagnosticity reports."""
+
+    REPORT = {
+        "candidate_features": [
+            {"feature_id": "f1", "feature": "red cover"},
+            {"feature_id": "f2", "feature": "mountain illustration"},
+            {"feature_id": "f3", "feature": "paperback format"},
+        ],
+        "recommended_cues": {
+            "include": [
+                {"feature_id": "f1", "priority": 1, "reason": "conjunction member"},
+                {"feature_id": "f2", "priority": 1, "reason": "conjunction member"},
+                {"feature_id": "f3", "priority": 4, "reason": "low diagnosticity"},
+            ],
+            "exclude": [],
+        },
+    }
+
+    def test_no_report_passes(self) -> None:
+        result = check_cue_priority_compliance("any text", None)
+        assert result.passed
+        assert "skipped" in result.detail.lower()
+
+    def test_all_high_cues_present(self) -> None:
+        text = "Remember the red book with the mountain illustration on the cover."
+        result = check_cue_priority_compliance(text, self.REPORT)
+        assert result.passed
+
+    def test_missing_high_cue_fails(self) -> None:
+        # "red cover" → key_terms=["cover"] → "cover" not in text → f1 missing
+        text = "Remember the book with the mountain illustration."
+        result = check_cue_priority_compliance(text, self.REPORT)
+        assert not result.passed
+        assert "f1" in result.detail
+
+    def test_truly_missing_cue_fails(self) -> None:
+        text = "Remember to get the paperback from the shelf."
+        result = check_cue_priority_compliance(text, self.REPORT)
+        assert not result.passed
+        assert "f1" in result.detail or "f2" in result.detail
+
+    def test_empty_include_passes(self) -> None:
+        report = {"recommended_cues": {"include": []}, "candidate_features": []}
+        result = check_cue_priority_compliance("any text", report)
+        assert result.passed

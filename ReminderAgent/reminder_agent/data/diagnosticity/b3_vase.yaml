@@ -1,0 +1,149 @@
+task_id: b3_vase
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:30:07.914234+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: blue
+  source: encoding_text
+  feature_type: visual_color
+  exact_quote: the small ceramic vase with blue glaze
+- feature_id: f2
+  feature: small
+  source: encoding_text
+  feature_type: visual_size
+  exact_quote: the small ceramic vase with blue glaze
+- feature_id: f3
+  feature: ceramic
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: the small ceramic vase with blue glaze
+- feature_id: f4
+  feature: blue glaze
+  source: encoding_text
+  feature_type: visual_pattern
+  exact_quote: the small ceramic vase with blue glaze
+- feature_id: f5
+  feature: bedroom
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the bedroom and get the vase from the windowsill
+- feature_id: f6
+  feature: windowsill
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the bedroom and get the vase from the windowsill
+- feature_id: f7
+  feature: kitchen
+  source: encoding_text
+  feature_type: location
+  exact_quote: Fill it with water in the kitchen
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: high
+    reasoning: Only the vase task mentions 'blue'; hanger (wood), speaker (gray),
+      and hand cream (purple/white) have no blue reference.
+  level_b:
+    rating: high
+    reasoning: 'D1 has green glaze, D2 has blue glaze — so ''blue'' excludes D1 but
+      not D2; however, combined with size or location it discriminates, but alone
+      it only excludes one distractor — wait: correction — D2 *also* has blue glaze,
+      so ''blue'' is shared with D2 and absent in D1 → excludes only D1 → medium.'
+  combined: MEDIUM
+- feature_id: f2
+  level_a:
+    rating: high
+    reasoning: Only the vase task specifies 'small'; hanger is 'wide', speaker is
+      'small round' (ambiguous but overlaps), hand cream tube is 'white tube' (no
+      size qualifier) — however 'small' appears in speaker description too, so not
+      fully unique.
+  level_b:
+    rating: high
+    reasoning: D1 is small (shared), D2 is large (distinguishing) → 'small' excludes
+      D2 but not D1 → medium.
+  combined: MEDIUM
+- feature_id: f3
+  level_a:
+    rating: low
+    reasoning: '''Ceramic'' is object-type specific to vase and does not appear in
+      hanger (wood), speaker (plastic/mesh), or hand cream (tube) descriptions, so
+      it''s actually unique to this task.'
+  level_b:
+    rating: low
+    reasoning: Both D1 and D2 are ceramic, so 'ceramic' is shared with both distractors
+      and provides no discrimination.
+  combined: LOW
+- feature_id: f4
+  level_a:
+    rating: high
+    reasoning: '''Blue glaze'' is a compound visual pattern unique to the vase task
+      — no other task mentions glaze or this phrasing.'
+  level_b:
+    rating: medium
+    reasoning: D1 has green glaze (excluded), D2 has blue glaze (shared) → excludes
+      only D1.
+  combined: MEDIUM
+- feature_id: f5
+  level_a:
+    rating: medium
+    reasoning: '''Bedroom'' is mentioned only for the vase task, but location cues
+      are weakly diagnostic across tasks since other tasks don’t specify locations
+      — however, absence of bedroom in others makes it moderately distinctive.'
+  level_b:
+    rating: low
+    reasoning: Both D1 and D2 are on the same windowsill in the bedroom, so 'bedroom'
+      is shared with both distractors.
+  combined: LOW
+- feature_id: f6
+  level_a:
+    rating: medium
+    reasoning: '''Windowsill'' is unique to the vase task among the four PM tasks
+      — others don’t mention it.'
+  level_b:
+    rating: low
+    reasoning: Both D1 and D2 are on the same windowsill, so 'windowsill' is shared
+      with both distractors.
+  combined: LOW
+- feature_id: f7
+  level_a:
+    rating: low
+    reasoning: '''Kitchen'' is mentioned only for the water-filling substep, not the
+      retrieval task itself, and appears in no other PM task’s primary action — but
+      as a location it’s not tied to object identification and is non-diagnostic for
+      *which* task, since it’s a shared procedural step context.'
+  level_b:
+    rating: low
+    reasoning: Kitchen is irrelevant to object discrimination in the bedroom — not
+      present on any of the three objects.
+  combined: LOW
+recommended_cues:
+  include:
+  - feature_id: f1
+    priority: 1
+    reason: Essential for distinguishing from D1; uniquely signals target’s glaze
+      color and is task-specific.
+  - feature_id: f2
+    priority: 1
+    reason: Essential for distinguishing from D2; uniquely signals target’s size and
+      is task-discriminative when paired with color.
+  - feature_id: f4
+    priority: 2
+    reason: Compound cue 'blue glaze' improves task uniqueness and adds perceptual
+      specificity beyond 'blue' alone.
+  exclude:
+  - feature_id: f3
+    reason: Shared with both distractors and non-unique across tasks.
+  - feature_id: f5
+    reason: Shared with both distractors and not sufficient for task discrimination
+      alone.
+  - feature_id: f6
+    reason: Shared with both distractors and uninformative for object selection.
+  - feature_id: f7
+    reason: Irrelevant to object discrimination and not tied to the retrieval cue
+      context.
+target_conjunction: small blue glaze
+minimum_cues_for_discrimination:
+- f1
+- f2

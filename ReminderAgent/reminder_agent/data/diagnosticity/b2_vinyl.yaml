@@ -1,0 +1,88 @@
+task_id: b2_vinyl
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:27:36.668211+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: car illustration
+  source: encoding_text
+  feature_type: visual_pattern
+  exact_quote: it has a car illustration on the cover
+- feature_id: f2
+  feature: Night Drive
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: titled Night Drive
+- feature_id: f3
+  feature: vinyl record
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: prepare a vinyl record
+- feature_id: f4
+  feature: on the desk
+  source: encoding_text
+  feature_type: location
+  exact_quote: find the record on the desk
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: high
+    reasoning: Only the vinyl record task involves a car illustration; napkin rings,
+      pot, and softener have no visual pattern matching 'car illustration'.
+  level_b:
+    rating: high
+    reasoning: 'Excludes d1 (shares car illustration but d1 is titled ''Dark Side'')
+      — wait, no: d1 *also* has car illustration, so f1 is shared with d1; d2 has
+      abstract art, so f1 excludes only d2 → medium.'
+  combined: MEDIUM
+- feature_id: f2
+  level_a:
+    rating: high
+    reasoning: Only the vinyl record task has the title 'Night Drive'; none of the
+      other tasks (napkin rings, pot, softener) involve titles or named media.
+  level_b:
+    rating: high
+    reasoning: Excludes d1 ('Dark Side') and matches target and d2 — but d2 also has
+      'Night Drive', so f2 is shared with d2 → excludes only d1 → medium.
+  combined: MEDIUM
+- feature_id: f3
+  level_a:
+    rating: high
+    reasoning: Only this task specifies 'vinyl record'; the other tasks are napkin
+      rings, pot, and softener — all categorically distinct objects.
+  level_b:
+    rating: low
+    reasoning: All three objects (target, d1, d2) are vinyl records — f3 is shared
+      across all, providing no discrimination among them.
+  combined: MEDIUM
+- feature_id: f4
+  level_a:
+    rating: low
+    reasoning: '''On the desk'' is likely true for all four tasks (all items are on
+      the desk per context), so it does not distinguish the vinyl record task from
+      others.'
+  level_b:
+    rating: low
+    reasoning: All three objects (target, d1, d2) are on the same desk, so location
+      provides zero discrimination.
+  combined: LOW
+recommended_cues:
+  include:
+  - feature_id: f1
+    priority: 1
+    reason: Car illustration uniquely identifies the target category among tasks and
+      excludes d2; when combined with title, fully discriminates target from both
+      distractors.
+  - feature_id: f2
+    priority: 1
+    reason: Title 'Night Drive' uniquely identifies the target among tasks and excludes
+      d1; conjunction with car illustration yields full object-level discrimination.
+  exclude:
+  - feature_id: f4
+    reason: Location 'on the desk' is non-diagnostic at both task and object levels
+      due to complete overlap with competitors.
+target_conjunction: car illustration AND Night Drive
+minimum_cues_for_discrimination:
+- f1
+- f2

@@ -1,0 +1,115 @@
+task_id: b1_soap
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:25:21.294649+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: lemon label
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: the pump bottle with the lemon label
+- feature_id: f2
+  feature: pump bottle
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: the pump bottle with the lemon label
+- feature_id: f3
+  feature: shelf above the sink
+  source: encoding_text
+  feature_type: location
+  exact_quote: from the shelf above the sink
+- feature_id: f4
+  feature: kitchen sink
+  source: encoding_text
+  feature_type: location
+  exact_quote: Put it by the kitchen sink
+- feature_id: f5
+  feature: bathroom
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the bathroom
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: high
+    reasoning: Only the hand soap task references 'lemon', whereas book (mountain),
+      gift bag (bow), and dish (blue handles) have no scent or citrus association.
+  level_b:
+    rating: high
+    reasoning: D1 shares 'lemon label' but D2 has 'mint label', so 'lemon label' excludes
+      D2; D1 differs in dispenser type but still shares the label, so it does not
+      exclude D1 — however, 'lemon label' is present only on target and D1, not D2,
+      so it distinguishes target from D2 but not D1 — thus it excludes only one distractor,
+      making it medium.
+  combined: MEDIUM
+- feature_id: f2
+  level_a:
+    rating: high
+    reasoning: Only the hand soap task involves a 'pump bottle'; book (cover), gift
+      bag (bow), and dish (handles) lack dispensers entirely.
+  level_b:
+    rating: high
+    reasoning: D1 has flip-cap (not pump), D2 has pump — so 'pump bottle' excludes
+      D1 but not D2; thus it excludes only one distractor, making it medium.
+  combined: MEDIUM
+- feature_id: f3
+  level_a:
+    rating: medium
+    reasoning: '''Shelf above the sink'' is specific to hand soap, but ''shelf'' is
+      generic and could loosely apply to book or gift bag placement; it narrows to
+      hand soap and possibly book (if placed on shelf), but not dish or bag — so medium.'
+  level_b:
+    rating: low
+    reasoning: Both distractors d1 and d2 are explicitly stated to be on the 'same
+      shelf', so this feature is shared with both and provides no object discrimination.
+  combined: MEDIUM
+- feature_id: f4
+  level_a:
+    rating: low
+    reasoning: '''Kitchen sink'' is not mentioned in any other task description and
+      is location-specific, but ''sink'' is not a task identifier — other tasks (book,
+      gift bag, dish) could plausibly occur near a sink, so it''s not uniquely diagnostic
+      for the hand soap task.'
+  level_b:
+    rating: low
+    reasoning: Distractors d1 and d2 are both on the same shelf (implied to be above
+      the sink), so 'kitchen sink' does not distinguish among the three objects visually
+      present.
+  combined: LOW
+- feature_id: f5
+  level_a:
+    rating: low
+    reasoning: '''Bathroom'' contradicts the target’s actual location (kitchen sink/shelf),
+      and none of the other tasks mention bathroom — but since it’s factually incorrect
+      for the target, it cannot reliably cue the correct task.'
+  level_b:
+    rating: low
+    reasoning: The target and both distractors are located in the kitchen (shelf above
+      sink), not bathroom, so this cue is false and shared by none — but as a false
+      cue, it provides no valid discrimination and may impair retrieval.
+  combined: LOW
+recommended_cues:
+  include:
+  - feature_id: f1
+    priority: 1
+    reason: Lemon label uniquely identifies the target task among PM tasks and excludes
+      D2; combined with pump bottle, it fully discriminates the target.
+  - feature_id: f2
+    priority: 1
+    reason: Pump bottle uniquely identifies the target task and excludes D1; together
+      with lemon label, it forms a conjunction that isolates the target from both
+      distractors.
+  exclude:
+  - feature_id: f4
+    reason: Not diagnostic at either level — shared with distractors and non-unique
+      across tasks.
+  - feature_id: f5
+    reason: Factually incorrect location that impairs validity and provides zero discrimination.
+  - feature_id: f3
+    reason: Provides no object-level discrimination as all items share the shelf,
+      and only weakly constrains task identity.
+target_conjunction: white pump bottle with lemon label
+minimum_cues_for_discrimination:
+- f1
+- f2

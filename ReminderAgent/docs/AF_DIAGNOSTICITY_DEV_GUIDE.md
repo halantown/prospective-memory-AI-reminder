@@ -656,19 +656,19 @@ python -m reminder_agent.stage2.diagnosticity_analyzer --review
 3. Human review each migration (verify conjunction is correct) ← **next step**
 4. Update test_task_schemas.py
 
-### Phase 2: Core Diagnosticity Analyzer
+### Phase 2: Core Diagnosticity Analyzer ✅ (completed 2026-03-31)
 
-1. Implement `diagnosticity_analyzer.py` with text-only analysis
-2. Run on all 12 tasks using Qwen via 百炼 API
-3. Human review all 12 diagnosticity reports
-4. Iterate on prompts if quality is poor
+1. ~~Implement `diagnosticity_analyzer.py` with text-only analysis~~
+2. ~~Run on all 12 tasks using Qwen (qwen-plus) via 百炼 API~~
+3. Human review all 12 diagnosticity reports (in `data/diagnosticity/*.yaml`) ← **next step**
+4. ~~Iterate on prompts if quality is poor~~
 
-### Phase 3: Pipeline Integration
+### Phase 3: Pipeline Integration ✅ (completed 2026-03-31)
 
-1. Add `diagnosticity_report` parameter to `prompt_constructor.build_user_prompt()`
-2. Add `check_cue_priority_compliance` to `quality_gate.py`
-3. Update `batch_runner.py` to load approved diagnosticity reports
-4. Re-run batch generation with diagnosticity-aware prompts
+1. ~~Add `diagnosticity_report` parameter to `prompt_constructor.build_user_prompt()`~~
+2. ~~Add `check_cue_priority_compliance` to `quality_gate.py`~~
+3. ~~Update `batch_runner.py` to load approved diagnosticity reports~~
+4. Re-run batch generation with diagnosticity-aware prompts ← **after report review**
 
 ### Phase 4: VLM Enhancement (optional)
 

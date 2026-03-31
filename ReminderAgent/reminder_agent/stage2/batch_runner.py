@@ -9,6 +9,7 @@ from pathlib import Path
 from reminder_agent.stage2.baseline_generator import generate_baseline, load_all_task_jsons
 from reminder_agent.stage2.config_loader import load_all_configs
 from reminder_agent.stage2.context_extractor import extract
+from reminder_agent.stage2.diagnosticity_analyzer import load_approved_reports
 from reminder_agent.stage2.llm_backend import GenerationError, create_backend
 from reminder_agent.stage2.output_store import OutputStore
 from reminder_agent.stage2.prompt_constructor import build_prompts
@@ -47,6 +48,13 @@ def run_batch(
     n_variants = n_variants or gen_config.n_variants
     conditions = [condition_filter] if condition_filter else LLM_CONDITIONS
 
+    # Load approved diagnosticity reports (if any)
+    diag_reports = load_approved_reports()
+    if diag_reports:
+        print(f"  Loaded {len(diag_reports)} approved diagnosticity reports")
+    else:
+        print("  No approved diagnosticity reports found — cue priority disabled")
+
     # Phase 1: Baselines
     print(f"\n=== Phase 1: Baselines ({len(tasks)} tasks) ===")
     for task in tasks:
@@ -73,6 +81,7 @@ def run_batch(
 
     for task in tasks:
         entity_name = task["reminder_context"]["element1"]["target_entity"]["entity_name"]
+        task_diag = diag_reports.get(task["task_id"])
 
         for condition in conditions:
             prior_variants: list[str] = []
@@ -87,6 +96,7 @@ def run_batch(
                         prior_variants=prior_variants,
                         field_map=field_map,
                         gen_config=gen_config,
+                        diagnosticity_report=task_diag,
                     )
 
                     # Generate
@@ -107,6 +117,7 @@ def run_batch(
                         entity_name=entity_name,
                         prior_variants=prior_variants,
                         gen_config=gen_config,
+                        diagnosticity_report=task_diag,
                     )
 
                     # Serialize QG details for logging

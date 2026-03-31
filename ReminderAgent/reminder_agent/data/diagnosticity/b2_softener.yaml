@@ -1,0 +1,172 @@
+task_id: b2_softener
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:27:13.013054+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: purple bottle
+  source: encoding_text
+  feature_type: visual_color
+  exact_quote: the purple bottle
+- feature_id: f2
+  feature: lavender label
+  source: encoding_text
+  feature_type: visual_color
+  exact_quote: the lavender label
+- feature_id: f3
+  feature: bathroom
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the bathroom
+- feature_id: f4
+  feature: shelf above the machine
+  source: encoding_text
+  feature_type: location
+  exact_quote: get the fabric softener from the shelf above the machine
+- feature_id: f5
+  feature: fabric softener
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: get the fabric softener
+- feature_id: f6
+  feature: purple bottle
+  source: encoding_text
+  feature_type: visual_shape
+  exact_quote: the purple bottle
+- feature_id: f7
+  feature: lavender label
+  source: encoding_text
+  feature_type: visual_pattern
+  exact_quote: the lavender label
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: medium
+    reasoning: Purple bottle is not unique to fabric softener—vinyl record has black
+      sleeve, napkin rings are light oak, pot is brown terracotta, so purple bottle
+      narrows to fabric softener only if no other purple items exist in other tasks;
+      but 'purple bottle' alone doesn’t distinguish from hypothetical purple items
+      in other tasks, and no other task mentions purple, so it moderately constrains
+      to this task.
+  level_b:
+    rating: high
+    reasoning: 'D1 shares purple bottle but has eucalyptus label (not lavender), D2
+      has white bottle—so ''purple bottle'' excludes D2 and is shared only with D1,
+      but combined with label it’s diagnostic; as a standalone visual-color cue, it
+      excludes D2 (white) and distinguishes from D1 only if label is considered separately—yet
+      per spec, ''purple bottle'' alone excludes D2 and is ambiguous only with D1,
+      so it excludes one distractor fully and partially constrains the other—thus
+      medium? Wait: re-evaluate. D1 = purple bottle + eucalyptus label → shares ''purple
+      bottle''; D2 = white bottle → does NOT share. So ''purple bottle'' excludes
+      D2 completely, but does NOT exclude D1 — so it excludes only one distractor
+      → level_b = medium.'
+  combined: MEDIUM
+- feature_id: f2
+  level_a:
+    rating: high
+    reasoning: No other task mentions 'lavender label'—vinyl has car illustration,
+      napkin rings are wood, pot is terracotta—so this uniquely identifies the fabric
+      softener task.
+  level_b:
+    rating: high
+    reasoning: 'D1 has eucalyptus leaf (not lavender), D2 has lavender flower label
+      but white bottle—so ''lavender label'' excludes D1 and is shared with D2; thus
+      excludes only one distractor → wait: D2 *has* lavender label, so ''lavender
+      label'' is shared with D2 → then it excludes only D1. So level_b = medium. Correction:
+      D2 description says ''White bottle with lavender flower label'' → yes, shares
+      ''lavender label''. So f2 is shared with D2, not with D1 → excludes only D1
+      → level_b = medium.'
+  combined: MEDIUM
+- feature_id: f3
+  level_a:
+    rating: low
+    reasoning: Bathroom is not task-specific—any of the four tasks could plausibly
+      occur in or involve the bathroom, and none of the other tasks explicitly rule
+      it out.
+  level_b:
+    rating: low
+    reasoning: Location 'bathroom' is not listed for any distractor, but neither is
+      it discriminative among the three objects on the shelf—distractors d1 and d2
+      are on same shelf as target, so 'bathroom' doesn’t help select among them.
+  combined: LOW
+- feature_id: f4
+  level_a:
+    rating: high
+    reasoning: Only the fabric softener task specifies 'shelf above the machine';
+      other tasks give no location or different locations (e.g., 'on turntable', 'at
+      dining table', 'on windowsill'), so this uniquely identifies the task.
+  level_b:
+    rating: low
+    reasoning: All three objects (target, d1, d2) are on the same shelf, so 'shelf
+      above the machine' does not distinguish the target from either distractor.
+  combined: MEDIUM
+- feature_id: f5
+  level_a:
+    rating: high
+    reasoning: The term 'fabric softener' explicitly names the target task and appears
+      in no other task description (which name vinyl record, napkin rings, flower
+      pot).
+  level_b:
+    rating: high
+    reasoning: Though all three objects are laundry-adjacent, only the target is *named*
+      'fabric softener'; distractors d1 and d2 are unnamed products—so verbal label
+      uniquely identifies target object.
+  combined: HIGH
+- feature_id: f6
+  level_a:
+    rating: medium
+    reasoning: '''Purple bottle'' as shape is inconsistent—bottle is a container shape,
+      but ''bottle'' is not a shape feature; ''purple bottle'' was already assessed
+      as color (f1); treating as shape misclassifies—it''s not shape-discriminative
+      across tasks, so same as f1: medium at level A.'
+  level_b:
+    rating: medium
+    reasoning: 'Same as f1: ''bottle'' shape is shared with both d1 and d2 (both described
+      as bottles), so shape alone doesn’t discriminate; ''purple'' is color, not shape—so
+      this feature is ill-specified and provides no shape-based discrimination beyond
+      color—thus level_b = medium (same as f1).'
+  combined: MEDIUM
+- feature_id: f7
+  level_a:
+    rating: high
+    reasoning: '''Lavender label'' refers to a specific visual pattern (flower motif),
+      which appears only in the fabric softener task—not in vinyl (car), napkin rings
+      (wood texture), or pot (terracotta plain)—so uniquely identifies the task.'
+  level_b:
+    rating: medium
+    reasoning: D2 also has a lavender flower label, so this feature is shared with
+      D2 and excludes only D1 (eucalyptus), thus distinguishing one distractor only.
+  combined: MEDIUM
+recommended_cues:
+  include:
+  - feature_id: f5
+    priority: 1
+    reason: Direct lexical label 'fabric softener' is unambiguous at both task and
+      object levels, providing maximal diagnosticity.
+  - feature_id: f2
+    priority: 2
+    reason: Lavender label is highly task-specific and excludes D1; when combined
+      with f5 or f1, resolves ambiguity with D2.
+  - feature_id: f1
+    priority: 2
+    reason: Purple bottle excludes D2 and—paired with lavender label—fully isolates
+      the target from both distractors.
+  exclude:
+  - feature_id: f3
+    reason: Bathroom is non-discriminative at both levels—shared across potential
+      contexts and uninformative among shelf objects.
+  - feature_id: f4
+    reason: Shelf location is task-specific but provides zero object-level discrimination
+      since all three items occupy that shelf.
+  - feature_id: f6
+    reason: Misclassified as shape; 'purple bottle' is a color+object description,
+      not a shape cue—adds no unique discriminative value beyond f1.
+  - feature_id: f7
+    reason: Redundant with f2—'lavender label' as pattern offers no additional discrimination
+      over its color+content interpretation in f2.
+target_conjunction: fabric softener with purple bottle and lavender label
+minimum_cues_for_discrimination:
+- f5
+- f1
+- f2

@@ -78,6 +78,9 @@ Constraints:
 - Natural spoken English — warm and brief. Not clinical. Not robotic.
 - Do NOT use bullet points, numbering, or explanations.
 - Do NOT add quotation marks around the reminder.
+- When CUE PRIORITY is provided, you MUST include all high-priority cues.
+  Include medium-priority cues when they fit naturally.
+  Do NOT include low-priority cues unless needed for grammatical completeness.
 - Output ONLY the reminder text, nothing else."""
 
 
@@ -139,6 +142,48 @@ def _to_prose(pruned_dict: dict) -> str:
     return "\n".join(parts)
 
 
+def _build_cue_priority_section(diagnosticity_report: dict) -> str:
+    """Build CUE PRIORITY annotation from a diagnosticity report."""
+    include = diagnosticity_report.get("recommended_cues", {}).get("include", [])
+    if not include:
+        return ""
+
+    features_by_id = {
+        f["feature_id"]: f.get("feature", f["feature_id"])
+        for f in diagnosticity_report.get("candidate_features", [])
+    }
+
+    high = []   # priority 1-2
+    medium = []  # priority 3
+    low = []     # priority 4+
+
+    for cue in include:
+        fid = cue.get("feature_id", "?")
+        feature_text = features_by_id.get(fid, fid)
+        priority = cue.get("priority", 99)
+        if priority <= 2:
+            high.append(feature_text)
+        elif priority == 3:
+            medium.append(feature_text)
+        else:
+            low.append(feature_text)
+
+    lines = ["CUE PRIORITY (based on diagnosticity analysis):"]
+    if high:
+        lines.append(f"  MUST include (high diagnosticity): {', '.join(high)}")
+    if medium:
+        lines.append(f"  SHOULD include (medium): {', '.join(medium)}")
+    if low:
+        lines.append(f"  MAY omit (low diagnosticity): {', '.join(low)}")
+
+    lines.append("")
+    lines.append(
+        "The reminder MUST contain at least the high-priority cues. "
+        "Include medium-priority cues if they fit naturally within the word limit."
+    )
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # User prompt builder
 # ---------------------------------------------------------------------------
@@ -147,6 +192,7 @@ def build_user_prompt(
     pruned_context: dict,
     prior_variants: list[str] | None = None,
     context_format: str = "prose",
+    diagnosticity_report: dict | None = None,
 ) -> str:
     """Build the user prompt with task context and optional diversity instruction.
 
@@ -154,6 +200,7 @@ def build_user_prompt(
         pruned_context: Output from context_extractor.extract().
         prior_variants: Previously generated variants (for diversity).
         context_format: "prose" or "json".
+        diagnosticity_report: Approved diagnosticity report for cue prioritization.
     """
     formatted = format_context(pruned_context, style=context_format)
 
@@ -161,6 +208,13 @@ def build_user_prompt(
         "Task context:",
         formatted,
     ]
+
+    # Append cue priority annotation from diagnosticity report
+    if diagnosticity_report:
+        cue_section = _build_cue_priority_section(diagnosticity_report)
+        if cue_section:
+            prompt_parts.append("")
+            prompt_parts.append(cue_section)
 
     if prior_variants:
         prompt_parts.append("")
@@ -186,6 +240,7 @@ def build_prompts(
     prior_variants: list[str] | None = None,
     field_map: ConditionFieldMap | None = None,
     gen_config: GenerationConfig | None = None,
+    diagnosticity_report: dict | None = None,
 ) -> tuple[str, str]:
     """Build system + user prompts for a (task, condition) pair.
 
@@ -200,7 +255,8 @@ def build_prompts(
     pruned = extract(task_json, condition, field_map=field_map)
     system = build_system_prompt(condition)
     user = build_user_prompt(
-        pruned, prior_variants=prior_variants, context_format=gen_config.context_format
+        pruned, prior_variants=prior_variants, context_format=gen_config.context_format,
+        diagnosticity_report=diagnosticity_report,
     )
     return system, user
 

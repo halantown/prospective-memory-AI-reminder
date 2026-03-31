@@ -182,6 +182,41 @@ def check_language(text: str) -> CheckResult:
     return CheckResult("language", False, f"Detected language: {lang} (expected en)")
 
 
+def check_cue_priority_compliance(
+    text: str,
+    diagnosticity_report: dict | None,
+) -> CheckResult:
+    """Check that high-priority cues from diagnosticity report appear in the text."""
+    if diagnosticity_report is None:
+        return CheckResult("cue_priority", True, "No diagnosticity report — skipped")
+
+    include = diagnosticity_report.get("recommended_cues", {}).get("include", [])
+    if not include:
+        return CheckResult("cue_priority", True, "No recommended cues — skipped")
+
+    features_by_id = {
+        f["feature_id"]: f.get("feature", "")
+        for f in diagnosticity_report.get("candidate_features", [])
+    }
+
+    high_priority = [
+        cue for cue in include if cue.get("priority", 99) <= 2
+    ]
+
+    missing = []
+    for cue in high_priority:
+        fid = cue.get("feature_id", "?")
+        feature_text = features_by_id.get(fid, "").lower()
+        # Check if any key term (>3 chars) from the feature appears in the text
+        key_terms = [t.strip() for t in feature_text.split() if len(t.strip()) > 3]
+        if key_terms and not any(term in text.lower() for term in key_terms):
+            missing.append(fid)
+
+    if missing:
+        return CheckResult("cue_priority", False, f"Missing high-priority cues: {missing}")
+    return CheckResult("cue_priority", True, f"All {len(high_priority)} high-priority cues present")
+
+
 # ---------------------------------------------------------------------------
 # CB activity consistency (batch-level check)
 # ---------------------------------------------------------------------------
@@ -286,6 +321,7 @@ def check(
     prior_variants: list[str] | None = None,
     gen_config: GenerationConfig | None = None,
     forbidden_kw: dict[str, dict[str, list[str]]] | None = None,
+    diagnosticity_report: dict | None = None,
 ) -> GateResult:
     """Run all per-variant quality checks.
 
@@ -297,6 +333,7 @@ def check(
         prior_variants: Previously accepted variants in this batch.
         gen_config: Generation config (for thresholds). Loaded if None.
         forbidden_kw: Forbidden keywords dict. Loaded if None.
+        diagnosticity_report: Approved diagnosticity report for cue priority check.
 
     Returns:
         GateResult with pass/fail and details of each check.
@@ -313,6 +350,7 @@ def check(
     results.append(check_length(text, gen_config.min_words, gen_config.max_words))
     results.append(check_duplicate(text, prior_variants, gen_config.similarity_threshold))
     results.append(check_language(text))
+    results.append(check_cue_priority_compliance(text, diagnosticity_report))
 
     all_passed = all(r.passed for r in results)
     return GateResult(passed=all_passed, checks=results)

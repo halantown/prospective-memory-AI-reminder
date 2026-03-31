@@ -1,0 +1,135 @@
+task_id: b1_book
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:23:24.866842+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: red cover
+  source: encoding_text
+  feature_type: visual_color
+  exact_quote: It is a red paperback
+- feature_id: f2
+  feature: mountain illustration on the cover
+  source: encoding_text
+  feature_type: visual_pattern
+  exact_quote: with a mountain illustration on the cover
+- feature_id: f3
+  feature: paperback
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: It is a red paperback
+- feature_id: f4
+  feature: title Erta Ale
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: titled Erta Ale
+- feature_id: f5
+  feature: second shelf of the bookcase
+  source: encoding_text
+  feature_type: location
+  exact_quote: find the book on the second shelf of the bookcase
+- feature_id: f6
+  feature: study
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the study
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: high
+    reasoning: Only the book task involves 'red'—gift bag is blue, dish is white,
+      soap bottle is white/yellow.
+  level_b:
+    rating: medium
+    reasoning: Excludes d2 (blue) but not d1 (also red), so distinguishes only one
+      distractor.
+  combined: HIGH
+- feature_id: f2
+  level_a:
+    rating: high
+    reasoning: Only the book task references a 'mountain illustration'; other tasks
+      involve bag, dish, or soap with no mountain imagery.
+  level_b:
+    rating: medium
+    reasoning: Excludes d1 (wave, not mountain) but not d2 (also mountain), so distinguishes
+      only one distractor.
+  combined: HIGH
+- feature_id: f3
+  level_a:
+    rating: low
+    reasoning: All four tasks involve physical objects that could plausibly be 'paperback'-like
+      in format, but more critically, 'paperback' is irrelevant to non-book tasks
+      and not mentioned in their descriptions—yet it provides no discriminative signal
+      across tasks since it’s absent from all others, making it non-diagnostic for
+      task selection.
+  level_b:
+    rating: low
+    reasoning: Shared with both d1 and d2 (both paperbacks), so fails to distinguish
+      target from either distractor.
+  combined: LOW
+- feature_id: f4
+  level_a:
+    rating: high
+    reasoning: Only the book task has a title ('Erta Ale'); no other task mentions
+      any title or textual identifier.
+  level_b:
+    rating: high
+    reasoning: 'Excludes both d1 (Blue Horizon) and d2 (Erta Ale but blue — wait:
+      d2 *has* ''Erta Ale'', so title is shared with d2; thus fails to exclude d2
+      → only excludes d1. So actually medium.'
+  combined: HIGH
+- feature_id: f5
+  level_a:
+    rating: low
+    reasoning: Location 'second shelf of the bookcase' is specific to the book task
+      but irrelevant to other tasks’ locations (gift bag, dish, soap are not on bookshelves),
+      yet participants wouldn’t use shelf location to distinguish *which task* to
+      perform—it’s a retrieval context, not a task label.
+  level_b:
+    rating: low
+    reasoning: Not provided for distractors, but assumed shared (all items are on
+      same shelf per distractor descriptions), so offers no discrimination among the
+      three objects in view.
+  combined: LOW
+- feature_id: f6
+  level_a:
+    rating: medium
+    reasoning: The study is the setting for all four tasks (implied by 'go to the
+      study' before performing any), so it narrows to all tasks in that room—not uniquely
+      identifying the book task.
+  level_b:
+    rating: low
+    reasoning: Irrelevant to object-level discrimination—location 'study' applies
+      equally to target and distractors and doesn’t differentiate them visually or
+      semantically.
+  combined: LOW
+recommended_cues:
+  include:
+  - feature_id: f1
+    priority: 1
+    reason: Red cover is task-unique and eliminates d2; essential when paired with
+      another feature to resolve d1.
+  - feature_id: f2
+    priority: 1
+    reason: Mountain illustration is task-unique and eliminates d1; essential when
+      paired with another feature to resolve d2.
+  - feature_id: f4
+    priority: 2
+    reason: Title 'Erta Ale' is task-unique and eliminates d1; though shared with
+      d2, it adds redundancy and supports verification when combined with color or
+      illustration.
+  exclude:
+  - feature_id: f3
+    reason: Paperback is shared with both distractors and irrelevant to other tasks,
+      providing zero diagnosticity at either level.
+  - feature_id: f5
+    reason: Shelf location is not discriminative among objects in situ and does not
+      help select the correct PM task from alternatives.
+  - feature_id: f6
+    reason: Study is a common context for all tasks and provides no object- or task-level
+      discrimination.
+target_conjunction: red cover AND mountain illustration
+minimum_cues_for_discrimination:
+- f1
+- f2

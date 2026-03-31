@@ -1,0 +1,126 @@
+task_id: b3_speaker
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:29:28.401441+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: round
+  source: encoding_text
+  feature_type: visual_shape
+  exact_quote: the round one
+- feature_id: f2
+  feature: fabric cover
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: the round one with the fabric cover
+- feature_id: f3
+  feature: bottom shelf
+  source: encoding_text
+  feature_type: location
+  exact_quote: bottom shelf
+- feature_id: f4
+  feature: sideboard
+  source: encoding_text
+  feature_type: location
+  exact_quote: from the sideboard, bottom shelf
+- feature_id: f5
+  feature: living room
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the living room
+- feature_id: f6
+  feature: dining area
+  source: encoding_text
+  feature_type: location
+  exact_quote: Set it up in the dining area
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: high
+    reasoning: Only the Bluetooth speaker task references 'round'; hanger is wide-curved,
+      vase is ceramic/smooth, hand cream is tube-shaped—none are described as round.
+  level_b:
+    rating: medium
+    reasoning: Excludes d2 (square) but not d1 (also round), so distinguishes target
+      from one distractor only.
+  combined: HIGH
+- feature_id: f2
+  level_a:
+    rating: high
+    reasoning: No other task mentions 'fabric cover'; hanger is wood, vase is ceramic,
+      hand cream is a tube—none have fabric covers.
+  level_b:
+    rating: high
+    reasoning: Excludes both d1 (rubber cover) and d2 (gray fabric but square), and
+      uniquely matches target's 'fabric' + implied shape context.
+  combined: HIGH
+- feature_id: f3
+  level_a:
+    rating: low
+    reasoning: All four tasks (including hanger, vase, hand cream) could plausibly
+      occur on the bottom shelf—no task-specific association.
+  level_b:
+    rating: low
+    reasoning: Both distractors d1 and d2 share 'same shelf' with target, so 'bottom
+      shelf' does not distinguish among the three objects.
+  combined: LOW
+- feature_id: f4
+  level_a:
+    rating: low
+    reasoning: Sideboard is not mentioned in any other task description and is irrelevant
+      to hanger/vase/hand cream contexts, but it's a generic furniture item not tied
+      to the Bluetooth speaker task identity.
+  level_b:
+    rating: low
+    reasoning: Location 'sideboard' is not specified for d1 or d2, but since both
+      distractors are on the same shelf as target, and sideboard is a container-level
+      location, it provides no discriminative power among the three visible objects.
+  combined: LOW
+- feature_id: f5
+  level_a:
+    rating: low
+    reasoning: Living room is a broad spatial context likely shared across all tasks
+      (hanger, vase, hand cream could all be retrieved there).
+  level_b:
+    rating: low
+    reasoning: Distractors d1 and d2 are co-located with target in the same room,
+      so 'living room' does not aid object-level discrimination.
+  combined: LOW
+- feature_id: f6
+  level_a:
+    rating: low
+    reasoning: Dining area is task-irrelevant for the Bluetooth speaker task (which
+      specifies living room), and conflicts with target context—so it’s misleading,
+      not diagnostic.
+  level_b:
+    rating: low
+    reasoning: Dining area is not where the target or distractors are located; it
+      introduces false spatial information and shares no feature with the target or
+      its distractors.
+  combined: LOW
+recommended_cues:
+  include:
+  - feature_id: f2
+    priority: 1
+    reason: Uniquely identifies both the task and the target object, excluding both
+      distractors via domain property 'fabric cover'.
+  - feature_id: f1
+    priority: 2
+    reason: Strong task-level uniqueness and partial object-level discrimination;
+      combined with f2, ensures robust disambiguation.
+  exclude:
+  - feature_id: f3
+    reason: Non-discriminative at both levels—shared location cue with all distractors
+      and other tasks.
+  - feature_id: f4
+    reason: Overly coarse location that adds no object-level distinction and lacks
+      task specificity.
+  - feature_id: f5
+    reason: Too generic to differentiate among PM tasks or objects.
+  - feature_id: f6
+    reason: Contradicts target context and provides zero diagnostic value for identification.
+target_conjunction: the round one with the fabric cover
+minimum_cues_for_discrimination:
+- f1
+- f2

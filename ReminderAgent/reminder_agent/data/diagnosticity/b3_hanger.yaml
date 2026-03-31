@@ -1,0 +1,173 @@
+task_id: b3_hanger
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:28:55.574032+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: wooden
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: the wooden hanger
+- feature_id: f2
+  feature: wide shoulders
+  source: encoding_text
+  feature_type: visual_shape
+  exact_quote: the wooden hanger with wide shoulders
+- feature_id: f3
+  feature: left side
+  source: encoding_text
+  feature_type: location
+  exact_quote: left side
+- feature_id: f4
+  feature: closet
+  source: encoding_text
+  feature_type: location
+  exact_quote: the closet
+- feature_id: f5
+  feature: study
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the study
+- feature_id: f6
+  feature: living room
+  source: encoding_text
+  feature_type: location
+  exact_quote: Hang the jacket on it in the living room
+- feature_id: f7
+  feature: jacket
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: Sophie's jacket
+- feature_id: f8
+  feature: Sophie's
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: Sophie's jacket
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: medium
+    reasoning: Wooden is shared with d1 and d2 but not with speaker, vase, or hand
+      cream, so it narrows to hanger tasks only (1 target + 2 distractors), excluding
+      the other 3 PM tasks.
+  level_b:
+    rating: medium
+    reasoning: Shared with both d1 and d2 (both wooden), so does not distinguish target
+      from either distractor.
+  combined: MEDIUM
+- feature_id: f2
+  level_a:
+    rating: high
+    reasoning: Wide shoulders is unique to the hanger task and absent in speaker,
+      vase, and hand cream descriptions, uniquely identifying this PM task.
+  level_b:
+    rating: medium
+    reasoning: Shared with d1 (both have wide shoulders) and absent in d2 (narrow),
+      so excludes only d2.
+  combined: HIGH
+- feature_id: f3
+  level_a:
+    rating: low
+    reasoning: Left side is spatial and could plausibly apply to any object in the
+      study, living room, or closet, offering no task-specific constraint across the
+      four PM tasks.
+  level_b:
+    rating: low
+    reasoning: No location information is provided for the distractors relative to
+      'left side', so it cannot discriminate among the three hangers in situ.
+  combined: LOW
+- feature_id: f4
+  level_a:
+    rating: low
+    reasoning: Closet is mentioned for hangers but also implicitly relevant to speaker
+      (in study), vase (living room), and hand cream (likely bathroom/kitchen), making
+      it non-diagnostic across tasks.
+  level_b:
+    rating: low
+    reasoning: All hangers (target, d1, d2) are stated to be in the 'same closet',
+      so 'closet' is shared across all three objects.
+  combined: LOW
+- feature_id: f5
+  level_a:
+    rating: high
+    reasoning: Study is explicitly tied to the speaker task ('b3_speaker') and not
+      mentioned for hanger, vase, or hand cream, uniquely identifying the speaker
+      task—not the hanger—so for *this* target, 'study' is irrelevant and does not
+      refer to it at all.
+  level_b:
+    rating: low
+    reasoning: Study is not associated with any hanger (target or distractors), so
+      provides zero discrimination among the three hangers.
+  combined: LOW
+- feature_id: f6
+  level_a:
+    rating: high
+    reasoning: Living room is specified only for the hanger task ('Hang the jacket
+      on it in the living room') and not for speaker, vase, or hand cream, uniquely
+      identifying this PM task.
+  level_b:
+    rating: low
+    reasoning: No location differentiation is given among the three hangers—they’re
+      all in the same closet per distractor descriptions, so 'living room' refers
+      to action context, not object location, and doesn’t help select among them.
+  combined: MEDIUM
+- feature_id: f7
+  level_a:
+    rating: medium
+    reasoning: 'Jacket is mentioned only for the hanger task (action: ''hang the jacket''),
+      and not for speaker, vase, or hand cream, narrowing to this task alone—so high?
+      But ''jacket'' could conceptually relate to hanger use, yet no other task mentions
+      clothing; thus it uniquely identifies the hanger task.'
+  level_b:
+    rating: low
+    reasoning: Jacket is an associated action object, not a property of the hanger
+      itself, and provides no basis to distinguish target from d1 or d2 visually or
+      structurally.
+  combined: MEDIUM
+- feature_id: f8
+  level_a:
+    rating: high
+    reasoning: Sophie's is a unique proper modifier attached only to 'jacket' in this
+      task and absent from all other task descriptions, making it highly specific
+      to this PM intention.
+  level_b:
+    rating: low
+    reasoning: Sophie's modifies 'jacket', not the hanger, so offers no discriminative
+      information among the three hangers.
+  combined: MEDIUM
+recommended_cues:
+  include:
+  - feature_id: f2
+    priority: 1
+    reason: Wide shoulders is the only feature that directly differentiates the target
+      from d2 and—when integrated with contextual inference about bar presence—supports
+      reliable selection; it is high in task discrimination and medium in object discrimination,
+      forming the core visual diagnostic cue.
+  - feature_id: f1
+    priority: 2
+    reason: Wooden eliminates non-wooden competitors (speaker, vase, hand cream) at
+      task level and—though shared with both distractors—anchors the domain, making
+      it a necessary supporting cue when paired with f2.
+  exclude:
+  - feature_id: f3
+    reason: Left side provides no task-specific or object-specific discrimination
+      and introduces spatial ambiguity without anchoring.
+  - feature_id: f4
+    reason: Closet is shared by all hangers and non-diagnostic across PM tasks.
+  - feature_id: f5
+    reason: Study refers exclusively to the speaker task, misaligning with the hanger
+      target.
+  - feature_id: f7
+    reason: Jacket is an action-related noun, not a hanger property, and fails object-level
+      discrimination.
+  - feature_id: f8
+    reason: Sophie's modifies jacket, not hanger, and adds no perceptual or structural
+      diagnosticity.
+  - feature_id: f6
+    reason: Living room specifies action context, not hanger identity or location,
+      and is uninformative for selecting among hangers in the closet.
+target_conjunction: wooden hanger with wide shoulders
+minimum_cues_for_discrimination:
+- f1
+- f2

@@ -1,0 +1,141 @@
+task_id: b1_dish
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:24:07.366331+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: blue
+  source: encoding_text
+  feature_type: visual_color
+  exact_quote: it is the oval ceramic dish with blue handles
+- feature_id: f2
+  feature: oval
+  source: encoding_text
+  feature_type: visual_shape
+  exact_quote: it is the oval ceramic dish with blue handles
+- feature_id: f3
+  feature: ceramic
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: it is the oval ceramic dish with blue handles
+- feature_id: f4
+  feature: bottom shelf
+  source: encoding_text
+  feature_type: location
+  exact_quote: bottom shelf
+- feature_id: f5
+  feature: display cabinet
+  source: encoding_text
+  feature_type: location
+  exact_quote: get the baking dish from the display cabinet, bottom shelf
+- feature_id: f6
+  feature: living room
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the living room and get the baking dish from the display cabinet
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: high
+    reasoning: Only the baking dish cue mentions 'blue' among the PM tasks; b1_book
+      (red), b1_giftbag (blue bag but not handles), b1_soap (yellow label) — 'blue'
+      is uniquely tied to the baking dish's handles in this task set.
+  level_b:
+    rating: high
+    reasoning: 'D1 has blue handles (shared), but D2 has red handles — so ''blue''
+      excludes D2 but not D1; however, combined with shape it discriminates, but alone
+      it only excludes one distractor — wait: rechecking — D1 *does* have blue handles
+      (shared_features_with_target includes ''handle_color: blue''), so ''blue'' is
+      shared with both D1 and D2? No: D2’s distinguishing feature is ''handle_color:
+      red'', so D2 does *not* have blue handles. D1 *does* have blue handles (shared).
+      So ''blue'' excludes D2 but not D1 → medium.'
+  combined: MEDIUM
+- feature_id: f2
+  level_a:
+    rating: high
+    reasoning: '''Oval'' is not mentioned in any other PM task description (b1_book:
+      mountain landscape, b1_giftbag: small blue bag, b1_soap: pump bottle — no shape
+      specification), so it uniquely identifies the baking dish task.'
+  level_b:
+    rating: high
+    reasoning: 'D1 is round (distinguishing feature), D2 is oval (shared), so ''oval''
+      excludes D1 but not D2 — thus only excludes one distractor → medium. Wait: D2
+      is described as ''Oval white ceramic dish with two red handles'' — so ''oval''
+      is shared with D2, not distinguishing. Target and D2 share ''oval''; D1 is ''round''.
+      So ''oval'' excludes D1 only → medium.'
+  combined: MEDIUM
+- feature_id: f3
+  level_a:
+    rating: low
+    reasoning: '''Ceramic'' is not referenced in any other task descriptions and is
+      not a salient or encoded property for b1_book, b1_giftbag, or b1_soap — but
+      since it’s absent from all competitors, it doesn’t help distinguish *among*
+      them; it’s non-informative for task selection.'
+  level_b:
+    rating: low
+    reasoning: Both D1 and D2 are explicitly 'white ceramic dish', so 'ceramic' is
+      shared with both distractors and provides no discrimination.
+  combined: LOW
+- feature_id: f4
+  level_a:
+    rating: low
+    reasoning: '''Bottom shelf'' appears only in the baking dish instruction, but
+      location terms like ''living room'' and ''display cabinet'' also appear — and
+      ''bottom shelf'' is too granular and uncontrasted with other tasks’ locations;
+      without cross-task location contrast, it doesn’t reliably isolate this task.'
+  level_b:
+    rating: low
+    reasoning: 'Both distractors are on the same shelf as the target (shared_features_with_target
+      for both D1 and D2 include ''location: same shelf''), so ''bottom shelf'' is
+      shared with both and provides no object-level discrimination.'
+  combined: LOW
+- feature_id: f5
+  level_a:
+    rating: medium
+    reasoning: '''Display cabinet'' is mentioned only for the baking dish, but it’s
+      a coarse location that could plausibly contain other items (e.g., book or gift
+      bag), so it narrows to ≤2–3 tasks but doesn’t uniquely identify this one.'
+  level_b:
+    rating: low
+    reasoning: Both D1 and D2 share the same location context (same shelf in display
+      cabinet), so 'display cabinet' is shared with both distractors and fails to
+      discriminate the target object.
+  combined: MEDIUM
+- feature_id: f6
+  level_a:
+    rating: low
+    reasoning: '''Living room'' is mentioned only for the baking dish, but it’s a
+      broad location also plausible for gift bags or books — and no other task specifies
+      location at all, so it doesn’t reliably differentiate among the four tasks.'
+  level_b:
+    rating: low
+    reasoning: Location 'living room' applies to the entire scene, not the object
+      set — both distractors are in the same room, so it provides zero object-level
+      discrimination.
+  combined: LOW
+recommended_cues:
+  include:
+  - feature_id: f1
+    priority: 1
+    reason: Blue handles uniquely identify the target task among PM tasks and exclude
+      D2 (red handles), making it essential when paired with shape.
+  - feature_id: f2
+    priority: 1
+    reason: Oval shape uniquely identifies the target task and excludes D1 (round),
+      making it essential when paired with color.
+  exclude:
+  - feature_id: f3
+    reason: Ceramic is shared by both distractors and irrelevant to task discrimination.
+  - feature_id: f4
+    reason: Bottom shelf is shared by both distractors and lacks task-level contrast.
+  - feature_id: f5
+    reason: Display cabinet is shared by both distractors and insufficiently specific
+      for task discrimination.
+  - feature_id: f6
+    reason: Living room is overly broad, shared across the environment, and non-discriminative
+      at both levels.
+target_conjunction: oval shape and blue handles
+minimum_cues_for_discrimination:
+- f1
+- f2

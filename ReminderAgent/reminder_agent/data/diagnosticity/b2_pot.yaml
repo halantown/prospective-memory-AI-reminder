@@ -1,0 +1,100 @@
+task_id: b2_pot
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:26:18.846316+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: terracotta
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: the terracotta pot with a saucer
+- feature_id: f2
+  feature: saucer
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: the terracotta pot with a saucer
+- feature_id: f3
+  feature: living room
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the living room
+- feature_id: f4
+  feature: window shelf
+  source: encoding_text
+  feature_type: location
+  exact_quote: get the pot from the window shelf
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: medium
+    reasoning: Terracotta appears in no other listed task (vinyl, napkin rings, softener),
+      so it uniquely identifies 'flower pot' among the four tasks.
+  level_b:
+    rating: medium
+    reasoning: Shared with both d1 and d2 (both terracotta), so it does not distinguish
+      the target from either distractor.
+  combined: MEDIUM
+- feature_id: f2
+  level_a:
+    rating: high
+    reasoning: ‘Saucer’ is unique to the flower pot task and does not appear in any
+      description of the other three tasks.
+  level_b:
+    rating: high
+    reasoning: 'd1 has a saucer but is small (so ‘with saucer’ alone is insufficient),
+      yet d2 explicitly lacks a saucer — so ‘with saucer’ excludes d2; combined with
+      size or context, it supports discrimination, but as a standalone cue in object
+      discrimination, it excludes only d2 — however, per operational definition, ‘high’
+      requires exclusion of *both* distractors; since d1 shares ‘saucer’, rating is
+      medium — correction: d1 *has* saucer, so ‘saucer’ is shared with d1 and absent
+      in d2 → excludes only d2 → level_b = medium.'
+  combined: MEDIUM
+- feature_id: f3
+  level_a:
+    rating: low
+    reasoning: ‘Living room’ is generic and could plausibly apply to any of the four
+      tasks (e.g., vinyl record or napkin rings could be in living room).
+  level_b:
+    rating: low
+    reasoning: Location ‘living room’ is not specified for any distractor, but neither
+      is it discriminative among the three objects on the shelf — all are co-located
+      on the window shelf, making it non-diagnostic at object level.
+  combined: LOW
+- feature_id: f4
+  level_a:
+    rating: high
+    reasoning: ‘Window shelf’ is specific and does not appear in descriptions of the
+      other three tasks, uniquely anchoring this PM task.
+  level_b:
+    rating: high
+    reasoning: 'All three objects (target, d1, d2) are on the same window shelf per
+      distractor descriptions, so ‘window shelf’ is shared across all — thus it does
+      *not* discriminate the target from distractors; correction: distractors state
+      ‘same shelf’, implying shared location → feature f4 is shared → level_b = low.'
+  combined: MEDIUM
+recommended_cues:
+  include:
+  - feature_id: f2
+    priority: 1
+    reason: ‘Saucer’ is task-unique and excludes d2; when combined with size or material,
+      enables full object discrimination — it is the most diagnostic domain property
+      for target identification.
+  - feature_id: f1
+    priority: 2
+    reason: ‘Terracotta’ supports task-level uniqueness and, though shared with both
+      distractors, jointly with ‘saucer’ creates a conjunction that distinguishes
+      the target (medium terracotta + saucer) from d1 (small + saucer) and d2 (medium
+      + no saucer).
+  exclude:
+  - feature_id: f3
+    reason: ‘Living room’ is overly generic and provides no discrimination at either
+      task or object level.
+  - feature_id: f4
+    reason: ‘Window shelf’ is shared by all three objects and adds no object-level
+      diagnosticity; its task-level specificity is undermined by lack of exclusivity
+      in real-world contexts.
+target_conjunction: medium terracotta pot with saucer
+minimum_cues_for_discrimination:
+- f1
+- f2

@@ -1,0 +1,115 @@
+task_id: b3_handcream
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:28:07.695541+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: lavender label
+  source: encoding_text
+  feature_type: visual_color
+  exact_quote: the one with the lavender label
+- feature_id: f2
+  feature: bathroom
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the bathroom
+- feature_id: f3
+  feature: shelf above the sink
+  source: encoding_text
+  feature_type: location
+  exact_quote: find the tube on the shelf above the sink
+- feature_id: f4
+  feature: hand cream
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: the hand cream she liked
+- feature_id: f5
+  feature: lavender
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: the one with the lavender label
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: high
+    reasoning: Only the hand cream task references a 'lavender label'; none of the
+      other tasks (hanger, speaker, vase) involve labels or scent-based visual identifiers.
+  level_b:
+    rating: high
+    reasoning: D1 has a green mint label and D2 has a purple lavender label but beige
+      tube—so 'lavender label' excludes D1 and matches target; D2 shares 'lavender
+      label' but the cue specifies 'lavender label' which both target and D2 have,
+      so it does NOT exclude D2—thus this cue is shared with D2 and only excludes
+      D1, making it medium at level B.
+  combined: MEDIUM
+- feature_id: f2
+  level_a:
+    rating: low
+    reasoning: All four tasks (hand cream, hanger, speaker, vase) could plausibly
+      occur in the bathroom, so 'bathroom' does not distinguish the PM task.
+  level_b:
+    rating: low
+    reasoning: Both distractors d1 and d2 are on the same shelf in the bathroom, so
+      'bathroom' is shared with all three objects.
+  combined: LOW
+- feature_id: f3
+  level_a:
+    rating: high
+    reasoning: Only the hand cream task specifies 'shelf above the sink'; the hanger,
+      speaker, and vase tasks do not reference that precise location.
+  level_b:
+    rating: high
+    reasoning: The target and both distractors d1 and d2 are explicitly on the same
+      shelf, so 'shelf above the sink' is shared across all three—thus it does NOT
+      discriminate the target from distractors, making it low at level B.
+  combined: MEDIUM
+- feature_id: f4
+  level_a:
+    rating: high
+    reasoning: '''Hand cream'' uniquely names the target task and is not mentioned
+      in any other task description (hanger, speaker, vase).'
+  level_b:
+    rating: low
+    reasoning: D1 and D2 are both tubes of topical products (mint and lavender variants),
+      and without further qualification, 'hand cream' is a category label that may
+      apply to both distractors in context—especially since they share form (tube)
+      and domain (toiletry), making it non-discriminating among the three objects.
+  combined: MEDIUM
+- feature_id: f5
+  level_a:
+    rating: high
+    reasoning: '''Lavender'' as a scent property uniquely maps to the hand cream task;
+      no other task (hanger, speaker, vase) involves scent.'
+  level_b:
+    rating: medium
+    reasoning: D1 has mint scent (not lavender), so excluded; D2 has lavender scent
+      (shared with target), so not excluded—thus discriminates one distractor only.
+  combined: MEDIUM
+recommended_cues:
+  include:
+  - feature_id: f1
+    priority: 1
+    reason: ‘Lavender label’ is highly task-diagnostic and partially object-diagnostic—it
+      excludes D1 and, when combined with tube color, enables full discrimination.
+  - feature_id: f5
+    priority: 1
+    reason: ‘Lavender’ scent is task-unique and excludes D1; paired with visual label
+      or color, resolves ambiguity with D2.
+  - feature_id: f3
+    priority: 2
+    reason: ‘Shelf above the sink’ is task-specific and constrains search location—though
+      not object-discriminative alone, it reduces perceptual load and supports conjunction
+      with f1/f5.
+  exclude:
+  - feature_id: f2
+    reason: ‘Bathroom’ is non-diagnostic at both levels—shared across all tasks and
+      all objects in the scene.
+  - feature_id: f4
+    reason: ‘Hand cream’ is task-specific but fails object discrimination because
+      both distractors are plausible hand creams (same form, location, toiletry domain),
+      risking false positives.
+target_conjunction: white tube with purple lavender flower label and lavender scent
+minimum_cues_for_discrimination:
+- f1
+- f5

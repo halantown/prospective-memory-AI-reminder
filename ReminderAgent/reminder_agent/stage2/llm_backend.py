@@ -143,9 +143,9 @@ class TogetherBackend(LLMBackend):
 # ---------------------------------------------------------------------------
 
 class OpenAIBackend(LLMBackend):
-    """OpenAI API (or compatible)."""
+    """OpenAI API (or compatible, e.g. Qwen 百炼 via DashScope)."""
 
-    API_URL = "https://api.openai.com/v1/chat/completions"
+    DEFAULT_URL = "https://api.openai.com/v1/chat/completions"
 
     def _call(self, system_prompt: str, user_prompt: str) -> str:
         api_key_env = self.config.api_key_env or "OPENAI_API_KEY"
@@ -154,6 +154,13 @@ class OpenAIBackend(LLMBackend):
             raise GenerationError(
                 f"API key not found in environment variable '{api_key_env}'"
             )
+
+        base_url = (self.config.base_url or self.DEFAULT_URL).rstrip("/")
+        # If base_url doesn't end with a path segment like /chat/completions, append it
+        if not base_url.endswith("/chat/completions"):
+            url = f"{base_url}/chat/completions"
+        else:
+            url = base_url
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -170,7 +177,7 @@ class OpenAIBackend(LLMBackend):
         }
 
         response = httpx.post(
-            self.API_URL, headers=headers, json=payload, timeout=60.0
+            url, headers=headers, json=payload, timeout=60.0
         )
         response.raise_for_status()
         data = response.json()

@@ -1,0 +1,112 @@
+task_id: b2_napkinrings
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:25:50.483974+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: wooden
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: the set with wooden rings
+- feature_id: f2
+  feature: top drawer
+  source: encoding_text
+  feature_type: location
+  exact_quote: wardrobe, top drawer
+- feature_id: f3
+  feature: wardrobe
+  source: encoding_text
+  feature_type: location
+  exact_quote: wardrobe, top drawer
+- feature_id: f4
+  feature: bedroom
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the bedroom and get the napkin rings from the wardrobe, top drawer
+- feature_id: f5
+  feature: napkin rings
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: get the napkin rings from the wardrobe, top drawer — the set with wooden
+    rings
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: high
+    reasoning: Only the napkin rings task specifies 'wooden'; vinyl record, flower
+      pot, and fabric softener are not wooden objects.
+  level_b:
+    rating: high
+    reasoning: Excludes d2 (metallic) and is shared with d1 but d1 is distinguished
+      by 'dark walnut'—so 'wooden' + context suffices to reject metal and supports
+      wood identity.
+  combined: HIGH
+- feature_id: f2
+  level_a:
+    rating: medium
+    reasoning: All four tasks could plausibly be located in the 'top drawer', so it
+      narrows but doesn’t uniquely identify the napkin rings task.
+  level_b:
+    rating: low
+    reasoning: Both distractors d1 and d2 are in the same top drawer, so location
+      alone cannot distinguish the target from either.
+  combined: MEDIUM
+- feature_id: f3
+  level_a:
+    rating: medium
+    reasoning: The wardrobe is not mentioned for other tasks, but it’s a generic furniture
+      item — possible overlap if another task used wardrobe; insufficiently specific
+      to guarantee uniqueness.
+  level_b:
+    rating: low
+    reasoning: Both distractors d1 and d2 are in the same wardrobe, so 'wardrobe'
+      does not discriminate among the three objects inside.
+  combined: MEDIUM
+- feature_id: f4
+  level_a:
+    rating: low
+    reasoning: Bedroom is a broad location shared across many household tasks and
+      is not uniquely tied to napkin rings versus vinyl record, pot, or softener.
+  level_b:
+    rating: low
+    reasoning: All distractors are in the same bedroom (implied by shared wardrobe
+      location), so 'bedroom' provides no object-level discrimination.
+  combined: LOW
+- feature_id: f5
+  level_a:
+    rating: high
+    reasoning: '''Napkin rings'' is the explicit name of the target task and does
+      not appear in any other task description (vinyl record, flower pot, fabric softener).'
+  level_b:
+    rating: high
+    reasoning: Directly names the target category and excludes both d1 and d2 only
+      as instances of that category — but since d1 and d2 *are* napkin rings, this
+      cue alone does not distinguish them; however, in context of encoding ('the set
+      with wooden rings'), it anchors attention to the category and enables use of
+      subordinate features — per standard PM cue diagnosticity models, category name
+      + domain property yields high diagnosticity when combined, and f5 is the categorical
+      anchor.
+  combined: HIGH
+recommended_cues:
+  include:
+  - feature_id: f1
+    priority: 1
+    reason: Uniquely identifies the task among alternatives and excludes the metallic
+      distractor while supporting wood-based discrimination against d2.
+  - feature_id: f5
+    priority: 1
+    reason: Essential categorical cue that isolates the target task from all others
+      and grounds interpretation of subordinate features like 'wooden'.
+  exclude:
+  - feature_id: f4
+    reason: Too coarse-grained to support either task or object discrimination.
+  - feature_id: f3
+    reason: Fails object discrimination and only weakly constrains task identity.
+  - feature_id: f2
+    reason: Fails object discrimination entirely and only moderately constrains task
+      identity.
+target_conjunction: napkin rings that are wooden
+minimum_cues_for_discrimination:
+- f5
+- f1

@@ -1,0 +1,167 @@
+task_id: b1_giftbag
+analysis_version: '0.1'
+model_used: qwen-plus
+analyzed_at: '2026-03-31T09:24:50.526305+00:00'
+review_status: pending
+candidate_features:
+- feature_id: f1
+  feature: blue
+  source: encoding_text
+  feature_type: visual_color
+  exact_quote: the small blue bag with the bow
+- feature_id: f2
+  feature: small
+  source: encoding_text
+  feature_type: visual_size
+  exact_quote: the small blue bag with the bow
+- feature_id: f3
+  feature: bow
+  source: encoding_text
+  feature_type: visual_pattern
+  exact_quote: the small blue bag with the bow
+- feature_id: f4
+  feature: bedroom
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the bedroom and get a gift bag from the dresser
+- feature_id: f5
+  feature: dresser
+  source: encoding_text
+  feature_type: location
+  exact_quote: go to the bedroom and get a gift bag from the dresser
+- feature_id: f6
+  feature: entrance
+  source: encoding_text
+  feature_type: location
+  exact_quote: Bring it to the entrance to bag the gift
+- feature_id: f7
+  feature: Mei
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: You ordered a birthday gift for Mei online
+- feature_id: f8
+  feature: gift bag
+  source: encoding_text
+  feature_type: domain_property
+  exact_quote: go to the bedroom and get a gift bag from the dresser — the small blue
+    bag with the bow
+diagnosticity:
+- feature_id: f1
+  level_a:
+    rating: low
+    reasoning: Blue appears in b1_soap (yellow lemon label on white bottle, no blue),
+      b1_dish (two blue handles), and b1_book (red cover); not unique to gift bag
+      task.
+  level_b:
+    rating: medium
+    reasoning: Shared with both d1 and d2 (both blue), so does not exclude either
+      distractor.
+  combined: MEDIUM
+- feature_id: f2
+  level_a:
+    rating: low
+    reasoning: Size 'small' is not mentioned in any other task description and is
+      not a salient differentiator across tasks; thus it provides no task-level discrimination.
+  level_b:
+    rating: high
+    reasoning: 'Excludes d2 (medium) but not d1 (also small), so only excludes one
+      distractor — wait: correction — d1 is ''small blue gift bag'', so ''small''
+      is shared with d1; d2 is medium → ''small'' excludes only d2 → medium.'
+  combined: MEDIUM
+- feature_id: f3
+  level_a:
+    rating: low
+    reasoning: Bow decoration is not referenced in any other task (b1_book, b1_dish,
+      b1_soap), so provides no task-level discrimination.
+  level_b:
+    rating: high
+    reasoning: Excludes d1 (ribbon, not bow) and matches target and d2; but d2 also
+      has bow → so shared with d2 → only excludes d1 → medium.
+  combined: MEDIUM
+- feature_id: f4
+  level_a:
+    rating: medium
+    reasoning: Bedroom is mentioned only in this task’s instruction ('go to the bedroom'),
+      while other tasks don’t specify location — so narrows to this task alone, but
+      'bedroom' alone isn’t sufficient without object reference, so medium for task
+      identity.
+  level_b:
+    rating: low
+    reasoning: Location 'bedroom' is shared across target and both distractors (all
+      on same dresser in bedroom), so provides no object-level discrimination.
+  combined: MEDIUM
+- feature_id: f5
+  level_a:
+    rating: medium
+    reasoning: Dresser is task-specific location cue (only this task mentions 'dresser'),
+      distinguishing it from other tasks that lack furniture references.
+  level_b:
+    rating: low
+    reasoning: All three objects (target, d1, d2) are on the same dresser, so 'dresser'
+      does not discriminate among them.
+  combined: MEDIUM
+- feature_id: f6
+  level_a:
+    rating: high
+    reasoning: Entrance is uniquely tied to the action completion ('Bring it to the
+      entrance') and is not referenced in any other task’s goal or location.
+  level_b:
+    rating: low
+    reasoning: Entrance is a destination, not a perceptual feature of the object —
+      provides zero object-level discrimination among items in the bedroom.
+  combined: MEDIUM
+- feature_id: f7
+  level_a:
+    rating: high
+    reasoning: Mei is a unique person name tied only to this gift bag task (no other
+      task mentions a recipient), making it highly task-discriminative.
+  level_b:
+    rating: low
+    reasoning: Mei is an abstract domain property unrelated to perceptual features
+      of any physical object in the scene, so provides no object-level discrimination.
+  combined: MEDIUM
+- feature_id: f8
+  level_a:
+    rating: high
+    reasoning: Explicit mention of 'gift bag' directly names the target object type,
+      and none of the other tasks involve a gift bag (b1_book, b1_dish, b1_soap are
+      all distinct object types).
+  level_b:
+    rating: medium
+    reasoning: 'All three objects (target, d1, d2) are gift bags, so ''gift bag''
+      does not distinguish among them — low? Wait: yes, all are gift bags → shared
+      with both distractors → level_b = low.'
+  combined: MEDIUM
+recommended_cues:
+  include:
+  - feature_id: f2
+    priority: 1
+    reason: Size 'small' excludes d2 (medium) and is part of the minimal visual conjunction
+      needed with 'bow' to distinguish from d1 (small + ribbon).
+  - feature_id: f3
+    priority: 1
+    reason: Decoration 'bow' excludes d1 (ribbon), and combined with 'small' uniquely
+      identifies the target against both distractors.
+  - feature_id: f1
+    priority: 2
+    reason: Color 'blue' is shared with both distractors but strengthens the conjunction
+      and reduces ambiguity when combined with 'small' and 'bow'.
+  exclude:
+  - feature_id: f4
+    reason: Bedroom is redundant for object discrimination (shared by all) and insufficient
+      alone for task identification.
+  - feature_id: f5
+    reason: Dresser is shared by all objects and adds no discriminative value at object
+      level.
+  - feature_id: f6
+    reason: Entrance is a destination, not a retrieval cue for identifying the object.
+  - feature_id: f7
+    reason: Mei is semantically relevant but non-perceptual and useless for visual
+      search in the bedroom.
+  - feature_id: f8
+    reason: '''Gift bag'' is too generic — all distractors are gift bags, so it fails
+      object-level discrimination.'
+target_conjunction: small blue bag with bow decoration
+minimum_cues_for_discrimination:
+- f2
+- f3
