@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 182" width="1260" height="546">
+  <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+  <rect width="420" height="182" fill="white" rx="6"/>
+  <!-- Title -->
+  <text x="210" y="20" text-anchor="middle" font-size="13" fill="#2C3E50" font-weight="700">Hanger (b3_hanger)</text>
+  <!-- Separators -->
+  <line x1="142.5" y1="39" x2="142.5" y2="139" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="277.5" y1="39" x2="277.5" y2="139" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,3"/>
+  <!-- Items -->
+  <g transform="translate(40,44) scale(1)" style="cursor:default"><path d="M30,4 Q30,10 33,12 Q35,14 35,18" fill="none" stroke="#95A5A6" stroke-width="1.5" stroke-linecap="round"></path><path d="M4,35 Q8,18 30,14 Q52,18 56,35" fill="none" stroke="#C19A6B" stroke-width="4" stroke-linecap="round"></path><path d="M6,28 Q30,20 54,28" fill="none" stroke="#B8860B" stroke-width="0.3" opacity="0.3"></path><line x1="12" y1="42" x2="48" y2="42" stroke="#C19A6B" stroke-width="2.5" stroke-linecap="round"></line></g>
+  <text x="75" y="155" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#C0392B" font-weight="700">Target</text>
+  <g transform="translate(175,44) scale(1)" style="cursor:default"><path d="M30,4 Q30,10 33,12 Q35,14 35,18" fill="none" stroke="#95A5A6" stroke-width="1.5" stroke-linecap="round"></path><path d="M4,35 Q8,18 30,14 Q52,18 56,35" fill="none" stroke="#C19A6B" stroke-width="4" stroke-linecap="round"></path><path d="M6,28 Q30,20 54,28" fill="none" stroke="#B8860B" stroke-width="0.3" opacity="0.3"></path></g>
+  <text x="210" y="155" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#7F8C8D" font-weight="400">Distractor 1</text>
+  <g transform="translate(310,44) scale(1)" style="cursor:default"><path d="M30,4 Q30,10 33,12 Q35,14 35,18" fill="none" stroke="#95A5A6" stroke-width="1.5" stroke-linecap="round"></path><path d="M12,35 Q16,18 30,14 Q44,18 48,35" fill="none" stroke="#C19A6B" stroke-width="4" stroke-linecap="round"></path><path d="M14,28 Q30,20 46,28" fill="none" stroke="#B8860B" stroke-width="0.3" opacity="0.3"></path><line x1="20" y1="42" x2="40" y2="42" stroke="#C19A6B" stroke-width="2.5" stroke-linecap="round"></line></g>
+  <text x="345" y="155" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#7F8C8D" font-weight="400">Distractor 2</text>
+</svg>

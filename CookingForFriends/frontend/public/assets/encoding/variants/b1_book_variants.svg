@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 182" width="1260" height="546">
+  <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+  <rect width="420" height="182" fill="white" rx="6"/>
+  <!-- Title -->
+  <text x="210" y="20" text-anchor="middle" font-size="13" fill="#2C3E50" font-weight="700">Book (b1_book)</text>
+  <!-- Separators -->
+  <line x1="142.5" y1="39" x2="142.5" y2="139" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="277.5" y1="39" x2="277.5" y2="139" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,3"/>
+  <!-- Items -->
+  <g transform="translate(40,44) scale(1)" style="cursor:default"><rect x="0" y="0" width="40" height="56" rx="3" fill="#C0392B"></rect><rect x="0" y="0" width="4" height="56" rx="1" fill="#922B21"></rect><polygon points="12,44 20,24 28,44" fill="#2C3E50"></polygon><polygon points="16,44 22,30 28,44" fill="#34495E"></polygon><polygon points="18,30 20,24 22,30" fill="white" opacity="0.85"></polygon><text x="20" y="52" text-anchor="middle" font-family="Georgia,serif" font-size="5" fill="#F5B7B1" font-weight="700">Erta Ale</text></g>
+  <text x="75" y="155" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#C0392B" font-weight="700">Target</text>
+  <g transform="translate(175,44) scale(1)" style="cursor:default"><rect x="0" y="0" width="40" height="56" rx="3" fill="#C0392B"></rect><rect x="0" y="0" width="4" height="56" rx="1" fill="#922B21"></rect><path d="M12,38 Q16,32 20,38 Q24,44 28,38" fill="none" stroke="#2E86C1" stroke-width="1.5"></path><path d="M10,42 Q16,36 22,42 Q28,48 32,42" fill="none" stroke="#3498DB" stroke-width="1.2"></path><text x="20" y="52" text-anchor="middle" font-family="Georgia,serif" font-size="4.5" fill="#F5B7B1" font-weight="700">Blue Horizon</text></g>
+  <text x="210" y="155" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#7F8C8D" font-weight="400">Distractor 1</text>
+  <g transform="translate(310,44) scale(1)" style="cursor:default"><rect x="0" y="0" width="40" height="56" rx="3" fill="#2E86C1"></rect><rect x="0" y="0" width="4" height="56" rx="1" fill="#1A5276"></rect><polygon points="12,44 20,24 28,44" fill="#2C3E50"></polygon><polygon points="16,44 22,30 28,44" fill="#34495E"></polygon><polygon points="18,30 20,24 22,30" fill="white" opacity="0.85"></polygon><text x="20" y="52" text-anchor="middle" font-family="Georgia,serif" font-size="5" fill="#D6EAF8" font-weight="700">Erta Ale</text></g>
+  <text x="345" y="155" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#7F8C8D" font-weight="400">Distractor 2</text>
+</svg>
