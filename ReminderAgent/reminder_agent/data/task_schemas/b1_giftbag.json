@@ -39,13 +39,26 @@
       "encoding_image": "b1_giftbag_target.png",
       "confirmation_question": {
         "question": "Which gift bag do you need?",
-        "options": ["Medium bag with ribbon", "Small bag with bow", "Large bag with bow"],
+        "options": ["Small bag with ribbon", "Small bag with bow", "Medium bag with bow"],
         "correct_index": 1
       }
     },
     "distractor_info": {
-      "distractor_description": "Medium blue gift bag with ribbon decoration, same dresser",
-      "discriminating_dimension": "size (small vs medium) + decoration (bow vs ribbon)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "Small blue gift bag with ribbon decoration",
+          "shared_features_with_target": ["size: small", "color: blue", "location: same dresser"],
+          "distinguishing_features": ["decoration: ribbon (not bow)"]
+        },
+        {
+          "id": "d2",
+          "description": "Medium blue gift bag with bow decoration",
+          "shared_features_with_target": ["decoration: bow", "color: blue", "location: same dresser"],
+          "distinguishing_features": ["size: medium (not small)"]
+        }
+      ],
+      "target_unique_conjunction": "small + bow — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "communication",

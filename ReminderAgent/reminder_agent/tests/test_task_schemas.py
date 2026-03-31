@@ -61,3 +61,39 @@ class TestTaskSchemas:
         ids = [t["task_id"] for t in all_tasks]
         assert len(ids) == len(set(ids)), "Duplicate task_ids found"
         assert set(ids) == EXPECTED_TASK_IDS
+
+    def test_distractor_info_has_two_distractors(self, all_tasks):
+        for task in all_tasks:
+            tid = task["task_id"]
+            di = task["agent_reasoning_context"]["distractor_info"]
+            assert "distractors" in di, f"{tid} missing distractors list"
+            assert len(di["distractors"]) == 2, f"{tid} should have exactly 2 distractors"
+
+    def test_distractor_fields_present(self, all_tasks):
+        required = {"id", "description", "shared_features_with_target", "distinguishing_features"}
+        for task in all_tasks:
+            tid = task["task_id"]
+            for d in task["agent_reasoning_context"]["distractor_info"]["distractors"]:
+                missing = required - set(d.keys())
+                assert not missing, f"{tid} distractor {d.get('id','?')} missing {missing}"
+                assert len(d["shared_features_with_target"]) > 0, (
+                    f"{tid} distractor {d['id']} has empty shared_features"
+                )
+                assert len(d["distinguishing_features"]) > 0, (
+                    f"{tid} distractor {d['id']} has empty distinguishing_features"
+                )
+
+    def test_distractor_ids_are_d1_d2(self, all_tasks):
+        for task in all_tasks:
+            tid = task["task_id"]
+            ids = [d["id"] for d in task["agent_reasoning_context"]["distractor_info"]["distractors"]]
+            assert ids == ["d1", "d2"], f"{tid} distractor ids should be ['d1','d2'], got {ids}"
+
+    def test_target_unique_conjunction_present(self, all_tasks):
+        for task in all_tasks:
+            tid = task["task_id"]
+            di = task["agent_reasoning_context"]["distractor_info"]
+            assert "target_unique_conjunction" in di, f"{tid} missing target_unique_conjunction"
+            assert len(di["target_unique_conjunction"]) > 0, (
+                f"{tid} target_unique_conjunction is empty"
+            )

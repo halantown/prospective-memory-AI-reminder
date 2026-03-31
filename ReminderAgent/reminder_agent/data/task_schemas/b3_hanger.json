@@ -43,8 +43,21 @@
       }
     },
     "distractor_info": {
-      "distractor_description": "Wood hanger with narrow straight shoulders, same closet",
-      "discriminating_dimension": "shoulder type (wide vs narrow)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "Wooden hanger with wide shoulders, no trouser bar",
+          "shared_features_with_target": ["shoulder_type: wide", "material: wood", "location: same closet"],
+          "distinguishing_features": ["bar: none (not with bar)"]
+        },
+        {
+          "id": "d2",
+          "description": "Wooden hanger with narrow shoulders, with trouser bar",
+          "shared_features_with_target": ["bar: with bar", "material: wood", "location: same closet"],
+          "distinguishing_features": ["shoulder_type: narrow (not wide)"]
+        }
+      ],
+      "target_unique_conjunction": "wide shoulders + with bar — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "appliance",

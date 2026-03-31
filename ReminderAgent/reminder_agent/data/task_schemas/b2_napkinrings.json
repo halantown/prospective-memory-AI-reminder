@@ -43,8 +43,21 @@
       }
     },
     "distractor_info": {
-      "distractor_description": "Set of metal napkin rings, silver polished, same drawer",
-      "discriminating_dimension": "material (wooden vs metal)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "Set of dark wooden napkin rings, walnut color",
+          "shared_features_with_target": ["material: wood", "location: same drawer"],
+          "distinguishing_features": ["shade: dark walnut (not light oak)"]
+        },
+        {
+          "id": "d2",
+          "description": "Set of light metallic napkin rings, silver polished",
+          "shared_features_with_target": ["shade: light", "location: same drawer"],
+          "distinguishing_features": ["material: metal (not wood)"]
+        }
+      ],
+      "target_unique_conjunction": "wood + light oak — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "activity",

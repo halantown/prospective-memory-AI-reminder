@@ -43,8 +43,21 @@
       }
     },
     "distractor_info": {
-      "distractor_description": "Small ceramic vase with green glaze, same windowsill",
-      "discriminating_dimension": "glaze color (blue vs green)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "Small ceramic vase with green glaze",
+          "shared_features_with_target": ["size: small", "material: ceramic", "location: same windowsill"],
+          "distinguishing_features": ["glaze: green (not blue)"]
+        },
+        {
+          "id": "d2",
+          "description": "Large ceramic vase with blue glaze",
+          "shared_features_with_target": ["glaze: blue", "material: ceramic", "location: same windowsill"],
+          "distinguishing_features": ["size: large (not small)"]
+        }
+      ],
+      "target_unique_conjunction": "blue glaze + small — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "visitor",

@@ -44,8 +44,21 @@
       }
     },
     "distractor_info": {
-      "distractor_description": "Oval white ceramic dish with two red handles, same shelf",
-      "discriminating_dimension": "handle color (blue vs red)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "Round white ceramic dish with two blue handles",
+          "shared_features_with_target": ["handle_color: blue", "material: white ceramic", "location: same shelf"],
+          "distinguishing_features": ["shape: round (not oval)"]
+        },
+        {
+          "id": "d2",
+          "description": "Oval white ceramic dish with two red handles",
+          "shared_features_with_target": ["shape: oval", "material: white ceramic", "location: same shelf"],
+          "distinguishing_features": ["handle_color: red (not blue)"]
+        }
+      ],
+      "target_unique_conjunction": "oval + blue handles — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "appliance",

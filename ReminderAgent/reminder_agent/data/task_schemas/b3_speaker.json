@@ -43,8 +43,21 @@
       }
     },
     "distractor_info": {
-      "distractor_description": "Round speaker with black rubber cover, same shelf",
-      "discriminating_dimension": "cover material (fabric vs rubber)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "Round speaker with black rubber cover",
+          "shared_features_with_target": ["shape: round", "location: same shelf"],
+          "distinguishing_features": ["cover: rubber (not fabric)"]
+        },
+        {
+          "id": "d2",
+          "description": "Square speaker with gray fabric mesh cover",
+          "shared_features_with_target": ["cover: fabric", "location: same shelf"],
+          "distinguishing_features": ["shape: square (not round)"]
+        }
+      ],
+      "target_unique_conjunction": "round + fabric cover — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "activity",

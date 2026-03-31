@@ -44,8 +44,21 @@
       }
     },
     "distractor_info": {
-      "distractor_description": "White pump bottle with green mint label, same shelf",
-      "discriminating_dimension": "scent label (lemon vs mint)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "White flip-cap bottle with yellow lemon label",
+          "shared_features_with_target": ["label: lemon", "body_color: white", "location: same shelf"],
+          "distinguishing_features": ["dispenser_type: flip-cap (not pump)"]
+        },
+        {
+          "id": "d2",
+          "description": "White pump bottle with green mint label",
+          "shared_features_with_target": ["dispenser_type: pump", "body_color: white", "location: same shelf"],
+          "distinguishing_features": ["label: mint (not lemon)"]
+        }
+      ],
+      "target_unique_conjunction": "lemon label + pump — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "activity",

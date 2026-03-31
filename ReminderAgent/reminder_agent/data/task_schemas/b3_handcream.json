@@ -43,8 +43,21 @@
       }
     },
     "distractor_info": {
-      "distractor_description": "White tube with mint label, same shelf",
-      "discriminating_dimension": "scent label (lavender vs mint)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "White tube with green mint label",
+          "shared_features_with_target": ["tube_color: white", "location: same shelf"],
+          "distinguishing_features": ["label: mint (not lavender)"]
+        },
+        {
+          "id": "d2",
+          "description": "Beige tube with purple lavender label",
+          "shared_features_with_target": ["label: lavender", "location: same shelf"],
+          "distinguishing_features": ["tube_color: beige (not white)"]
+        }
+      ],
+      "target_unique_conjunction": "white tube + lavender label — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "communication",

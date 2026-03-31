@@ -43,8 +43,21 @@
       }
     },
     "distractor_info": {
-      "distractor_description": "Terracotta pot without saucer, slightly smaller, same shelf",
-      "discriminating_dimension": "feature (with saucer vs without)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "Small terracotta pot with matching saucer",
+          "shared_features_with_target": ["feature: with saucer", "material: terracotta", "location: same shelf"],
+          "distinguishing_features": ["size: small (not medium)"]
+        },
+        {
+          "id": "d2",
+          "description": "Medium terracotta pot without saucer",
+          "shared_features_with_target": ["size: medium", "material: terracotta", "location: same shelf"],
+          "distinguishing_features": ["feature: no saucer (not with saucer)"]
+        }
+      ],
+      "target_unique_conjunction": "medium + with saucer — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "visitor",

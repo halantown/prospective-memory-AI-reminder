@@ -43,8 +43,21 @@
       }
     },
     "distractor_info": {
-      "distractor_description": "Black sleeve with abstract art, titled Dark Side, same desk",
-      "discriminating_dimension": "cover art (car vs abstract)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "Black sleeve with car illustration, titled Dark Side",
+          "shared_features_with_target": ["cover_art: car illustration", "sleeve_color: black", "location: same desk"],
+          "distinguishing_features": ["title: Dark Side (not Night Drive)"]
+        },
+        {
+          "id": "d2",
+          "description": "Black sleeve with abstract art, titled Night Drive",
+          "shared_features_with_target": ["title: Night Drive", "sleeve_color: black", "location: same desk"],
+          "distinguishing_features": ["cover_art: abstract (not car)"]
+        }
+      ],
+      "target_unique_conjunction": "car illustration + Night Drive — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "communication",

@@ -43,8 +43,21 @@
       }
     },
     "distractor_info": {
-      "distractor_description": "Purple bottle with eucalyptus label, same shelf",
-      "discriminating_dimension": "scent label (lavender vs eucalyptus)"
+      "distractors": [
+        {
+          "id": "d1",
+          "description": "Purple bottle with eucalyptus leaf label",
+          "shared_features_with_target": ["bottle_color: purple", "location: same shelf"],
+          "distinguishing_features": ["label: eucalyptus (not lavender)"]
+        },
+        {
+          "id": "d2",
+          "description": "White bottle with lavender flower label",
+          "shared_features_with_target": ["label: lavender", "location: same shelf"],
+          "distinguishing_features": ["bottle_color: white (not purple)"]
+        }
+      ],
+      "target_unique_conjunction": "purple bottle + lavender label — only the target has both"
     },
     "trigger_info": {
       "trigger_type": "appliance",
