@@ -1,4 +1,8 @@
-"""Batch generation orchestrator for the reminder pipeline."""
+"""Batch generation orchestrator for the reminder pipeline.
+
+All 4 conditions (AF_low_EC_off, AF_low_EC_on, AF_high_EC_off, AF_high_EC_on)
+use LLM generation. No template fallback.
+"""
 
 import argparse
 import json
@@ -6,10 +10,8 @@ import logging
 import sys
 from pathlib import Path
 
-from reminder_agent.stage2.baseline_generator import generate_baseline, load_all_task_jsons
 from reminder_agent.stage2.config_loader import load_all_configs
 from reminder_agent.stage2.context_extractor import extract
-from reminder_agent.stage2.diagnosticity_analyzer import load_approved_reports
 from reminder_agent.stage2.llm_backend import GenerationError, create_backend
 from reminder_agent.stage2.output_store import OutputStore
 from reminder_agent.stage2.prompt_constructor import build_prompts
@@ -17,7 +19,24 @@ from reminder_agent.stage2.quality_gate import check as qg_check
 
 logger = logging.getLogger(__name__)
 
-LLM_CONDITIONS = ["AF_only", "AF_CB"]
+TASK_DIR = Path(__file__).resolve().parent.parent / "data" / "task_schemas"
+
+ALL_CONDITIONS = [
+    "AF_low_EC_off",
+    "AF_high_EC_off",
+    "AF_low_EC_on",
+    "AF_high_EC_on",
+]
+
+
+def load_all_task_jsons(task_dir: Path | None = None) -> list[dict]:
+    """Load all task JSON files from the task_schemas directory."""
+    task_dir = task_dir or TASK_DIR
+    tasks = []
+    for path in sorted(task_dir.glob("*.json")):
+        with open(path) as f:
+            tasks.append(json.load(f))
+    return tasks
 
 
 def run_batch(
@@ -27,9 +46,10 @@ def run_batch(
     condition_filter: str | None = None,
     clear_db: bool = False,
 ):
-    """Full batch generation pipeline."""
+    """Full batch generation pipeline. All conditions use LLM."""
     model_config, gen_config, field_map = load_all_configs()
 
+    backend = None
     if not dry_run:
         backend = create_backend(model_config)
 
@@ -46,42 +66,17 @@ def run_batch(
             return
 
     n_variants = n_variants or gen_config.n_variants
-    conditions = [condition_filter] if condition_filter else LLM_CONDITIONS
+    conditions = [condition_filter] if condition_filter else ALL_CONDITIONS
 
-    # Load approved diagnosticity reports (if any)
-    diag_reports = load_approved_reports()
-    if diag_reports:
-        print(f"  Loaded {len(diag_reports)} approved diagnosticity reports")
-    else:
-        print("  No approved diagnosticity reports found — cue priority disabled")
-
-    # Phase 1: Baselines
-    print(f"\n=== Phase 1: Baselines ({len(tasks)} tasks) ===")
-    for task in tasks:
-        text = generate_baseline(task, field_map)
-        store.write_reminder(
-            task_id=task["task_id"],
-            condition="Baseline",
-            variant_idx=0,
-            text=text,
-            passed_qg=True,
-            qg_failures=None,
-            model_used=None,
-            attempt=1,
-        )
-        print(f"  ✅ {task['task_id']}: \"{text}\"")
-
-    # Phase 2: LLM Generation
     total = len(tasks) * len(conditions) * n_variants
     succeeded = 0
     failed = 0
     failure_breakdown: dict[str, int] = {}
 
-    print(f"\n=== Phase 2: LLM Generation ({len(tasks)} tasks × {len(conditions)} conditions × {n_variants} variants) ===")
+    print(f"\n=== LLM Generation ({len(tasks)} tasks × {len(conditions)} conditions × {n_variants} variants = {total} total) ===")
 
     for task in tasks:
         entity_name = task["reminder_context"]["element1"]["target_entity"]["entity_name"]
-        task_diag = diag_reports.get(task["task_id"])
 
         for condition in conditions:
             prior_variants: list[str] = []
@@ -90,18 +85,15 @@ def run_batch(
                 success = False
 
                 for attempt in range(1, gen_config.max_retries + 1):
-                    # Build prompts
                     sys_prompt, usr_prompt = build_prompts(
                         task, condition,
                         prior_variants=prior_variants,
                         field_map=field_map,
                         gen_config=gen_config,
-                        diagnosticity_report=task_diag,
                     )
 
-                    # Generate
                     if dry_run:
-                        raw_output = f"[DRY RUN] {task['task_id']} / {condition} / v{v_idx}"
+                        raw_output = f"[DRY RUN] Remember to {task['reminder_context']['element1']['action_verb']} the {entity_name}. ({condition} v{v_idx})"
                     else:
                         try:
                             raw_output = backend.generate(sys_prompt, usr_prompt)
@@ -109,7 +101,6 @@ def run_batch(
                             logger.error("LLM error: %s", e)
                             continue
 
-                    # Quality gate
                     qg_result = qg_check(
                         text=raw_output,
                         condition=condition,
@@ -117,17 +108,14 @@ def run_batch(
                         entity_name=entity_name,
                         prior_variants=prior_variants,
                         gen_config=gen_config,
-                        diagnosticity_report=task_diag,
+                        task_json=task,
                     )
 
-                    # Serialize QG details for logging
                     qg_details_str = json.dumps([
                         {"check": c.check_name, "passed": c.passed, "detail": c.detail}
                         for c in qg_result.checks
                     ])
-                    qg_failure_names = [c.check_name for c in qg_result.failures] if not qg_result.passed else None
 
-                    # Log attempt
                     store.write_generation_log(
                         task_id=task["task_id"],
                         condition=condition,
@@ -159,7 +147,7 @@ def run_batch(
                     else:
                         fail_names = ", ".join(c.check_name for c in qg_result.failures)
                         if attempt < gen_config.max_retries:
-                            print(f"  ⚠️  {task['task_id']} / {condition} / v{v_idx} (attempt {attempt}) — {fail_names}")
+                            print(f"  ⚠️  {task['task_id']} / {condition} / v{v_idx} attempt {attempt} — {fail_names}")
                         for c in qg_result.failures:
                             failure_breakdown[c.check_name] = failure_breakdown.get(c.check_name, 0) + 1
 
@@ -169,44 +157,24 @@ def run_batch(
                     failed += 1
                     print(f"  ❌ {task['task_id']} / {condition} / v{v_idx}: FAILED after {gen_config.max_retries} attempts")
 
-    # Summary
     print(f"\n=== Summary ===")
-    print(f"  Baselines: {len(tasks)}/{len(tasks)}")
-    print(f"  LLM texts: {total} attempted, {succeeded} succeeded, {failed} failed")
+    print(f"  Total: {total} attempted, {succeeded} succeeded, {failed} failed")
     print(f"  Database: {store.db_path}")
 
-    if conditions:
-        print(f"\n  By condition:")
-        stats = store.get_stats()
-        for cond, count in stats["by_condition"].items():
-            if cond != "Baseline":
-                print(f"    {cond}: {count}")
-
     if failure_breakdown:
-        print(f"\n  Quality gate failure breakdown:")
+        print(f"\n  QG failure breakdown:")
         for name, count in sorted(failure_breakdown.items()):
             print(f"    {name}: {count}")
 
-    print(f"\n  Check output:")
-    print(f"    sqlite3 {store.db_path} \"SELECT task_id, condition, text FROM reminders LIMIT 20;\"")
-
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Batch generate reminder texts for the experiment."
-    )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Validate pipeline without LLM calls")
-    parser.add_argument("--n-variants", type=int, default=None,
-                        help="Number of variants per (task, condition)")
-    parser.add_argument("--task", type=str, default=None,
-                        help="Generate for specific task_id only")
-    parser.add_argument("--condition", type=str, default=None,
-                        help="Generate for specific condition only")
-    parser.add_argument("--clear", action="store_true",
-                        help="Clear DB before generating")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Enable debug logging")
+    parser = argparse.ArgumentParser(description="Batch generate reminder texts.")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--n-variants", type=int, default=None)
+    parser.add_argument("--task", type=str, default=None)
+    parser.add_argument("--condition", type=str, default=None)
+    parser.add_argument("--clear", action="store_true")
+    parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.WARNING
