@@ -1,11 +1,21 @@
+# Directories
 /sdk
 /robot_test
 /archive
-/.github
 /docs
-__pycache__/
+/.github
+/.idea
+
+# Python
 *.pyc
+__pycache__/
+
+# Node.js
 **node_modules/
-experiment.db
+
+# Databases
 **.db
+experiment.db
+
+# Environment
 .env
