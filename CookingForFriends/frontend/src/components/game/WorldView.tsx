@@ -1,6 +1,7 @@
 /** World View — home panorama with rooms, activation/dimming, click to navigate.
- *  All rooms are ALWAYS visible. Inactive rooms are dimmed (opacity) but their
- *  content is still rendered so the participant can monitor state from any room.
+ *  Active room expands to ~64% width (left column). Inactive rooms stack in a
+ *  right column at ~24% height each. Inactive rooms are dimmed with a
+ *  semi-transparent overlay but content remains visible for monitoring.
  */
 
 import { useCallback, useRef, useEffect } from 'react'
@@ -24,19 +25,35 @@ interface RoomDef {
   id: RoomId
   label: string
   emoji: string
-  x: string
-  y: string
-  w: string
-  h: string
 }
 
 const ROOMS: RoomDef[] = [
-  { id: 'kitchen', label: 'Kitchen', emoji: '🍳', x: '2%', y: '2%', w: '46%', h: '55%' },
-  { id: 'bedroom', label: 'Bedroom', emoji: '🛏️', x: '52%', y: '2%', w: '46%', h: '55%' },
-  { id: 'living_room', label: 'Living Room', emoji: '🛋️', x: '2%', y: '60%', w: '30%', h: '38%' },
-  { id: 'study', label: 'Study', emoji: '📚', x: '35%', y: '60%', w: '30%', h: '38%' },
-  { id: 'bathroom', label: 'Bathroom', emoji: '🚿', x: '68%', y: '60%', w: '30%', h: '38%' },
+  { id: 'kitchen', label: 'Kitchen', emoji: '🍳' },
+  { id: 'bedroom', label: 'Bedroom', emoji: '🛏️' },
+  { id: 'living_room', label: 'Living Room', emoji: '🛋️' },
+  { id: 'study', label: 'Study', emoji: '📚' },
+  { id: 'bathroom', label: 'Bathroom', emoji: '🚿' },
 ]
+
+/** Compute absolute position/size for a room based on which room is active.
+ *  Active room: left column ~64% wide, full height (~64% of total area).
+ *  Inactive rooms: right column, 4 rooms stacked with small gaps. */
+function getRoomStyle(roomId: RoomId, currentRoom: RoomId): React.CSSProperties {
+  if (roomId === currentRoom) {
+    return { left: '0%', top: '0%', width: '64%', height: '100%' }
+  }
+  const inactiveRooms = ROOMS.filter(r => r.id !== currentRoom)
+  const idx = inactiveRooms.findIndex(r => r.id === roomId)
+  const count = inactiveRooms.length // always 4
+  const rowH = 24 // % height per inactive room
+  const gap = (100 - count * rowH) / (count - 1) // distribute remaining space as gaps
+  return {
+    left: '65.5%',
+    top: `${idx * (rowH + gap)}%`,
+    width: '34.5%',
+    height: `${rowH}%`,
+  }
+}
 
 const FURNITURE_MAP: Record<RoomId, React.ComponentType> = {
   kitchen: KitchenFurniture,
@@ -87,6 +104,7 @@ export default function WorldView() {
           const FurnitureComp = FURNITURE_MAP[room.id]
           const RoomContent = ROOM_CONTENT[room.id]
           const floor = FLOOR_STYLES[room.id]
+          const posStyle = getRoomStyle(room.id, currentRoom)
 
           return (
             <div
@@ -95,13 +113,8 @@ export default function WorldView() {
                 isActive ? 'z-20' : 'z-[1]'
               }`}
               style={{
-                left: room.x, top: room.y,
-                width: room.w, height: room.h,
-                transform: isActive ? 'scale(1.04)' : 'scale(0.96)',
-                transformOrigin: 'center center',
-                filter: isActive
-                  ? 'brightness(1.05) saturate(1.1)'
-                  : 'brightness(0.5) saturate(0.6)',
+                ...posStyle,
+                filter: isActive ? 'brightness(1.05) saturate(1.1)' : undefined,
               }}
               onClick={() => handleRoomClick(room.id)}
             >
@@ -119,10 +132,20 @@ export default function WorldView() {
                   <FurnitureComp />
                 </div>
 
-                {/* Room label badge */}
-                <div className="absolute top-1.5 left-1.5 z-[2] pointer-events-none">
+                {/* Room content — ALWAYS rendered for monitoring */}
+                <div className="absolute inset-0 z-[2]">
+                  <RoomContent isActive={isActive} />
+                </div>
+
+                {/* Dim overlay for inactive rooms — 50% black, sits above content */}
+                {!isActive && (
+                  <div className="absolute inset-0 z-[3] rounded-[inherit] bg-black/50 pointer-events-none" />
+                )}
+
+                {/* Room label badge — always on top of everything */}
+                <div className="absolute top-1.5 left-1.5 z-[4] pointer-events-none">
                   <div className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1
-                    ${isActive ? 'bg-slate-900/70' : 'bg-slate-900/50'}`}
+                    ${isActive ? 'bg-slate-900/70' : 'bg-slate-900/60'}`}
                   >
                     <span className="text-sm">{room.emoji}</span>
                     <span className={`text-xs font-semibold ${
@@ -136,16 +159,6 @@ export default function WorldView() {
                       </span>
                     )}
                   </div>
-                </div>
-
-                {/* Room content — ALWAYS rendered. Inactive rooms are
-                    non-interactive but still visible for monitoring. */}
-                <div
-                  className={`absolute inset-0 z-[3] transition-opacity duration-400 ${
-                    isActive ? '' : 'room-inactive-content'
-                  }`}
-                >
-                  <RoomContent isActive={isActive} />
                 </div>
 
                 {/* Trigger room glow effect */}
