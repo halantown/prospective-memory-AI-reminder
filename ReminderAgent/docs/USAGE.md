@@ -1,6 +1,19 @@
 # ReminderAgent 使用说明
 
-> 离线批量生成实验提示语的流水线工具。在正式数据采集前运行一次，生成所有任务 × 条件组合的提醒文本变体并存入 SQLite 数据库。
+> 离线批量生成实验提示语的流水线工具。基于 2×2 被试间设计（AF × EC），在正式数据采集前运行一次，生成所有任务 × 条件组合的提醒文本变体并存入 SQLite 数据库。
+
+---
+
+## 实验设计概览
+
+| | EC off（无来源信息） | EC on（含来源信息） |
+|---|---|---|
+| **AF low**（仅动作+物品） | `AF_low_EC_off` | `AF_low_EC_on` |
+| **AF high**（含视觉线索/属性/位置） | `AF_high_EC_off` | `AF_high_EC_on` |
+
+- **AF（Attention Features）**：控制提醒文本包含多少物品特征（within-subject）
+- **EC（Encoding Context）**：控制是否提及任务来源信息（between-subject）
+- **所有 4 个条件均使用 LLM 生成**（不再有模板 Baseline）
 
 ---
 
@@ -19,20 +32,15 @@ python -m reminder_agent.stage2.batch_runner --dry-run
 
 输出示例：
 ```
-=== Phase 1: Baselines (12 tasks) ===
-  ✅ b1_book: "Remember to find and bring the book."
-  ✅ b1_dish: "Remember to get and bring the baking dish."
-  ...
-
-=== Phase 2: LLM Generation (12 tasks × 2 conditions × 3 variants) ===
-  ✅ b1_book / AF_only / v0 (attempt 1)
-  ✅ b1_book / AF_CB / v0 (attempt 1)
+=== LLM Generation (2 tasks × 4 conditions × 3 variants = 24 total) ===
+  ✅ example_book / AF_low_EC_off / v0 (attempt 1)
+  ✅ example_book / AF_high_EC_off / v0 (attempt 1)
+  ✅ example_book / AF_low_EC_on / v0 (attempt 1)
+  ✅ example_book / AF_high_EC_on / v0 (attempt 1)
   ...
 
 === Summary ===
-  Baselines : 12 / 12
-  Generated : 72 / 72
-  Failed    : 0
+  Total: 24 attempted, 24 succeeded, 0 failed
 ```
 
 Dry-run 不调用 LLM，不写入数据库，用于检查配置和任务 JSON 是否完整。
@@ -65,10 +73,10 @@ python -m reminder_agent.stage2.batch_runner
 
 ```bash
 # 只生成某个任务
-python -m reminder_agent.stage2.batch_runner --task b1_book
+python -m reminder_agent.stage2.batch_runner --task example_book
 
 # 只生成某个条件
-python -m reminder_agent.stage2.batch_runner --condition AF_only
+python -m reminder_agent.stage2.batch_runner --condition AF_high_EC_on
 
 # 指定变体数量（覆盖配置文件）
 python -m reminder_agent.stage2.batch_runner --n-variants 5
@@ -76,8 +84,8 @@ python -m reminder_agent.stage2.batch_runner --n-variants 5
 # 清空数据库重新生成
 python -m reminder_agent.stage2.batch_runner --clear
 
-# 组合使用：重新生成 b2_vinyl 的 AF_CB 条件，5 个变体
-python -m reminder_agent.stage2.batch_runner --task b2_vinyl --condition AF_CB --n-variants 5 --clear
+# 组合使用：重新生成 example_book 的 AF_low_EC_off 条件，5 个变体
+python -m reminder_agent.stage2.batch_runner --task example_book --condition AF_low_EC_off --n-variants 5 --clear
 
 # 详细日志
 python -m reminder_agent.stage2.batch_runner --verbose
@@ -95,53 +103,30 @@ python -m reminder_agent.review.review_interface --stats
 输出示例：
 ```
 === Review Statistics ===
-  Total reminders : 84
+  Total reminders : 24
   Approved        : 0
-  Pending review  : 84
+  Pending review  : 24
   Failed QA       : 0
 
   By condition:
-    Baseline : 12
-    AF_only  : 36
-    AF_CB    : 36
+    AF_low_EC_off  : 6
+    AF_high_EC_off : 6
+    AF_low_EC_on   : 6
+    AF_high_EC_on  : 6
 ```
 
 ```bash
 # 交互式审核某个任务
-python -m reminder_agent.review.review_interface --task b1_book
+python -m reminder_agent.review.review_interface --task example_book
 
 # 只看特定条件
-python -m reminder_agent.review.review_interface --condition AF_CB
+python -m reminder_agent.review.review_interface --condition AF_high_EC_on
 
 # 导出已通过审核的提示语
 python -m reminder_agent.review.review_interface --export approved_reminders.json
 
 # 指定数据库路径（非默认位置时使用）
 python -m reminder_agent.review.review_interface --db /path/to/reminders.db
-```
-
----
-
-## 只生成 Baseline（模板文本）
-
-Baseline 为固定模板，不依赖 LLM，可单独调用：
-
-```python
-from reminder_agent.stage2.baseline_generator import generate_all_baselines, load_all_task_jsons
-
-tasks = load_all_task_jsons()
-baselines = generate_all_baselines(tasks)
-
-for task_id, text in baselines.items():
-    print(f"{task_id}: {text}")
-```
-
-输出：
-```
-b1_book: "Remember to find and bring the book."
-b1_dish: "Remember to get and bring the baking dish."
-b2_vinyl: "Remember to find and place the vinyl record."
-...
 ```
 
 ---
@@ -183,7 +168,7 @@ Method: Rule-based (no LLM)
 ```bash
 cd ReminderAgent
 pytest reminder_agent/tests -v
-# 预期: 129 passed
+# 预期: 106 passed
 ```
 
 ---
@@ -193,9 +178,9 @@ pytest reminder_agent/tests -v
 | 文件 | 作用 |
 |------|------|
 | `config/model_config.yaml` | 切换 LLM 后端、模型名、温度 |
-| `config/generation_config.yaml` | 变体数量、字数限制、重试次数 |
-| `config/condition_field_map.yaml` | 各条件可见的任务 JSON 字段白名单 |
-| `config/forbidden_keywords.yaml` | Low-AF 条件不能出现的词汇 |
+| `config/generation_config.yaml` | 变体数量、字数限制（8–45 词）、重试次数 |
+| `config/condition_field_map.yaml` | 4 个条件各自可见的任务 JSON 字段白名单 |
+| `config/forbidden_keywords.yaml` | AF_low 条件不能出现的关键词（按任务） |
 
 ### 切换到云端 LLM
 
@@ -227,20 +212,12 @@ n_variants: 10   # 从 3 改为 10
 
 ## 任务 ID 对照表
 
-| Block | 任务 ID | 物品 |
-|-------|---------|------|
-| B1 | `b1_book` | 书 |
-| B1 | `b1_dish` | 烤盘 |
-| B1 | `b1_giftbag` | 礼品袋 |
-| B1 | `b1_soap` | 洗手液 |
-| B2 | `b2_vinyl` | 黑胶唱片 |
-| B2 | `b2_napkinrings` | 餐巾环 |
-| B2 | `b2_pot` | 花盆 |
-| B2 | `b2_softener` | 柔顺剂 |
-| B3 | `b3_hanger` | 衣架 |
-| B3 | `b3_speaker` | 蓝牙音箱 |
-| B3 | `b3_vase` | 花瓶 |
-| B3 | `b3_handcream` | 护手霜 |
+| 任务 ID | 物品 | 说明 |
+|---------|------|------|
+| `example_book` | 书 | 含视觉线索（红色封面、山景插图）、位置（书房书架） |
+| `example_hanger` | 衣架 | 含视觉线索（木质、金色挂钩）、位置（卧室衣柜） |
+
+> 正式实验任务 JSON 将按同样结构扩展，放入 `data/task_schemas/` 目录。
 
 ---
 
