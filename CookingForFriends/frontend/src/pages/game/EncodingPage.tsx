@@ -75,6 +75,11 @@ export default function EncodingPage() {
   }, [])
 
   const startReadTimer = useCallback(() => {
+    // Skip lock in dev — no forced wait
+    if (import.meta.env.DEV) {
+      setReadCountdown(0)
+      return
+    }
     setReadCountdown(10)
     clearReadTimer()
     timerRef.current = setInterval(() => {
