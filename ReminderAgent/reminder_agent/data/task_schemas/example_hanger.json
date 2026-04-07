@@ -1,5 +1,5 @@
 {
-  "task_id": "b3_hanger",
+  "task_id": "example_hanger",
   "description": "Get hanger when dryer finishes for Sophie's jacket",
 
   "reminder_context": {
@@ -35,7 +35,7 @@
   "agent_reasoning_context": {
     "encoding_info": {
       "encoding_text": "Sophie's jacket has been in the dryer since it got wet last visit. When the dryer finishes, go to the study and get a hanger from the closet, left side — the wooden hanger with wide shoulders. Hang the jacket on it in the living room.",
-      "encoding_image": "b3_hanger_target.png",
+      "encoding_image": "example_hanger_target.png",
       "confirmation_question": {
         "question": "Which hanger do you need?",
         "options": ["Narrow shoulders", "Wide shoulders", "Padded"],
@@ -43,21 +43,8 @@
       }
     },
     "distractor_info": {
-      "distractors": [
-        {
-          "id": "d1",
-          "description": "Wooden hanger with wide shoulders, no trouser bar",
-          "shared_features_with_target": ["shoulder_type: wide", "material: wood", "location: same closet"],
-          "distinguishing_features": ["bar: none (not with bar)"]
-        },
-        {
-          "id": "d2",
-          "description": "Wooden hanger with narrow shoulders, with trouser bar",
-          "shared_features_with_target": ["bar: with bar", "material: wood", "location: same closet"],
-          "distinguishing_features": ["shoulder_type: narrow (not wide)"]
-        }
-      ],
-      "target_unique_conjunction": "wide shoulders + with bar — only the target has both"
+      "distractor_description": "Wood hanger with narrow straight shoulders, same closet",
+      "discriminating_dimension": "shoulder type (wide vs narrow)"
     },
     "trigger_info": {
       "trigger_type": "appliance",

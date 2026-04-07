@@ -1,5 +1,5 @@
 {
-  "task_id": "b1_book",
+  "task_id": "example_book",
   "description": "Find the travel book for Mei when she arrives",
 
   "reminder_context": {
@@ -36,7 +36,7 @@
   "agent_reasoning_context": {
     "encoding_info": {
       "encoding_text": "Your friend Mei asked to borrow a travel book. When Mei arrives, go to the study and find the book on the second shelf of the bookcase. It is a red paperback with a mountain illustration on the cover, titled Erta Ale. Bring it to the living room and give it to Mei.",
-      "encoding_image": "b1_book_target.png",
+      "encoding_image": "example_book_target.png",
       "confirmation_question": {
         "question": "What is on the cover of the book you need to find?",
         "options": ["Ocean landscape", "Mountain landscape", "City skyline"],
@@ -44,21 +44,8 @@
       }
     },
     "distractor_info": {
-      "distractors": [
-        {
-          "id": "d1",
-          "description": "Red paperback with ocean wave illustration, titled Blue Horizon",
-          "shared_features_with_target": ["color: red", "format: paperback", "location: same shelf"],
-          "distinguishing_features": ["cover_illustration: wave (not mountain)", "title: Blue Horizon (not Erta Ale)"]
-        },
-        {
-          "id": "d2",
-          "description": "Blue paperback with mountain illustration, titled Erta Ale",
-          "shared_features_with_target": ["cover_illustration: mountain", "title: Erta Ale", "format: paperback", "location: same shelf"],
-          "distinguishing_features": ["color: blue (not red)"]
-        }
-      ],
-      "target_unique_conjunction": "red + mountain illustration — only the target has both"
+      "distractor_description": "Red paperback with ocean landscape illustration, titled Blue Horizon, same shelf",
+      "discriminating_dimension": "cover illustration (mountain vs ocean)"
     },
     "trigger_info": {
       "trigger_type": "visitor",
