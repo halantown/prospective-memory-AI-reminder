@@ -548,7 +548,7 @@ async def _handle_phone_reply(participant_id, block_number, data, db_factory):
         )
         await db.commit()
 
-    logger.debug(f"Phone reply: {participant_id} msg={message_id} choice={user_choice} correct={is_correct}")
+    logger.debug(f"Phone reply: {participant_id} msg={message_id} choice={choice_index} correct={is_correct}")
 
     # Also log as generic interaction
     await _handle_interaction(participant_id, block_number, "phone_reply", data, db_factory)
