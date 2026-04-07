@@ -1,11 +1,10 @@
 """Tests for context_extractor — validates that pruning logic correctly
-implements the condition field whitelist for the 3-group design
-(Baseline, AF_only, AF_CB).
+implements the condition field whitelist for the 2×2 AF × EC design
+(AF_low_EC_off, AF_high_EC_off, AF_low_EC_on, AF_high_EC_on).
 """
 
 from __future__ import annotations
 
-import copy
 import json
 from pathlib import Path
 
@@ -26,9 +25,9 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "task_schemas"
 
 @pytest.fixture(scope="module")
 def book_task() -> dict:
-    """Load the canonical b1_book.json task schema."""
-    path = DATA_DIR / "b1_book.json"
-    assert path.exists(), f"b1_book.json not found at {path}"
+    """Load the canonical example_book.json task schema."""
+    path = DATA_DIR / "example_book.json"
+    assert path.exists(), f"example_book.json not found at {path}"
     with open(path) as f:
         return json.load(f)
 
@@ -37,15 +36,6 @@ def book_task() -> dict:
 def field_map():
     """Load the production condition field map once per module."""
     return load_condition_field_map()
-
-
-@pytest.fixture()
-def book_task_with_authority(book_task: dict) -> dict:
-    """b1_book variant where creator_is_authority is true."""
-    task = copy.deepcopy(book_task)
-    task["reminder_context"]["element2"]["origin"]["creator_is_authority"] = True
-    task["reminder_context"]["element2"]["origin"]["task_creator"] = "Doctor"
-    return task
 
 
 # ---------------------------------------------------------------------------
@@ -65,131 +55,176 @@ def _collect_leaf_paths(d: dict, prefix: str = "") -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# AF_only tests — High AF, no CB (no detected_activity)
+# AF_low_EC_off — minimal: action + entity only, no source, no features
 # ---------------------------------------------------------------------------
 
-class TestAFOnly:
+class TestAFLowECOff:
 
-    def test_af_only_contains_action_and_entity(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_only", field_map=field_map)
+    def test_extracts_action_verb(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_off", field_map=field_map)
+        assert pruned["reminder_context"]["element1"]["action_verb"] == "find and bring"
+
+    def test_extracts_entity_name(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_off", field_map=field_map)
+        assert pruned["reminder_context"]["element1"]["target_entity"]["entity_name"] == "book"
+
+    def test_excludes_visual_cues(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_off", field_map=field_map)
+        paths = _collect_leaf_paths(pruned)
+        assert not any("cues" in p for p in paths)
+
+    def test_excludes_domain_properties(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_off", field_map=field_map)
+        paths = _collect_leaf_paths(pruned)
+        assert not any("domain_properties" in p for p in paths)
+
+    def test_excludes_location(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_off", field_map=field_map)
+        paths = _collect_leaf_paths(pruned)
+        assert not any("location" in p for p in paths)
+
+    def test_excludes_element2(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_off", field_map=field_map)
+        paths = _collect_leaf_paths(pruned)
+        assert not any("element2" in p for p in paths)
+
+    def test_excludes_element3(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_off", field_map=field_map)
+        paths = _collect_leaf_paths(pruned)
+        assert not any("element3" in p for p in paths)
+
+    def test_excludes_agent_reasoning_zone(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_off", field_map=field_map)
+        assert "agent_reasoning_context" not in pruned
+
+
+# ---------------------------------------------------------------------------
+# AF_high_EC_off — detailed item features, no source context
+# ---------------------------------------------------------------------------
+
+class TestAFHighECOff:
+
+    def test_extracts_action_and_entity(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_off", field_map=field_map)
         ctx = pruned["reminder_context"]["element1"]
         assert ctx["action_verb"] == "find and bring"
         assert ctx["target_entity"]["entity_name"] == "book"
 
-    def test_af_only_contains_visual_cues(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_only", field_map=field_map)
+    def test_extracts_visual_cues(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_off", field_map=field_map)
         visual = pruned["reminder_context"]["element1"]["target_entity"]["cues"]["visual"]
         assert "Red cover" in visual
 
-    def test_af_only_contains_domain_properties(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_only", field_map=field_map)
+    def test_extracts_domain_properties(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_off", field_map=field_map)
         props = pruned["reminder_context"]["element1"]["target_entity"]["domain_properties"]
         assert props["title"] == "Erta Ale"
-        assert props["format"] == "paperback"
 
-    def test_af_only_contains_location(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_only", field_map=field_map)
-        assert "location" in pruned["reminder_context"]["element1"]
+    def test_extracts_location(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_off", field_map=field_map)
+        loc = pruned["reminder_context"]["element1"]["location"]
+        assert loc["room"] == "study"
 
-    def test_af_only_excludes_detected_activity(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_only", field_map=field_map)
+    def test_excludes_element2(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_off", field_map=field_map)
         paths = _collect_leaf_paths(pruned)
-        assert not any("detected_activity" in p for p in paths)
+        assert not any("element2" in p for p in paths)
 
-    def test_af_only_excludes_agent_reasoning(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_only", field_map=field_map)
+    def test_excludes_element3(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_off", field_map=field_map)
+        paths = _collect_leaf_paths(pruned)
+        assert not any("element3" in p for p in paths)
+
+    def test_excludes_agent_reasoning_zone(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_off", field_map=field_map)
         assert "agent_reasoning_context" not in pruned
 
-    def test_af_only_excludes_placeholder(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_only", field_map=field_map)
-        assert "placeholder" not in pruned
-
 
 # ---------------------------------------------------------------------------
-# AF_CB tests — High AF + Contextual Bridging (includes detected_activity)
+# AF_low_EC_on — minimal item + source context
 # ---------------------------------------------------------------------------
 
-class TestAFCB:
+class TestAFLowECOn:
 
-    def test_af_cb_contains_all_key_fields(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_CB", field_map=field_map)
+    def test_extracts_action_and_entity(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_on", field_map=field_map)
+        ctx = pruned["reminder_context"]["element1"]
+        assert ctx["action_verb"] == "find and bring"
+        assert ctx["target_entity"]["entity_name"] == "book"
+
+    def test_extracts_origin(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_on", field_map=field_map)
+        origin = pruned["reminder_context"]["element2"]["origin"]
+        assert origin["task_creator"] == "friend Mei"
+        assert origin["creator_is_authority"] is False
+
+    def test_extracts_creation_context(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_on", field_map=field_map)
+        cc = pruned["reminder_context"]["element2"]["creation_context"]
+        assert "phone call" in cc
+
+    def test_excludes_visual_cues(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_on", field_map=field_map)
         paths = _collect_leaf_paths(pruned)
-        assert any("action_verb" in p for p in paths)
-        assert any("entity_name" in p for p in paths)
-        assert any("cues.visual" in p for p in paths)
-        assert any("domain_properties" in p for p in paths)
-        assert any("detected_activity_raw" in p for p in paths)
+        assert not any("cues" in p for p in paths)
 
-    def test_af_cb_contains_detected_activity(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_CB", field_map=field_map)
-        activity = pruned["reminder_context"]["element3"]["detected_activity_raw"]
-        assert "steak" in activity.lower() or "flipping" in activity.lower()
+    def test_excludes_domain_properties(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_on", field_map=field_map)
+        paths = _collect_leaf_paths(pruned)
+        assert not any("domain_properties" in p for p in paths)
 
-    def test_af_cb_contains_visual_cues(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_CB", field_map=field_map)
+    def test_excludes_location(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_on", field_map=field_map)
+        paths = _collect_leaf_paths(pruned)
+        assert not any("location" in p for p in paths)
+
+    def test_excludes_element3(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_low_EC_on", field_map=field_map)
+        paths = _collect_leaf_paths(pruned)
+        assert not any("element3" in p for p in paths)
+
+
+# ---------------------------------------------------------------------------
+# AF_high_EC_on — full information
+# ---------------------------------------------------------------------------
+
+class TestAFHighECOn:
+
+    def test_extracts_action_and_entity(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_on", field_map=field_map)
+        ctx = pruned["reminder_context"]["element1"]
+        assert ctx["action_verb"] == "find and bring"
+        assert ctx["target_entity"]["entity_name"] == "book"
+
+    def test_extracts_visual_cues(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_on", field_map=field_map)
         visual = pruned["reminder_context"]["element1"]["target_entity"]["cues"]["visual"]
         assert "Red cover" in visual
 
-    def test_af_cb_excludes_agent_reasoning(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_CB", field_map=field_map)
-        assert "agent_reasoning_context" not in pruned
+    def test_extracts_domain_properties(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_on", field_map=field_map)
+        props = pruned["reminder_context"]["element1"]["target_entity"]["domain_properties"]
+        assert props["title"] == "Erta Ale"
 
+    def test_extracts_location(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_on", field_map=field_map)
+        loc = pruned["reminder_context"]["element1"]["location"]
+        assert loc["room"] == "study"
 
-# ---------------------------------------------------------------------------
-# Conditional field: Task_Creator (authority check)
-# ---------------------------------------------------------------------------
+    def test_extracts_origin(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_on", field_map=field_map)
+        origin = pruned["reminder_context"]["element2"]["origin"]
+        assert origin["task_creator"] == "friend Mei"
 
-class TestConditionalAuthority:
+    def test_extracts_creation_context(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_on", field_map=field_map)
+        cc = pruned["reminder_context"]["element2"]["creation_context"]
+        assert "phone call" in cc
 
-    def test_af_only_includes_creator_when_authority(
-        self, book_task_with_authority: dict, field_map
-    ) -> None:
-        pruned = extract(book_task_with_authority, "AF_only", field_map=field_map)
-        creator = pruned["reminder_context"]["element2"]["origin"]["task_creator"]
-        assert creator == "Doctor"
-
-    def test_af_only_excludes_creator_when_not_authority(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_only", field_map=field_map)
+    def test_excludes_element3(self, book_task: dict, field_map) -> None:
+        pruned = extract(book_task, "AF_high_EC_on", field_map=field_map)
         paths = _collect_leaf_paths(pruned)
-        assert not any("task_creator" in p for p in paths)
-
-    def test_af_cb_includes_creator_when_authority(
-        self, book_task_with_authority: dict, field_map
-    ) -> None:
-        pruned = extract(book_task_with_authority, "AF_CB", field_map=field_map)
-        creator = pruned["reminder_context"]["element2"]["origin"]["task_creator"]
-        assert creator == "Doctor"
-
-    def test_af_cb_excludes_creator_when_not_authority(
-        self, book_task: dict, field_map
-    ) -> None:
-        pruned = extract(book_task, "AF_CB", field_map=field_map)
-        paths = _collect_leaf_paths(pruned)
-        assert not any("task_creator" in p for p in paths)
+        assert not any("element3" in p for p in paths)
 
 
 # ---------------------------------------------------------------------------
@@ -209,13 +244,18 @@ class TestErrors:
             },
         }
         with pytest.raises(MissingRequiredFieldError, match="entity_name"):
-            extract(incomplete_task, "AF_only", field_map=field_map)
+            extract(incomplete_task, "AF_low_EC_off", field_map=field_map)
 
     def test_unknown_condition_raises(self, book_task: dict, field_map) -> None:
         with pytest.raises(ValueError, match="Unknown condition"):
             extract(book_task, "InvalidCondition", field_map=field_map)
 
-    def test_old_condition_name_raises(self, book_task: dict, field_map) -> None:
-        """Old 2×2 condition names should no longer be accepted."""
+    def test_old_condition_af_cb_raises(self, book_task: dict, field_map) -> None:
+        """Old condition name 'AF_CB' should no longer be accepted."""
         with pytest.raises(ValueError, match="Unknown condition"):
-            extract(book_task, "LowAF_LowCB", field_map=field_map)
+            extract(book_task, "AF_CB", field_map=field_map)
+
+    def test_old_condition_baseline_raises(self, book_task: dict, field_map) -> None:
+        """Old condition name 'Baseline' should no longer be accepted."""
+        with pytest.raises(ValueError, match="Unknown condition"):
+            extract(book_task, "Baseline", field_map=field_map)

@@ -1,4 +1,4 @@
-"""Validate all 12 task JSON files against the schema."""
+"""Validate all task JSON files against the schema."""
 
 from __future__ import annotations
 
@@ -9,11 +9,7 @@ import pytest
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "task_schemas"
 
-EXPECTED_TASK_IDS = {
-    "b1_book", "b1_giftbag", "b1_dish", "b1_soap",
-    "b2_vinyl", "b2_napkinrings", "b2_pot", "b2_softener",
-    "b3_hanger", "b3_speaker", "b3_vase", "b3_handcream",
-}
+EXPECTED_TASK_IDS = {"example_book", "example_hanger"}
 
 
 @pytest.fixture(scope="module")
@@ -28,9 +24,9 @@ def all_tasks() -> list[dict]:
 
 class TestTaskSchemas:
 
-    def test_all_12_files_exist(self):
+    def test_all_2_files_exist(self):
         json_files = list(DATA_DIR.glob("*.json"))
-        assert len(json_files) == 12
+        assert len(json_files) == 2
 
     def test_all_files_valid_json(self):
         for path in DATA_DIR.glob("*.json"):
@@ -62,38 +58,15 @@ class TestTaskSchemas:
         assert len(ids) == len(set(ids)), "Duplicate task_ids found"
         assert set(ids) == EXPECTED_TASK_IDS
 
-    def test_distractor_info_has_two_distractors(self, all_tasks):
+    def test_element2_present(self, all_tasks):
         for task in all_tasks:
             tid = task["task_id"]
-            di = task["agent_reasoning_context"]["distractor_info"]
-            assert "distractors" in di, f"{tid} missing distractors list"
-            assert len(di["distractors"]) == 2, f"{tid} should have exactly 2 distractors"
+            el2 = task["reminder_context"]["element2"]
+            assert "origin" in el2, f"{tid} missing element2.origin"
+            assert "creation_context" in el2, f"{tid} missing element2.creation_context"
 
-    def test_distractor_fields_present(self, all_tasks):
-        required = {"id", "description", "shared_features_with_target", "distinguishing_features"}
+    def test_element3_present(self, all_tasks):
         for task in all_tasks:
             tid = task["task_id"]
-            for d in task["agent_reasoning_context"]["distractor_info"]["distractors"]:
-                missing = required - set(d.keys())
-                assert not missing, f"{tid} distractor {d.get('id','?')} missing {missing}"
-                assert len(d["shared_features_with_target"]) > 0, (
-                    f"{tid} distractor {d['id']} has empty shared_features"
-                )
-                assert len(d["distinguishing_features"]) > 0, (
-                    f"{tid} distractor {d['id']} has empty distinguishing_features"
-                )
-
-    def test_distractor_ids_are_d1_d2(self, all_tasks):
-        for task in all_tasks:
-            tid = task["task_id"]
-            ids = [d["id"] for d in task["agent_reasoning_context"]["distractor_info"]["distractors"]]
-            assert ids == ["d1", "d2"], f"{tid} distractor ids should be ['d1','d2'], got {ids}"
-
-    def test_target_unique_conjunction_present(self, all_tasks):
-        for task in all_tasks:
-            tid = task["task_id"]
-            di = task["agent_reasoning_context"]["distractor_info"]
-            assert "target_unique_conjunction" in di, f"{tid} missing target_unique_conjunction"
-            assert len(di["target_unique_conjunction"]) > 0, (
-                f"{tid} target_unique_conjunction is empty"
-            )
+            el3 = task["reminder_context"]["element3"]
+            assert "detected_activity_raw" in el3, f"{tid} missing element3.detected_activity_raw"

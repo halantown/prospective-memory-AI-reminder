@@ -115,8 +115,12 @@ class TestBlockAssignments:
         assert TASK_TO_BLOCK["b3_vase"] == "B3"
 
     def test_get_block_peers(self):
-        all_tasks = load_all_tasks()
-        peers = get_block_peers("b1_book", all_tasks)
+        # After the AF×EC migration only example tasks exist on disk,
+        # so b1_book peers won't be found.  Verify the function still
+        # works when given a synthetic all_tasks dict containing the
+        # full B1 block.
+        fake_tasks = {tid: {"task_id": tid} for tid in BLOCK_ASSIGNMENTS["B1"]}
+        peers = get_block_peers("b1_book", fake_tasks)
         peer_ids = [t["task_id"] for t in peers]
         assert "b1_book" not in peer_ids
         assert len(peer_ids) == 3

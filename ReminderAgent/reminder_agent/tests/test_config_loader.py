@@ -1,7 +1,7 @@
 """Tests for config_loader — validates that all configs load cleanly and
 that validation catches missing / invalid fields.
 
-Updated for 3-group between-subjects design (Baseline, AF_only, AF_CB).
+Updated for 2×2 factorial design (AF_low_EC_off, AF_high_EC_off, AF_low_EC_on, AF_high_EC_on).
 """
 
 from __future__ import annotations
@@ -43,13 +43,13 @@ def tmp_config_dir(tmp_path: Path) -> Path:
         n_variants: 3
         max_retries: 3
         min_words: 5
-        max_words: 35
+        max_words: 45
         similarity_threshold: 0.85
         context_format: "prose"
     """))
 
     (cfg / "condition_field_map.yaml").write_text(textwrap.dedent("""\
-        Baseline:
+        AF_low_EC_off:
           required_fields:
             - "reminder_context.element1.action_verb"
             - "reminder_context.element1.target_entity.entity_name"
@@ -64,34 +64,49 @@ def tmp_config_dir(tmp_path: Path) -> Path:
             - "agent_reasoning_context"
             - "placeholder"
 
-        AF_only:
+        AF_high_EC_off:
           required_fields:
             - "reminder_context.element1.action_verb"
             - "reminder_context.element1.target_entity.entity_name"
             - "reminder_context.element1.target_entity.cues.visual"
             - "reminder_context.element1.target_entity.domain_properties"
             - "reminder_context.element1.location"
-          conditional_fields:
-            - field: "reminder_context.element2.origin.task_creator"
-              condition: "reminder_context.element2.origin.creator_is_authority == true"
+          conditional_fields: []
           excluded_fields:
+            - "reminder_context.element2"
             - "reminder_context.element3"
           excluded_zones:
             - "agent_reasoning_context"
             - "placeholder"
 
-        AF_CB:
+        AF_low_EC_on:
+          required_fields:
+            - "reminder_context.element1.action_verb"
+            - "reminder_context.element1.target_entity.entity_name"
+            - "reminder_context.element2.origin"
+            - "reminder_context.element2.creation_context"
+          conditional_fields: []
+          excluded_fields:
+            - "reminder_context.element1.target_entity.cues"
+            - "reminder_context.element1.target_entity.domain_properties"
+            - "reminder_context.element1.location"
+            - "reminder_context.element3"
+          excluded_zones:
+            - "agent_reasoning_context"
+            - "placeholder"
+
+        AF_high_EC_on:
           required_fields:
             - "reminder_context.element1.action_verb"
             - "reminder_context.element1.target_entity.entity_name"
             - "reminder_context.element1.target_entity.cues.visual"
             - "reminder_context.element1.target_entity.domain_properties"
             - "reminder_context.element1.location"
-            - "reminder_context.element3.detected_activity_raw"
-          conditional_fields:
-            - field: "reminder_context.element2.origin.task_creator"
-              condition: "reminder_context.element2.origin.creator_is_authority == true"
-          excluded_fields: []
+            - "reminder_context.element2.origin"
+            - "reminder_context.element2.creation_context"
+          conditional_fields: []
+          excluded_fields:
+            - "reminder_context.element3"
           excluded_zones:
             - "agent_reasoning_context"
             - "placeholder"
@@ -111,7 +126,7 @@ class TestLoadFromProductionConfigs:
         model, gen, field_map = load_all_configs()
         assert model.backend == "ollama"
         assert gen.n_variants == 3
-        assert len(field_map.conditions) == 3
+        assert len(field_map.conditions) == 4
 
     def test_model_config(self) -> None:
         cfg = load_model_config()
@@ -127,41 +142,31 @@ class TestLoadFromProductionConfigs:
         assert cfg.n_variants == 3
         assert cfg.max_retries == 3
         assert cfg.min_words == 5
-        assert cfg.max_words == 35
+        assert cfg.max_words == 45
         assert cfg.similarity_threshold == 0.85
 
     def test_condition_field_map_all_conditions(self) -> None:
         cfg = load_condition_field_map()
-        expected = {"Baseline", "AF_only", "AF_CB"}
+        expected = {"AF_low_EC_off", "AF_high_EC_off", "AF_low_EC_on", "AF_high_EC_on"}
         assert set(cfg.conditions.keys()) == expected
 
-    def test_af_only_has_visual_cues(self) -> None:
+    def test_af_high_has_visual_cues(self) -> None:
         cfg = load_condition_field_map()
-        af_only = cfg.conditions["AF_only"]
-        assert "reminder_context.element1.target_entity.cues.visual" in af_only.required_fields
+        af_high = cfg.conditions["AF_high_EC_off"]
+        assert "reminder_context.element1.target_entity.cues.visual" in af_high.required_fields
 
-    def test_af_only_excludes_detected_activity(self) -> None:
+    def test_all_conditions_exclude_detected_activity(self) -> None:
         cfg = load_condition_field_map()
-        af_only = cfg.conditions["AF_only"]
-        assert "reminder_context.element3.detected_activity_raw" not in af_only.required_fields
+        for cond_name, entry in cfg.conditions.items():
+            assert "reminder_context.element3.detected_activity_raw" not in entry.required_fields, (
+                f"{cond_name} should not include detected_activity_raw"
+            )
 
-    def test_af_cb_has_detected_activity(self) -> None:
+    def test_af_high_conditions_have_domain_properties(self) -> None:
         cfg = load_condition_field_map()
-        af_cb = cfg.conditions["AF_CB"]
-        assert "reminder_context.element3.detected_activity_raw" in af_cb.required_fields
-
-    def test_both_conditions_have_domain_properties(self) -> None:
-        cfg = load_condition_field_map()
-        for cond_name in ("AF_only", "AF_CB"):
+        for cond_name in ("AF_high_EC_off", "AF_high_EC_on"):
             entry = cfg.conditions[cond_name]
             assert "reminder_context.element1.target_entity.domain_properties" in entry.required_fields
-
-    def test_conditional_authority_field(self) -> None:
-        cfg = load_condition_field_map()
-        for cond_name in ("AF_only", "AF_CB"):
-            entry = cfg.conditions[cond_name]
-            cond_fields = [cf.field for cf in entry.conditional_fields]
-            assert "reminder_context.element2.origin.task_creator" in cond_fields
 
 
 # ---------------------------------------------------------------------------
@@ -218,7 +223,7 @@ class TestValidationErrors:
     def test_missing_condition_in_field_map(self, tmp_config_dir: Path) -> None:
         path = tmp_config_dir / "condition_field_map.yaml"
         data = yaml.safe_load(path.read_text())
-        del data["AF_CB"]
+        del data["AF_high_EC_on"]
         path.write_text(yaml.dump(data))
         with pytest.raises(ValueError, match="Missing condition"):
             load_condition_field_map(path)
@@ -226,7 +231,7 @@ class TestValidationErrors:
     def test_extra_condition_in_field_map(self, tmp_config_dir: Path) -> None:
         path = tmp_config_dir / "condition_field_map.yaml"
         data = yaml.safe_load(path.read_text())
-        data["BogusCondition"] = data["AF_only"]
+        data["BogusCondition"] = data["AF_low_EC_off"]
         path.write_text(yaml.dump(data))
         with pytest.raises(ValueError, match="Unexpected condition"):
             load_condition_field_map(path)
@@ -242,4 +247,4 @@ class TestTmpConfigRoundTrip:
         model, gen, field_map = load_all_configs(tmp_config_dir)
         assert model.backend == "together"
         assert gen.n_variants == 3
-        assert len(field_map.conditions) == 3
+        assert len(field_map.conditions) == 4
