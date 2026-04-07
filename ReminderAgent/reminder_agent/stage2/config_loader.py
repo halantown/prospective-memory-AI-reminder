@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 
 VALID_BACKENDS = {"together", "ollama", "openai", "anthropic"}
-VALID_CONDITIONS = {"Baseline", "AF_only", "AF_CB"}
+VALID_CONDITIONS = {"AF_low_EC_off", "AF_high_EC_off", "AF_low_EC_on", "AF_high_EC_on"}
 
 
 # ---------------------------------------------------------------------------
@@ -73,23 +73,20 @@ class GenerationConfig(BaseModel):
 *        ConditionFieldMap schema         *
 ===========================================
 
-3-group between-subjects design:
-  Group 1 (Control): No reminder — not in field map.
-  Group 2 (AF_only): High AF, no CB.
-  Group 3 (AF_CB):   High AF + CB.
+2×2 factorial design: AF (low/high) × EC (off/on)
+  AF_low_EC_off:  action + entity only, no source context
+  AF_high_EC_off: + visual cues, domain properties, location
+  AF_low_EC_on:   action + entity + source context
+  AF_high_EC_on:  full information (AF features + source context)
 
 ConditionFieldMap
 └── conditions (dict[str, ConditionEntry])
-    ├── AF_only (ConditionEntry)
+    ├── AF_low_EC_off (ConditionEntry)
     │   ├── required_fields (list[str])
     │   ├── conditional_fields (list[ConditionalField])
-    │   │   └── ConditionalField
-    │   │       ├── field (str)
-    │   │       └── condition (str)
     │   ├── excluded_fields (list[str])
     │   └── excluded_zones (list[str])
-    └── AF_CB (ConditionEntry)
-        ├── ...
+    └── ... (3 more conditions)
 """
 
 class ConditionalField(BaseModel):

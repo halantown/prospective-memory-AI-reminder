@@ -1,21 +1,20 @@
 """Quality Gate — automated compliance checks for generated reminder texts.
 
 Implements checks from TECH_DOC v0.4 §4.2 / DEV_PLAN v0.3 S4:
-  1. Forbidden keyword leak (reserved for future use; no Low AF conditions in 3-group design)
+  1. Forbidden keyword leak (AF_low conditions)
   2. Required entity presence
   3. Length constraint (word count)
   4. Duplicate detection (Levenshtein similarity)
   5. Language check (English only)
-  6. CB activity consistency (batch-level, AF_CB only)
+  6. EC source present (EC_on conditions)
+  7. EC source absent (EC_off conditions)
 """
 
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 import yaml
 from langdetect import detect, LangDetectException
@@ -104,11 +103,31 @@ def check_forbidden_keywords(
 ) -> CheckResult:
     """Check that Low AF text does not contain forbidden visual/domain keywords.
 
-    In the current 3-group design there are no Low AF conditions, so this check
-    always passes.  The mechanism is retained for potential future use.
+    For AF_low conditions, checks that visual/domain cues didn't leak into the text.
+    For AF_high conditions, this check always passes.
     """
-    # No Low AF conditions in 3-group design — always pass
-    return CheckResult("forbidden_keywords", True, "No Low AF conditions in current design — skipped")
+    if "AF_low" not in condition:
+        return CheckResult("forbidden_keywords", True, "Not AF_low — skipped")
+
+    if forbidden_kw is None:
+        forbidden_kw = load_forbidden_keywords()
+
+    task_kw = forbidden_kw.get(task_id)
+    if task_kw is None:
+        return CheckResult("forbidden_keywords", True, f"No forbidden keywords for task '{task_id}'")
+
+    text_lower = text.lower()
+    leaked = []
+    for kw in task_kw.get("visual_keywords", []) + task_kw.get("domain_keywords", []):
+        if kw.lower() in text_lower:
+            leaked.append(kw)
+
+    if leaked:
+        return CheckResult(
+            "forbidden_keywords", False,
+            f"AF_low leak: forbidden keywords found: {leaked}"
+        )
+    return CheckResult("forbidden_keywords", True, "No forbidden keyword leaks")
 
 
 def check_entity_present(text: str, entity_name: str) -> CheckResult:
@@ -218,95 +237,66 @@ def check_cue_priority_compliance(
 
 
 # ---------------------------------------------------------------------------
-# CB activity consistency (batch-level check)
+# EC source checks
 # ---------------------------------------------------------------------------
 
-_CB_ACTIVITY_PATTERNS = [
-    re.compile(r"I (?:can )?see (?:that )?you['\u2019]?(?:re|are)\b", re.IGNORECASE),
-    re.compile(r"I notice (?:that )?you['\u2019]?(?:re|are)?\b", re.IGNORECASE),
-    re.compile(r"(?:Since|While|Now that) you['\u2019]?(?:re|ve|are|have)\b", re.IGNORECASE),
-    re.compile(r"(?:It (?:looks|seems) like) you['\u2019]?(?:re|are)?\b", re.IGNORECASE),
-]
-
-
-def _extract_activity_sentence(text: str) -> str | None:
-    """Extract the activity phrase from the CB reference.
-
-    Splits on sentence boundaries AND common reminder phrase boundaries
-    (e.g. ", remember", ", don't forget") to isolate just the activity part.
-    Returns the activity fragment if a CB pattern is found, else None.
-    """
-    # Split on sentence-ending punctuation first, then on reminder phrase boundaries
-    segments = re.split(r"[.!?]+", text)
-    refined: list[str] = []
-    for seg in segments:
-        # Further split on ", remember" / ", don't forget" / ", by the way" boundaries
-        parts = re.split(r",\s*(?=remember|don['\u2019]t forget|by the way)", seg, flags=re.IGNORECASE)
-        refined.extend(parts)
-
-    for segment in refined:
-        segment = segment.strip()
-        if not segment:
-            continue
-        for pattern in _CB_ACTIVITY_PATTERNS:
-            if pattern.search(segment):
-                return segment
-    return None
-
-
-def check_cb_consistency(
-    variants: list[str],
+def check_ec_source_present(
+    text: str,
     condition: str,
-    similarity_threshold: float = 0.40,
+    task_json: dict,
 ) -> CheckResult:
-    """Check that CB variants all reference the same activity.
+    """For EC_on conditions: verify source context appears in the text."""
+    if "EC_on" not in condition:
+        return CheckResult("ec_source_present", True, "Not EC_on — skipped")
 
-    Only applies to the AF_CB condition. Compares activity sentences
-    pairwise using normalised Levenshtein similarity. Flags if any pair
-    has similarity below the threshold (meaning they describe different activities).
+    el2 = task_json.get("reminder_context", {}).get("element2", {})
+    creator = el2.get("origin", {}).get("task_creator", "")
+    creation_ctx = el2.get("creation_context", "")
 
-    Args:
-        variants: All generated variants for this (task, condition) batch.
-        condition: The condition string (only AF_CB is checked).
-        similarity_threshold: Minimum pairwise similarity for activity sentences.
-    """
-    if condition != "AF_CB":
-        return CheckResult("cb_consistency", True, "Not AF_CB condition — skipped")
+    text_lower = text.lower()
 
-    if len(variants) < 2:
-        return CheckResult("cb_consistency", True, "Fewer than 2 variants — skipped")
+    # Check creator name (use words >2 chars to handle "friend Mei" → "mei")
+    creator_found = False
+    if creator:
+        creator_words = [w.lower() for w in creator.split() if len(w) > 2]
+        creator_found = any(w in text_lower for w in creator_words)
 
-    activity_sentences = []
-    for i, v in enumerate(variants):
-        sent = _extract_activity_sentence(v)
-        if sent is None:
-            return CheckResult(
-                "cb_consistency", False,
-                f"Variant {i} has no detectable CB activity reference"
-            )
-        activity_sentences.append(sent.lower().strip())
+    # Check creation context keywords
+    context_found = False
+    if creation_ctx:
+        context_words = [w.lower() for w in creation_ctx.split() if len(w) > 4]
+        context_found = any(w in text_lower for w in context_words)
 
-    # Pairwise similarity check
-    min_sim = 1.0
-    worst_pair = (0, 0)
-    for i in range(len(activity_sentences)):
-        for j in range(i + 1, len(activity_sentences)):
-            dist = Levenshtein.normalized_distance(activity_sentences[i], activity_sentences[j])
-            sim = 1.0 - dist
-            if sim < min_sim:
-                min_sim = sim
-                worst_pair = (i, j)
-
-    if min_sim < similarity_threshold:
+    if not creator_found and not context_found:
         return CheckResult(
-            "cb_consistency", False,
-            f"Activity divergence between variants {worst_pair[0]} and {worst_pair[1]} "
-            f"(similarity={min_sim:.3f}, threshold={similarity_threshold})"
+            "ec_source_present", False,
+            f"EC_on but no source context found. Expected '{creator}' or context keywords."
         )
-    return CheckResult(
-        "cb_consistency", True,
-        f"All activity sentences consistent (min_sim={min_sim:.3f})"
-    )
+    return CheckResult("ec_source_present", True)
+
+
+def check_ec_source_absent(
+    text: str,
+    condition: str,
+    task_json: dict,
+) -> CheckResult:
+    """For EC_off conditions: verify source context did NOT leak into text."""
+    if "EC_off" not in condition:
+        return CheckResult("ec_source_absent", True, "Not EC_off — skipped")
+
+    el2 = task_json.get("reminder_context", {}).get("element2", {})
+    creator = el2.get("origin", {}).get("task_creator", "")
+
+    if creator and creator.lower() != "self":
+        creator_words = [w.lower() for w in creator.split() if len(w) > 2]
+        text_lower = text.lower()
+        for w in creator_words:
+            if w in text_lower:
+                return CheckResult(
+                    "ec_source_absent", False,
+                    f"EC_off but creator word '{w}' found in text — source context leak"
+                )
+    return CheckResult("ec_source_absent", True)
 
 
 # ---------------------------------------------------------------------------
@@ -321,19 +311,19 @@ def check(
     prior_variants: list[str] | None = None,
     gen_config: GenerationConfig | None = None,
     forbidden_kw: dict[str, dict[str, list[str]]] | None = None,
-    diagnosticity_report: dict | None = None,
+    task_json: dict | None = None,
 ) -> GateResult:
     """Run all per-variant quality checks.
 
     Args:
         text: The generated reminder text.
-        condition: e.g. "LowAF_LowCB".
-        task_id: e.g. "medicine_a".
+        condition: e.g. "AF_low_EC_off".
+        task_id: e.g. "example_book".
         entity_name: The entity name that must appear in the text.
         prior_variants: Previously accepted variants in this batch.
         gen_config: Generation config (for thresholds). Loaded if None.
         forbidden_kw: Forbidden keywords dict. Loaded if None.
-        diagnosticity_report: Approved diagnosticity report for cue priority check.
+        task_json: Full task JSON for EC checks.
 
     Returns:
         GateResult with pass/fail and details of each check.
@@ -350,22 +340,13 @@ def check(
     results.append(check_length(text, gen_config.min_words, gen_config.max_words))
     results.append(check_duplicate(text, prior_variants, gen_config.similarity_threshold))
     results.append(check_language(text))
-    results.append(check_cue_priority_compliance(text, diagnosticity_report))
+
+    if task_json is not None:
+        results.append(check_ec_source_present(text, condition, task_json))
+        results.append(check_ec_source_absent(text, condition, task_json))
 
     all_passed = all(r.passed for r in results)
     return GateResult(passed=all_passed, checks=results)
-
-
-def check_batch(
-    variants: list[str],
-    condition: str,
-    cb_similarity_threshold: float = 0.40,
-) -> CheckResult:
-    """Run batch-level checks (CB activity consistency).
-
-    Call this after all variants for a (task, condition) pair are generated.
-    """
-    return check_cb_consistency(variants, condition, cb_similarity_threshold)
 
 
 # ---------------------------------------------------------------------------
@@ -375,18 +356,18 @@ def check_batch(
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    # Demo: check a good and a bad text for medicine_a
-    good_af = "Remember to take the red round Doxycycline 100mg tablet from the bottle."
-    bad_af = "Remember to take your medicine after dinner."
+    # Demo: check a good and a bad text for example_book
+    good_af = "Remember to find and bring the book from the study — the red paperback titled Erta Ale with a mountain cover."
+    bad_af = "Remember to get your book."
 
-    print("=== Quality Gate Demo (medicine_a, AF_only) ===\n")
+    print("=== Quality Gate Demo (example_book, AF_high_EC_off) ===\n")
 
-    for label, text in [("Good (AF_only)", good_af), ("Bad (missing entity details)", bad_af)]:
+    for label, text in [("Good (AF_high)", good_af), ("Bad (missing details)", bad_af)]:
         result = check(
             text=text,
-            condition="AF_only",
-            task_id="medicine_a",
-            entity_name="Doxycycline",
+            condition="AF_high_EC_off",
+            task_id="example_book",
+            entity_name="book",
         )
         print(f"{label}: {text!r}")
         print(f"  → {result.summary()}")

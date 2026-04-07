@@ -3,10 +3,11 @@
 Implements the dual format strategy (prose/json) from TECH_DOC v0.3 §4.2.
 Tone constant (intention-reactivation framing) per TECH_DOC v0.4 §2.4.
 
-3-group design:
-  Control — no generation (handled upstream).
-  AF_only — high AF, no CB.
-  AF_CB   — high AF + contextual bridging.
+2×2 factorial design: AF (low/high) × EC (off/on)
+  AF_low_EC_off  — minimal: action + entity only
+  AF_high_EC_off — detailed item features, no source context
+  AF_low_EC_on   — minimal item + source context
+  AF_high_EC_on  — full information
 """
 
 from __future__ import annotations
@@ -31,15 +32,25 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 CONDITION_DESCRIPTIONS: dict[str, dict[str, str]] = {
-    "AF_only": {
-        "include": "the action, entity name, visual appearance of the target (colour, shape, container), specific properties (dosage, form), and who assigned the task (if a professional)",
-        "exclude": "any reference to what the user is currently doing or their detected activity",
-        "tone": "Be specific and descriptive about the target object so the user can identify it.",
+    "AF_low_EC_off": {
+        "include": "only the intended action and the entity name",
+        "exclude": "visual appearance, specific properties, location, who assigned the task, any background about when/why the task was created, and any reference to the user's current activity",
+        "tone": "Keep it minimal and brief. Just the action and the object.",
     },
-    "AF_CB": {
-        "include": "everything: the action, entity name, visual appearance, specific properties, who assigned it (if a professional), and a reference to what the user is currently doing",
-        "exclude": "nothing — this is the full-information condition",
-        "tone": "Acknowledge what the user is doing, then give a detailed, specific reminder.",
+    "AF_high_EC_off": {
+        "include": "the action, entity name, visual appearance of the target (colour, shape, distinguishing features), specific discriminating properties, and the location (room and spot)",
+        "exclude": "who assigned the task, any background about when/why the task was created, and any reference to the user's current activity",
+        "tone": "Be specific and descriptive about the target object so the user can identify it among similar items.",
+    },
+    "AF_low_EC_on": {
+        "include": "the intended action, the entity name, AND source context: who communicated the task and the situational background of when/how it was communicated",
+        "exclude": "visual appearance, specific properties, location, and any reference to the user's current activity",
+        "tone": "Mention who asked and the circumstance, then state the task simply.",
+    },
+    "AF_high_EC_on": {
+        "include": "everything: the action, entity name, visual appearance, specific discriminating properties, location (room and spot), AND source context (who communicated the task and the situational background)",
+        "exclude": "any reference to the user's current activity",
+        "tone": "Give full details: who asked, the context, plus a detailed description of the target object and where to find it.",
     },
 }
 
@@ -73,7 +84,7 @@ Use intention-reactivation framing ONLY:
   ✗ Never imply the task should be executed immediately.
 
 Constraints:
-- Length: 8–30 words.
+- Length: 8–40 words.
 - Output: one reminder sentence or two short sentences.
 - Natural spoken English — warm and brief. Not clinical. Not robotic.
 - Do NOT use bullet points, numbering, or explanations.
@@ -104,11 +115,11 @@ def format_context(pruned_dict: dict, style: str = "prose") -> str:
 
 
 def _to_prose(pruned_dict: dict) -> str:
-    """Convert pruned context dict to field-aware prose per TECH_DOC v0.3 §4.2."""
+    """Convert pruned context dict to field-aware prose."""
     parts: list[str] = []
     ctx = pruned_dict.get("reminder_context", pruned_dict)
 
-    # Element 1: action + entity + cues + domain properties
+    # Element 1: action + entity
     el1 = ctx.get("element1", {})
     action = el1.get("action_verb", "")
     entity = el1.get("target_entity", {})
@@ -117,6 +128,7 @@ def _to_prose(pruned_dict: dict) -> str:
     if action and entity_name:
         parts.append(f"Task: {action} {entity_name}.")
 
+    # AF+ fields: visual cues, domain properties, location
     visual = entity.get("cues", {}).get("visual", "")
     if visual:
         parts.append(f"Target appearance: {visual}.")
@@ -126,14 +138,26 @@ def _to_prose(pruned_dict: dict) -> str:
         details = ", ".join(f"{k}: {v}" for k, v in domain.items())
         parts.append(f"Details: {details}.")
 
-    # Element 2: origin / authority
+    location = el1.get("location", {})
+    if location:
+        room = location.get("room", "")
+        spot = location.get("spot", "")
+        if room or spot:
+            loc_str = f"{room}, {spot}" if room and spot else (room or spot)
+            parts.append(f"Location: {loc_str}.")
+
+    # Element 2: encoding context (EC)
     el2 = ctx.get("element2", {})
     origin = el2.get("origin", {})
     creator = origin.get("task_creator", "")
     if creator:
-        parts.append(f"Prescribed by: {creator}.")
+        parts.append(f"Source: task from {creator}.")
 
-    # Element 3: detected activity
+    creation_ctx = el2.get("creation_context", "")
+    if creation_ctx:
+        parts.append(f"Background: {creation_ctx}.")
+
+    # Element 3: should never appear (excluded from all conditions), but handle gracefully
     el3 = ctx.get("element3", {})
     activity = el3.get("detected_activity_raw", "")
     if activity:
@@ -262,14 +286,14 @@ def build_prompts(
 
 
 # ---------------------------------------------------------------------------
-# CLI entry point — prints assembled prompt for medicine_a × HighAF_HighCB
+# CLI entry point — prints assembled prompt for example_book × AF_high_EC_on
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     data_dir = Path(__file__).resolve().parent.parent / "data" / "task_schemas"
-    task_path = data_dir / "medicine_a.json"
+    task_path = data_dir / "example_book.json"
 
     if not task_path.exists():
         print(f"Task file not found: {task_path}")
@@ -281,8 +305,8 @@ if __name__ == "__main__":
     gen_cfg = load_generation_config()
     fm = load_condition_field_map()
 
-    # Demo: AF_CB with no prior variants
-    condition = "AF_CB"
+    # Demo: AF_high_EC_on with no prior variants
+    condition = "AF_high_EC_on"
     system, user = build_prompts(
         task_json, condition, field_map=fm, gen_config=gen_cfg
     )
@@ -293,16 +317,3 @@ if __name__ == "__main__":
     print(f"{'='*60}")
     print(f"\n--- SYSTEM PROMPT ---\n{system}")
     print(f"\n--- USER PROMPT ---\n{user}")
-
-    # Demo: with prior variants
-    print(f"\n{'='*60}")
-    print("  With prior variants (diversity instruction)")
-    print(f"{'='*60}")
-    prior = [
-        "I can see you just finished dinner. Remember to take your Doxycycline — the 100mg tablet in the red round bottle.",
-        "Since you've finished eating, it's time for your Doxycycline. Look for the red round bottle — your doctor prescribed it.",
-    ]
-    _, user_with_prior = build_prompts(
-        task_json, condition, prior_variants=prior, field_map=fm, gen_config=gen_cfg
-    )
-    print(f"\n--- USER PROMPT ---\n{user_with_prior}")

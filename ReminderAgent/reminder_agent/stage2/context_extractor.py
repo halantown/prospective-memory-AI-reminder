@@ -3,10 +3,11 @@
 The LLM receives only the pruned output. It cannot leak information it never sees.
 This implements Design Principle P1 (input truncation over output filtering).
 
-3-group design + Baseline:
-  Baseline: template-only (action + entity), uses this extractor for pruning.
-  AF_only: High AF, no CB.
-  AF_CB:   High AF + CB.
+2×2 factorial design: AF (low/high) × EC (off/on)
+  AF_low_EC_off:  action + entity only, no source context
+  AF_high_EC_off: + visual cues, domain properties, location
+  AF_low_EC_on:   action + entity + source context
+  AF_high_EC_on:  full information (AF features + source context)
   Control: No reminder — never calls this module.
 """
 
@@ -194,7 +195,7 @@ def _count_leaf_values(d: dict) -> int:
 
 
 # ---------------------------------------------------------------------------
-# CLI entry point — demo extraction for medicine_a
+# CLI entry point — demo extraction for example_book
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -203,7 +204,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 
     data_dir = Path(__file__).resolve().parent.parent / "data" / "task_schemas"
-    task_path = data_dir / "medicine_a.json"
+    task_path = data_dir / "example_book.json"
 
     if not task_path.exists():
         print(f"Task file not found: {task_path}")
@@ -212,7 +213,7 @@ if __name__ == "__main__":
     with open(task_path) as f:
         task_json = json.load(f)
 
-    conditions = ["AF_only", "AF_CB", "Baseline"]
+    conditions = ["AF_low_EC_off", "AF_high_EC_off", "AF_low_EC_on", "AF_high_EC_on"]
     fm = load_condition_field_map()
 
     for cond in conditions:
