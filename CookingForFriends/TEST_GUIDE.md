@@ -149,7 +149,7 @@ asyncio.run(create())
 ## Debugging
 
 ### Backend Errors
-- Check `CookingForFriends/backend/experiment.db` exists
+- Ensure PostgreSQL container is running: `docker compose up -d`
 - Verify `conda activate thesis_server` is active
 - Check port 5000 is free (or edit config.py)
 
