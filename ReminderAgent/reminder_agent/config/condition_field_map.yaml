@@ -1,17 +1,17 @@
-# Condition Field Map — Authoritative field whitelist per condition
-# Maps each experimental group to the Task JSON fields permitted in the LLM prompt.
-# This file is the single source of truth for the operationalisation.
+# Condition Field Map — 2×2 AF × EC Design
 #
-# 3-group between-subjects design:
-#   Group 1 (Control): No reminder — not listed here (no text generation needed).
-#   Group 2 (AF_only): High Associative Fidelity, no Contextual Bridging.
-#   Group 3 (AF_CB):   High Associative Fidelity + Contextual Bridging.
-#   Baseline: Template-only (action + entity), no LLM generation needed.
+# AF (within-subject): item-feature specificity
+#   AF_low  = action_verb + entity_name only
+#   AF_high = + visual cues, domain properties, location
 #
-# Field paths use dot notation into the Task JSON (snake_case, rooted at reminder_context).
-# excluded_zones: entire top-level zones stripped before the extractor even reads fields.
+# EC (between-subject): encoding context from source
+#   EC_off = no source context (element2 excluded)
+#   EC_on  = full element2 included (origin + creation_context)
+#
+# element3 (detected_activity_raw) is excluded from ALL conditions.
+# The old CB variable is removed entirely.
 
-Baseline:
+AF_low_EC_off:
   required_fields:
     - "reminder_context.element1.action_verb"
     - "reminder_context.element1.target_entity.entity_name"
@@ -26,34 +26,49 @@ Baseline:
     - "agent_reasoning_context"
     - "placeholder"
 
-AF_only:
+AF_high_EC_off:
   required_fields:
     - "reminder_context.element1.action_verb"
     - "reminder_context.element1.target_entity.entity_name"
     - "reminder_context.element1.target_entity.cues.visual"
     - "reminder_context.element1.target_entity.domain_properties"
     - "reminder_context.element1.location"
-  conditional_fields:
-    - field: "reminder_context.element2.origin.task_creator"
-      condition: "reminder_context.element2.origin.creator_is_authority == true"
+  conditional_fields: []
   excluded_fields:
+    - "reminder_context.element2"
     - "reminder_context.element3"
   excluded_zones:
     - "agent_reasoning_context"
     - "placeholder"
 
-AF_CB:
+AF_low_EC_on:
+  required_fields:
+    - "reminder_context.element1.action_verb"
+    - "reminder_context.element1.target_entity.entity_name"
+    - "reminder_context.element2.origin"
+    - "reminder_context.element2.creation_context"
+  conditional_fields: []
+  excluded_fields:
+    - "reminder_context.element1.target_entity.cues"
+    - "reminder_context.element1.target_entity.domain_properties"
+    - "reminder_context.element1.location"
+    - "reminder_context.element3"
+  excluded_zones:
+    - "agent_reasoning_context"
+    - "placeholder"
+
+AF_high_EC_on:
   required_fields:
     - "reminder_context.element1.action_verb"
     - "reminder_context.element1.target_entity.entity_name"
     - "reminder_context.element1.target_entity.cues.visual"
     - "reminder_context.element1.target_entity.domain_properties"
     - "reminder_context.element1.location"
-    - "reminder_context.element3.detected_activity_raw"
-  conditional_fields:
-    - field: "reminder_context.element2.origin.task_creator"
-      condition: "reminder_context.element2.origin.creator_is_authority == true"
-  excluded_fields: []
+    - "reminder_context.element2.origin"
+    - "reminder_context.element2.creation_context"
+  conditional_fields: []
+  excluded_fields:
+    - "reminder_context.element3"
   excluded_zones:
     - "agent_reasoning_context"
     - "placeholder"
