@@ -524,7 +524,7 @@ async def _handle_phone_reply(participant_id, block_number, data, db_factory):
                 PhoneMessageLog.participant_id == participant_id,
                 PhoneMessageLog.block_id == block_id,
                 PhoneMessageLog.message_id == message_id,
-            )
+            ).limit(1)
         )
         sent_at = sent_row.scalar_one_or_none()
         response_time_ms = int((timestamp - sent_at) * 1000) if sent_at else None

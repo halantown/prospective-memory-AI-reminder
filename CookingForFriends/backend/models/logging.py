@@ -1,7 +1,7 @@
 """Logging models — InteractionLog, MouseTrack, OngoingTaskScore, GameStateSnapshot, PhoneMessageLog."""
 
 from datetime import datetime
-from sqlalchemy import Integer, String, DateTime, JSON, Float, ForeignKey, Boolean, Index
+from sqlalchemy import Integer, String, DateTime, JSON, Float, ForeignKey, Boolean, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from models.base import Base
 
@@ -76,6 +76,7 @@ class PhoneMessageLog(Base):
     __tablename__ = "phone_message_logs"
     __table_args__ = (
         Index('ix_phonemsg_participant_block', 'participant_id', 'block_id'),
+        UniqueConstraint('participant_id', 'block_id', 'message_id', name='uq_phonemsg_participant_block_message'),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

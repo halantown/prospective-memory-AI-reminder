@@ -440,8 +440,13 @@ def cancel_all():
 async def _log_phone_message_sent(
     participant_id: str, block_number: int, message: dict, sent_at: float, db_factory
 ):
-    """Log that a phone message was sent to the participant."""
+    """Log that a phone message was sent to the participant.
+
+    Uses upsert so re-sending the same message_id (e.g. after reconnect) updates
+    the existing row instead of creating a duplicate.
+    """
     from sqlalchemy import select
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
     from models.block import Block
     from models.logging import PhoneMessageLog
     from engine.message_loader import _msg_category
@@ -460,18 +465,26 @@ async def _log_phone_message_sent(
 
             msg_type = message.get("type", "notification")
             category = _msg_category(msg_type)
+            message_id = message.get("id", "")
 
-            log = PhoneMessageLog(
-                participant_id=participant_id,
-                block_id=block_id,
-                message_id=message.get("id", ""),
-                sender=message.get("sender", ""),
-                message_type=msg_type,
-                category=category,
-                correct_answer=message.get("correct_index") if msg_type == "question" else None,
-                sent_at=sent_at,
+            stmt = (
+                pg_insert(PhoneMessageLog)
+                .values(
+                    participant_id=participant_id,
+                    block_id=block_id,
+                    message_id=message_id,
+                    sender=message.get("sender", ""),
+                    message_type=msg_type,
+                    category=category,
+                    correct_answer=message.get("correct_index") if msg_type == "question" else None,
+                    sent_at=sent_at,
+                )
+                .on_conflict_do_update(
+                    index_elements=["participant_id", "block_id", "message_id"],
+                    set_={"sent_at": sent_at},
+                )
             )
-            db.add(log)
+            await db.execute(stmt)
             await db.commit()
     except Exception as e:
         logger.error(f"[TIMELINE] Failed to log phone message: {e}")
