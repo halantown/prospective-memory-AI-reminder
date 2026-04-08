@@ -1,6 +1,6 @@
 # AF Diagnosticity Analysis — Development Guide
 
-> **Version**: 0.1 | **Date**: 2026-03-31 | **Prerequisite**: Read SUMMARY_M1.md + AGENT_DEV_GUIDE S5-7.md
+> **Version**: 0.1 | **Date**: 2026-03-31 | **Prerequisite**: Read USAGE.md
 > **Purpose**: Add diagnosticity-based cue selection to the AF operationalization pipeline
 > **Model**: Qwen (百炼 API) for development, switch to local Ollama when stable
 

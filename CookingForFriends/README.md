@@ -42,8 +42,7 @@ CookingForFriends/
 │   │   ├── services/       # API client
 │   │   └── types/          # TypeScript type definitions
 │   └── dist/               # Production build output
-├── experiment_plan_v3.md    # PRD (experiment design document)
-└── development_prompt_v3.md # Technical specification
+└── docs/                    # Project documentation
 ```
 
 ## Quick Start
