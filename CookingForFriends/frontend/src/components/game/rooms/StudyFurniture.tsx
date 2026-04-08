@@ -7,7 +7,7 @@ export default function StudyFurniture() {
     <svg
       className="absolute inset-0 w-full h-full"
       viewBox="0 0 400 300"
-      preserveAspectRatio="none"
+      preserveAspectRatio="xMidYMid meet"
     >
       {/* ── Desk ── */}
       <rect x="25" y="18" width="260" height="88" rx="3" fill={C.darkWood} />

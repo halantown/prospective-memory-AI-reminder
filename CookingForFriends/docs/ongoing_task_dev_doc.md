@@ -1,0 +1,465 @@
+# CookingForFriends — Ongoing Task Redesign: Development Document
+
+> **Date:** 2026-04-08
+> **Status:** Design finalized, ready for implementation
+> **Context:** This document captures all design decisions from the ongoing task brainstorming session. It serves as both a development spec and a prompt for AI-assisted coding.
+
+---
+
+## 1. Design Philosophy
+
+The experiment simulates **one hour (17:00–18:00) before a dinner party**. The participant is preparing food, tidying the house, and managing phone messages — all while maintaining PM intentions encoded before the session.
+
+### Core Principles
+
+- **"Living a day, not playing a game."** No scores, no levels, no completion badges, no optimal strategies. The interface is functional, not entertaining.
+- **No forced completion.** Participants can skip chores, ignore messages, or let food burn. Everything is recorded as behavioral data, nothing is punished.
+- **Narrative-driven triggers.** Events happen because of story reasons (cat knocks things over, friend asks to wash hands), not because a task list says so.
+- **Controlled variability.** The experience *feels* free but the timeline is fully scripted. All participants encounter the same events at the same times.
+
+### Literature Grounding
+
+- **Cooking as ongoing task:** Craik & Bialystok (2006) Breakfast Task — multi-dish time management as PM-relevant ongoing activity
+- **Recipe viewing as behavioral measure:** Kourtesis et al. (2020) VR-EAL — active checking of PM notes recorded as monitoring indicator
+- **Chores as filler/distractor:** Brooks et al. (2004) Virtual Bungalow — item sorting across rooms; EPELI (Jylkkä et al., 2023) — household chores with embedded PM
+- **Phone messages as cognitive load:** Barnett & Coldiron (2023) VKP-PM — True/False judgments occupying verbal working memory; CAMPROMPT (Wilson et al., 2005) — general knowledge quizzes as distractor
+
+---
+
+## 2. Layout Overhaul: Fixed Floor Plan
+
+### Current State
+
+- 5 room cards, active room expands to 64%, inactive rooms stack in sidebar
+- No spatial relationship between rooms
+- Feels like "clicking slides in a presentation"
+
+### New Design
+
+- **Fixed top-down floor plan** filling the full screen (participants required to use fullscreen)
+- **All rooms always visible** at fixed positions and sizes
+- **Hallway** connects all rooms, providing visual paths for character movement
+- **Kitchen is the largest room** (primary activity space)
+- **Front door** at bottom-right of hallway, where visitors arrive
+- No responsive/scaling concerns — fixed resolution, fullscreen only
+
+### Floor Plan Layout
+
+```
+┌──────────────────┬─────────────────────┐
+│                  │                     │
+│     Kitchen      │    Living Room      │
+│  (largest room)  │  (sofa, TV, shelf)  │
+│                  │                     │
+│  3 burners, oven ├──────────┬──────────┤
+│  fridge, cutting │  Study   │ Bathroom │
+│  board, spices,  │  (desk,  │ (washer, │
+│  plating area    │  shelf)  │  rack)   │
+├──────────────────┼──────────┴──────────┤
+│                  │                     │
+│   Dining Room    │     Hallway         │
+│  (table for 6)   │  (connects rooms)   │
+│                  │              [DOOR]  │
+└──────────────────┴─────────────────────┘
+```
+
+### Room Navigation
+
+- Click any room → character walks along hallway path to destination
+- Movement uses **pre-drawn path waypoints** (not free movement)
+- Brief transit delay simulates physical movement cost
+- Character position visible at all times (emoji or simple sprite)
+- Current room highlighted with border glow
+
+### Implementation Notes
+
+- Replace `WorldView.tsx` dynamic layout with fixed CSS Grid or absolute positioning
+- Each room is a fixed-size `<div>` with SVG furniture layer + HTML interaction overlay
+- `preserveAspectRatio="xMidYMid meet"` on all SVG furniture layers (already changed)
+- Room interaction: click room to navigate there, then click objects within active room
+- Inactive rooms are slightly dimmed but content remains visible (monitor stove from other rooms)
+
+---
+
+## 3. Ongoing Task Line 1: Cooking (Primary)
+
+### Overview
+
+4 dishes prepared across the 15-minute block. Each dish has multi-step procedures with qualitatively different operations. Backend timeline controls major phase transitions; frontend handles step-level state machines.
+
+### The Four Dishes
+
+**1. Roasted Vegetables (longest wait, first to start)**
+
+- Steps: fridge (select veggies) → cutting board (chop) → spice rack (season) → place on baking tray → oven → [long wait ~9 min] → remove from oven → plate → carry to dining room
+- Character: Low active time, long passive wait. Creates the main window for chores.
+
+**2. Tomato Soup (medium duration)**
+
+- Steps: fridge (select ingredients) → cutting board (chop onion, tomato) → burner 2 (sauté base) → add water → [simmer ~5 min, occasional stir prompt] → add seasoning → ladle into bowl → carry to dining room
+- Character: Periodic check-ins needed (stir), moderate cognitive load.
+
+**3. Spaghetti (medium duration, sequential)**
+
+- Steps: burner 1 (pot of water) → [wait for boil ~2 min] → add pasta → [cook ~2.5 min] → drain → add sauce from spice rack → toss → plate → carry to dining room
+- Character: Clear sequential steps with defined wait periods.
+
+**4. Steak (last to start, most time-pressure)**
+
+- Steps: fridge (select steak) → cutting board (season/marinate) → burner 3 (heat pan) → place steak → [cook side 1 ~1.5 min] → flip → [cook side 2 ~1.5 min] → plate → carry to dining room
+- Character: Dense operations, time-sensitive, requires attention.
+
+### Approximate Timeline (in minutes within 15-min block)
+
+```
+0:00  ─── Roast veg: start prep (fridge → chop → season → oven)
+0:40  ─── Roast veg IN OVEN ═══════════════════════════════════ 10:00 remove
+2:00  ─── Soup: start prep (fridge → chop → sauté)
+3:10  ─── Soup SIMMERING ════════════════ 8:00 season + serve
+5:00  ─── Pasta: start (boil water)
+5:20  ─── Pasta WATER HEATING ═══ 7:00 add pasta
+7:00  ─── Pasta COOKING ═════════ 9:30 drain + sauce + plate
+9:00  ─── Steak: start prep (fridge → season)
+9:30  ─── Steak COOKING SIDE 1 ══ 11:00 flip
+11:00 ─── Steak COOKING SIDE 2 ══ 12:30 plate
+13:00-15:00 ─── Final plating, carry remaining dishes to dining room
+```
+
+### Kitchen Interaction Points
+
+Each kitchen object is a **clickable area** in the SVG furniture layer. Clicking opens a **popup** showing available actions for that object in its current state.
+
+| Object        | Location in viewBox   | Function                 | Popup Actions (vary by state)                        |
+| ------------- | --------------------- | ------------------------ | ---------------------------------------------------- |
+| Fridge        | Top-right             | Select ingredients       | List of ingredients needed for current dish          |
+| Cutting Board | Upper-left of counter | Prepare/chop ingredients | "Chop [ingredient]", "Season [ingredient]"           |
+| Spice Rack    | Lower-left shelf      | Add seasonings           | "Add salt", "Add pepper", "Add herbs", "Add oil"     |
+| Burner 1      | Center-left           | Pasta pot                | "Place pot", "Add pasta", "Drain", "Add sauce"       |
+| Burner 2      | Center                | Soup pot                 | "Place pot", "Sauté", "Add water", "Stir", "Season" |
+| Burner 3      | Center-right          | Steak pan                | "Heat pan", "Place steak", "Flip", "Remove"          |
+| Oven          | Lower-right           | Roast vegetables         | "Place tray", "Set temperature", "Remove tray"       |
+| Plating Area  | Counter area          | Assemble finished dishes | "Plate [dish name]"                                  |
+
+### Cooking State Machine (per dish)
+
+Each dish progresses through a linear state chain. The popup only shows the **currently valid action(s)** for that dish's state. Backend pushes phase transitions at fixed times; frontend manages the step-by-step progression within each phase.
+
+```
+IDLE → PREP (at fridge/cutting board) → COOKING (on burner/oven) → READY → PLATED → SERVED (in dining room)
+```
+
+- If participant misses a Kitchen Timer prompt, the dish state still advances (food might "overcook" — visual change but no punishment)
+- Popup actions are **not trick questions** — they show real operations, participant just needs to remember which one is next from the recipe
+
+### Visual Feedback
+
+- Burners: color change indicates heat state (gray=off, orange=active, red=high)
+- Pots/pans: content changes appearance as cooking progresses (raw→cooking→done→overcooked)
+- Oven: indicator light shows on/off/ready
+- Use emoji or simple colored shapes as placeholder assets initially
+
+---
+
+## 4. Recipe System (Press-and-Hold)
+
+### Design
+
+- Recipe lives in a **dedicated Tab** on the phone sidebar
+- Participant **presses and holds** a button to view the recipe; **releasing hides it**
+- This forces a resource trade-off: while viewing recipe, participant cannot interact with kitchen or respond to messages
+
+### Recipe Content
+
+- Shows all 4 dishes in a vertical scrollable list
+- Each dish shows its **full step list**
+- **Current step is highlighted** (system tracks progress)
+- Participant uses recipe to remind themselves what to do next
+
+### Behavioral Data Captured
+
+- `recipe_view_start` timestamp (mousedown/touchstart)
+- `recipe_view_end` timestamp (mouseup/touchend)
+- Duration of each view
+- Count of views per dish
+- Time between recipe view and subsequent kitchen action
+
+### Implementation
+
+```
+Phone component:
+- Tab bar: [Messages] [Recipe]
+- Recipe tab content: press-hold overlay
+- onMouseDown → show recipe panel, record timestamp, send WS event
+- onMouseUp → hide recipe panel, record timestamp, send WS event
+- Recipe panel renders 4 dish cards with step lists
+- Current step per dish tracked in gameStore (updated by backend events)
+```
+
+---
+
+## 5. Kitchen Timer Notifications
+
+### Design
+
+- Cooking reminders are delivered as **phone notifications** from "Kitchen Timer 🍳"
+- They appear in the same message stream as friend messages
+- They are `notification` type (no reply needed)
+- Participant set up these timers "before the experiment started" (narrative justification)
+
+### Examples
+
+- 🍳 Kitchen Timer: "Water is boiling — time to add the pasta!"
+- 🍳 Kitchen Timer: "Give the soup a stir"
+- 🍳 Kitchen Timer: "Steak ready to flip!"
+- 🍳 Kitchen Timer: "Vegetables are done — take them out of the oven!"
+
+### Implementation
+
+- Backend timeline pushes `phone_message` events with `sender: "Kitchen Timer"`, `category: "notification"`, `avatar: "🍳"`
+- Frontend renders them identically to other notifications
+- Locked phone shows banner preview (participant must unlock to read full message if it's long)
+
+---
+
+## 6. Ongoing Task Line 2: Chores (Narrative-Driven Filler)
+
+### Design Philosophy
+
+Chores fill cooking wait periods. Each is triggered by a **narrative event**, not a task list. Participants are never told "go do this now" — they experience events that make doing something feel natural.
+
+### Chore 1: Set the Table (Dining Room)
+
+**Trigger:** Robot says "Friends arriving at 6, maybe set the table first?" at experiment start.
+
+**Operation:**
+
+- Enter dining room → table is empty
+- Bottom bar shows utensils: plate, knife, fork, glass
+- Drag utensils to 6 seat positions (or click-select + click-target)
+- 6 seats × 4 utensils = 24 placements
+- One-time task, no repeat
+
+**Later:** Each completed dish gets carried here. Click plated dish in kitchen → "Carry to dining room" → switch to dining room → click table to place. Table visually fills up over the session.
+
+**State:** Persists across room switches. If participant leaves mid-setup and returns, progress is kept.
+
+### Chore 2: Tidy the Living Room
+
+**Trigger:** ~4 min into session, notification: "Your cat knocked things over in the living room 😾" or robot mentions it.
+
+**Operation:**
+
+- Enter living room → 6-8 objects scattered on floor/sofa/coffee table
+- Click object to select (highlights) → click correct destination to place
+- Objects: cup→coffee table, book→bookshelf, remote→TV stand, blanket→sofa arm, magazine→shelf, toy→basket
+- Wrong placement: object bounces back (gentle feedback, no penalty)
+
+**Possible second wave:** Later in session, a few more items appear ("cat did it again" or items from a delivered package).
+
+**State:** Persists. Each placed object stays placed.
+
+### Chore 3: Tidy the Bathroom
+
+**Trigger:** ~7 min, friend message: "I'm almost there, can I wash my hands when I arrive?" — participant realizes bathroom is messy.
+
+**Operation:**
+
+- Enter bathroom → washing machine door open with 3-4 clothes inside, some items on floor
+- Drag/click clothes from washer to drying rack positions
+- Click floor items (towel, bottles) to put them in correct spots
+- ~6-8 total interactions
+
+**State:** One-time task. Persists.
+
+### Chore 4: Fetch Speaker from Study
+
+**Trigger:** ~8 min, friend message or robot: "Should we have music? The Bluetooth speaker is on the study bookshelf"
+
+**Operation:**
+
+- Enter study → click speaker on bookshelf → item enters "carrying" state
+- Navigate to living room → click destination to place speaker
+- Single cross-room transport task
+
+**State:** One-time. Once placed, done.
+
+### Interaction Pattern (Shared)
+
+All chores use **click-select + click-target**:
+
+1. Click an out-of-place object → it highlights/lifts
+2. Click the correct destination → object animates to position
+3. If wrong destination → object returns to original spot with brief shake
+
+No drag-and-drop required (avoids small-target issues in fixed floor plan). Reuse the visual language of PM item selection (highlight + confirm) but with **different visual styling** (warm colors for chores vs cool colors for PM) to avoid confound.
+
+---
+
+## 7. Ongoing Task Line 3: Phone Messages
+
+### Message Types
+
+| Type                         | Count per block | Reply needed          | Purpose                            |
+| ---------------------------- | --------------- | --------------------- | ---------------------------------- |
+| Question (friend chat)       | 10-12           | Yes (2 options)       | Cognitive load — occupy verbal WM |
+| Notification (system/social) | 5-6             | No                    | Information noise, realism         |
+| Kitchen Timer                | ~8-10           | No                    | Cooking phase transition cues      |
+| PM Trigger                   | 3-4 per block   | No (triggers PM task) | Experimental manipulation          |
+
+### Question Message Design
+
+- Packaged as **contextual friend conversations**, not quiz questions
+- Two reply options, both natural responses, one correct based on scenario logic
+- Correct rate serves as ongoing engagement measure
+- Example: Tom: "I'm driving from Leiden, 25 min away. I leave at 5:35, will I make it by 6?" → "You'll make it" / "Might be late" (correct: make it)
+
+### Message Sources
+
+- ~40% party-related (friends attending asking practical questions)
+- ~40% general friend chat (friends not attending, daily life topics)
+- ~20% system notifications (weather, delivery, battery, storage)
+
+### Nudge Mechanism
+
+- If **5+ question messages** go unanswered, system sends a follow-up notification: "You have several unread messages 📱"
+- This is a single `notification` type message, not a penalty
+- Instruction during trial session: "Please reply to your friends' messages as you normally would. Your responses are recorded."
+
+### Phone Lock Screen
+
+- Auto-locks after 15s of no phone interaction (existing mechanism)
+- New messages show as banner previews on lock screen
+- Must unlock to read full message and reply
+- Unlock action logged as behavioral data
+
+---
+
+## 8. Trial Session (3 minutes)
+
+### Purpose
+
+Familiarize participants with all interaction types so experimental performance reflects memory, not interface learning.
+
+### Structure
+
+```
+0:00-0:30  — Welcome text overlay explaining basic controls
+             "Click rooms to move. Click objects to interact.
+              Press and hold Recipe to view cooking steps.
+              Reply to phone messages from friends."
+
+0:30-1:30  — Kitchen practice
+             - Simple recipe: "Fry an egg"
+             - Open fridge → select egg → cutting board (crack) → burner (cook) → plate
+             - Practice press-hold recipe viewing
+             - One Kitchen Timer notification fires
+
+1:30-2:00  — Phone practice
+             - One friend message arrives, practice unlock + reply
+             - One notification arrives (no reply needed)
+
+2:00-2:40  — PM practice
+             - One dummy PM trigger fires (doorbell)
+             - Navigate to target room → open furniture popup → select item → confirm
+             - NOT a real PM task, just operation practice
+
+2:40-3:00  — "Ready?" confirmation screen
+             - Brief summary of what to expect
+             - Confirm understanding of all interaction types
+```
+
+### Implementation
+
+- Separate timeline config file (`trial_session.json`)
+- Simplified kitchen with 1 burner, 1 dish
+- No scoring, no data analysis — pure familiarization
+- Can be replayed if participant requests
+
+---
+
+## 9. Technical Implementation Plan
+
+### Architecture (unchanged)
+
+- **Frontend:** React 18 + Vite + TypeScript + Tailwind + Zustand
+- **Backend:** FastAPI + PostgreSQL + WebSocket
+- **Communication:** Timeline engine pushes events via WS; frontend manages local state machines and reports actions back
+
+### What Changes
+
+#### Frontend — Layout (`WorldView.tsx` rewrite)
+
+- Replace dynamic card layout with **fixed CSS Grid floor plan**
+- All rooms rendered simultaneously at fixed positions
+- Active room has highlight border, inactive rooms slightly dimmed
+- Character sprite moves along predefined waypoints between rooms
+- Phone sidebar remains on the right (25% width)
+
+#### Frontend — Kitchen (`KitchenRoom.tsx` rewrite)
+
+- Replace steak-flipping mechanic with multi-dish state machine
+- Each kitchen object (fridge, burners, oven, cutting board, spice rack, plating) is a clickable area
+- Clicking opens a popup with context-sensitive action list
+- Dish state tracked in Zustand store, updated by backend events + participant actions
+
+#### Frontend — Recipe Tab (new component)
+
+- New tab in `PhoneSidebar.tsx`
+- Press-and-hold interaction for viewing
+- Renders 4 dish cards with step progression
+- Behavioral data sent via WS on view start/end
+
+#### Frontend — Chores (new components per room)
+
+- `LivingRoom.tsx`: scattered objects + click-to-place interaction
+- `BedroomRoom.tsx` (Dining): simplified one-time table setting + dish placement
+- `BathroomRoom.tsx`: washer→rack + floor item cleanup
+- `StudyRoom.tsx`: single fetch-and-carry task
+- All use click-select + click-target pattern
+- Room states persist in Zustand store
+
+#### Frontend — Phone Messages (modify `PhoneSidebar.tsx`)
+
+- Add Kitchen Timer as a notification sender
+- Redesign question content from quiz to contextual conversations
+- Add nudge mechanism (5+ unanswered → nudge notification)
+- Keep existing lock screen, banner, and reply mechanics
+
+#### Backend — Timeline
+
+- New timeline config files with cooking phase events, chore triggers, Kitchen Timer notifications
+- Existing `ongoing_task_event` WS message type can be extended for cooking + chores
+- Phone messages updated with new contextual content
+
+### Asset Strategy
+
+- **Phase 1 (now):** Emoji + simple colored SVG shapes as placeholders
+- **Phase 2 (later):** AI-generated consistent-style assets (icon/simple illustration style)
+- All assets placed within SVG `viewBox="0 0 400 300"` coordinate system using `<image>` tags or inline SVG paths
+- Interactive hotspots as HTML overlays with percentage positioning on top of SVG layer
+
+---
+
+## 10. Next Steps (Priority Order)
+
+### Immediate (this week)
+
+1. **Sketch the floor plan layout** in code — fixed grid, all rooms visible, hallway connecting them. No furniture details yet, just colored rectangles with labels. Get character movement working between rooms via waypoints.
+2. **Prototype kitchen cooking** for ONE dish (pasta or steak). Implement: clickable burner → popup with actions → state progression → Kitchen Timer notification. Use emoji placeholders.
+3. **Implement press-hold recipe** on phone. Just a static panel for now showing pasta steps. Record view timestamps.
+4. **Test the loop:** Start cooking → get Kitchen Timer notification → check recipe → perform action → wait → get next notification. Confirm the cognitive load chain works.
+
+### Next (following week)
+
+5. Add remaining 3 dishes with full state machines
+6. Implement chore interactions (living room first — most complex)
+7. Rewrite phone messages with contextual friend conversations
+8. Build 3-minute trial session
+9. Implement dining room dish serving (table filling up visually)
+
+### Before Pilot
+
+10. Full 15-minute timeline with all events synchronized
+11. Asset upgrade (AI-generated consistent style)
+12. Data logging verification — all behavioral measures recording correctly
+13. Deploy to Hetzner cloud server (2-core, 4GB)

@@ -7,7 +7,7 @@
     { "t": 0,   "type": "block_start", "data": {} },
 
     { "t": 0,   "type": "ongoing_task_event", "data": { "task": "steak", "event": "place_steak", "pan": 1, "room": "kitchen" } },
-    { "t": 5,   "type": "ongoing_task_event", "data": { "task": "dining", "event": "table_ready", "room": "bedroom" } },
+    { "t": 5,   "type": "ongoing_task_event", "data": { "task": "dining", "event": "table_ready", "room": "dining_room" } },
     { "t": 20,  "type": "ongoing_task_event", "data": { "task": "steak", "event": "place_steak", "pan": 2, "room": "kitchen" } },
 
     { "t": 30,  "type": "phone_message", "data": { "message_id": "msg_001" } },

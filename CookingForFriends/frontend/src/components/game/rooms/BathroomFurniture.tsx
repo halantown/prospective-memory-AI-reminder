@@ -7,7 +7,7 @@ export default function BathroomFurniture() {
     <svg
       className="absolute inset-0 w-full h-full"
       viewBox="0 0 400 300"
-      preserveAspectRatio="none"
+      preserveAspectRatio="xMidYMid meet"
     >
       {/* ── Plant pots (top row) ── */}
       {/* Pot 1 — reddish with green plant */}

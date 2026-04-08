@@ -50,7 +50,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         break
 
       case 'robot_move': {
-        const VALID_ROOMS = ['kitchen', 'bedroom', 'living_room', 'study', 'bathroom']
+        const VALID_ROOMS = ['kitchen', 'dining_room', 'living_room', 'study', 'bathroom', 'hallway']
         const toRoom = data.to_room as string
         if (VALID_ROOMS.includes(toRoom)) {
           store.setRobotRoom(toRoom as RoomId)

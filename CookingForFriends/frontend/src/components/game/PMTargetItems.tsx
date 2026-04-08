@@ -41,7 +41,7 @@ const TASK_ITEMS: TaskItemGroup[] = [
     ]
   },
   {
-    taskId: 'b1_giftbag', block: 1, room: 'bedroom',
+    taskId: 'b1_giftbag', block: 1, room: 'dining_room',
     items: [
       { id: 'b1_giftbag_target', type: 'target', label: 'Small bag + bow', description: 'Small blue gift bag with bow decoration' },
       { id: 'b1_giftbag_d1', type: 'd1', label: 'Small bag + ribbon', description: 'Small blue gift bag with ribbon decoration' },
@@ -74,7 +74,7 @@ const TASK_ITEMS: TaskItemGroup[] = [
     ]
   },
   {
-    taskId: 'b2_napkinrings', block: 2, room: 'bedroom',
+    taskId: 'b2_napkinrings', block: 2, room: 'dining_room',
     items: [
       { id: 'b2_napkinrings_target', type: 'target', label: 'Wood + light oak', description: 'Wooden napkin rings, light oak color' },
       { id: 'b2_napkinrings_d1', type: 'd1', label: 'Wood + dark', description: 'Wooden napkin rings, dark walnut color' },
@@ -115,7 +115,7 @@ const TASK_ITEMS: TaskItemGroup[] = [
     ]
   },
   {
-    taskId: 'b3_vase', block: 3, room: 'bedroom',
+    taskId: 'b3_vase', block: 3, room: 'dining_room',
     items: [
       { id: 'b3_vase_target', type: 'target', label: 'Blue + small', description: 'Small ceramic vase with blue glaze' },
       { id: 'b3_vase_d1', type: 'd1', label: 'Green + small', description: 'Small ceramic vase with green glaze' },
@@ -135,7 +135,7 @@ const TASK_ITEMS: TaskItemGroup[] = [
 // Room label lookup for destination messages
 const ROOM_LABELS: Record<string, string> = {
   kitchen: 'Kitchen',
-  bedroom: 'Bedroom',
+  dining_room: 'Dining Room',
   living_room: 'Living Room',
   study: 'Study',
   bathroom: 'Bathroom',
@@ -161,7 +161,7 @@ function deterministicShuffle<T>(arr: T[], seed: string): T[] {
 /** Furniture labels and emoji for each room — clicking these opens the PM item popup. */
 const ROOM_FURNITURE: Record<string, { label: string; emoji: string }> = {
   study: { label: 'Bookshelf', emoji: '📚' },
-  bedroom: { label: 'Cabinet', emoji: '🗄️' },
+  dining_room: { label: 'Cabinet', emoji: '🗄️' },
   living_room: { label: 'Shelf', emoji: '📖' },
   bathroom: { label: 'Supply Shelf', emoji: '🧴' },
   kitchen: { label: 'Kitchen Shelf', emoji: '🍶' },

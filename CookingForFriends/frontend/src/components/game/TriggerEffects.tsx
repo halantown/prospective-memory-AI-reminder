@@ -81,7 +81,7 @@ const TRIGGER_EFFECTS: Record<string, {
     label: 'All steaks are plated!',
   },
   table_complete: {
-    sourceRoom: 'bedroom',
+    sourceRoom: 'dining_room',
     audioFreq: 440,
     audioDuration: 0.3,
     audioPattern: 'single',

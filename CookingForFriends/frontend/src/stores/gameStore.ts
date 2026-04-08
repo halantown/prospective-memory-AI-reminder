@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import type {
   Phase, Condition, RoomId, Pan, PhoneNotification, PhoneMessage, RobotState, SessionData,
   ActivePMTrial, PMTaskConfig, DiningPhase, SteakState, SeatState, UtensilType,
+  DishId, DishState, KitchenStationId,
 } from '../types'
 
 const EMPTY_SEAT: SeatState = { plate: false, knife: false, fork: false, glass: false }
@@ -25,9 +26,14 @@ interface GameState {
   previousRoom: RoomId | null
   avatarMoving: boolean
 
-  // ── Kitchen ──
+  // ── Kitchen (legacy steak pans — kept for backward compat) ──
   pans: Pan[]
   kitchenScore: number
+
+  // ── Cooking (new multi-dish system) ──
+  dishes: Record<DishId, DishState>
+  /** Which station's popup is currently open */
+  activeStation: KitchenStationId | null
 
   // ── Dining ──
   diningPhase: DiningPhase
@@ -73,10 +79,16 @@ interface GameState {
   setCurrentRoom: (room: RoomId) => void
   setAvatarMoving: (moving: boolean) => void
 
-  // Kitchen actions
+  // Kitchen actions (legacy)
   setPans: (pans: Pan[]) => void
   updatePan: (panId: number, update: Partial<Pan>) => void
   addKitchenScore: (points: number) => void
+
+  // Cooking actions (new multi-dish)
+  setActiveStation: (station: KitchenStationId | null) => void
+  advanceDishStep: (dishId: DishId) => void
+  setDishStepReady: (dishId: DishId, ready: boolean) => void
+  setDishPhase: (dishId: DishId, phase: DishState['phase']) => void
 
   // Dining actions
   setDiningPhase: (phase: DiningPhase) => void
@@ -140,6 +152,74 @@ const initialPans: Pan[] = [
   { id: 3, state: 'empty', timer: null, placedAt: null },
 ]
 
+/** Spaghetti recipe steps */
+const SPAGHETTI_STEPS: DishState['steps'] = [
+  { id: 'place_pot',    label: 'Place pot of water', station: 'burner1', description: 'Put a pot of water on the burner' },
+  { id: 'add_pasta',    label: 'Add pasta',          station: 'burner1', description: 'Add spaghetti to boiling water' },
+  { id: 'drain',        label: 'Drain pasta',        station: 'burner1', description: 'Drain the cooked pasta' },
+  { id: 'add_sauce',    label: 'Add sauce',          station: 'spice_rack', description: 'Add tomato sauce' },
+  { id: 'toss',         label: 'Toss pasta',         station: 'burner1', description: 'Toss pasta with sauce' },
+  { id: 'plate',        label: 'Plate spaghetti',    station: 'plating_area', description: 'Plate the finished spaghetti' },
+]
+
+/** Steak recipe steps */
+const STEAK_STEPS: DishState['steps'] = [
+  { id: 'select_steak', label: 'Select steak',    station: 'fridge',        description: 'Get the steak from the fridge' },
+  { id: 'season',       label: 'Season steak',    station: 'cutting_board', description: 'Season and marinate the steak' },
+  { id: 'heat_pan',     label: 'Heat pan',        station: 'burner3',       description: 'Heat up the pan' },
+  { id: 'place_steak',  label: 'Place steak',     station: 'burner3',       description: 'Place steak in hot pan' },
+  { id: 'flip',         label: 'Flip steak',      station: 'burner3',       description: 'Flip to cook other side' },
+  { id: 'remove',       label: 'Remove steak',    station: 'burner3',       description: 'Remove from pan' },
+  { id: 'plate',        label: 'Plate steak',     station: 'plating_area',  description: 'Plate the finished steak' },
+]
+
+/** Tomato soup recipe steps */
+const SOUP_STEPS: DishState['steps'] = [
+  { id: 'select_ingr',  label: 'Select ingredients', station: 'fridge',        description: 'Get onion and tomatoes' },
+  { id: 'chop',         label: 'Chop vegetables',    station: 'cutting_board', description: 'Chop onion and tomato' },
+  { id: 'saute',        label: 'Sauté base',         station: 'burner2',       description: 'Sauté the chopped vegetables' },
+  { id: 'add_water',    label: 'Add water',           station: 'burner2',       description: 'Add water to the pot' },
+  { id: 'stir',         label: 'Stir soup',           station: 'burner2',       description: 'Give the soup a stir' },
+  { id: 'season',       label: 'Add seasoning',       station: 'spice_rack',    description: 'Season the soup' },
+  { id: 'ladle',        label: 'Ladle into bowl',     station: 'plating_area',  description: 'Ladle soup into serving bowl' },
+]
+
+/** Roasted vegetables recipe steps */
+const VEGGIE_STEPS: DishState['steps'] = [
+  { id: 'select_veggies', label: 'Select vegetables',    station: 'fridge',        description: 'Get vegetables from the fridge' },
+  { id: 'chop',           label: 'Chop vegetables',      station: 'cutting_board', description: 'Chop the vegetables' },
+  { id: 'season',         label: 'Season vegetables',    station: 'spice_rack',    description: 'Add oil, salt, and herbs' },
+  { id: 'place_tray',     label: 'Place on baking tray', station: 'oven',          description: 'Arrange on baking tray' },
+  { id: 'set_oven',       label: 'Set oven temperature', station: 'oven',          description: 'Set oven to 200°C' },
+  { id: 'remove_tray',    label: 'Remove from oven',     station: 'oven',          description: 'Take the tray out of the oven' },
+  { id: 'plate',          label: 'Plate vegetables',     station: 'plating_area',  description: 'Plate the roasted vegetables' },
+]
+
+function createInitialDishes(): Record<DishId, DishState> {
+  return {
+    spaghetti: {
+      id: 'spaghetti', label: 'Spaghetti', emoji: '🍝',
+      phase: 'idle', currentStepIndex: 0, steps: SPAGHETTI_STEPS,
+      stepReady: true, startedAt: null, completedAt: null,
+    },
+    steak: {
+      id: 'steak', label: 'Steak', emoji: '🥩',
+      phase: 'idle', currentStepIndex: 0, steps: STEAK_STEPS,
+      stepReady: false, startedAt: null, completedAt: null,
+    },
+    tomato_soup: {
+      id: 'tomato_soup', label: 'Tomato Soup', emoji: '🍅',
+      phase: 'idle', currentStepIndex: 0, steps: SOUP_STEPS,
+      stepReady: false, startedAt: null, completedAt: null,
+    },
+    roasted_vegetables: {
+      id: 'roasted_vegetables', label: 'Roasted Vegetables', emoji: '🥕',
+      phase: 'idle', currentStepIndex: 0, steps: VEGGIE_STEPS,
+      stepReady: false, startedAt: null, completedAt: null,
+    },
+  }
+}
+
 export const useGameStore = create<GameState>((set, get) => ({
   // ── Session ──
   sessionId: null,
@@ -154,9 +234,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   previousRoom: null,
   avatarMoving: false,
 
-  // ── Kitchen ──
+  // ── Kitchen (legacy) ──
   pans: [...initialPans],
   kitchenScore: 0,
+
+  // ── Cooking (new multi-dish) ──
+  dishes: createInitialDishes(),
+  activeStation: null,
 
   // ── Dining ──
   diningPhase: 'idle',
@@ -221,12 +305,69 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setAvatarMoving: (moving) => set({ avatarMoving: moving }),
 
-  // Kitchen
+  // Kitchen (legacy)
   setPans: (pans) => set({ pans }),
   updatePan: (panId, update) => set((s) => ({
     pans: s.pans.map((p) => p.id === panId ? { ...p, ...update } : p),
   })),
   addKitchenScore: (points) => set((s) => ({ kitchenScore: s.kitchenScore + points })),
+
+  // Cooking (new multi-dish)
+  setActiveStation: (station) => set({ activeStation: station }),
+
+  advanceDishStep: (dishId) => {
+    const dishes = get().dishes
+    const dish = dishes[dishId]
+    if (!dish || dish.currentStepIndex >= dish.steps.length) return
+
+    const nextIndex = dish.currentStepIndex + 1
+    const isComplete = nextIndex >= dish.steps.length
+    const now = Date.now()
+
+    // Report action to backend
+    const send = get().wsSend
+    if (send) {
+      const step = dish.steps[dish.currentStepIndex]
+      send({
+        type: 'task_action',
+        data: {
+          task: 'cooking',
+          action: step.id,
+          dish: dishId,
+          step_index: dish.currentStepIndex,
+          timestamp: now / 1000,
+        },
+      })
+    }
+
+    set({
+      dishes: {
+        ...dishes,
+        [dishId]: {
+          ...dish,
+          currentStepIndex: nextIndex,
+          phase: isComplete ? 'plated' : dish.phase === 'idle' ? 'prep' : dish.phase,
+          stepReady: false, // backend must gate the next step
+          startedAt: dish.startedAt ?? now,
+          completedAt: isComplete ? now : null,
+        },
+      },
+    })
+  },
+
+  setDishStepReady: (dishId, ready) => set((s) => ({
+    dishes: {
+      ...s.dishes,
+      [dishId]: { ...s.dishes[dishId], stepReady: ready },
+    },
+  })),
+
+  setDishPhase: (dishId, phase) => set((s) => ({
+    dishes: {
+      ...s.dishes,
+      [dishId]: { ...s.dishes[dishId], phase },
+    },
+  })),
 
   // Dining
   setDiningPhase: (phase) => set({ diningPhase: phase }),
@@ -372,12 +513,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (event === 'place_steak' || event === 'auto_place' || event === 'place_meat') {
         const panId = data.pan as number | undefined
         const pans = get().pans
-
-        // Target a specific pan if specified, otherwise find first empty
         const targetPan = panId
           ? pans.find(p => p.id === panId && p.state === 'empty')
           : pans.find(p => p.state === 'empty')
-
         if (targetPan) {
           set({
             pans: pans.map(p =>
@@ -391,6 +529,21 @@ export const useGameStore = create<GameState>((set, get) => ({
     } else if (task === 'dining') {
       if (event === 'table_ready') {
         set({ diningPhase: 'active' as const })
+      }
+    } else if (task === 'cooking') {
+      // New multi-dish cooking events from backend
+      const dishId = data.dish as DishId | undefined
+      if (!dishId) return
+
+      if (event === 'step_ready') {
+        // Backend signals that the next step can be performed
+        get().setDishStepReady(dishId, true)
+      } else if (event === 'phase_change') {
+        const phase = data.phase as DishState['phase']
+        if (phase) get().setDishPhase(dishId, phase)
+      } else if (event === 'unlock_dish') {
+        // Backend unlocks a dish for cooking
+        get().setDishStepReady(dishId, true)
       }
     }
   },
@@ -417,6 +570,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     avatarMoving: false,
     pans: [...initialPans],
     kitchenScore: 0,
+    dishes: createInitialDishes(),
+    activeStation: null,
     diningPhase: 'idle',
     diningSeats: [{ ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }],
     diningSelectedUtensil: null,

@@ -23,7 +23,7 @@ export interface SessionData {
 
 // ── Rooms ──
 
-export type RoomId = 'kitchen' | 'bedroom' | 'living_room' | 'study' | 'bathroom'
+export type RoomId = 'kitchen' | 'dining_room' | 'living_room' | 'study' | 'bathroom' | 'hallway'
 
 export interface RoomConfig {
   id: RoomId
@@ -32,6 +32,42 @@ export interface RoomConfig {
   y: number
   width: number
   height: number
+}
+
+// ── Cooking ──
+
+export type DishId = 'spaghetti' | 'steak' | 'tomato_soup' | 'roasted_vegetables'
+
+export type KitchenStationId =
+  | 'fridge'
+  | 'cutting_board'
+  | 'spice_rack'
+  | 'burner1'
+  | 'burner2'
+  | 'burner3'
+  | 'oven'
+  | 'plating_area'
+
+export interface CookingStep {
+  id: string
+  label: string
+  station: KitchenStationId
+  description: string
+}
+
+export type DishPhase = 'idle' | 'prep' | 'cooking' | 'waiting' | 'ready' | 'plated' | 'served'
+
+export interface DishState {
+  id: DishId
+  label: string
+  emoji: string
+  phase: DishPhase
+  currentStepIndex: number
+  steps: CookingStep[]
+  /** Whether the next step can be performed (backend may gate transitions) */
+  stepReady: boolean
+  startedAt: number | null
+  completedAt: number | null
 }
 
 // ── PM Tasks ──

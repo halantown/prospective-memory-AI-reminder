@@ -24,7 +24,7 @@ class PMTaskDef:
     trigger_visual: str             # frontend event type
 
     # Target
-    target_room: str                # "study" | "bedroom" | "living_room" | "bathroom"
+    target_room: str                # "study" | "dining_room" | "living_room" | "bathroom"
     target_name: str
     target_visual_desc: str
     target_image: str               # encoding card image filename
@@ -89,7 +89,7 @@ B1_GIFTBAG = PMTaskDef(
     trigger_event="Phone message: delivery notification",
     trigger_audio="phone_notification.mp3",
     trigger_visual="phone_message_banner",
-    target_room="bedroom",
+    target_room="dining_room",
     target_name="Small blue gift bag with bow",
     target_visual_desc="Small blue gift bag, bow decoration on handle",
     target_image="b1_giftbag_target.png",
@@ -101,7 +101,7 @@ B1_GIFTBAG = PMTaskDef(
     action_destination="living_room",
     encoding_text=(
         "You ordered a birthday gift for Mei online. When the delivery notification "
-        "arrives on your phone, go to the bedroom and get a gift bag from the dresser — "
+        "arrives on your phone, go to the dining room and get a gift bag from the dresser — "
         "the small blue bag with the bow. Bring it to the entrance to bag the gift."
     ),
     quiz_question="Which gift bag do you need?",
@@ -212,7 +212,7 @@ B2_NAPKINRINGS = PMTaskDef(
     trigger_event="Table fully set (16 items placed, reset triggered)",
     trigger_audio="task_complete_chime.mp3",
     trigger_visual="table_complete",
-    target_room="bedroom",
+    target_room="dining_room",
     target_name="Wooden napkin rings",
     target_visual_desc="Set of 4 natural wood napkin rings, light oak color",
     target_image="b2_napkinrings_target.png",
@@ -223,7 +223,7 @@ B2_NAPKINRINGS = PMTaskDef(
     action_description="Place on napkins at each seat",
     action_destination="kitchen",
     encoding_text=(
-        "After you finish setting the table for the first time, go to the bedroom "
+        "After you finish setting the table for the first time, go to the dining room "
         "and get the napkin rings from the wardrobe, top drawer — the set with "
         "wooden rings. Place them on the napkins at each seat."
     ),
@@ -362,7 +362,7 @@ B3_VASE = PMTaskDef(
     trigger_event="Doorbell — Sophie arrives with flowers",
     trigger_audio="doorbell.mp3",
     trigger_visual="visitor_arrival",
-    target_room="bedroom",
+    target_room="dining_room",
     target_name="Small blue glazed ceramic vase",
     target_visual_desc="Small ceramic vase, smooth blue glaze",
     target_image="b3_vase_target.png",
@@ -374,7 +374,7 @@ B3_VASE = PMTaskDef(
     action_destination="kitchen",
     encoding_text=(
         "Sophie mentioned she would bring flowers. When she arrives with them, go to "
-        "the bedroom and get the vase from the windowsill — the small ceramic vase "
+        "the dining room and get the vase from the windowsill — the small ceramic vase "
         "with blue glaze. Fill it with water in the kitchen and arrange the flowers."
     ),
     quiz_question="What color is the glaze on the vase?",

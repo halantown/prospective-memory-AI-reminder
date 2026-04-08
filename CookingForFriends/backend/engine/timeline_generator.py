@@ -82,7 +82,7 @@ def generate_block_timeline(
     events.append({
         "t": 5,
         "type": "ongoing_task_event",
-        "data": {"task": "dining", "event": "table_ready", "room": "bedroom"},
+        "data": {"task": "dining", "event": "table_ready", "room": "dining_room"},
     })
 
     # ── PM reminders + triggers ──

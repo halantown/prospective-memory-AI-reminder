@@ -88,7 +88,7 @@ export const FLOOR_STYLES: Record<string, { backgroundColor: string; backgroundI
       'repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(100,120,140,0.07) 19px, rgba(100,120,140,0.07) 20px)',
     ].join(', '),
   },
-  bedroom: {
+  dining_room: {
     backgroundColor: '#2D2822',
     backgroundImage:
       'repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(120,100,80,0.06) 39px, rgba(120,100,80,0.06) 40px)',
@@ -103,5 +103,12 @@ export const FLOOR_STYLES: Record<string, { backgroundColor: string; backgroundI
   },
   bathroom: {
     backgroundColor: '#283028',
+  },
+  hallway: {
+    backgroundColor: '#2A2D30',
+    backgroundImage: [
+      'repeating-linear-gradient(0deg, transparent, transparent 29px, rgba(100,110,120,0.06) 29px, rgba(100,110,120,0.06) 30px)',
+      'repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(100,110,120,0.06) 29px, rgba(100,110,120,0.06) 30px)',
+    ].join(', '),
   },
 }

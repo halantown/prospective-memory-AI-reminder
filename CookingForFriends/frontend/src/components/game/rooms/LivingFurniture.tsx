@@ -7,7 +7,7 @@ export default function LivingFurniture() {
     <svg
       className="absolute inset-0 w-full h-full"
       viewBox="0 0 400 300"
-      preserveAspectRatio="none"
+      preserveAspectRatio="xMidYMid meet"
     >
       {/* ── TV (top) ── */}
       <rect x="95" y="12" width="200" height="14" rx="2" fill={C.tv} />
