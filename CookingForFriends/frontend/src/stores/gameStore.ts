@@ -477,7 +477,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   })),
   setRecipeTabBounce: (bounce) => set({ recipeTabBounce: bounce }),
   addLockSystemNotification: (notif) => set((s) => ({
-    lockSystemNotifications: [...s.lockSystemNotifications, notif],
+    lockSystemNotifications: [...s.lockSystemNotifications, notif].slice(-2),
   })),
 
   // Robot
