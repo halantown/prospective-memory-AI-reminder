@@ -121,40 +121,45 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
 
       case 'phone_message': {
         const now = Date.now()
-        const category = (data.category as string) || 'notification'
-        const contactId = (data.contact_id as string) || '_system'
+        const channel = (data.channel as string) || 'notification'
+        const contactId = (data.contact_id as string) || undefined
 
-        // Ignore pm_trigger messages in the chat UI
-        if (category === 'notification' && contactId === '_system' && (data.id as string)?.startsWith('pm_trigger')) {
+        // Notification messages → banner only, never stored as chat
+        if (channel === 'notification') {
+          const bannerMsg = {
+            id: data.id as string,
+            text: data.text as string,
+            channel: 'notification' as const,
+            sender: data.sender as string,
+            timestamp: now,
+            read: false,
+            answered: false,
+          }
+          store.setPhoneBanner(bannerMsg)
           break
         }
 
+        // Chat message → store and conditionally show banner
         const phoneMsg = {
           id: data.id as string,
-          sender: data.sender as string,
-          avatar: (data.avatar as string) || '💬',
           text: data.text as string,
-          category: category as 'question' | 'notification',
+          channel: 'chat' as const,
           contactId,
-          choices: data.choices as string[] | undefined,
-          correctIndex: data.correct_index as number | undefined,
+          correctChoice: data.correct_choice as string | undefined,
+          wrongChoice: data.wrong_choice as string | undefined,
+          correctPosition: (data.correct_position as number | null) ?? null,
           feedbackCorrect: data.feedback_correct as string | undefined,
           feedbackIncorrect: data.feedback_incorrect as string | undefined,
           timestamp: now,
-          status: 'active' as const,
           read: false,
+          answered: false,
         }
         store.addPhoneMessage(phoneMsg)
 
-        // Show banner when:
-        //  - Phone is locked, OR
-        //  - On recipe tab, OR
-        //  - Viewing a different contact's chat, OR
-        //  - System notification (always banner, never in chat)
+        // Show banner when not viewing this contact's chat
         const isActiveChat = !store.phoneLocked
           && store.activePhoneTab === 'chats'
           && contactId === store.activeContactId
-          && contactId !== '_system'
         if (!isActiveChat) {
           store.setPhoneBanner(phoneMsg)
         }

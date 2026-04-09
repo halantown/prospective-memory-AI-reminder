@@ -12,7 +12,7 @@ export default function PhoneTabBar() {
   const wsSend = useGameStore((s) => s.wsSend)
 
   const totalUnread = useMemo(() => {
-    return phoneMessages.filter((m) => m.status === 'active' && !m.read && m.contactId !== '_system').length
+    return phoneMessages.filter((m) => m.channel === 'chat' && !m.read).length
   }, [phoneMessages])
 
   const handleTabClick = (tab: 'chats' | 'recipe') => {

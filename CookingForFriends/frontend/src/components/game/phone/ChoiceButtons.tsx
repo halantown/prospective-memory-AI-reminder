@@ -1,51 +1,62 @@
-/** Choice buttons — inline reply buttons for question messages. */
+/** Choice buttons — inline reply buttons with randomized answer position. */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 
 interface ChoiceButtonsProps {
-  choices: string[]
-  correctIndex?: number
-  disabled: boolean
-  selectedIndex?: number
-  onChoose: (index: number) => void
+  correctChoice: string
+  wrongChoice: string
+  /** null = frontend randomizes; 0 = correct first; 1 = correct second */
+  correctPosition?: number | null
+  onChoose: (chosenText: string, isCorrect: boolean, correctPositionShown: number) => void
 }
 
 export default function ChoiceButtons({
-  choices,
-  correctIndex,
-  disabled,
-  selectedIndex,
+  correctChoice,
+  wrongChoice,
+  correctPosition,
   onChoose,
 }: ChoiceButtonsProps) {
+  // Randomize button order once on first render; stable across re-renders
+  const resolvedPosition = useMemo(() => {
+    if (correctPosition === 0 || correctPosition === 1) return correctPosition
+    return Math.random() < 0.5 ? 0 : 1
+  }, [correctPosition])
+
+  const buttons = useMemo(() => {
+    return resolvedPosition === 0
+      ? [correctChoice, wrongChoice]
+      : [wrongChoice, correctChoice]
+  }, [resolvedPosition, correctChoice, wrongChoice])
+
   const [flashIndex, setFlashIndex] = useState<number | null>(null)
   const [flashType, setFlashType] = useState<'correct' | 'incorrect' | null>(null)
+  const [answered, setAnswered] = useState(false)
 
   const handleClick = useCallback((idx: number) => {
-    if (disabled) return
-    const isCorrect = correctIndex !== undefined && idx === correctIndex
+    if (answered) return
+    const chosenText = buttons[idx]
+    const isCorrect = chosenText === correctChoice
     setFlashIndex(idx)
     setFlashType(isCorrect ? 'correct' : 'incorrect')
-    onChoose(idx)
+    setAnswered(true)
+    onChoose(chosenText, isCorrect, resolvedPosition)
 
     setTimeout(() => {
       setFlashIndex(null)
       setFlashType(null)
     }, 600)
-  }, [disabled, correctIndex, onChoose])
-
-  const isAnswered = selectedIndex !== undefined
+  }, [answered, buttons, correctChoice, onChoose, resolvedPosition])
 
   return (
     <div className="flex gap-2 mt-1.5">
-      {choices.map((choice, idx) => {
-        const isSelected = selectedIndex === idx
+      {buttons.map((text, idx) => {
         const isFlashing = flashIndex === idx
 
         let bgClass = 'bg-blue-600/15 text-blue-200 border-blue-500/25 hover:bg-blue-600/30 hover:border-blue-400/40'
 
-        if (isAnswered) {
-          if (isSelected) {
+        if (answered) {
+          if (flashIndex === idx) {
             bgClass = flashType === 'correct'
               ? 'bg-green-500/30 text-green-200 border-green-400/50'
               : 'bg-red-500/30 text-red-200 border-red-400/50'
@@ -58,15 +69,15 @@ export default function ChoiceButtons({
           <motion.button
             key={idx}
             onClick={() => handleClick(idx)}
-            disabled={disabled}
+            disabled={answered}
             animate={isFlashing ? { scale: [1, 1.05, 1] } : {}}
             transition={{ duration: 0.2 }}
             className={`flex-1 py-2 px-2 text-[11px] font-medium rounded-xl
                        border transition-colors leading-tight
                        ${bgClass}
-                       ${disabled ? 'cursor-default' : 'active:scale-95 cursor-pointer'}`}
+                       ${answered ? 'cursor-default' : 'active:scale-95 cursor-pointer'}`}
           >
-            {choice}
+            {text}
           </motion.button>
         )
       })}

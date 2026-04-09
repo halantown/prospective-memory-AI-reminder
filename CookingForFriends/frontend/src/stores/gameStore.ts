@@ -111,7 +111,8 @@ interface GameState {
   setPhoneLocked: (locked: boolean) => void
   markNotificationRead: (id: string) => void
   markMessageRead: (id: string) => void
-  answerPhoneMessage: (messageId: string, choiceIndex: number) => void
+  markContactMessagesRead: (contactId: string) => void
+  answerPhoneMessage: (messageId: string, chosenText: string, isCorrect: boolean) => void
   expirePhoneMessage: (id: string) => void
   removePhoneMessage: (id: string) => void
   setPhoneBanner: (msg: PhoneMessage | null) => void
@@ -432,23 +433,26 @@ export const useGameStore = create<GameState>((set, get) => ({
       m.id === id ? { ...m, read: true } : m
     ),
   })),
-  answerPhoneMessage: (messageId, choiceIndex) => set((s) => ({
+  markContactMessagesRead: (contactId) => set((s) => ({
+    phoneMessages: s.phoneMessages.map((m) =>
+      m.contactId === contactId && !m.read ? { ...m, read: true } : m
+    ),
+  })),
+  answerPhoneMessage: (messageId, chosenText, isCorrect) => set((s) => ({
     phoneMessages: s.phoneMessages.map((m) => {
-      if (m.id !== messageId || m.status !== 'active') return m
-      const isCorrect = m.correctIndex !== undefined && choiceIndex === m.correctIndex
+      if (m.id !== messageId || m.answered) return m
       return {
         ...m,
-        status: (isCorrect ? 'answered_correct' : 'answered_incorrect') as PhoneMessage['status'],
-        userChoice: choiceIndex,
+        answered: true,
+        answeredCorrect: isCorrect,
+        userChoice: chosenText,
         respondedAt: Date.now(),
       }
     }),
   })),
-  expirePhoneMessage: (id) => set((s) => ({
-    phoneMessages: s.phoneMessages.map((m) =>
-      m.id === id && m.status === 'active' ? { ...m, status: 'dismissed' as const } : m
-    ),
-  })),
+  expirePhoneMessage: (_id) => {
+    // No-op in chat mode — messages persist in conversation
+  },
   removePhoneMessage: (id) => set((s) => ({
     phoneMessages: s.phoneMessages.filter((m) => m.id !== id),
   })),

@@ -2,7 +2,7 @@
  *
  *  Two roles:
  *  1. System notifications (weather, battery, delivery) — auto-dismiss 3s, no contact nav.
- *  2. Cross-contact message alerts — shows avatar + sender + preview. Tap → navigate to contact.
+ *  2. Cross-contact chat alerts — shows sender + preview. Tap → navigate to contact.
  *
  *  Shows on lock screen too (on top of lock screen content). */
 
@@ -14,6 +14,7 @@ const BANNER_DURATION = 3_000
 
 export default function NotificationBanner() {
   const banner = useGameStore((s) => s.phoneBanner)
+  const contacts = useGameStore((s) => s.contacts)
   const setBanner = useGameStore((s) => s.setPhoneBanner)
   const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
   const setActiveContactId = useGameStore((s) => s.setActiveContactId)
@@ -32,12 +33,19 @@ export default function NotificationBanner() {
     }
   }, [banner, setBanner])
 
+  // Derive display info from banner
+  const contact = banner?.channel === 'chat' && banner.contactId
+    ? contacts.find((c) => c.id === banner.contactId)
+    : null
+  const displayName = contact?.name || banner?.sender || 'System'
+  const displayAvatar = contact?.avatar || '📱'
+
   const handleClick = useCallback(() => {
     if (!banner) return
     if (timerRef.current) clearTimeout(timerRef.current)
 
-    // If from a real contact (not _system), navigate to that chat
-    if (banner.contactId && banner.contactId !== '_system') {
+    // If from a real contact (chat channel), navigate to that chat
+    if (banner.channel === 'chat' && banner.contactId) {
       setPhoneLocked(false)
       setActivePhoneTab('chats')
       setActiveContactId(banner.contactId)
@@ -66,11 +74,11 @@ export default function NotificationBanner() {
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-full bg-blue-500/70 flex items-center justify-center
                             text-sm font-bold text-white ring-2 ring-blue-400/40">
-              {banner.avatar}
+              {displayAvatar}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-white">{banner.sender}</span>
+                <span className="text-xs font-bold text-white">{displayName}</span>
                 <span className="text-[9px] text-blue-400 font-medium">now</span>
               </div>
               <p className="text-[11px] text-slate-200 truncate mt-0.5">{banner.text}</p>

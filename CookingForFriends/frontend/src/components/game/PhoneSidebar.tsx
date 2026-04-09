@@ -43,7 +43,7 @@ export default function PhoneSidebar() {
   const [panelPulse, setPanelPulse] = useState(false)
 
   const unreadCount = useMemo(
-    () => phoneMessages.filter((m) => m.status === 'active' && !m.read && m.contactId !== '_system').length,
+    () => phoneMessages.filter((m) => m.channel === 'chat' && !m.read).length,
     [phoneMessages],
   )
 
@@ -78,9 +78,9 @@ export default function PhoneSidebar() {
     // Auto-navigate to contact with oldest unread
     if (!activeContactId) {
       const unreadMessages = phoneMessages
-        .filter((m) => m.status === 'active' && !m.read && m.contactId !== '_system')
+        .filter((m) => m.channel === 'chat' && !m.read)
         .sort((a, b) => a.timestamp - b.timestamp)
-      if (unreadMessages.length > 0) {
+      if (unreadMessages.length > 0 && unreadMessages[0].contactId) {
         setActiveContactId(unreadMessages[0].contactId)
       } else if (contacts.length > 0) {
         setActiveContactId(contacts[0].id)

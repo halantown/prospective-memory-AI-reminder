@@ -23,15 +23,16 @@ export default function LockScreen({
     const grouped: Record<string, { contact: Contact | null; count: number; latest: PhoneMessage }> = {}
 
     const activeUnread = phoneMessages
-      .filter((m) => m.status === 'active' && !m.read && m.contactId !== '_system')
+      .filter((m) => m.channel === 'chat' && !m.read)
       .sort((a, b) => b.timestamp - a.timestamp)
 
     for (const msg of activeUnread) {
-      if (!grouped[msg.contactId]) {
-        const contact = contacts.find((c) => c.id === msg.contactId) || null
-        grouped[msg.contactId] = { contact, count: 0, latest: msg }
+      const cid = msg.contactId || '_unknown'
+      if (!grouped[cid]) {
+        const contact = contacts.find((c) => c.id === cid) || null
+        grouped[cid] = { contact, count: 0, latest: msg }
       }
-      grouped[msg.contactId].count++
+      grouped[cid].count++
     }
 
     return Object.values(grouped)
@@ -61,26 +62,26 @@ export default function LockScreen({
           <AnimatePresence>
             {contactPreviews.map((preview, idx) => (
               <motion.div
-                key={preview.latest.contactId}
+                key={preview.latest.contactId || idx}
                 initial={{ opacity: 0, y: -8, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: idx * 0.04, type: 'spring', stiffness: 280, damping: 22 }}
                 onClick={(e) => {
                   e.stopPropagation()
-                  handlePreviewClick(preview.latest.contactId)
+                  if (preview.latest.contactId) handlePreviewClick(preview.latest.contactId)
                 }}
                 className="flex items-center gap-2 rounded-xl px-2.5 py-2 cursor-pointer
                            bg-slate-800/60 border border-slate-700/40 backdrop-blur-sm"
               >
                 <div className="w-7 h-7 rounded-full bg-blue-600/50 flex items-center justify-center
                                 text-xs font-bold text-blue-100 flex-shrink-0">
-                  {preview.contact?.avatar || preview.latest.avatar}
+                  {preview.contact?.avatar || '💬'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1">
                     <span className="text-[10px] font-semibold text-blue-300 leading-none">
-                      {preview.contact?.name || preview.latest.sender}
+                      {preview.contact?.name || 'Unknown'}
                     </span>
                     {preview.count > 1 && (
                       <span className="text-[8px] bg-red-500/80 text-white px-1 rounded-full font-bold">

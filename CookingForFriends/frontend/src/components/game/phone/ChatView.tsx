@@ -14,7 +14,7 @@ export default function ChatView() {
   const contacts = useGameStore((s) => s.contacts)
   const phoneMessages = useGameStore((s) => s.phoneMessages)
   const answerPhoneMessage = useGameStore((s) => s.answerPhoneMessage)
-  const markMessageRead = useGameStore((s) => s.markMessageRead)
+  const markContactMessagesRead = useGameStore((s) => s.markContactMessagesRead)
   const wsSend = useGameStore((s) => s.wsSend)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -32,24 +32,24 @@ export default function ChatView() {
   const contactMessages = useMemo(() => {
     if (!activeContactId) return []
     return phoneMessages
-      .filter((m) => m.contactId === activeContactId)
+      .filter((m) => m.channel === 'chat' && m.contactId === activeContactId)
       .sort((a, b) => a.timestamp - b.timestamp)
   }, [phoneMessages, activeContactId])
 
-  // Mark messages as read when viewing
+  // Mark all messages as read when viewing a contact
   useEffect(() => {
     if (!activeContactId) return
-    const unread = contactMessages.filter((m) => !m.read && m.status === 'active')
-    for (const msg of unread) {
-      markMessageRead(msg.id)
+    const hasUnread = contactMessages.some((m) => !m.read)
+    if (hasUnread) {
+      markContactMessagesRead(activeContactId)
       if (wsSend) {
         wsSend({
           type: 'phone_read',
-          data: { message_id: msg.id, contact_id: activeContactId, timestamp: Date.now() / 1000 },
+          data: { contact_id: activeContactId, timestamp: Date.now() / 1000 },
         })
       }
     }
-  }, [contactMessages, activeContactId, markMessageRead, wsSend])
+  }, [contactMessages, activeContactId, markContactMessagesRead, wsSend])
 
   // Auto-scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -71,20 +71,22 @@ export default function ChatView() {
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
-    // If user is near bottom (within 40px), we're not "manually scrolled"
     userScrolledRef.current = scrollHeight - scrollTop - clientHeight > 40
   }, [])
 
-  const handleAnswer = useCallback((msg: PhoneMessage, choiceIndex: number) => {
-    if (msg.status !== 'active' || msg.category !== 'question') return
-    answerPhoneMessage(msg.id, choiceIndex)
+  const handleAnswer = useCallback((msg: PhoneMessage, chosenText: string, isCorrect: boolean, correctPositionShown: number) => {
+    if (msg.answered || msg.channel !== 'chat') return
+    answerPhoneMessage(msg.id, chosenText, isCorrect)
 
     if (wsSend) {
       wsSend({
         type: 'phone_reply',
         data: {
           message_id: msg.id,
-          choice_index: choiceIndex,
+          contact_id: msg.contactId,
+          chosen_text: chosenText,
+          is_correct: isCorrect,
+          correct_position_shown: correctPositionShown,
           timestamp: Date.now() / 1000,
         },
       })
@@ -130,7 +132,9 @@ export default function ChatView() {
                 key={msg.id}
                 msg={msg}
                 feedbackVisible={feedbackVisible.has(msg.id)}
-                onAnswer={(idx) => handleAnswer(msg, idx)}
+                onAnswer={(chosenText, isCorrect, correctPositionShown) =>
+                  handleAnswer(msg, chosenText, isCorrect, correctPositionShown)
+                }
               />
             ))}
           </AnimatePresence>
@@ -149,50 +153,42 @@ function MessageGroup({
 }: {
   msg: PhoneMessage
   feedbackVisible: boolean
-  onAnswer: (choiceIndex: number) => void
+  onAnswer: (chosenText: string, isCorrect: boolean, correctPositionShown: number) => void
 }) {
-  const isAnswered = msg.status === 'answered_correct' || msg.status === 'answered_incorrect'
+  const isAnswered = msg.answered === true
   const [flashResult, setFlashResult] = useState<'correct' | 'incorrect' | null>(null)
 
   // Determine feedback text
-  const feedbackText = msg.status === 'answered_correct'
-    ? msg.feedbackCorrect
-    : msg.status === 'answered_incorrect'
-      ? msg.feedbackIncorrect
-      : undefined
-
-  // Participant's chosen text
-  const participantChoice = isAnswered && msg.userChoice !== undefined && msg.choices
-    ? msg.choices[msg.userChoice]
+  const feedbackText = isAnswered
+    ? (msg.answeredCorrect ? msg.feedbackCorrect : msg.feedbackIncorrect)
     : undefined
 
   // Flash the participant bubble border briefly on answer
   useEffect(() => {
-    if (!isAnswered || msg.userChoice === undefined) return
-    const result = msg.status === 'answered_correct' ? 'correct' : 'incorrect'
+    if (!isAnswered) return
+    const result = msg.answeredCorrect ? 'correct' : 'incorrect'
     setFlashResult(result)
     const timer = setTimeout(() => setFlashResult(null), 600)
     return () => clearTimeout(timer)
-  }, [isAnswered, msg.status, msg.userChoice])
+  }, [isAnswered, msg.answeredCorrect])
 
   return (
     <div className="flex flex-col gap-1">
       <ChatBubble text={msg.text} variant="friend" />
 
-      {/* Choice buttons — only shown before answering */}
-      {msg.category === 'question' && msg.choices && !isAnswered && (
+      {/* Choice buttons — only shown before answering for chat messages with choices */}
+      {msg.correctChoice && msg.wrongChoice && !isAnswered && (
         <ChoiceButtons
-          choices={msg.choices}
-          correctIndex={msg.correctIndex}
-          disabled={false}
-          selectedIndex={undefined}
+          correctChoice={msg.correctChoice}
+          wrongChoice={msg.wrongChoice}
+          correctPosition={msg.correctPosition}
           onChoose={onAnswer}
         />
       )}
 
       {/* Participant's reply bubble (right-aligned) */}
-      {participantChoice && (
-        <ChatBubble text={participantChoice} variant="participant" flashResult={flashResult} />
+      {isAnswered && msg.userChoice && (
+        <ChatBubble text={msg.userChoice} variant="participant" flashResult={flashResult} />
       )}
 
       {/* Feedback bubble from friend (appears after delay) */}

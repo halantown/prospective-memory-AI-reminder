@@ -184,20 +184,24 @@ export interface Contact {
 
 export interface PhoneMessage {
   id: string
-  sender: string
-  avatar: string
   text: string
-  category: 'question' | 'notification'
-  contactId: string
-  choices?: string[]
-  correctIndex?: number
+  channel: 'chat' | 'notification'
+  // Chat-specific fields (channel === 'chat')
+  contactId?: string
+  correctChoice?: string
+  wrongChoice?: string
+  correctPosition?: number | null  // null = frontend randomizes, 0|1 = forced
   feedbackCorrect?: string
   feedbackIncorrect?: string
+  // Notification-specific fields (channel === 'notification')
+  sender?: string
+  // State tracking
   timestamp: number
-  status: 'active' | 'answered_correct' | 'answered_incorrect' | 'dismissed'
   read: boolean
+  answered: boolean
+  answeredCorrect?: boolean
   respondedAt?: number
-  userChoice?: number
+  userChoice?: string  // the actual text the participant chose
 }
 
 /** @deprecated Use PhoneMessage instead — kept for backward compat with old phone_notification events */
