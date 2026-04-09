@@ -4,13 +4,13 @@ import { create } from 'zustand'
 import type {
   Phase, Condition, RoomId, Pan, PhoneNotification, PhoneMessage, RobotState, SessionData,
   ActivePMTrial, PMTaskConfig, DiningPhase, SteakState, SeatState, UtensilType,
-  DishId, DishState, KitchenStationId,
+  DishId, DishState, KitchenStationId, Contact,
 } from '../types'
 
 const EMPTY_SEAT: SeatState = { plate: false, knife: false, fork: false, glass: false }
 
-/** Max visible phone messages — when a new one arrives and we're at max, oldest gets dismissed. */
-const MAX_PHONE_MESSAGES = 5
+/** Max visible phone messages — unused in chat mode but kept for backward compat. */
+const MAX_PHONE_MESSAGES = 50
 
 interface GameState {
   // ── Session ──
@@ -51,6 +51,11 @@ interface GameState {
   phoneLocked: boolean
   phoneLastActivity: number
   phoneBanner: PhoneMessage | null
+  contacts: Contact[]
+  activeContactId: string | null
+  activePhoneTab: 'chats' | 'recipe'
+  kitchenTimerQueue: Array<{ id: string; icon: string; message: string; appearedAt: number }>
+  recipeTabBounce: boolean
 
   // ── Robot ──
   robot: RobotState
@@ -110,6 +115,12 @@ interface GameState {
   expirePhoneMessage: (id: string) => void
   removePhoneMessage: (id: string) => void
   setPhoneBanner: (msg: PhoneMessage | null) => void
+  setContacts: (contacts: Contact[]) => void
+  setActiveContactId: (id: string | null) => void
+  setActivePhoneTab: (tab: 'chats' | 'recipe') => void
+  pushKitchenTimer: (timer: { id: string; icon: string; message: string }) => void
+  dismissKitchenTimer: () => void
+  setRecipeTabBounce: (bounce: boolean) => void
 
   // Robot actions
   setRobotSpeaking: (text: string) => void
@@ -258,6 +269,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   phoneLocked: true,
   phoneLastActivity: Date.now(),
   phoneBanner: null,
+  contacts: [],
+  activeContactId: null,
+  activePhoneTab: 'chats',
+  kitchenTimerQueue: [],
+  recipeTabBounce: false,
 
   // ── Robot ──
   robot: { room: 'kitchen', speaking: false, text: '', visible: true },
@@ -399,15 +415,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // Phone
   addPhoneMessage: (msg) => set((s) => {
-    let messages = [...s.phoneMessages, msg]
-    // Enforce max visible: dismiss oldest active if over limit
-    const active = messages.filter(m => m.status === 'active')
-    if (active.length > MAX_PHONE_MESSAGES) {
-      const oldest = active[0]
-      messages = messages.map(m =>
-        m.id === oldest.id ? { ...m, status: 'dismissed' as const } : m
-      )
-    }
+    const messages = [...s.phoneMessages, msg]
     return { phoneMessages: messages }
   }),
   addPhoneNotification: (notif) => set((s) => ({
@@ -445,6 +453,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     phoneMessages: s.phoneMessages.filter((m) => m.id !== id),
   })),
   setPhoneBanner: (msg) => set({ phoneBanner: msg }),
+  setContacts: (contacts) => set({ contacts }),
+  setActiveContactId: (id) => set({ activeContactId: id }),
+  setActivePhoneTab: (tab) => set({ activePhoneTab: tab }),
+  pushKitchenTimer: (timer) => set((s) => ({
+    kitchenTimerQueue: [...s.kitchenTimerQueue, { ...timer, appearedAt: Date.now() }],
+  })),
+  dismissKitchenTimer: () => set((s) => ({
+    kitchenTimerQueue: s.kitchenTimerQueue.slice(1),
+  })),
+  setRecipeTabBounce: (bounce) => set({ recipeTabBounce: bounce }),
 
   // Robot
   setRobotSpeaking: (text) => set((s) => ({
@@ -582,6 +600,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     phoneNotifications: [],
     phoneLocked: true,
     phoneBanner: null,
+    contacts: [],
+    activeContactId: null,
+    activePhoneTab: 'chats',
+    kitchenTimerQueue: [],
+    recipeTabBounce: false,
     robot: { room: 'kitchen', speaking: false, text: '', visible: true },
     activePMTrials: [],
     completedPMTrialIds: new Set(),

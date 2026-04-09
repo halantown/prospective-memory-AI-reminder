@@ -176,14 +176,23 @@ export interface Pan {
 
 // ── Phone ──
 
+export interface Contact {
+  id: string
+  name: string
+  avatar: string  // emoji
+}
+
 export interface PhoneMessage {
   id: string
   sender: string
   avatar: string
   text: string
   category: 'question' | 'notification'
+  contactId: string
   choices?: string[]
   correctIndex?: number
+  feedbackCorrect?: string
+  feedbackIncorrect?: string
   timestamp: number
   status: 'active' | 'answered_correct' | 'answered_incorrect' | 'dismissed'
   read: boolean
