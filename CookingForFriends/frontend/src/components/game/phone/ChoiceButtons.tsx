@@ -40,12 +40,11 @@ export default function ChoiceButtons({
     setFlashIndex(idx)
     setFlashType(isCorrect ? 'correct' : 'incorrect')
     setAnswered(true)
-    onChoose(chosenText, isCorrect, resolvedPosition)
 
+    // Delay store update so the green/red flash is visible before buttons unmount
     setTimeout(() => {
-      setFlashIndex(null)
-      setFlashType(null)
-    }, 600)
+      onChoose(chosenText, isCorrect, resolvedPosition)
+    }, 500)
   }, [answered, buttons, correctChoice, onChoose, resolvedPosition])
 
   return (

@@ -21,9 +21,9 @@ export default function ChatBubble({ text, variant = 'friend', flashResult }: Ch
       : 'bg-slate-700/50 text-slate-200'
 
   const borderFlash = flashResult === 'correct'
-    ? 'ring-2 ring-green-400'
+    ? 'ring-2 ring-green-400 ring-offset-1 ring-offset-slate-800'
     : flashResult === 'incorrect'
-      ? 'ring-2 ring-red-400'
+      ? 'ring-2 ring-red-400 ring-offset-1 ring-offset-slate-800'
       : ''
 
   return (
