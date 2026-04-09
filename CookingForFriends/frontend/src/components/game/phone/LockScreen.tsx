@@ -55,38 +55,6 @@ export default function LockScreen({
       {/* Scrollable notifications area */}
       <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-0 scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
 
-      {/* System notifications */}
-      {hasSysNotifs && (
-        <div className="mb-2">
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="flex-1 h-px bg-slate-600/60" />
-            <span className="text-[9px] text-slate-400 font-medium uppercase tracking-widest whitespace-nowrap">
-              System
-            </span>
-            <div className="flex-1 h-px bg-slate-600/60" />
-          </div>
-          <div className="flex flex-col gap-1">
-            {lockSystemNotifications.map((notif) => (
-              <div
-                key={notif.id}
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-start gap-2 rounded-xl px-2.5 py-2
-                           bg-slate-800/55 border border-slate-700/35 backdrop-blur-sm"
-              >
-                <div className="w-6 h-6 rounded-lg bg-slate-700/70 flex items-center justify-center
-                                text-xs flex-shrink-0 mt-0.5">
-                  📱
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[9px] font-semibold text-slate-300 leading-none">{notif.sender}</span>
-                  <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{notif.text}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Chat messages */}
       {hasChatNotifs && (
         <div className="mb-2">
@@ -130,6 +98,38 @@ export default function LockScreen({
                   </p>
                 </div>
               </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* System notifications */}
+      {hasSysNotifs && (
+        <div className="mb-2">
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex-1 h-px bg-slate-600/60" />
+            <span className="text-[9px] text-slate-400 font-medium uppercase tracking-widest whitespace-nowrap">
+              System
+            </span>
+            <div className="flex-1 h-px bg-slate-600/60" />
+          </div>
+          <div className="flex flex-col gap-1">
+            {lockSystemNotifications.map((notif) => (
+              <div
+                key={notif.id}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-start gap-2 rounded-xl px-2.5 py-2
+                           bg-slate-800/55 border border-slate-700/35 backdrop-blur-sm"
+              >
+                <div className="w-6 h-6 rounded-lg bg-slate-700/70 flex items-center justify-center
+                                text-xs flex-shrink-0 mt-0.5">
+                  📱
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9px] font-semibold text-slate-300 leading-none">{notif.sender}</span>
+                  <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{notif.text}</p>
+                </div>
+              </div>
             ))}
           </div>
         </div>

@@ -114,6 +114,7 @@ interface GameState {
   markMessageRead: (id: string) => void
   markContactMessagesRead: (contactId: string) => void
   answerPhoneMessage: (messageId: string, chosenText: string, isCorrect: boolean) => void
+  showMessageFeedback: (messageId: string) => void
   expirePhoneMessage: (id: string) => void
   removePhoneMessage: (id: string) => void
   setPhoneBanner: (msg: PhoneMessage | null) => void
@@ -452,6 +453,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         respondedAt: Date.now(),
       }
     }),
+  })),
+  showMessageFeedback: (messageId) => set((s) => ({
+    phoneMessages: s.phoneMessages.map((m) =>
+      m.id === messageId ? { ...m, feedbackVisible: true } : m
+    ),
   })),
   expirePhoneMessage: (_id) => {
     // No-op in chat mode — messages persist in conversation

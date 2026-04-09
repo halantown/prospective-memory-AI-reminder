@@ -1,6 +1,6 @@
 /** Chat view — WhatsApp-style message thread for a single contact. */
 
-import { useEffect, useRef, useMemo, useCallback, useState } from 'react'
+import { useEffect, useRef, useMemo, useCallback } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
 import type { PhoneMessage } from '../../../types'
@@ -14,14 +14,12 @@ export default function ChatView() {
   const contacts = useGameStore((s) => s.contacts)
   const phoneMessages = useGameStore((s) => s.phoneMessages)
   const answerPhoneMessage = useGameStore((s) => s.answerPhoneMessage)
+  const showMessageFeedback = useGameStore((s) => s.showMessageFeedback)
   const markContactMessagesRead = useGameStore((s) => s.markContactMessagesRead)
   const wsSend = useGameStore((s) => s.wsSend)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const userScrolledRef = useRef(false)
-
-  // Track which messages have feedback visible (after delay)
-  const [feedbackVisible, setFeedbackVisible] = useState<Set<string>>(new Set())
 
   const activeContact = useMemo(
     () => contacts.find((c) => c.id === activeContactId),
@@ -60,7 +58,7 @@ export default function ChatView() {
 
   useEffect(() => {
     scrollToBottom()
-  }, [contactMessages, feedbackVisible, scrollToBottom])
+  }, [contactMessages, scrollToBottom])
 
   // Reset scroll tracking on contact switch
   useEffect(() => {
@@ -92,11 +90,11 @@ export default function ChatView() {
       })
     }
 
-    // Show feedback after delay
+    // Persist feedback visibility in store — survives remounts
     setTimeout(() => {
-      setFeedbackVisible((prev) => new Set(prev).add(msg.id))
+      showMessageFeedback(msg.id)
     }, FEEDBACK_DELAY_MS)
-  }, [answerPhoneMessage, wsSend])
+  }, [answerPhoneMessage, showMessageFeedback, wsSend])
 
   if (!activeContactId || !activeContact) {
     return (
@@ -131,7 +129,6 @@ export default function ChatView() {
               <MessageGroup
                 key={msg.id}
                 msg={msg}
-                feedbackVisible={feedbackVisible.has(msg.id)}
                 onAnswer={(chosenText, isCorrect, correctPositionShown) =>
                   handleAnswer(msg, chosenText, isCorrect, correctPositionShown)
                 }
@@ -148,35 +145,24 @@ export default function ChatView() {
 /** A single message group: bubble + optional choice buttons + participant reply + optional feedback. */
 function MessageGroup({
   msg,
-  feedbackVisible,
   onAnswer,
 }: {
   msg: PhoneMessage
-  feedbackVisible: boolean
   onAnswer: (chosenText: string, isCorrect: boolean, correctPositionShown: number) => void
 }) {
   const isAnswered = msg.answered === true
-  const [flashResult, setFlashResult] = useState<'correct' | 'incorrect' | null>(null)
+  const feedbackVisible = msg.feedbackVisible === true
 
   // Determine feedback text
   const feedbackText = isAnswered
     ? (msg.answeredCorrect ? msg.feedbackCorrect : msg.feedbackIncorrect)
     : undefined
 
-  // Flash the participant bubble border briefly on answer
-  useEffect(() => {
-    if (!isAnswered) return
-    const result = msg.answeredCorrect ? 'correct' : 'incorrect'
-    setFlashResult(result)
-    const timer = setTimeout(() => setFlashResult(null), 600)
-    return () => clearTimeout(timer)
-  }, [isAnswered, msg.answeredCorrect])
-
   return (
     <div className="flex flex-col gap-1">
       <ChatBubble text={msg.text} variant="friend" />
 
-      {/* Choice buttons — only shown before answering for chat messages with choices */}
+      {/* Choice buttons — only shown before answering */}
       {msg.correctChoice && msg.wrongChoice && !isAnswered && (
         <ChoiceButtons
           correctChoice={msg.correctChoice}
@@ -188,7 +174,11 @@ function MessageGroup({
 
       {/* Participant's reply bubble (right-aligned) */}
       {isAnswered && msg.userChoice && (
-        <ChatBubble text={msg.userChoice} variant="participant" flashResult={flashResult} />
+        <ChatBubble
+          text={msg.userChoice}
+          variant="participant"
+          flashResult={msg.answeredCorrect ? 'correct' : 'incorrect'}
+        />
       )}
 
       {/* Feedback bubble from friend (appears after delay) */}

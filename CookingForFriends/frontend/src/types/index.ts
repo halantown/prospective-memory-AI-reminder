@@ -200,6 +200,7 @@ export interface PhoneMessage {
   read: boolean
   answered: boolean
   answeredCorrect?: boolean
+  feedbackVisible?: boolean   // true after feedback delay has elapsed
   respondedAt?: number
   userChoice?: string  // the actual text the participant chose
 }
