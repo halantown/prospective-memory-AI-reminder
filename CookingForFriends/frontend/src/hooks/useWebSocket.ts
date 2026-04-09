@@ -113,23 +113,60 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         break
       }
 
+      case 'phone_contacts': {
+        const contacts = (data.contacts as Array<{ id: string; name: string; avatar: string }>) || []
+        store.setContacts(contacts)
+        break
+      }
+
       case 'phone_message': {
         const now = Date.now()
         const category = (data.category as string) || 'notification'
+        const contactId = (data.contact_id as string) || '_system'
+
+        // Ignore pm_trigger messages in the chat UI
+        if (category === 'notification' && contactId === '_system' && (data.id as string)?.startsWith('pm_trigger')) {
+          break
+        }
+
         const phoneMsg = {
           id: data.id as string,
           sender: data.sender as string,
           avatar: (data.avatar as string) || '💬',
           text: data.text as string,
           category: category as 'question' | 'notification',
+          contactId,
           choices: data.choices as string[] | undefined,
           correctIndex: data.correct_index as number | undefined,
+          feedbackCorrect: data.feedback_correct as string | undefined,
+          feedbackIncorrect: data.feedback_incorrect as string | undefined,
           timestamp: now,
           status: 'active' as const,
           read: false,
         }
         store.addPhoneMessage(phoneMsg)
-        store.setPhoneBanner(phoneMsg)
+
+        // Show banner when:
+        //  - Phone is locked, OR
+        //  - On recipe tab, OR
+        //  - Viewing a different contact's chat, OR
+        //  - System notification (always banner, never in chat)
+        const isActiveChat = !store.phoneLocked
+          && store.activePhoneTab === 'chats'
+          && contactId === store.activeContactId
+          && contactId !== '_system'
+        if (!isActiveChat) {
+          store.setPhoneBanner(phoneMsg)
+        }
+        break
+      }
+
+      case 'kitchen_timer': {
+        store.pushKitchenTimer({
+          id: data.id as string,
+          icon: (data.icon as string) || '🍳',
+          message: data.message as string,
+        })
         break
       }
 
