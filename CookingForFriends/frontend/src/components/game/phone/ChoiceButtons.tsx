@@ -49,7 +49,7 @@ export default function ChoiceButtons({
   }, [answered, buttons, correctChoice, onChoose, resolvedPosition])
 
   return (
-    <div className="flex gap-2 mt-1.5">
+    <div className="flex flex-col gap-1.5 mt-1.5">
       {buttons.map((text, idx) => {
         const isFlashing = flashIndex === idx
 
@@ -72,8 +72,8 @@ export default function ChoiceButtons({
             disabled={answered}
             animate={isFlashing ? { scale: [1, 1.05, 1] } : {}}
             transition={{ duration: 0.2 }}
-            className={`flex-1 py-2 px-2 text-[11px] font-medium rounded-xl
-                       border transition-colors leading-tight
+            className={`w-full py-2.5 px-3 text-[11px] font-medium rounded-xl
+                       border transition-colors leading-tight text-left
                        ${bgClass}
                        ${answered ? 'cursor-default' : 'active:scale-95 cursor-pointer'}`}
           >
