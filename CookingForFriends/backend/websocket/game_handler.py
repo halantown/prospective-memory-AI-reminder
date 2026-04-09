@@ -174,6 +174,12 @@ async def _ws_receiver(
                     await _handle_phone_reply(participant_id, block_number, data, db_factory)
                 elif msg_type == "phone_read":
                     await _handle_phone_read(participant_id, block_number, data, db_factory)
+                elif msg_type == "phone_contact_switch":
+                    await _handle_interaction(participant_id, block_number, "phone_contact_switch", data, db_factory)
+                elif msg_type == "phone_tab_switch":
+                    await _handle_interaction(participant_id, block_number, "phone_tab_switch", data, db_factory)
+                elif msg_type == "kitchen_timer_acknowledged":
+                    await _handle_interaction(participant_id, block_number, "kitchen_timer_acknowledged", data, db_factory)
                 elif msg_type == "mouse_position":
                     await _handle_mouse(participant_id, block_number, data, db_factory)
                 else:

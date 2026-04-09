@@ -74,6 +74,7 @@ def build_ws_payload(message: dict) -> dict:
     Sends 'category' (question | notification) — frontend never sees
     the raw type field. PM trigger messages appear as notifications.
     For questions, includes choices and correct_index for answer buttons.
+    Also includes contact_id and feedback texts for chat UI.
     """
     msg_type = message.get("type", "notification")
     category = _msg_category(msg_type)
@@ -84,14 +85,48 @@ def build_ws_payload(message: dict) -> dict:
         "avatar": message.get("avatar", "?"),
         "text": message["text"],
         "category": category,
+        "contact_id": message.get("contact_id", "_system"),
     }
 
     # Questions need the choices for answer buttons
     if msg_type == "question":
         payload["choices"] = message.get("choices", [])
         payload["correct_index"] = message.get("correct_index", 0)
+        payload["feedback_correct"] = message.get("feedback_correct", "Thanks! 👍")
+        payload["feedback_incorrect"] = message.get("feedback_incorrect", "Hmm, I think that's not quite right 🤔")
 
     return payload
+
+
+def get_contacts(block_number: int) -> list[dict]:
+    """Get the contacts list for a block. Falls back to default contacts."""
+    pool_path = DATA_DIR / "messages" / f"messages_day{block_number}.json"
+    if not pool_path.exists():
+        pool_path = DATA_DIR / "messages" / "messages_day1.json"
+    if not pool_path.exists():
+        return _default_contacts()
+
+    try:
+        with open(pool_path) as f:
+            data = json.load(f)
+        contacts = data.get("contacts")
+        if contacts:
+            return contacts
+    except (json.JSONDecodeError, OSError):
+        pass
+
+    return _default_contacts()
+
+
+def _default_contacts() -> list[dict]:
+    return [
+        {"id": "alice", "name": "Alice", "avatar": "👩"},
+        {"id": "tom", "name": "Tom", "avatar": "👦"},
+        {"id": "emma", "name": "Emma", "avatar": "👧"},
+        {"id": "jake", "name": "Jake", "avatar": "🧑"},
+        {"id": "sophie", "name": "Sophie", "avatar": "👱‍♀️"},
+        {"id": "liam", "name": "Liam", "avatar": "🧔"},
+    ]
 
 
 def check_answer(message: dict, choice_index: int) -> bool | None:

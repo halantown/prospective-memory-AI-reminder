@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from config import DATA_DIR, MESSAGE_COOLDOWN_S
 from engine.execution_window import start_window
-from engine.message_loader import load_message_pool, build_ws_payload, get_message
+from engine.message_loader import load_message_pool, build_ws_payload, get_message, get_contacts
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +109,13 @@ async def run_timeline(
         try:
             start_time = time.time()
             logger.info(f"[TIMELINE] _run started: {key} ({len(events)} events, {duration}s)")
+
+            # Send contacts list for phone chat UI
+            contacts = get_contacts(block_number)
+            try:
+                await send_fn("phone_contacts", {"contacts": contacts})
+            except Exception as e:
+                logger.error(f"[TIMELINE] Failed to send phone_contacts: {e}")
 
             # Build trial lookup for this block
             trial_lookup = {}

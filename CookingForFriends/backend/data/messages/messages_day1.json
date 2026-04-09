@@ -1,37 +1,76 @@
 {
   "block": 1,
+  "contacts": [
+    {
+      "id": "alice",
+      "name": "Alice",
+      "avatar": "👩"
+    },
+    {
+      "id": "tom",
+      "name": "Tom",
+      "avatar": "👦"
+    },
+    {
+      "id": "emma",
+      "name": "Emma",
+      "avatar": "👧"
+    },
+    {
+      "id": "jake",
+      "name": "Jake",
+      "avatar": "🧑"
+    },
+    {
+      "id": "sophie",
+      "name": "Sophie",
+      "avatar": "👱‍♀️"
+    },
+    {
+      "id": "liam",
+      "name": "Liam",
+      "avatar": "🧔"
+    }
+  ],
   "messages": [
     {
       "id": "q_001",
       "t": 20,
       "sender": "Alice",
-      "avatar": "A",
+      "avatar": "👩",
+      "contact_id": "alice",
       "text": "Hey I want to bring cakes to the party 🎂 They're €12 each and I need 4. That's €48 right?",
       "type": "question",
       "choices": [
         "Yep, €48!",
         "Hmm no, should be €46"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Great, thanks! 🎂",
+      "feedback_incorrect": "Hmm wait, 12 × 4 = 48 actually! Thanks anyway 😄"
     },
     {
       "id": "q_002",
       "t": 40,
       "sender": "Emma",
-      "avatar": "E",
+      "avatar": "👧",
+      "contact_id": "emma",
       "text": "Isn't Canberra the capital of Australia? Tom keeps saying it's Sydney 😂",
       "type": "question",
       "choices": [
         "Tom's wrong, it's Canberra",
         "He's right, it's Sydney"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Ha! Knew it! Gonna tell Tom now 😏",
+      "feedback_incorrect": "Actually I just checked — it IS Canberra! 🇦🇺"
     },
     {
       "id": "n_001",
       "t": 60,
       "sender": "Phone",
       "avatar": "📱",
+      "contact_id": "_system",
       "text": "Your laundry is halfway done 🧺",
       "type": "notification"
     },
@@ -39,46 +78,56 @@
       "id": "q_003",
       "t": 80,
       "sender": "Tom",
-      "avatar": "T",
+      "avatar": "👦",
+      "contact_id": "tom",
       "text": "My cat Whiskers — all cats are animals so Whiskers is an animal, right? 🐱",
       "type": "question",
       "choices": [
         "Obviously yes 😄",
         "Hmm no, not necessarily"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Right?? Simple logic 😄🐱",
+      "feedback_incorrect": "Wait really? All cats ARE animals so Whiskers must be too! 🐱"
     },
     {
       "id": "q_004",
       "t": 100,
       "sender": "Jake",
-      "avatar": "J",
+      "avatar": "🧑",
+      "contact_id": "jake",
       "text": "Hey quick question — March has 31 days right?",
       "type": "question",
       "choices": [
         "Yeah 31 days",
         "Nah it's 30"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Cool, thanks! 📅",
+      "feedback_incorrect": "I just looked it up — March does have 31 days! 📅"
     },
     {
       "id": "q_005",
       "t": 120,
       "sender": "Alice",
-      "avatar": "A",
+      "avatar": "👩",
+      "contact_id": "alice",
       "text": "I split €15 among 3 people. That's €5 each?",
       "type": "question",
       "choices": [
         "Yep, €5 each",
         "No that's €4 each"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Perfect, thought so! 💰",
+      "feedback_incorrect": "Wait, 15 ÷ 3 = 5 right? I think it IS €5 each 🤔"
     },
     {
       "id": "n_002",
       "t": 140,
       "sender": "Phone",
       "avatar": "📱",
+      "contact_id": "_system",
       "text": "It's 5:30 PM — evening traffic is building up",
       "type": "notification"
     },
@@ -86,33 +135,40 @@
       "id": "q_006",
       "t": 160,
       "sender": "Emma",
-      "avatar": "E",
+      "avatar": "👧",
+      "contact_id": "emma",
       "text": "How many continents are there? I keep saying 6 but Jake says 7 🌍",
       "type": "question",
       "choices": [
         "Jake's right, 7!",
         "You're right, 6"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Ugh fine, Jake wins this one 😅🌍",
+      "feedback_incorrect": "I looked it up — it's 7! Jake was right all along 😭"
     },
     {
       "id": "q_007",
       "t": 180,
       "sender": "Tom",
-      "avatar": "T",
+      "avatar": "👦",
+      "contact_id": "tom",
       "text": "Water boils at 100°C at sea level right?",
       "type": "question",
       "choices": [
         "Yeah 100°C",
         "No, 90°C"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Thought so, thanks! 💧",
+      "feedback_incorrect": "Pretty sure it's 100°C actually! Standard physics 🌡️"
     },
     {
       "id": "n_003",
       "t": 200,
       "sender": "Weather",
       "avatar": "🌤",
+      "contact_id": "_system",
       "text": "Tomorrow: 14°C, partly cloudy ⛅",
       "type": "notification"
     },
@@ -120,46 +176,56 @@
       "id": "q_008",
       "t": 220,
       "sender": "Jake",
-      "avatar": "J",
+      "avatar": "🧑",
+      "contact_id": "jake",
       "text": "Wait does a triangle have 3 or 4 sides? 😅",
       "type": "question",
       "choices": [
         "4 sides",
         "3 sides 😂"
       ],
-      "correct_index": 1
+      "correct_index": 1,
+      "feedback_correct": "Right, 3! What was I thinking 😂",
+      "feedback_incorrect": "No wait, TRI-angle... 3 sides! 😅"
     },
     {
       "id": "q_009",
       "t": 240,
       "sender": "Alice",
-      "avatar": "A",
+      "avatar": "👩",
+      "contact_id": "alice",
       "text": "The sun rises in the east right? Just making sure 🌅",
       "type": "question",
       "choices": [
         "Yep, the east!",
         "No, the west!"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Okay good, I wasn't going crazy 🌅",
+      "feedback_incorrect": "Hmm pretty sure it's the east actually! 🌅"
     },
     {
       "id": "q_010",
       "t": 260,
       "sender": "Emma",
-      "avatar": "E",
+      "avatar": "👧",
+      "contact_id": "emma",
       "text": "Help me: 7 × 8 = ?",
       "type": "question",
       "choices": [
         "54",
         "56"
       ],
-      "correct_index": 1
+      "correct_index": 1,
+      "feedback_correct": "56! Thanks, I keep mixing it up 😄",
+      "feedback_incorrect": "Hmm I just calculated — it's 56! 🔢"
     },
     {
       "id": "n_004",
       "t": 280,
       "sender": "Delivery",
       "avatar": "📦",
+      "contact_id": "_system",
       "text": "Your bol.com package is out for delivery 📦",
       "type": "notification"
     },
@@ -167,33 +233,40 @@
       "id": "q_011",
       "t": 300,
       "sender": "Tom",
-      "avatar": "T",
+      "avatar": "👦",
+      "contact_id": "tom",
       "text": "Light travels faster than sound right? ⚡",
       "type": "question",
       "choices": [
         "No, sound is faster",
         "Yeah, light is way faster"
       ],
-      "correct_index": 1
+      "correct_index": 1,
+      "feedback_correct": "Yeah that's what I thought! ⚡",
+      "feedback_incorrect": "Actually light IS faster — that's why you see lightning before thunder ⚡"
     },
     {
       "id": "q_012",
       "t": 320,
       "sender": "Jake",
-      "avatar": "J",
+      "avatar": "🧑",
+      "contact_id": "jake",
       "text": "An octagon has 8 sides? Or was it 6?",
       "type": "question",
       "choices": [
         "8 sides!",
         "6 sides"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "8, right! Oct = 8. Got it 👍",
+      "feedback_incorrect": "Wait, oct means 8... so 8 sides! 🛑"
     },
     {
       "id": "n_005",
       "t": 340,
       "sender": "Alice",
-      "avatar": "A",
+      "avatar": "👩",
+      "contact_id": "alice",
       "text": "Emma just posted a new photo on Instagram 📸",
       "type": "notification"
     },
@@ -201,46 +274,56 @@
       "id": "q_013",
       "t": 360,
       "sender": "Alice",
-      "avatar": "A",
+      "avatar": "👩",
+      "contact_id": "alice",
       "text": "Water freezes at 0°C, right?",
       "type": "question",
       "choices": [
         "Yes, 0°C",
         "No, at -5°C"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Okay cool, just double checking 🧊",
+      "feedback_incorrect": "I'm pretty sure it IS 0°C actually! 🧊"
     },
     {
       "id": "q_014",
       "t": 380,
       "sender": "Emma",
-      "avatar": "E",
+      "avatar": "👧",
+      "contact_id": "emma",
       "text": "I did 100 ÷ 4 = 25. Correct?",
       "type": "question",
       "choices": [
         "That's wrong, it's 20",
         "Yep, 25!"
       ],
-      "correct_index": 1
+      "correct_index": 1,
+      "feedback_correct": "Nice, thanks for checking! ✅",
+      "feedback_incorrect": "Wait, 4 × 25 = 100... so it IS 25! 🔢"
     },
     {
       "id": "q_015",
       "t": 400,
       "sender": "Tom",
-      "avatar": "T",
+      "avatar": "👦",
+      "contact_id": "tom",
       "text": "There are 60 seconds in a minute right?",
       "type": "question",
       "choices": [
         "Yes, 60!",
         "No I think it's 100"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Cool thanks! ⏱️",
+      "feedback_incorrect": "Nah it's definitely 60 seconds! ⏱️"
     },
     {
       "id": "n_006",
       "t": 420,
       "sender": "Phone",
       "avatar": "📱",
+      "contact_id": "_system",
       "text": "Battery at 40% 🔋",
       "type": "notification"
     },
@@ -248,33 +331,40 @@
       "id": "q_016",
       "t": 440,
       "sender": "Jake",
-      "avatar": "J",
+      "avatar": "🧑",
+      "contact_id": "jake",
       "text": "Biggest ocean — Pacific or Atlantic? 🌊",
       "type": "question",
       "choices": [
         "Atlantic",
         "Pacific"
       ],
-      "correct_index": 1
+      "correct_index": 1,
+      "feedback_correct": "Pacific, right! It's massive 🌊",
+      "feedback_incorrect": "I just looked it up — Pacific is the biggest! 🌊"
     },
     {
       "id": "q_017",
       "t": 460,
       "sender": "Alice",
-      "avatar": "A",
+      "avatar": "👩",
+      "contact_id": "alice",
       "text": "A square has 4 equal sides, yeah?",
       "type": "question",
       "choices": [
         "Yep all 4 equal!",
         "No, only 2 pairs are equal"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Right! That's what makes it a square 🟩",
+      "feedback_incorrect": "Actually all 4 ARE equal — that's a square vs rectangle! 🟩"
     },
     {
       "id": "n_007",
       "t": 480,
       "sender": "Phone",
       "avatar": "📱",
+      "contact_id": "_system",
       "text": "Storage almost full — 2.1 GB left",
       "type": "notification"
     },
@@ -282,33 +372,40 @@
       "id": "q_018",
       "t": 500,
       "sender": "Emma",
-      "avatar": "E",
+      "avatar": "👧",
+      "contact_id": "emma",
       "text": "24 + 18... I got 42. Sound right?",
       "type": "question",
       "choices": [
         "Yes, 42!",
         "No, that's 40"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Nice, my math isn't totally broken then 😄",
+      "feedback_incorrect": "Hmm, 24 + 18 = 42 actually! ➕"
     },
     {
       "id": "q_019",
       "t": 520,
       "sender": "Tom",
-      "avatar": "T",
+      "avatar": "👦",
+      "contact_id": "tom",
       "text": "Venus is the closest planet to the Sun, right? ☀️",
       "type": "question",
       "choices": [
         "Yep, Venus",
         "Nah, that's Mercury"
       ],
-      "correct_index": 1
+      "correct_index": 1,
+      "feedback_correct": "Mercury, of course! Thanks ☀️",
+      "feedback_incorrect": "Wait, it's actually Mercury! Venus is second ☀️"
     },
     {
       "id": "n_008",
       "t": 540,
       "sender": "Alice",
-      "avatar": "A",
+      "avatar": "👩",
+      "contact_id": "alice",
       "text": "Jake shared a link: 'Best kitchen gadgets 2026' 🔗",
       "type": "notification"
     },
@@ -316,33 +413,40 @@
       "id": "q_020",
       "t": 560,
       "sender": "Jake",
-      "avatar": "J",
+      "avatar": "🧑",
+      "contact_id": "jake",
       "text": "Can sound travel through space? 🚀",
       "type": "question",
       "choices": [
         "No it can't, no air there",
         "Yeah of course it can"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Right, no medium to travel through! 🚀",
+      "feedback_incorrect": "Actually it can't — there's no air in space! 🚀"
     },
     {
       "id": "q_021",
       "t": 580,
       "sender": "Alice",
-      "avatar": "A",
+      "avatar": "👩",
+      "contact_id": "alice",
       "text": "A dozen is 12, yeah?",
       "type": "question",
       "choices": [
         "Yeah, 12!",
         "No, it's 10"
       ],
-      "correct_index": 0
+      "correct_index": 0,
+      "feedback_correct": "Perfect, thanks! 🥚",
+      "feedback_incorrect": "Pretty sure a dozen IS 12! 🥚"
     },
     {
       "id": "pm_trigger_b1_giftbag",
       "t": 0,
       "sender": "Delivery",
       "avatar": "📦",
+      "contact_id": "_system",
       "text": "A package has just been delivered to your front door",
       "type": "pm_trigger",
       "trigger_id": "b1_giftbag"
@@ -352,6 +456,7 @@
       "t": 0,
       "sender": "Lucas",
       "avatar": "L",
+      "contact_id": "_system",
       "text": "Hey, put on some music for tonight! Have you still got that vinyl I like?",
       "type": "pm_trigger",
       "trigger_id": "b2_vinyl"
@@ -361,6 +466,7 @@
       "t": 0,
       "sender": "Sophie",
       "avatar": "S",
+      "contact_id": "_system",
       "text": "Do you have any hand cream? My hands are so dry from the cold!",
       "type": "pm_trigger",
       "trigger_id": "b3_handcream"
