@@ -53,7 +53,7 @@ export default function LockScreen({
       </div>
 
       {/* Scrollable notifications area */}
-      <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-0">
+      <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-0 scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
 
       {/* System notifications */}
       {hasSysNotifs && (
