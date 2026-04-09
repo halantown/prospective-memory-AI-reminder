@@ -142,13 +142,7 @@ def generate_block_timeline(
                 },
             })
 
-        # Also inject phone message for communication triggers
-        if task_def.trigger_type == "communication":
-            events.append({
-                "t": trigger_time,
-                "type": "phone_message",
-                "data": {"message_id": f"pm_trigger_{task_id}"},
-            })
+        # PM triggers are now handled as phone calls (separate UI), not phone messages
 
     # ── Neutral robot utterances ──
     utterances = list(NEUTRAL_UTTERANCES[block_number])
@@ -195,10 +189,21 @@ def generate_block_timeline(
             msg_data = json.load(f)
 
         msg_events: list[dict] = []
-        for msg in msg_data.get("messages", []):
+        # Load from chats array
+        for msg in msg_data.get("chats", []):
             msg_id = msg.get("id", "")
             msg_t = msg.get("t", 0)
-            if msg_id and msg.get("type") != "pm_trigger":
+            if msg_id:
+                msg_events.append({
+                    "t": msg_t,
+                    "type": "phone_message",
+                    "data": {"message_id": msg_id},
+                })
+        # Load from notifications array
+        for msg in msg_data.get("notifications", []):
+            msg_id = msg.get("id", "")
+            msg_t = msg.get("t", 0)
+            if msg_id:
                 msg_events.append({
                     "t": msg_t,
                     "type": "phone_message",
@@ -215,13 +220,13 @@ def generate_block_timeline(
 
         # Cap message times to stay within block duration
         for msg_event in msg_events:
-            if msg_event["t"] >= 600:
-                msg_event["t"] = 599
+            if msg_event["t"] >= 900:
+                msg_event["t"] = 899
 
         events.extend(msg_events)
 
     # ── Block end ──
-    events.append({"t": 600, "type": "block_end", "data": {}})
+    events.append({"t": 900, "type": "block_end", "data": {}})
 
     # Sort by time, then by type priority (block_start first, block_end last)
     type_priority = {"block_start": 0, "block_end": 99}
@@ -232,6 +237,6 @@ def generate_block_timeline(
         "condition": condition,
         "guest": guest,
         "day_story": f"Day {block_number}: Cooking steak dinner for {guest}",
-        "duration_seconds": 600,
+        "duration_seconds": 900,
         "events": events,
     }
