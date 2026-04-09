@@ -56,6 +56,7 @@ interface GameState {
   activePhoneTab: 'chats' | 'recipe'
   kitchenTimerQueue: Array<{ id: string; icon: string; message: string; appearedAt: number }>
   recipeTabBounce: boolean
+  lockSystemNotifications: Array<{ id: string; sender: string; text: string; timestamp: number }>
 
   // ── Robot ──
   robot: RobotState
@@ -122,6 +123,7 @@ interface GameState {
   pushKitchenTimer: (timer: { id: string; icon: string; message: string }) => void
   dismissKitchenTimer: () => void
   setRecipeTabBounce: (bounce: boolean) => void
+  addLockSystemNotification: (notif: { id: string; sender: string; text: string; timestamp: number }) => void
 
   // Robot actions
   setRobotSpeaking: (text: string) => void
@@ -275,6 +277,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   activePhoneTab: 'chats',
   kitchenTimerQueue: [],
   recipeTabBounce: false,
+  lockSystemNotifications: [],
 
   // ── Robot ──
   robot: { room: 'kitchen', speaking: false, text: '', visible: true },
@@ -467,6 +470,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     kitchenTimerQueue: s.kitchenTimerQueue.slice(1),
   })),
   setRecipeTabBounce: (bounce) => set({ recipeTabBounce: bounce }),
+  addLockSystemNotification: (notif) => set((s) => ({
+    lockSystemNotifications: [...s.lockSystemNotifications, notif],
+  })),
 
   // Robot
   setRobotSpeaking: (text) => set((s) => ({
@@ -609,6 +615,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     activePhoneTab: 'chats',
     kitchenTimerQueue: [],
     recipeTabBounce: false,
+    lockSystemNotifications: [],
     robot: { room: 'kitchen', speaking: false, text: '', visible: true },
     activePMTrials: [],
     completedPMTrialIds: new Set(),

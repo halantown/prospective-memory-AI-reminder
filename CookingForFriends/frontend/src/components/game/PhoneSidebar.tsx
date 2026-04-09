@@ -123,7 +123,7 @@ export default function PhoneSidebar() {
 
           {/* Status bar */}
           <div className="flex items-center justify-between px-6 py-1 text-[10px]">
-            <span className="text-white font-medium">{gameClock ?? '--:--'}</span>
+            <span className={`text-white font-medium ${locked ? 'invisible' : ''}`}>{gameClock ?? '--:--'}</span>
             <div className="flex items-center gap-1">
               {unreadCount > 0 && (
                 <span className="bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">

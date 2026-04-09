@@ -69,7 +69,7 @@ export default function ContactStrip() {
             <span className="text-base leading-none">{contact.avatar}</span>
             {/* Number badge: unread unseen messages */}
             {badge.type === 'count' && (
-              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-500 rounded-full
+              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full
                               text-[8px] font-bold text-white flex items-center justify-center
                               ring-1 ring-slate-900">
                 {badge.count > 9 ? '9+' : badge.count}
@@ -77,7 +77,7 @@ export default function ContactStrip() {
             )}
             {/* Red dot: read but unanswered questions */}
             {badge.type === 'dot' && (
-              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full
                               ring-1 ring-slate-900" />
             )}
           </button>

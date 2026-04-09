@@ -124,18 +124,21 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         const channel = (data.channel as string) || 'notification'
         const contactId = (data.contact_id as string) || undefined
 
-        // Notification messages → banner only, never stored as chat
+        // Notification messages → banner only + persist to lock screen list
         if (channel === 'notification') {
+          const sender = data.sender as string
+          const text = data.text as string
           const bannerMsg = {
             id: data.id as string,
-            text: data.text as string,
+            text,
             channel: 'notification' as const,
-            sender: data.sender as string,
+            sender,
             timestamp: now,
             read: false,
             answered: false,
           }
           store.setPhoneBanner(bannerMsg)
+          store.addLockSystemNotification({ id: data.id as string, sender, text, timestamp: now })
           break
         }
 
