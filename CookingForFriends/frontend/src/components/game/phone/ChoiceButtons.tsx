@@ -30,7 +30,6 @@ export default function ChoiceButtons({
   }, [resolvedPosition, correctChoice, wrongChoice])
 
   const [flashIndex, setFlashIndex] = useState<number | null>(null)
-  const [flashType, setFlashType] = useState<'correct' | 'incorrect' | null>(null)
   const [answered, setAnswered] = useState(false)
 
   const handleClick = useCallback((idx: number) => {
@@ -38,13 +37,8 @@ export default function ChoiceButtons({
     const chosenText = buttons[idx]
     const isCorrect = chosenText === correctChoice
     setFlashIndex(idx)
-    setFlashType(isCorrect ? 'correct' : 'incorrect')
     setAnswered(true)
-
-    // Delay store update so the green/red flash is visible before buttons unmount
-    setTimeout(() => {
-      onChoose(chosenText, isCorrect, resolvedPosition)
-    }, 500)
+    onChoose(chosenText, isCorrect, resolvedPosition)
   }, [answered, buttons, correctChoice, onChoose, resolvedPosition])
 
   return (
@@ -56,9 +50,7 @@ export default function ChoiceButtons({
 
         if (answered) {
           if (flashIndex === idx) {
-            bgClass = flashType === 'correct'
-              ? 'bg-green-500/30 text-green-200 border-green-400/50'
-              : 'bg-red-500/30 text-red-200 border-red-400/50'
+            bgClass = 'bg-blue-600/30 text-blue-200 border-blue-400/50'
           } else {
             bgClass = 'bg-slate-700/20 text-slate-500 border-slate-600/20'
           }

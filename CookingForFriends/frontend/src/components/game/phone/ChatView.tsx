@@ -177,7 +177,6 @@ function MessageGroup({
         <ChatBubble
           text={msg.userChoice}
           variant="participant"
-          flashResult={msg.answeredCorrect ? 'correct' : 'incorrect'}
         />
       )}
 
