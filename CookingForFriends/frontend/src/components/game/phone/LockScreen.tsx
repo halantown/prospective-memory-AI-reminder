@@ -43,14 +43,17 @@ export default function LockScreen({
 
   return (
     <div
-      className="flex-1 phone-locked flex flex-col px-3 pt-3 pb-4 overflow-y-auto"
+      className="flex-1 phone-locked flex flex-col px-3 pt-3 pb-4 overflow-hidden"
       onClick={(e) => { e.stopPropagation(); onUnlock() }}
     >
       {/* Clock */}
-      <div className="flex flex-col items-center mb-4">
+      <div className="flex flex-col items-center mb-3 shrink-0">
         <div className="text-2xl mb-1">🔒</div>
         <div className="text-3xl font-extralight text-white tracking-wider">{gameClock ?? '--:--'}</div>
       </div>
+
+      {/* Scrollable notifications area */}
+      <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-0">
 
       {/* System notifications */}
       {hasSysNotifs && (
@@ -132,8 +135,10 @@ export default function LockScreen({
         </div>
       )}
 
-      {/* Unlock prompt */}
-      <div className="mt-auto flex flex-col items-center gap-1.5 cursor-pointer pt-2">
+      </div>{/* end scrollable notifications area */}
+
+      {/* Unlock prompt — pinned at bottom */}
+      <div className="shrink-0 flex flex-col items-center gap-1.5 cursor-pointer pt-2">
         <svg width="36" height="36" viewBox="0 0 48 48" fill="none" className="animate-bounce">
           <circle cx="24" cy="14" r="6" fill="white" opacity="0.3" />
           <circle cx="24" cy="14" r="3.5" fill="white" opacity="0.5" />
