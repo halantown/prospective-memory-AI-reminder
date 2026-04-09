@@ -156,3 +156,57 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 - [ ] 调查 WS 重连时 timeline 是否真的重放事件，若是则修复重放逻辑
 - [ ] 对所有使用 `scalar_one_or_none()` 的查询做审计，确认业务上保证唯一的字段都有数据库约束
 - [ ] 添加集成测试：模拟重连场景，验证消息不重复插入
+
+---
+
+## INC-004 — Phone receives zero messages after JSON restructure
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-04-09 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | Manual testing |
+| Affected area| `timeline_generator.py` → phone message scheduling |
+
+### Background
+> The phone message system was refactored (Phase 3) to split the flat `messages` array in `messages_day1.json` into separate `chats[]` and `notifications[]` arrays. The static timeline template (`block_default.json`), the message loader (`message_loader.py`), and all frontend components were updated — but the **dynamic timeline generator** (`timeline_generator.py`) was missed.
+
+### Incident Description
+> After the Phase 3 refactor, no phone messages appeared in the frontend at all. The game ran normally otherwise (steaks, robot speech, PM triggers all worked).
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 22:36 | No messages received in frontend reported |
+| 22:38 | Investigation started |
+| 22:42 | Root cause identified: `timeline_generator.py` line 198 reads `msg_data.get("messages", [])` — empty because the key was removed |
+| 22:44 | Fix deployed: read from `chats[]` + `notifications[]`, update duration to 900s |
+| 22:45 | Confirmed resolved via smoke test |
+
+### Root Cause
+> `timeline_generator.py` was not updated during the Phase 3 JSON restructure. It still read from `msg_data.get("messages", [])` which returned an empty list because the new JSON no longer has a top-level `messages` key. Since the generated timeline had zero `phone_message` events, no messages were ever sent to the frontend.
+>
+> Additionally, the generator still injected `pm_trigger_{task_id}` phone messages for communication triggers (removed in the redesign) and capped message times at 600s (old block duration instead of 900s).
+
+### Contributing Factors
+> - `timeline_generator.py` was not listed in the Phase 3 migration checklist
+> - The static `block_default.json` fallback WAS updated, masking the issue in that code path
+> - The active code path used by experimental conditions (AF, AFCB, CONTROL) goes through `generate_block_timeline()`, not the static JSON
+> - No integration test verifies that generated timelines contain phone_message events
+
+### Fix
+> `backend/engine/timeline_generator.py`:
+> - Lines 198-206: Read from `chats[]` and `notifications[]` arrays instead of `messages[]`
+> - Lines 146-151: Removed `pm_trigger_{task_id}` phone_message injection
+> - Lines 218-219: Updated duration cap from 600 → 900
+> - Lines 224, 235: Updated `block_end` time and `duration_seconds` from 600 → 900
+
+### Verification
+> - Python syntax check passed
+> - `load_message_pool(1)` returns 18 messages (12 chats + 6 notifications)
+> - Smoke test confirms pool loads correctly with channel tags
+
+### Follow-up Actions
+> - [ ] Add a unit test that `generate_block_timeline(1, "AF", ...)` produces ≥1 phone_message event
+> - [ ] Ensure any future data format changes have a grep audit for all files referencing the old format
