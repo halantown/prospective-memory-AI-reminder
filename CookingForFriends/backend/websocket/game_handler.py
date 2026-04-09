@@ -497,20 +497,26 @@ async def _record_resumption_lag(trial_id: int, lag_ms: int, db_factory):
 
 
 async def _handle_phone_reply(participant_id, block_number, data, db_factory):
-    """Handle a phone message answer — validate choice index and log."""
+    """Handle a phone message answer — validate chosen text and log."""
     from engine.message_loader import get_message, check_answer
     from sqlalchemy import select, update
 
     message_id = data.get("message_id", "")
-    choice_index = data.get("choice_index")  # int: 0 or 1
+    chosen_text = data.get("chosen_text", "")
+    is_correct_client = data.get("is_correct")  # frontend's judgment
+    correct_position_shown = data.get("correct_position_shown")  # 0 or 1
     timestamp = data.get("timestamp", time.time())
 
-    if not message_id or choice_index is None:
+    if not message_id or not chosen_text:
         return
 
-    # Check correctness from the message pool
+    # Verify correctness server-side from the message pool
     message = get_message(block_number, message_id)
-    is_correct = check_answer(message, int(choice_index)) if message else None
+    is_correct = check_answer(message, chosen_text) if message else is_correct_client
+
+    # Mark as answered in timeline nudge tracker
+    from engine.timeline import mark_chat_answered
+    mark_chat_answered(participant_id, message_id)
 
     async with db_factory() as db:
         from models.block import Block
@@ -546,7 +552,7 @@ async def _handle_phone_reply(participant_id, block_number, data, db_factory):
             )
             .values(
                 replied_at=timestamp,
-                user_choice=int(choice_index),
+                user_choice=chosen_text,
                 reply_correct=is_correct,
                 response_time_ms=response_time_ms,
                 status=status,
@@ -554,7 +560,7 @@ async def _handle_phone_reply(participant_id, block_number, data, db_factory):
         )
         await db.commit()
 
-    logger.debug(f"Phone reply: {participant_id} msg={message_id} choice={choice_index} correct={is_correct}")
+    logger.debug(f"Phone reply: {participant_id} msg={message_id} choice={chosen_text!r} correct={is_correct} pos={correct_position_shown}")
 
     # Also log as generic interaction
     await _handle_interaction(participant_id, block_number, "phone_reply", data, db_factory)

@@ -14,8 +14,18 @@ logger = logging.getLogger(__name__)
 # Active timelines: key = "participant_id:block_number"
 _active_timelines: dict[str, asyncio.Task] = {}
 
+# Per-participant unanswered chat tracking for nudge mechanism
+# key = participant_id, value = set of unanswered message_ids
+_unanswered_chats: dict[str, set[str]] = {}
+
 # DB factory reference for execution window callbacks
 _db_factory = None
+
+
+def mark_chat_answered(participant_id: str, message_id: str):
+    """Remove a message from the unanswered set (called when participant replies)."""
+    if participant_id in _unanswered_chats:
+        _unanswered_chats[participant_id].discard(message_id)
 
 
 def set_db_factory(factory):
@@ -127,6 +137,11 @@ async def run_timeline(
 
             # Track last phone message send time for runtime cooldown
             last_msg_sent_at: float = 0.0
+            # Initialize unanswered chat tracking for nudge mechanism
+            _unanswered_chats[participant_id] = set()
+            last_nudge_at: float = 0.0
+            NUDGE_THRESHOLD = 5
+            NUDGE_COOLDOWN_S = 60.0
 
             for event in events:
                 if asyncio.current_task().cancelled():
@@ -195,6 +210,27 @@ async def run_timeline(
                         try:
                             await send_fn("phone_message", ws_payload)
                             last_msg_sent_at = time.time()
+                            # Track unanswered chats for nudge
+                            if msg.get("channel") == "chat":
+                                _unanswered_chats.setdefault(participant_id, set()).add(message_id)
+                                # Nudge: if too many unanswered and cooldown elapsed
+                                now = time.time()
+                                unanswered_count = len(_unanswered_chats.get(participant_id, set()))
+                                if (unanswered_count >= NUDGE_THRESHOLD
+                                        and now - last_nudge_at > NUDGE_COOLDOWN_S):
+                                    nudge_payload = {
+                                        "id": f"nudge_{int(now)}",
+                                        "sender": "Phone 📱",
+                                        "text": "You have several unread messages",
+                                        "channel": "notification",
+                                        "server_ts": now,
+                                    }
+                                    try:
+                                        await send_fn("phone_message", nudge_payload)
+                                        last_nudge_at = now
+                                        logger.info(f"[TIMELINE] Nudge sent: {unanswered_count} unanswered")
+                                    except Exception as e:
+                                        logger.error(f"[TIMELINE] Failed to send nudge: {e}")
                         except Exception as e:
                             logger.error(f"[TIMELINE] Failed to send phone_message: {e}")
                         continue  # phone_message is fully handled here
@@ -456,7 +492,6 @@ async def _log_phone_message_sent(
     from sqlalchemy.dialects.postgresql import insert as pg_insert
     from models.block import Block
     from models.logging import PhoneMessageLog
-    from engine.message_loader import _msg_category
 
     try:
         async with db_factory() as db:
@@ -470,9 +505,10 @@ async def _log_phone_message_sent(
             if block_id is None:
                 return
 
-            msg_type = message.get("type", "notification")
-            category = _msg_category(msg_type)
+            channel = message.get("channel", "notification")
             message_id = message.get("id", "")
+            # For chats: derive sender from contact_id; for notifications: use sender field
+            sender = message.get("sender", message.get("contact_id", ""))
 
             stmt = (
                 pg_insert(PhoneMessageLog)
@@ -480,10 +516,10 @@ async def _log_phone_message_sent(
                     participant_id=participant_id,
                     block_id=block_id,
                     message_id=message_id,
-                    sender=message.get("sender", ""),
-                    message_type=msg_type,
-                    category=category,
-                    correct_answer=message.get("correct_index") if msg_type == "question" else None,
+                    sender=sender,
+                    message_type=channel,
+                    category=channel,
+                    correct_answer=message.get("correct_choice") if channel == "chat" else None,
                     sent_at=sent_at,
                 )
                 .on_conflict_do_update(

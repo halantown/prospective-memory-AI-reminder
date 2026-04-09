@@ -1,9 +1,10 @@
 """Message pool loader — loads day-specific message JSON files for the phone system.
 
-Message taxonomy (v2):
-  - "question"     → True/False factual statement, frontend shows T/F buttons
-  - "notification" → Informational one-liner, no interaction required
-  - "pm_trigger"   → Visually identical to notification, backend-only tag for PM scoring
+Message taxonomy (v3 — split structure):
+  - "chats" array      → question messages routed to contacts, with correct/wrong choices
+  - "notifications" array → system banners, no interaction required
+
+PM triggers are handled separately (phone calls), not in message data.
 """
 
 import json
@@ -20,6 +21,7 @@ def load_message_pool(block_number: int) -> dict[str, dict]:
     """Load and cache the message pool for a given block (day).
 
     Returns a dict keyed by message_id → full message data.
+    Loads from both 'chats' and 'notifications' arrays.
     Falls back to day1 if specific day file doesn't exist.
     """
     if block_number in _message_pools:
@@ -41,9 +43,23 @@ def load_message_pool(block_number: int) -> dict[str, dict]:
         return {}
 
     pool = {}
-    for msg in data.get("messages", []):
+
+    # Load chat messages (questions)
+    for msg in data.get("chats", []):
         msg_id = msg.get("id", "")
         if msg_id:
+            pool[msg_id] = {**msg, "channel": "chat"}
+
+    # Load notification messages
+    for msg in data.get("notifications", []):
+        msg_id = msg.get("id", "")
+        if msg_id:
+            pool[msg_id] = {**msg, "channel": "notification"}
+
+    # Backward compat: also check legacy 'messages' array
+    for msg in data.get("messages", []):
+        msg_id = msg.get("id", "")
+        if msg_id and msg_id not in pool:
             pool[msg_id] = msg
 
     _message_pools[block_number] = pool
@@ -57,43 +73,35 @@ def get_message(block_number: int, message_id: str) -> dict | None:
     return pool.get(message_id)
 
 
-def _msg_category(msg_type: str) -> str:
-    """Map raw message type to frontend category.
-
-    Frontend only sees 'question' or 'notification'.
-    PM triggers are rendered identically to notifications.
-    """
-    if msg_type == "question":
-        return "question"
-    return "notification"
-
-
 def build_ws_payload(message: dict) -> dict:
     """Build the WebSocket payload for a phone message.
 
-    Sends 'category' (question | notification) — frontend never sees
-    the raw type field. PM trigger messages appear as notifications.
-    For questions, includes choices and correct_index for answer buttons.
-    Also includes contact_id and feedback texts for chat UI.
+    For chat messages: includes correct_choice, wrong_choice, feedback texts, contact_id.
+    For notifications: includes sender and text only.
+    Both include a 'channel' field for frontend routing.
     """
-    msg_type = message.get("type", "notification")
-    category = _msg_category(msg_type)
+    channel = message.get("channel", "notification")
 
-    payload = {
-        "id": message["id"],
-        "sender": message["sender"],
-        "avatar": message.get("avatar", "?"),
-        "text": message["text"],
-        "category": category,
-        "contact_id": message.get("contact_id", "_system"),
-    }
-
-    # Questions need the choices for answer buttons
-    if msg_type == "question":
-        payload["choices"] = message.get("choices", [])
-        payload["correct_index"] = message.get("correct_index", 0)
-        payload["feedback_correct"] = message.get("feedback_correct", "Thanks! 👍")
-        payload["feedback_incorrect"] = message.get("feedback_incorrect", "Hmm, I think that's not quite right 🤔")
+    if channel == "chat":
+        # Chat message — look up contact info
+        payload = {
+            "id": message["id"],
+            "contact_id": message.get("contact_id", ""),
+            "text": message["text"],
+            "channel": "chat",
+            "correct_choice": message.get("correct_choice", ""),
+            "wrong_choice": message.get("wrong_choice", ""),
+            "feedback_correct": message.get("feedback_correct", "Thanks! 👍"),
+            "feedback_incorrect": message.get("feedback_incorrect", "Hmm, I think that's not quite right 🤔"),
+        }
+    else:
+        # Notification — system banner
+        payload = {
+            "id": message["id"],
+            "sender": message.get("sender", "System"),
+            "text": message["text"],
+            "channel": "notification",
+        }
 
     return payload
 
@@ -125,16 +133,15 @@ def _default_contacts() -> list[dict]:
         {"id": "emma", "name": "Emma", "avatar": "👧"},
         {"id": "jake", "name": "Jake", "avatar": "🧑"},
         {"id": "sophie", "name": "Sophie", "avatar": "👱‍♀️"},
-        {"id": "liam", "name": "Liam", "avatar": "🧔"},
     ]
 
 
-def check_answer(message: dict, choice_index: int) -> bool | None:
-    """Check if a choice index matches the correct answer. Returns None for non-questions."""
-    correct = message.get("correct_index")
+def check_answer(message: dict, chosen_text: str) -> bool | None:
+    """Check if a chosen text matches the correct choice. Returns None for non-chats."""
+    correct = message.get("correct_choice")
     if correct is None:
         return None
-    return choice_index == correct
+    return chosen_text == correct
 
 
 def clear_cache():
