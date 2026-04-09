@@ -210,3 +210,54 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 ### Follow-up Actions
 > - [ ] Add a unit test that `generate_block_timeline(1, "AF", ...)` produces ≥1 phone_message event
 > - [ ] Ensure any future data format changes have a grep audit for all files referencing the old format
+
+---
+
+## INC-005 — Friend reply bubble lost after phone lock/unlock
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-04-09 |
+| Severity     | P2 Medium |
+| Status       | Resolved |
+| Reported by  | Manual testing — reply bubble disappeared after unlocking the phone |
+| Affected area| `ChatView.tsx` → friend feedback bubble rendering |
+
+### Background
+> After a participant answers a question in chat, the friend's reply bubble appears with a 2.5-second delay. This feedback is an important part of the conversational flow and must persist across phone state changes.
+
+### Incident Description
+> After unlocking the phone (or switching contacts and returning), previously visible friend reply bubbles were gone. The participant's own answer bubble remained, but the friend's follow-up response had vanished.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 23:01 | Bug reported during UI testing |
+| 23:02 | Root cause identified: `feedbackVisible` stored in local `useState` |
+| 23:03 | Fix deployed: moved to Zustand store field `feedbackVisible` on message |
+| 23:04 | Confirmed resolved |
+
+### Root Cause
+> `ChatView.tsx` tracked which messages had their feedback bubble visible using a local `useState<Set<string>>`. When the phone locked, `LockScreen` replaced `ChatView` in the render tree, unmounting the component and discarding its local state. On unlock, `ChatView` remounted with an empty set — all feedback visibility was gone.
+
+### Contributing Factors
+> - Component-local state used for data that semantically belongs to the message itself
+> - Locking/unlocking causes unmount/remount of `ChatView` (expected behavior), making any local state non-persistent
+> - No test coverage for the lock → answer → lock → unlock → check feedback flow
+
+### Fix
+> **`frontend/src/types/index.ts`**: Added `feedbackVisible?: boolean` field to `PhoneMessage`.
+>
+> **`frontend/src/stores/gameStore.ts`**: Added `showMessageFeedback(messageId)` action that sets `feedbackVisible: true` on the target message (persisted in store across remounts).
+>
+> **`frontend/src/components/game/phone/ChatView.tsx`**:
+> - Removed `useState<Set<string>>` for `feedbackVisible`
+> - `handleAnswer` now calls `showMessageFeedback(msg.id)` after the 2.5s delay instead of `setFeedbackVisible`
+> - `MessageGroup` reads `msg.feedbackVisible` directly from the message prop
+
+### Verification
+> Answered a question, locked phone, unlocked — friend reply bubble still present.
+
+### Follow-up Actions
+> - [ ] Consider also persisting `flashResult` (correct/incorrect border flash) — currently it's also local state but is very short-lived (600ms) so loss is less noticeable
+> - [ ] Review other `ChatView` local state for similar persistence issues

@@ -85,7 +85,8 @@ ws://host/ws/game/{session_id}/{block_number}?auto_start={bool}
 | `time_tick` | `{elapsed, game_clock}` | Clock update (every 10s) |
 | `pm_trigger` | `{trigger_id, trigger_event, task_config, server_trigger_ts}` | PM task activated |
 | `fake_trigger` | `{trigger_type, duration}` | Decoy trigger (no PM task) |
-| `phone_message` | `{id, sender, avatar, text, is_ad, replies?}` | Phone notification |
+| `phone_message` | `{id, channel, text, contact_id?, correct_choice?, wrong_choice?, correct_position?, feedback_correct?, feedback_incorrect?, sender?}` | Chat message (`channel:"chat"`) or system notification (`channel:"notification"`) |
+| `kitchen_timer` | `{id, icon, message}` | Kitchen timer modal (blocking) |
 | `robot_speak` | `{text}` | Robot speech bubble |
 | `robot_move` | `{to_room}` | Robot changes room |
 | `ongoing_task_event` | `{task, event, ...}` | Steak/dining state change |
@@ -103,8 +104,11 @@ ws://host/ws/game/{session_id}/{block_number}?auto_start={bool}
 | `trigger_ack` | `{trigger_id, received_at}` | Trigger receipt confirmation |
 | `task_action` | `{task, event, timestamp}` | Ongoing task interaction |
 | `phone_unlock` | `{timestamp}` | Phone unlocked |
-| `phone_reply` | `{message_id, reply_id, timestamp}` | Message reply |
-| `phone_read` | `{message_id, timestamp}` | Message read |
+| `phone_reply` | `{message_id, contact_id, chosen_text, is_correct, correct_position_shown, timestamp}` | Chat message answered |
+| `phone_read` | `{contact_id, timestamp}` | Contact chat viewed (all messages marked read) |
+| `phone_contact_switch` | `{fromContactId, toContactId, timestamp}` | User switched to different contact |
+| `phone_tab_switch` | `{tab, timestamp}` | User switched between Chats/Recipe tabs |
+| `kitchen_timer_acknowledged` | `{timerId, timestamp, reactionTime}` | Kitchen timer modal dismissed |
 | `mouse_position` | `{positions: [{x, y, t}]}` | Mouse trajectory batch |
 
 ---
@@ -138,10 +142,35 @@ Key state sections:
 - **Room**: currentRoom, previousRoom, avatarMoving
 - **Kitchen**: pans (3 pan states), kitchenScore
 - **Dining**: diningPhase, seats (6), utensils, round, score
-- **Phone**: messages, notifications, locked, banner, lastActivity
+- **Phone**:
+  - `phoneMessages: PhoneMessage[]` — chat messages (channel `"chat"`) only; notifications are banner-only
+  - `contacts: Contact[]` — loaded from backend on block start; contacts with no messages are hidden in ContactStrip until first message arrives
+  - `activeContactId: string | null` — currently viewed contact
+  - `activePhoneTab: 'chats' | 'recipe'`
+  - `phoneLocked: boolean`, `phoneLastActivity: number`
+  - `phoneBanner: PhoneMessage | null` — auto-dismissed notification or cross-contact chat alert
+  - `kitchenTimerQueue: KitchenTimerModal[]` — queued blocking modals
+  - `lockSystemNotifications[]` — system notifications accumulated on lock screen (persist until session reset)
 - **PM**: activePMTrials, completedPMTrialIds
 - **Robot**: room, speaking, speechText
 - **Clock**: gameClock, elapsedSeconds
+
+### PhoneMessage fields
+```typescript
+{
+  id, text, channel: 'chat' | 'notification',
+  contactId?,            // chat messages only
+  correctChoice?,        // question text (correct answer)
+  wrongChoice?,          // question text (wrong answer)
+  correctPosition?,      // null = frontend randomizes; 0|1 = forced
+  feedbackCorrect?,      // friend's reply if answered correctly
+  feedbackIncorrect?,    // friend's reply if answered incorrectly
+  sender?,               // notification messages only
+  timestamp, read, answered, answeredCorrect?,
+  feedbackVisible?,      // true after 2.5s delay post-answer (persisted in store)
+  userChoice?,           // the text the participant actually chose
+}
+```
 
 ---
 

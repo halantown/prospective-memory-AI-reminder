@@ -301,36 +301,128 @@ No drag-and-drop required (avoids small-target issues in fixed floor plan). Reus
 
 | Type                         | Count per block | Reply needed          | Purpose                            |
 | ---------------------------- | --------------- | --------------------- | ---------------------------------- |
-| Question (friend chat)       | 10-12           | Yes (2 options)       | Cognitive load — occupy verbal WM |
-| Notification (system/social) | 5-6             | No                    | Information noise, realism         |
-| Kitchen Timer                | ~8-10           | No                    | Cooking phase transition cues      |
-| PM Trigger                   | 3-4 per block   | No (triggers PM task) | Experimental manipulation          |
+| Question (friend chat)       | 12              | Yes (2 options)       | Cognitive load — occupy verbal WM  |
+| Notification (system/social) | 6               | No                    | Information noise, realism         |
+| Kitchen Timer                | ~8-10           | No (modal dismiss)    | Cooking phase transition cues      |
+
+> **Note**: PM Trigger messages have been removed from the phone system. PM triggers now arrive via phone call UI (separate system).
+
+### JSON Data Structure
+
+Chat messages and notifications are stored in **separate arrays** in the timeline config file (e.g., `block_default.json`):
+
+```json
+{
+  "contacts": [
+    { "id": "alice", "name": "Alice", "avatar": "👩" },
+    ...
+  ],
+  "chats": [
+    {
+      "id": "q_001",
+      "t": 30,
+      "contact_id": "alice",
+      "text": "Hey, I'm bringing cakes! ...",
+      "correct_choice": "Yep, €48!",
+      "wrong_choice": "Hmm no, should be €46",
+      "feedback_correct": "Great, ordering now! 🎂",
+      "feedback_incorrect": "Wait, 12 × 4 = 48 actually! Thanks anyway 😄"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "n_001",
+      "t": 100,
+      "sender": "Laundry 🧺",
+      "text": "Your laundry is halfway done"
+    }
+  ]
+}
+```
+
+The WebSocket `phone_message` event includes a `channel` field (`"chat"` or `"notification"`) so the frontend routes them correctly:
+- `chat` → stored in `phoneMessages`, displayed in `ChatView` under the relevant contact
+- `notification` → displayed as auto-dismiss banner only; accumulated in `lockSystemNotifications` for lock screen
+
+### Question Message Data Model
+
+Old structure (deprecated):
+```json
+{ "choices": ["...", "..."], "correct_index": 0 }
+```
+
+New structure:
+```json
+{
+  "correct_choice": "Yep, €48!",
+  "wrong_choice": "Hmm no, should be €46",
+  "feedback_correct": "...",
+  "feedback_incorrect": "...",
+  "correct_position": null
+}
+```
+
+`correct_position: null` means frontend randomly assigns correct choice to left (0) or right (1) button on first render and fixes it — this naturally counterbalances answer position across participants.
+
+### Phone UI Architecture
+
+```
+PhoneSidebar.tsx          (iPhone shell + Dynamic Island + status bar + lock screen logic)
+├── LockScreen.tsx         (two sections: Messages above System, fixed layout, no overflow)
+├── NotificationBanner.tsx (floating pill at top, 5s auto-dismiss, countdown bar)
+├── KitchenTimerModal.tsx  (blocking modal overlay, must be dismissed manually)
+├── PhoneTabBar.tsx        (bottom tabs: Chats / Recipe)
+├── ContactStrip.tsx       (left 48px vertical avatar list — hidden until contact sends first msg)
+├── ChatView.tsx           (right panel: chat header + message scroll)
+│   ├── ChatBubble.tsx     (friend: left-aligned; participant reply: right-aligned blue)
+│   └── ChoiceButtons.tsx  (vertical stacked, full-width buttons)
+└── RecipeTab.tsx          (recipe viewer placeholder)
+```
+
+### Contact Badge System (3-state)
+
+| Badge | Meaning |
+|-------|---------|
+| **Red number (e.g. "2")** | N messages from this contact not yet seen (contact not visited) |
+| **Small red dot** (no number) | All messages seen but ≥1 question not yet answered |
+| **No badge** | All questions answered |
+
+State flow per message: `unread` → (switch to contact) → `read` → (tap choice) → `answered`
+
+`ContactStrip` filters to `visibleContacts` — contacts with ≥1 message in the store. Contacts are hidden until their first message arrives.
+
+### Friend Reply Persistence
+
+Friend reply bubbles are shown with a 2.5-second delay after the participant answers. The `feedbackVisible` flag is stored on the `PhoneMessage` object in Zustand (not in component local state). This ensures feedback survives phone lock/unlock cycles which unmount/remount `ChatView`.
 
 ### Question Message Design
 
 - Packaged as **contextual friend conversations**, not quiz questions
 - Two reply options, both natural responses, one correct based on scenario logic
 - Correct rate serves as ongoing engagement measure
-- Example: Tom: "I'm driving from Leiden, 25 min away. I leave at 5:35, will I make it by 6?" → "You'll make it" / "Might be late" (correct: make it)
+- Example: Tom: "I'm driving from Leiden, 25 min away. I leave at 5:35, will I make it by 6?" → "You'll make it" / "Might be late" (correct: "You'll make it")
 
 ### Message Sources
 
 - ~40% party-related (friends attending asking practical questions)
-- ~40% general friend chat (friends not attending, daily life topics)
+- ~40% general friend chat / light arithmetic
 - ~20% system notifications (weather, delivery, battery, storage)
 
 ### Nudge Mechanism
 
-- If **5+ question messages** go unanswered, system sends a follow-up notification: "You have several unread messages 📱"
-- This is a single `notification` type message, not a penalty
-- Instruction during trial session: "Please reply to your friends' messages as you normally would. Your responses are recorded."
+- If **5+ question messages** go unanswered, backend sends a notification: `"You have several unread messages"`
+- This is dynamically generated — not pre-scheduled in the JSON
+- Nudge does not repeat within 60 seconds
 
 ### Phone Lock Screen
 
-- Auto-locks after 15s of no phone interaction (existing mechanism)
-- New messages show as banner previews on lock screen
-- Must unlock to read full message and reply
-- Unlock action logged as behavioral data
+- Auto-locks after 15s of no phone interaction
+- **Two sections** (Messages above System), separated by a plain divider line
+- Messages section: shows per-contact summary (contact name + unread count + truncated latest text)
+- System section: shows accumulated system notifications (persist until session reset)
+- Sections only visible when they have content
+- Fixed-height layout — inner scroll if too many notifications; "Tap to unlock" always pinned at bottom
+- Lock screen does **not** show the status bar clock
 
 ---
 
