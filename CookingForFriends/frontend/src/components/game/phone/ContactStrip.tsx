@@ -48,9 +48,15 @@ export default function ContactStrip() {
     }
   }
 
+  // Only show contacts who have at least one message
+  const visibleContacts = useMemo(
+    () => contacts.filter((c) => phoneMessages.some((m) => m.channel === 'chat' && m.contactId === c.id)),
+    [contacts, phoneMessages]
+  )
+
   return (
     <div className="flex flex-col items-center gap-1.5 py-2 px-1 w-12 border-r border-slate-700/40 shrink-0 overflow-y-auto">
-      {contacts.map((contact) => {
+      {visibleContacts.map((contact) => {
         const isActive = contact.id === activeContactId
         const badge = badgeByContact[contact.id] || { type: 'none' }
 
