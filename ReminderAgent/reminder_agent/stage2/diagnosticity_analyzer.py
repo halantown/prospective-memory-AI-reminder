@@ -322,7 +322,13 @@ def analyze_task(
 def analyze_all_tasks(
     backend: LLMBackend,
 ) -> dict[str, dict]:
-    """Run diagnosticity analysis for all 12 tasks.
+    """Run diagnosticity analysis for all tasks.
+
+    .. deprecated:: v2
+        In v2, diagnosticity labels are pre-assigned statically in each task
+        JSON's ``c_af_candidates`` entries. This function is retained only as
+        an offline validation/re-analysis tool. Use the static labels in task
+        JSON for production pipeline runs.
 
     Groups tasks by block for Level A analysis.
     Returns {task_id: report_dict}.

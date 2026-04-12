@@ -32,15 +32,15 @@ python -m reminder_agent.stage2.batch_runner --dry-run
 
 输出示例：
 ```
-=== LLM Generation (2 tasks × 4 conditions × 3 variants = 24 total) ===
-  ✅ example_book / AF_low_EC_off / v0 (attempt 1)
-  ✅ example_book / AF_high_EC_off / v0 (attempt 1)
-  ✅ example_book / AF_low_EC_on / v0 (attempt 1)
-  ✅ example_book / AF_high_EC_on / v0 (attempt 1)
+=== LLM Generation (4 tasks × 4 conditions × 3 variants = 48 total) ===
+  ✅ book1_mei / AF_low_EC_off / v0 (attempt 1)
+  ✅ book1_mei / AF_high_EC_off / v0 (attempt 1)
+  ✅ book1_mei / AF_low_EC_on / v0 (attempt 1)
+  ✅ book1_mei / AF_high_EC_on / v0 (attempt 1)
   ...
 
 === Summary ===
-  Total: 24 attempted, 24 succeeded, 0 failed
+  Total: 48 attempted, 48 succeeded, 0 failed
 ```
 
 Dry-run 不调用 LLM，不写入数据库，用于检查配置和任务 JSON 是否完整。
@@ -73,7 +73,7 @@ python -m reminder_agent.stage2.batch_runner
 
 ```bash
 # 只生成某个任务
-python -m reminder_agent.stage2.batch_runner --task example_book
+python -m reminder_agent.stage2.batch_runner --task book1_mei
 
 # 只生成某个条件
 python -m reminder_agent.stage2.batch_runner --condition AF_high_EC_on
@@ -84,8 +84,8 @@ python -m reminder_agent.stage2.batch_runner --n-variants 5
 # 清空数据库重新生成
 python -m reminder_agent.stage2.batch_runner --clear
 
-# 组合使用：重新生成 example_book 的 AF_low_EC_off 条件，5 个变体
-python -m reminder_agent.stage2.batch_runner --task example_book --condition AF_low_EC_off --n-variants 5 --clear
+# 组合使用：重新生成 book1_mei 的 AF_low_EC_off 条件，5 个变体
+python -m reminder_agent.stage2.batch_runner --task book1_mei --condition AF_low_EC_off --n-variants 5 --clear
 
 # 详细日志
 python -m reminder_agent.stage2.batch_runner --verbose
@@ -117,7 +117,7 @@ python -m reminder_agent.review.review_interface --stats
 
 ```bash
 # 交互式审核某个任务
-python -m reminder_agent.review.review_interface --task example_book
+python -m reminder_agent.review.review_interface --task book1_mei
 
 # 只看特定条件
 python -m reminder_agent.review.review_interface --condition AF_high_EC_on
@@ -147,14 +147,15 @@ Method: Rule-based (no LLM)
 --- Extracted Task JSON ---
 {
   "reminder_context": {
-    "element1": {
+    "element1_af": {
       "action_verb": "take",
       "target_entity": { "entity_name": "Doxycycline", ... },
       "location": { "room": "kitchen", "spot": "shelf" }
     },
-    "element2": {
-      "origin": { "creator_is_authority": true },
-      ...
+    "element2_ec": {
+      "task_creator": "Dr. Smith",
+      "creator_relationship": "doctor",
+      "creation_context": "prescription"
     }
   }
 }
@@ -168,7 +169,7 @@ Method: Rule-based (no LLM)
 ```bash
 cd ReminderAgent
 pytest reminder_agent/tests -v
-# 预期: 106 passed
+# 预期: 113 passed
 ```
 
 ---
@@ -214,10 +215,12 @@ n_variants: 10   # 从 3 改为 10
 
 | 任务 ID | 物品 | 说明 |
 |---------|------|------|
-| `example_book` | 书 | 含视觉线索（红色封面、山景插图）、位置（书房书架） |
-| `example_hanger` | 衣架 | 含视觉线索（木质、金色挂钩）、位置（卧室衣柜） |
+| `book1_mei` | 书（给Mei） | 含视觉线索（红色封面、山景插图）、位置（书房书架） |
+| `book2_jack` | 书（给Jack） | TODO |
+| `tea_benjamin` | 茶（给Benjamin） | TODO |
+| `dessert_sophia` | 甜点（给Sophia） | TODO |
 
-> 正式实验任务 JSON 将按同样结构扩展，放入 `data/task_schemas/` 目录。
+> 所有 4 个任务为独立任务，任务 JSON 存放于 `data/task_schemas/` 目录。
 
 ---
 

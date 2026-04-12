@@ -1,8 +1,10 @@
 # AF Diagnosticity Analysis — Development Guide
 
-> **Version**: 0.1 | **Date**: 2026-03-31 | **Prerequisite**: Read USAGE.md
+> **Version**: 0.2 | **Date**: 2026-04 | **Prerequisite**: Read USAGE.md
 > **Purpose**: Add diagnosticity-based cue selection to the AF operationalization pipeline
 > **Model**: Qwen (百炼 API) for development, switch to local Ollama when stable
+
+> **⚠ v2 Migration Note**: Diagnosticity labels are now **static**, pre-labelled directly in the task JSON `c_af_candidates` entries with `diagnosticity: "high"/"low"`. The runtime LLM-based analyzer (`diagnosticity_analyzer.py`) is preserved as an **offline validation tool only** — it is no longer part of the production pipeline. AF_high feature selection now uses all features where `diagnosticity == "high"` (no top-k ranking).
 
 ---
 
@@ -10,7 +12,7 @@
 
 This guide adds a **diagnosticity analysis layer** between your task JSON design and the existing reminder generation pipeline. The goal: systematically decide which cues from the encoding material should appear in AF reminders, based on how well each cue discriminates the target from distractors.
 
-### Before (current state)
+### Before (v1)
 
 ```
 Task JSON (hand-authored cues) → context_extractor → prompt_constructor → LLM → reminder text
@@ -19,15 +21,18 @@ Task JSON (hand-authored cues) → context_extractor → prompt_constructor → 
                                         no documented rationale
 ```
 
-### After (new state)
+### After (v2 — current state)
 
 ```
-Task JSON (2 distractors) → diagnosticity_analyzer → diagnosticity report (YAML)
-                                                          ↓ (human review)
-                                                     approved report
-                                                          ↓
-Task JSON → context_extractor → prompt_constructor (now cue-priority-aware) → LLM → reminder text
+Task JSON (static diagnosticity labels in c_af_candidates)
+     ↓
+context_extractor → selects features where diagnosticity == "high"
+     ↓
+prompt_constructor (cue-priority-aware) → LLM → reminder text
 ```
+
+> **Note**: `diagnosticity_analyzer.py` is retained as an offline validation tool
+> to verify that static labels are consistent. It is **not** part of the production pipeline.
 
 ---
 
@@ -51,7 +56,7 @@ D(c) = A(c → target) / Σ A(c → t_i)
 
 where t_i includes the target plus all competing items (distractors + other active PM tasks in the same block). Higher D means the cue is more diagnostic.
 
-**L4 — AF Operationalization**: The reminder includes the top-diagnosticity cues from C_AF.
+**L4 — AF Operationalization**: The reminder includes all features from C_AF where `diagnosticity == "high"` (pre-labelled in task JSON `c_af_candidates`).
 
 **Key references** (include in prompts when relevant):
 
@@ -62,11 +67,11 @@ where t_i includes the target plus all competing items (distractors + other acti
 
 ---
 
-## 3. Schema Migration: 1 → 2 Distractors
+## 3. Schema Migration: v1 → v2
 
-### 3.1 New `distractor_info` Schema
+### 3.1 Distractor Schema (now in `element1_af.distractors`)
 
-Replace the current single-distractor structure in `agent_reasoning_context`:
+Distractors have moved from `agent_reasoning_context.distractor_info` to `reminder_context.element1_af.distractors`:
 
 **Current (single distractor):**
 
@@ -77,10 +82,12 @@ Replace the current single-distractor structure in `agent_reasoning_context`:
 }
 ```
 
-**New (two distractors):**
+**New (v2 — two distractors, under `element1_af`):**
 
 ```json
-"distractor_info": {
+"element1_af": {
+  "af_baseline": { "action_verb": "find", "target_entity": "..." },
+  "af_high": { "visual_cue": "...", "domain_properties": "..." },
   "distractors": [
     {
       "id": "d1",
@@ -147,28 +154,30 @@ After migration, update `test_task_schemas.py`:
 
 ---
 
-## 4. New Module: `diagnosticity_analyzer.py`
+## 4. Module: `diagnosticity_analyzer.py` (offline validation only)
+
+> **⚠ Deprecated for production use.** Diagnosticity labels are now static in the task JSON `c_af_candidates` entries. This module is retained as an offline validation tool to verify that static labels are consistent with the theoretical framework. See §1 pipeline diagram.
 
 ### 4.1 Location
 
 ```
 reminder_agent/
   stage2/
-    diagnosticity_analyzer.py    ← NEW
+    diagnosticity_analyzer.py    ← offline validation tool
   data/
-    diagnosticity/               ← NEW (output directory)
+    diagnosticity/               ← validation output directory
       b1_book.yaml
       b1_dish.yaml
       ...
 ```
 
-### 4.2 What It Does
+### 4.2 What It Does (offline validation)
 
 For each PM trial, it:
 
 1. Extracts all presented features from encoding material (L2: candidate set)
 2. Assesses each feature's diagnosticity at two levels (L3)
-3. Recommends which features to include in the AF reminder (L4)
+3. Validates that static labels in `c_af_candidates` are consistent with the assessment
 4. Optionally uses VLM to extract additional visual features from encoding images
 
 ### 4.3 Diagnosticity Assessment: Two Levels
@@ -320,13 +329,14 @@ minimum_cues_for_discrimination: ["f1", "f2"]
 ### 4.5 Module Interface
 
 ```python
-"""Diagnosticity analyzer — assesses cue diagnosticity for AF reminder design.
+"""Diagnosticity analyzer — offline validation of static diagnosticity labels.
 
-This is an OFFLINE analysis tool. Run it once per task, review the output,
-then use approved reports to guide AF reminder generation.
+Diagnosticity labels are now pre-set in task JSON c_af_candidates entries.
+This tool validates that static labels are consistent with the theoretical
+framework. It is NOT part of the production pipeline.
 
-Usage:
-    python -m reminder_agent.stage2.diagnosticity_analyzer [--task TASK_ID] [--all] [--use-vlm]
+Usage (offline validation only):
+    python -m reminder_agent.stage2.diagnosticity_analyzer [--task TASK_ID] [--validate] [--use-vlm]
 """
 
 def analyze_task(
@@ -627,17 +637,19 @@ def extract_image_features(image_path: Path, vlm_backend: LLMBackend) -> list[di
 
 ---
 
-## 8. CLI Interface
+## 8. CLI Interface (offline validation only)
+
+> **⚠ Deprecated for production.** The `--all` flag and block-based analysis are no longer used in the production pipeline. Diagnosticity is static in task JSON. These commands are retained for offline validation only.
 
 ```bash
-# Analyze a single task
-python -m reminder_agent.stage2.diagnosticity_analyzer --task b1_book
+# Validate static labels for a single task against LLM analysis
+python -m reminder_agent.stage2.diagnosticity_analyzer --task b1_book --validate
 
-# Analyze all tasks
-python -m reminder_agent.stage2.diagnosticity_analyzer --all
+# Validate all tasks (offline — not part of production pipeline)
+python -m reminder_agent.stage2.diagnosticity_analyzer --all --validate
 
 # With VLM (requires images in data/encoding_images/)
-python -m reminder_agent.stage2.diagnosticity_analyzer --all --use-vlm
+python -m reminder_agent.stage2.diagnosticity_analyzer --all --validate --use-vlm
 
 # Review mode: show existing reports
 python -m reminder_agent.stage2.diagnosticity_analyzer --review
