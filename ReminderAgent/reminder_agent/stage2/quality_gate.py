@@ -203,9 +203,37 @@ def check_language(text: str) -> CheckResult:
 
 def check_cue_priority_compliance(
     text: str,
-    diagnosticity_report: dict | None,
+    diagnosticity_report: dict | None = None,
+    task_json: dict | None = None,
 ) -> CheckResult:
-    """Check that high-priority cues from diagnosticity report appear in the text."""
+    """Check that high-diagnosticity features appear in the text.
+
+    Supports v2 static labels from task_json c_af_candidates (preferred)
+    and legacy diagnosticity report format.
+    """
+    # v2: read static labels from task JSON
+    if task_json is not None:
+        candidates = (
+            task_json
+            .get("reminder_context", {})
+            .get("element1_af", {})
+            .get("c_af_candidates", [])
+        )
+        high_features = [c["feature"] for c in candidates if c.get("diagnosticity") == "high"]
+        if not high_features:
+            return CheckResult("cue_priority", True, "No high-diagnosticity features — skipped")
+
+        missing = []
+        for feature in high_features:
+            key_terms = [t.strip().lower() for t in feature.split() if len(t.strip()) > 3]
+            if key_terms and not any(term in text.lower() for term in key_terms):
+                missing.append(feature)
+
+        if missing:
+            return CheckResult("cue_priority", False, f"Missing high-diagnosticity features: {missing}")
+        return CheckResult("cue_priority", True, f"All {len(high_features)} high-diagnosticity features present")
+
+    # Legacy: read from external diagnosticity report
     if diagnosticity_report is None:
         return CheckResult("cue_priority", True, "No diagnosticity report — skipped")
 
@@ -249,8 +277,8 @@ def check_ec_source_present(
     if "EC_on" not in condition:
         return CheckResult("ec_source_present", True, "Not EC_on — skipped")
 
-    el2 = task_json.get("reminder_context", {}).get("element2", {})
-    creator = el2.get("origin", {}).get("task_creator", "")
+    el2 = task_json.get("reminder_context", {}).get("element2_ec", {})
+    creator = el2.get("task_creator", "")
     creation_ctx = el2.get("creation_context", "")
 
     text_lower = text.lower()
@@ -284,8 +312,8 @@ def check_ec_source_absent(
     if "EC_off" not in condition:
         return CheckResult("ec_source_absent", True, "Not EC_off — skipped")
 
-    el2 = task_json.get("reminder_context", {}).get("element2", {})
-    creator = el2.get("origin", {}).get("task_creator", "")
+    el2 = task_json.get("reminder_context", {}).get("element2_ec", {})
+    creator = el2.get("task_creator", "")
 
     if creator and creator.lower() != "self":
         creator_words = [w.lower() for w in creator.split() if len(w) > 2]
@@ -318,7 +346,7 @@ def check(
     Args:
         text: The generated reminder text.
         condition: e.g. "AF_low_EC_off".
-        task_id: e.g. "example_book".
+        task_id: e.g. "book1_mei".
         entity_name: The entity name that must appear in the text.
         prior_variants: Previously accepted variants in this batch.
         gen_config: Generation config (for thresholds). Loaded if None.
@@ -356,17 +384,17 @@ def check(
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    # Demo: check a good and a bad text for example_book
-    good_af = "Remember to find and bring the book from the study — the red paperback titled Erta Ale with a mountain cover."
-    bad_af = "Remember to get your book."
+    # Demo: check a good and a bad text for book1_mei
+    good_af = "Remember to give Mei the book — the red one with a mountain illustration, on the second shelf in the study."
+    bad_af = "Remember to give Mei the book."
 
-    print("=== Quality Gate Demo (example_book, AF_high_EC_off) ===\n")
+    print("=== Quality Gate Demo (book1_mei, AF_high_EC_off) ===\n")
 
     for label, text in [("Good (AF_high)", good_af), ("Bad (missing details)", bad_af)]:
         result = check(
             text=text,
             condition="AF_high_EC_off",
-            task_id="example_book",
+            task_id="book1_mei",
             entity_name="book",
         )
         print(f"{label}: {text!r}")

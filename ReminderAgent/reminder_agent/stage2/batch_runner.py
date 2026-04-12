@@ -76,7 +76,7 @@ def run_batch(
     print(f"\n=== LLM Generation ({len(tasks)} tasks × {len(conditions)} conditions × {n_variants} variants = {total} total) ===")
 
     for task in tasks:
-        entity_name = task["reminder_context"]["element1"]["target_entity"]["entity_name"]
+        entity_name = task["reminder_context"]["element1_af"]["af_high"]["target_entity"]["entity_name"]
 
         for condition in conditions:
             prior_variants: list[str] = []
@@ -93,7 +93,7 @@ def run_batch(
                     )
 
                     if dry_run:
-                        raw_output = f"[DRY RUN] Remember to {task['reminder_context']['element1']['action_verb']} the {entity_name}. ({condition} v{v_idx})"
+                        raw_output = f"[DRY RUN] Remember to {task['reminder_context']['element1_af']['af_baseline']['action_verb']} the {entity_name}. ({condition} v{v_idx})"
                     else:
                         try:
                             raw_output = backend.generate(sys_prompt, usr_prompt)

@@ -37,7 +37,7 @@ class TestForbiddenKeywords:
     """Test forbidden keyword leak check for AF_low conditions."""
 
     FORBIDDEN_KW = {
-        "example_book": {
+        "book1_mei": {
             "visual_keywords": ["red", "mountain", "landscape", "cover"],
             "domain_keywords": ["erta ale", "paperback"],
         },
@@ -46,7 +46,7 @@ class TestForbiddenKeywords:
     def test_af_high_always_passes(self) -> None:
         result = check_forbidden_keywords(
             "Remember to find the red book with the mountain cover.",
-            "example_book", "AF_high_EC_off", self.FORBIDDEN_KW,
+            "book1_mei", "AF_high_EC_off", self.FORBIDDEN_KW,
         )
         assert result.passed
         assert "skipped" in result.detail.lower()
@@ -54,15 +54,15 @@ class TestForbiddenKeywords:
     def test_af_low_with_leak_fails(self) -> None:
         result = check_forbidden_keywords(
             "Remember to find the red book.",
-            "example_book", "AF_low_EC_off", self.FORBIDDEN_KW,
+            "book1_mei", "AF_low_EC_off", self.FORBIDDEN_KW,
         )
         assert not result.passed
         assert "red" in result.detail.lower()
 
     def test_af_low_without_leak_passes(self) -> None:
         result = check_forbidden_keywords(
-            "Remember to find and bring the book.",
-            "example_book", "AF_low_EC_off", self.FORBIDDEN_KW,
+            "Remember to give the book.",
+            "book1_mei", "AF_low_EC_off", self.FORBIDDEN_KW,
         )
         assert result.passed
 
@@ -231,12 +231,10 @@ class TestECSourcePresent:
 
     TASK_JSON = {
         "reminder_context": {
-            "element2": {
-                "origin": {
-                    "task_creator": "friend Mei",
-                    "creator_is_authority": False,
-                },
-                "creation_context": "Mei asked to borrow it during a phone call yesterday",
+            "element2_ec": {
+                "task_creator": "Mei",
+                "creator_relationship": "friend",
+                "creation_context": "While baking cookies together in the kitchen, Mei mentioned she would love to borrow the book",
             },
         },
     }
@@ -276,19 +274,17 @@ class TestECSourceAbsent:
 
     TASK_JSON = {
         "reminder_context": {
-            "element2": {
-                "origin": {
-                    "task_creator": "friend Mei",
-                    "creator_is_authority": False,
-                },
-                "creation_context": "Mei asked to borrow it during a phone call yesterday",
+            "element2_ec": {
+                "task_creator": "Mei",
+                "creator_relationship": "friend",
+                "creation_context": "While baking cookies together in the kitchen, Mei mentioned she would love to borrow the book",
             },
         },
     }
 
     def test_ec_off_no_source_passes(self) -> None:
         result = check_ec_source_absent(
-            "Remember to find and bring the book.",
+            "Remember to give the book.",
             "AF_low_EC_off",
             self.TASK_JSON,
         )
@@ -315,11 +311,9 @@ class TestECSourceAbsent:
     def test_creator_self_passes(self) -> None:
         task = {
             "reminder_context": {
-                "element2": {
-                    "origin": {
-                        "task_creator": "self",
-                        "creator_is_authority": False,
-                    },
+                "element2_ec": {
+                    "task_creator": "self",
+                    "creator_relationship": "self",
                     "creation_context": "",
                 },
             },
@@ -340,7 +334,7 @@ class TestAggregateCheck:
     """Test the main check() function that runs all per-variant checks."""
 
     FORBIDDEN_KW = {
-        "example_book": {
+        "book1_mei": {
             "visual_keywords": ["red", "mountain", "landscape", "cover"],
             "domain_keywords": ["erta ale", "paperback"],
         },
@@ -348,21 +342,19 @@ class TestAggregateCheck:
 
     TASK_JSON = {
         "reminder_context": {
-            "element2": {
-                "origin": {
-                    "task_creator": "friend Mei",
-                    "creator_is_authority": False,
-                },
-                "creation_context": "Mei asked to borrow it during a phone call yesterday",
+            "element2_ec": {
+                "task_creator": "Mei",
+                "creator_relationship": "friend",
+                "creation_context": "While baking cookies together in the kitchen, Mei mentioned she would love to borrow the book",
             },
         },
     }
 
     def test_valid_af_high_ec_off_passes(self) -> None:
         result = check(
-            text="Remember to find and bring the book from the study — the red paperback titled Erta Ale.",
+            text="Remember to give the book from the study — the red paperback titled Erta Ale.",
             condition="AF_high_EC_off",
-            task_id="example_book",
+            task_id="book1_mei",
             entity_name="book",
             forbidden_kw=self.FORBIDDEN_KW,
             task_json=self.TASK_JSON,
@@ -372,9 +364,9 @@ class TestAggregateCheck:
 
     def test_valid_af_high_ec_on_passes(self) -> None:
         result = check(
-            text="Mei asked you about the book yesterday. Remember to find and bring the red paperback titled Erta Ale from the study.",
+            text="Mei asked you about the book while baking. Remember to give the red paperback titled Erta Ale from the study.",
             condition="AF_high_EC_on",
-            task_id="example_book",
+            task_id="book1_mei",
             entity_name="book",
             forbidden_kw=self.FORBIDDEN_KW,
             task_json=self.TASK_JSON,
@@ -385,7 +377,7 @@ class TestAggregateCheck:
         result = check(
             text="Remember to find the item from the study shelf for your friend.",
             condition="AF_high_EC_off",
-            task_id="example_book",
+            task_id="book1_mei",
             entity_name="book",
             forbidden_kw=self.FORBIDDEN_KW,
         )
@@ -397,7 +389,7 @@ class TestAggregateCheck:
         result = check(
             text="Get book.",
             condition="AF_high_EC_off",
-            task_id="example_book",
+            task_id="book1_mei",
             entity_name="book",
             forbidden_kw=self.FORBIDDEN_KW,
         )
@@ -406,11 +398,11 @@ class TestAggregateCheck:
         assert "length" in failed_names
 
     def test_duplicate_fails_aggregate(self) -> None:
-        prior = ["Remember to find and bring the book from the study — the red paperback."]
+        prior = ["Remember to give the book from the study — the red paperback."]
         result = check(
-            text="Remember to find and bring the book from the study — the red paperback.",
+            text="Remember to give the book from the study — the red paperback.",
             condition="AF_high_EC_off",
-            task_id="example_book",
+            task_id="book1_mei",
             entity_name="book",
             prior_variants=prior,
             forbidden_kw=self.FORBIDDEN_KW,
@@ -421,9 +413,9 @@ class TestAggregateCheck:
 
     def test_gate_result_summary(self) -> None:
         result = check(
-            text="Remember to find and bring the book from the study — the red paperback titled Erta Ale.",
+            text="Remember to give the book from the study — the red paperback titled Erta Ale.",
             condition="AF_high_EC_off",
-            task_id="example_book",
+            task_id="book1_mei",
             entity_name="book",
             forbidden_kw=self.FORBIDDEN_KW,
         )
@@ -433,7 +425,7 @@ class TestAggregateCheck:
         result = check(
             text="Remember to find the book for Mei from the study.",
             condition="AF_high_EC_off",
-            task_id="example_book",
+            task_id="book1_mei",
             entity_name="book",
             forbidden_kw=self.FORBIDDEN_KW,
             task_json=self.TASK_JSON,
@@ -444,9 +436,9 @@ class TestAggregateCheck:
 
     def test_ec_on_missing_source_fails_aggregate(self) -> None:
         result = check(
-            text="Remember to find and bring the book from the study.",
+            text="Remember to give the book from the study.",
             condition="AF_high_EC_on",
-            task_id="example_book",
+            task_id="book1_mei",
             entity_name="book",
             forbidden_kw=self.FORBIDDEN_KW,
             task_json=self.TASK_JSON,
@@ -461,8 +453,22 @@ class TestAggregateCheck:
 # ===================================================================
 
 class TestCuePriorityCompliance:
-    """Test cue priority compliance check with diagnosticity reports."""
+    """Test cue priority compliance check with v2 static labels and legacy reports."""
 
+    # v2 static labels via task_json
+    TASK_JSON = {
+        "reminder_context": {
+            "element1_af": {
+                "c_af_candidates": [
+                    {"feature": "red cover", "diagnosticity": "high"},
+                    {"feature": "mountain illustration", "diagnosticity": "high"},
+                    {"feature": "paperback format", "diagnosticity": "low"},
+                ],
+            },
+        },
+    }
+
+    # Legacy report format (backward compat)
     REPORT = {
         "candidate_features": [
             {"feature_id": "f1", "feature": "red cover"},
@@ -479,26 +485,58 @@ class TestCuePriorityCompliance:
         },
     }
 
-    def test_no_report_passes(self) -> None:
+    def test_no_report_or_json_passes(self) -> None:
         from reminder_agent.stage2.quality_gate import check_cue_priority_compliance
         result = check_cue_priority_compliance("any text", None)
         assert result.passed
         assert "skipped" in result.detail.lower()
 
-    def test_all_high_cues_present(self) -> None:
+    # -- v2 static label tests --
+
+    def test_v2_all_high_cues_present(self) -> None:
+        from reminder_agent.stage2.quality_gate import check_cue_priority_compliance
+        text = "Remember the red book with the mountain illustration on the cover."
+        result = check_cue_priority_compliance(text, task_json=self.TASK_JSON)
+        assert result.passed
+
+    def test_v2_missing_high_cue_fails(self) -> None:
+        from reminder_agent.stage2.quality_gate import check_cue_priority_compliance
+        text = "Remember the book with the mountain illustration."
+        result = check_cue_priority_compliance(text, task_json=self.TASK_JSON)
+        assert not result.passed
+        assert "red cover" in result.detail
+
+    def test_v2_no_high_features_passes(self) -> None:
+        from reminder_agent.stage2.quality_gate import check_cue_priority_compliance
+        task = {
+            "reminder_context": {
+                "element1_af": {
+                    "c_af_candidates": [
+                        {"feature": "some feature", "diagnosticity": "low"},
+                    ],
+                },
+            },
+        }
+        result = check_cue_priority_compliance("any text", task_json=task)
+        assert result.passed
+        assert "no high" in result.detail.lower()
+
+    # -- Legacy report tests --
+
+    def test_legacy_all_high_cues_present(self) -> None:
         from reminder_agent.stage2.quality_gate import check_cue_priority_compliance
         text = "Remember the red book with the mountain illustration on the cover."
         result = check_cue_priority_compliance(text, self.REPORT)
         assert result.passed
 
-    def test_missing_high_cue_fails(self) -> None:
+    def test_legacy_missing_high_cue_fails(self) -> None:
         from reminder_agent.stage2.quality_gate import check_cue_priority_compliance
         text = "Remember the book with the mountain illustration."
         result = check_cue_priority_compliance(text, self.REPORT)
         assert not result.passed
         assert "f1" in result.detail
 
-    def test_empty_include_passes(self) -> None:
+    def test_legacy_empty_include_passes(self) -> None:
         from reminder_agent.stage2.quality_gate import check_cue_priority_compliance
         report = {"recommended_cues": {"include": []}, "candidate_features": []}
         result = check_cue_priority_compliance("any text", report)

@@ -51,65 +51,69 @@ def tmp_config_dir(tmp_path: Path) -> Path:
     (cfg / "condition_field_map.yaml").write_text(textwrap.dedent("""\
         AF_low_EC_off:
           required_fields:
-            - "reminder_context.element1.action_verb"
-            - "reminder_context.element1.target_entity.entity_name"
+            - "reminder_context.element1_af.af_baseline.action_verb"
+            - "reminder_context.element1_af.af_baseline.recipient"
+            - "reminder_context.element1_af.af_high.target_entity.entity_name"
           conditional_fields: []
           excluded_fields:
-            - "reminder_context.element1.target_entity.cues"
-            - "reminder_context.element1.target_entity.domain_properties"
-            - "reminder_context.element1.location"
-            - "reminder_context.element2"
-            - "reminder_context.element3"
+            - "reminder_context.element1_af.af_high.target_entity.visual_cues"
+            - "reminder_context.element1_af.af_high.target_entity.domain_properties"
+            - "reminder_context.element1_af.af_high.location"
+            - "reminder_context.element2_ec"
+            - "reminder_context.element3_excluded"
           excluded_zones:
             - "agent_reasoning_context"
-            - "placeholder"
+            - "experiment_metadata"
 
         AF_high_EC_off:
           required_fields:
-            - "reminder_context.element1.action_verb"
-            - "reminder_context.element1.target_entity.entity_name"
-            - "reminder_context.element1.target_entity.cues.visual"
-            - "reminder_context.element1.target_entity.domain_properties"
-            - "reminder_context.element1.location"
+            - "reminder_context.element1_af.af_baseline.action_verb"
+            - "reminder_context.element1_af.af_baseline.recipient"
+            - "reminder_context.element1_af.af_high.target_entity.entity_name"
+            - "reminder_context.element1_af.af_high.target_entity.visual_cues"
+            - "reminder_context.element1_af.af_high.target_entity.domain_properties"
+            - "reminder_context.element1_af.af_high.location"
           conditional_fields: []
           excluded_fields:
-            - "reminder_context.element2"
-            - "reminder_context.element3"
+            - "reminder_context.element2_ec"
+            - "reminder_context.element3_excluded"
           excluded_zones:
             - "agent_reasoning_context"
-            - "placeholder"
+            - "experiment_metadata"
 
         AF_low_EC_on:
           required_fields:
-            - "reminder_context.element1.action_verb"
-            - "reminder_context.element1.target_entity.entity_name"
-            - "reminder_context.element2.origin"
-            - "reminder_context.element2.creation_context"
+            - "reminder_context.element1_af.af_baseline.action_verb"
+            - "reminder_context.element1_af.af_baseline.recipient"
+            - "reminder_context.element1_af.af_high.target_entity.entity_name"
+            - "reminder_context.element2_ec.task_creator"
+            - "reminder_context.element2_ec.creation_context"
           conditional_fields: []
           excluded_fields:
-            - "reminder_context.element1.target_entity.cues"
-            - "reminder_context.element1.target_entity.domain_properties"
-            - "reminder_context.element1.location"
-            - "reminder_context.element3"
+            - "reminder_context.element1_af.af_high.target_entity.visual_cues"
+            - "reminder_context.element1_af.af_high.target_entity.domain_properties"
+            - "reminder_context.element1_af.af_high.location"
+            - "reminder_context.element3_excluded"
           excluded_zones:
             - "agent_reasoning_context"
-            - "placeholder"
+            - "experiment_metadata"
 
         AF_high_EC_on:
           required_fields:
-            - "reminder_context.element1.action_verb"
-            - "reminder_context.element1.target_entity.entity_name"
-            - "reminder_context.element1.target_entity.cues.visual"
-            - "reminder_context.element1.target_entity.domain_properties"
-            - "reminder_context.element1.location"
-            - "reminder_context.element2.origin"
-            - "reminder_context.element2.creation_context"
+            - "reminder_context.element1_af.af_baseline.action_verb"
+            - "reminder_context.element1_af.af_baseline.recipient"
+            - "reminder_context.element1_af.af_high.target_entity.entity_name"
+            - "reminder_context.element1_af.af_high.target_entity.visual_cues"
+            - "reminder_context.element1_af.af_high.target_entity.domain_properties"
+            - "reminder_context.element1_af.af_high.location"
+            - "reminder_context.element2_ec.task_creator"
+            - "reminder_context.element2_ec.creation_context"
           conditional_fields: []
           excluded_fields:
-            - "reminder_context.element3"
+            - "reminder_context.element3_excluded"
           excluded_zones:
             - "agent_reasoning_context"
-            - "placeholder"
+            - "experiment_metadata"
     """))
 
     return cfg
@@ -153,12 +157,12 @@ class TestLoadFromProductionConfigs:
     def test_af_high_has_visual_cues(self) -> None:
         cfg = load_condition_field_map()
         af_high = cfg.conditions["AF_high_EC_off"]
-        assert "reminder_context.element1.target_entity.cues.visual" in af_high.required_fields
+        assert "reminder_context.element1_af.af_high.target_entity.visual_cues" in af_high.required_fields
 
     def test_all_conditions_exclude_detected_activity(self) -> None:
         cfg = load_condition_field_map()
         for cond_name, entry in cfg.conditions.items():
-            assert "reminder_context.element3.detected_activity_raw" not in entry.required_fields, (
+            assert "reminder_context.element3_excluded.detected_activity_raw" not in entry.required_fields, (
                 f"{cond_name} should not include detected_activity_raw"
             )
 
@@ -166,7 +170,7 @@ class TestLoadFromProductionConfigs:
         cfg = load_condition_field_map()
         for cond_name in ("AF_high_EC_off", "AF_high_EC_on"):
             entry = cfg.conditions[cond_name]
-            assert "reminder_context.element1.target_entity.domain_properties" in entry.required_fields
+            assert "reminder_context.element1_af.af_high.target_entity.domain_properties" in entry.required_fields
 
 
 # ---------------------------------------------------------------------------

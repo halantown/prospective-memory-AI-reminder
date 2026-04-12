@@ -195,7 +195,7 @@ def _count_leaf_values(d: dict) -> int:
 
 
 # ---------------------------------------------------------------------------
-# CLI entry point — demo extraction for example_book
+# CLI entry point — demo extraction for book1_mei
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 
     data_dir = Path(__file__).resolve().parent.parent / "data" / "task_schemas"
-    task_path = data_dir / "example_book.json"
+    task_path = data_dir / "book1_mei.json"
 
     if not task_path.exists():
         print(f"Task file not found: {task_path}")
