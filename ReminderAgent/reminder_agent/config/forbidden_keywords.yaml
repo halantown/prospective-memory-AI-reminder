@@ -1,23 +1,27 @@
-# Forbidden Keywords — per-task visual/domain keywords.
+# Forbidden Keywords — per-task visual/domain keywords (v2 schema).
 # Used to enforce AF_low compliance: AF_low conditions must not leak these cues.
 #
 # visual_keywords: appearance cues (colour, shape, distinguishing features)
-# domain_keywords: specific properties
+# domain_keywords: specific properties (title, type, brand, etc.)
 
-example_book:
+book1_mei:
   visual_keywords:
     - "red"
     - "mountain"
-    - "landscape"
+    - "illustration"
     - "cover"
   domain_keywords:
     - "erta ale"
-    - "paperback"
+    - "travel"
 
-example_hanger:
-  visual_keywords:
-    - "wood"
-    - "wide"
-    - "curved"
-  domain_keywords:
-    - "wide"
+book2_jack:
+  visual_keywords: []
+  domain_keywords: []
+
+tea_benjamin:
+  visual_keywords: []
+  domain_keywords: []
+
+dessert_sophia:
+  visual_keywords: []
+  domain_keywords: []

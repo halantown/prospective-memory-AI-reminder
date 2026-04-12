@@ -1,0 +1,104 @@
+{
+  "task_id": "book2_jack",
+
+  "reminder_context": {
+
+    "element1_af": {
+
+      "af_baseline": {
+        "action_verb": "give",
+        "recipient": "Jack"
+      },
+
+      "af_high": {
+        "target_entity": {
+          "entity_name": "book",
+          "domain_properties": {
+            "genre": "TODO",
+            "title": "TODO"
+          },
+          "visual_cues": {
+            "color": "TODO",
+            "pattern": "TODO"
+          }
+        },
+        "location": {
+          "room": "TODO",
+          "spot": "TODO"
+        }
+      },
+
+      "c_af_candidates": [
+        { "feature": "TODO — feature 1", "source": "encoding_card_text + VLM", "diagnosticity": "TODO" },
+        { "feature": "TODO — feature 2", "source": "encoding_card_text + VLM", "diagnosticity": "TODO" }
+      ],
+
+      "distractors": [
+        {
+          "label": "d1",
+          "description": "TODO — distractor 1"
+        },
+        {
+          "label": "d2",
+          "description": "TODO — distractor 2"
+        }
+      ]
+    },
+
+    "element2_ec": {
+      "task_creator": "Jack",
+      "creator_relationship": "friend",
+      "creation_context": "Jack mentioned it when you were watching a film together"
+    },
+
+    "element3_excluded": {
+      "detected_activity_raw": null
+    }
+  },
+
+  "agent_reasoning_context": {
+
+    "encoding_card_text": "You were watching a film with your friend Jack last weekend. During a quiet scene, he mentioned he'd like to borrow a book. TODO — complete encoding episode narrative.",
+
+    "encoding_card_image": "assets/encoding/book2_jack_card.png",
+
+    "encoding_media": "video/book2_jack_encoding.mp4",
+
+    "execution_protocol": {
+      "post_action_requirement": "TODO",
+      "prerequisites": null,
+      "incompatible_contexts": null
+    }
+  },
+
+  "experiment_metadata": {
+
+    "trigger": {
+      "type": "event_based",
+      "event": "doorbell",
+      "event_description": "Jack arrives at the front door",
+      "fake_trigger": {
+        "event": "TODO",
+        "event_description": "TODO"
+      }
+    },
+
+    "timing": {
+      "reminder_delivery_before_trigger_s": 90,
+      "execution_window": {
+        "primary_s": 30,
+        "extended_s": 60
+      }
+    },
+
+    "scoring": {
+      "time_score": "0–3 based on response latency within execution window",
+      "action_score": {
+        "0": "no action taken",
+        "1": "wrong book selected",
+        "2": "correct book selected"
+      },
+      "composite_pm_score": "time_score × action_score (0–6)"
+    }
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "task_id": "book1_mei",
+
+  "reminder_context": {
+
+    "element1_af": {
+
+      "af_baseline": {
+        "action_verb": "give",
+        "recipient": "Mei"
+      },
+
+      "af_high": {
+        "target_entity": {
+          "entity_name": "book",
+          "domain_properties": {
+            "genre": "travel",
+            "title": "Erta Ale"
+          },
+          "visual_cues": {
+            "color": "red cover",
+            "pattern": "mountain illustration on cover"
+          }
+        },
+        "location": {
+          "room": "study",
+          "spot": "second shelf of the bookcase"
+        }
+      },
+
+      "c_af_candidates": [
+        { "feature": "red cover",             "source": "encoding_card_text + VLM", "diagnosticity": "low" },
+        { "feature": "mountain illustration",  "source": "encoding_card_text + VLM", "diagnosticity": "low" },
+        { "feature": "titled Erta Ale",        "source": "encoding_card_text",        "diagnosticity": "low" },
+        { "feature": "travel book",            "source": "encoding_card_text",        "diagnosticity": "low" },
+        { "feature": "red cover + mountain",   "source": "combination",               "diagnosticity": "high" },
+        { "feature": "second shelf, study",    "source": "encoding_card_text",        "diagnosticity": "high" }
+      ],
+
+      "distractors": [
+        {
+          "label": "d1",
+          "description": "red cover, wave illustration, titled 'Blue Horizon'"
+        },
+        {
+          "label": "d2",
+          "description": "blue cover, mountain illustration, titled 'Erta Ale'"
+        }
+      ]
+    },
+
+    "element2_ec": {
+      "task_creator": "Mei",
+      "creator_relationship": "friend",
+      "creation_context": "Mei brought it up when you were baking together last week"
+    },
+
+    "element3_excluded": {
+      "detected_activity_raw": null
+    }
+  },
+
+  "agent_reasoning_context": {
+
+    "encoding_card_text": "Last week you were baking with your friend Mei. While waiting for the cake to rise, she mentioned she'd like to borrow a travel book before her hiking trip. The book is on the second shelf of the bookcase in your study — it has a red cover with a mountain illustration, titled Erta Ale.",
+
+    "encoding_card_image": "assets/encoding/book1_mei_card.png",
+
+    "encoding_media": "video/book1_mei_encoding.mp4",
+
+    "execution_protocol": {
+      "post_action_requirement": "Bring book to living room and hand to Mei",
+      "prerequisites": null,
+      "incompatible_contexts": null
+    }
+  },
+
+  "experiment_metadata": {
+
+    "trigger": {
+      "type": "event_based",
+      "event": "doorbell",
+      "event_description": "Mei arrives at the front door",
+      "fake_trigger": {
+        "event": "doorbell",
+        "event_description": "Courier drops off a package and leaves"
+      }
+    },
+
+    "timing": {
+      "reminder_delivery_before_trigger_s": 90,
+      "execution_window": {
+        "primary_s": 30,
+        "extended_s": 60
+      }
+    },
+
+    "scoring": {
+      "time_score": "0–3 based on response latency within execution window",
+      "action_score": {
+        "0": "no action taken",
+        "1": "wrong book selected",
+        "2": "correct book selected"
+      },
+      "composite_pm_score": "time_score × action_score (0–6)"
+    }
+  }
+}
