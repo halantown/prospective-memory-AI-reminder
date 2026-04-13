@@ -308,12 +308,23 @@ def check_ec_source_absent(
     condition: str,
     task_json: dict,
 ) -> CheckResult:
-    """For EC_off conditions: verify source context did NOT leak into text."""
+    """For EC_off conditions: verify source context did NOT leak into text.
+
+    Note: if the task creator's name is the same as af_baseline.recipient the
+    name is legitimately present in AF context and must not be treated as an
+    EC leak.  Only flag the name when it is exclusive to element2_ec.
+    """
     if "EC_off" not in condition:
         return CheckResult("ec_source_absent", True, "Not EC_off — skipped")
 
-    el2 = task_json.get("reminder_context", {}).get("element2_ec", {})
+    rc = task_json.get("reminder_context", {})
+    el2 = rc.get("element2_ec", {})
     creator = el2.get("task_creator", "")
+
+    # If creator == recipient the name belongs to AF context too — not an EC leak
+    recipient = rc.get("element1_af", {}).get("af_baseline", {}).get("recipient", "")
+    if creator and creator.strip().lower() == recipient.strip().lower():
+        return CheckResult("ec_source_absent", True, "Creator equals recipient — name is AF context, not EC leak")
 
     if creator and creator.lower() != "self":
         creator_words = [w.lower() for w in creator.split() if len(w) > 2]

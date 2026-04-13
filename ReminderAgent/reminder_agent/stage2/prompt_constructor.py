@@ -268,6 +268,17 @@ def build_user_prompt(
         diagnosticity_report: Legacy diagnosticity report for cue prioritization.
         task_json: Full task JSON for reading static c_af_candidates labels (v2).
     """
+    # Detect AF level from the pruned context — only AF_high conditions have
+    # visual_cues / domain_properties in their extracted output.  We must NOT
+    # emit CUE PRIORITY for AF_low conditions: doing so would instruct the LLM
+    # to include high-diagnosticity visual features, immediately tripping the
+    # forbidden_keywords quality gate.
+    el1_af = pruned_context.get("reminder_context", {}).get("element1_af", {})
+    af_high_entity = el1_af.get("af_high", {}).get("target_entity", {})
+    is_af_high = bool(
+        af_high_entity.get("visual_cues") or af_high_entity.get("domain_properties")
+    )
+
     formatted = format_context(pruned_context, style=context_format)
 
     prompt_parts = [
@@ -275,11 +286,13 @@ def build_user_prompt(
         formatted,
     ]
 
-    # Append cue priority: prefer v2 static labels from task_json, fall back to legacy report
-    cue_section = _build_cue_priority_section(
-        diagnosticity_report=diagnosticity_report,
-        task_json=task_json,
-    )
+    # CUE PRIORITY: only for AF_high — prefer v2 static labels, fall back to legacy report
+    cue_section = ""
+    if is_af_high:
+        cue_section = _build_cue_priority_section(
+            diagnosticity_report=diagnosticity_report,
+            task_json=task_json,
+        )
     if cue_section:
         prompt_parts.append("")
         prompt_parts.append(cue_section)

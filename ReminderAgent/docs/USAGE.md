@@ -4,6 +4,50 @@
 
 ---
 
+## 这次更新做了什么
+
+- 将任务 JSON 从 v1 迁移到 **v2 结构**：
+  - `element1` → `element1_af.af_baseline` / `element1_af.af_high`
+  - `element2.origin` → `element2_ec`
+  - `element3` → `element3_excluded`
+  - `placeholder` → `experiment_metadata`
+- 任务集合从旧示例任务切换为 4 个独立任务：`book1_mei`、`book2_jack`、`tea_benjamin`、`dessert_sophia`
+- AF_high 的提示构造不再依赖运行时 diagnosticity YAML 报告，而是直接读取任务 JSON 中 `c_af_candidates[].diagnosticity`
+- 更新了 Stage 2 管线、质量检查、测试与使用文档；当前测试状态为 **113 passed**
+
+---
+
+## 如何启动
+
+### 最短路径（本地默认配置）
+
+```bash
+conda activate thesis_server
+cd ReminderAgent
+python -m reminder_agent.stage2.batch_runner --dry-run
+python -m reminder_agent.stage2.batch_runner
+```
+
+### 如果使用本地 Ollama
+
+```bash
+ollama serve
+ollama pull llama3.1
+conda activate thesis_server
+cd ReminderAgent
+python -m reminder_agent.stage2.batch_runner --dry-run
+python -m reminder_agent.stage2.batch_runner
+```
+
+### 生成后查看结果
+
+```bash
+python -m reminder_agent.review.review_interface --stats
+python -m reminder_agent.review.review_interface --task book1_mei
+```
+
+---
+
 ## 实验设计概览
 
 | | EC off（无来源信息） | EC on（含来源信息） |
@@ -103,16 +147,16 @@ python -m reminder_agent.review.review_interface --stats
 输出示例：
 ```
 === Review Statistics ===
-  Total reminders : 24
+  Total reminders : 48
   Approved        : 0
-  Pending review  : 24
+  Pending review  : 48
   Failed QA       : 0
 
   By condition:
-    AF_low_EC_off  : 6
-    AF_high_EC_off : 6
-    AF_low_EC_on   : 6
-    AF_high_EC_on  : 6
+    AF_low_EC_off  : 12
+    AF_high_EC_off : 12
+    AF_low_EC_on   : 12
+    AF_high_EC_on  : 12
 ```
 
 ```bash
@@ -148,9 +192,14 @@ Method: Rule-based (no LLM)
 {
   "reminder_context": {
     "element1_af": {
-      "action_verb": "take",
-      "target_entity": { "entity_name": "Doxycycline", ... },
-      "location": { "room": "kitchen", "spot": "shelf" }
+      "af_baseline": {
+        "action_verb": "take",
+        "recipient": "self"
+      },
+      "af_high": {
+        "target_entity": { "entity_name": "Doxycycline", ... },
+        "location": { "room": "kitchen", "spot": "shelf" }
+      }
     },
     "element2_ec": {
       "task_creator": "Dr. Smith",
