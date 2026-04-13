@@ -28,6 +28,19 @@ from reminder_agent.stage2.context_extractor import extract
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# [SEP] marker — separates EC prefix from action instruction in LLM output
+# ---------------------------------------------------------------------------
+
+SEP_MARKER = "[SEP]"
+
+
+def strip_sep_marker(text: str) -> str:
+    """Replace [SEP] marker with em-dash transition for final output."""
+    if SEP_MARKER not in text:
+        return text
+    return text.replace(f" {SEP_MARKER} ", " — ").replace(SEP_MARKER, " — ")
+
+# ---------------------------------------------------------------------------
 # Condition descriptions (plain English for LLM system prompt)
 # ---------------------------------------------------------------------------
 
@@ -363,14 +376,15 @@ def build_user_prompt(
         formatted,
     ]
 
-    # EC verbatim prefix instruction
+    # EC verbatim prefix instruction with [SEP] marker
     if ec_creation_context:
         prompt_parts.append("")
         prompt_parts.append(
             f"The reminder must begin with this exact phrase verbatim: "
             f"'{ec_creation_context}'. "
-            f"Do not paraphrase, expand, or infer from it. "
-            f"Only append the action instruction after it."
+            f"Insert the marker [SEP] immediately after the verbatim phrase. "
+            f"Then append only the action instruction after [SEP]. "
+            f"Do not paraphrase, expand, or infer from the verbatim phrase."
         )
 
     # CUE PRIORITY: only for AF_high — prefer v2 static labels, fall back to legacy report

@@ -14,7 +14,7 @@ from reminder_agent.stage2.config_loader import load_all_configs
 from reminder_agent.stage2.context_extractor import extract
 from reminder_agent.stage2.llm_backend import GenerationError, create_backend
 from reminder_agent.stage2.output_store import OutputStore
-from reminder_agent.stage2.prompt_constructor import build_prompts
+from reminder_agent.stage2.prompt_constructor import build_prompts, strip_sep_marker
 from reminder_agent.stage2.quality_gate import check as qg_check
 
 logger = logging.getLogger(__name__)
@@ -130,17 +130,18 @@ def run_batch(
                     )
 
                     if qg_result.passed or dry_run:
+                        final_text = strip_sep_marker(raw_output)
                         store.write_reminder(
                             task_id=task["task_id"],
                             condition=condition,
                             variant_idx=v_idx,
-                            text=raw_output,
+                            text=final_text,
                             passed_qg=True if dry_run else qg_result.passed,
                             qg_failures=None,
                             model_used=model_config.model_name,
                             attempt=attempt,
                         )
-                        prior_variants.append(raw_output)
+                        prior_variants.append(final_text)
                         success = True
                         print(f"  ✅ {task['task_id']} / {condition} / v{v_idx} (attempt {attempt})")
                         break

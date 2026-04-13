@@ -107,6 +107,10 @@ def check_forbidden_keywords(
 
     For AF_low conditions, checks that visual/domain cues didn't leak into the text.
     For AF_high conditions, this check always passes.
+
+    EC_on scoping: when the text contains the [SEP] marker, only the action
+    instruction (after [SEP]) is checked.  The EC verbatim prefix may
+    legitimately contain words that overlap with AF_high features.
     """
     if "AF_low" not in condition:
         return CheckResult("forbidden_keywords", True, "Not AF_low — skipped")
@@ -118,7 +122,12 @@ def check_forbidden_keywords(
     if task_kw is None:
         return CheckResult("forbidden_keywords", True, f"No forbidden keywords for task '{task_id}'")
 
-    text_lower = text.lower()
+    # For EC_on: scope to action instruction only (after [SEP])
+    check_text = text
+    if "[SEP]" in text:
+        check_text = text.split("[SEP]", 1)[1]
+
+    text_lower = check_text.lower()
     leaked = []
     for kw in task_kw.get("visual_keywords", []) + task_kw.get("domain_keywords", []):
         if kw.lower() in text_lower:
