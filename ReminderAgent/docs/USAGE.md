@@ -6,6 +6,21 @@
 
 ## 这次更新做了什么
 
+### ec_cue 重构（最新）
+
+- 在 4 个任务 JSON 中新增 `ec_cue` 字段，替代直接使用 `creation_context` 作为提醒前缀
+- EC_on 条件下，`ec_cue` 由 LLM 自然改写（paraphrase），而非逐字复制：
+  - 消除了 variant 间 EC 部分完全相同的问题
+  - 消除了 LLM 从 `creation_context` 自由编造细节的问题
+- 移除了 `[SEP]` 标记机制——`ec_cue` 本身不含 AF_high 的 forbidden keywords，无需分割扫描
+- 条件特定长度约束：
+  - 默认：不超过 20 词，单句
+  - `AF_high_EC_on`：可用两句，每句不超过 15 词
+- 更新了 `creation_context` 内容（`tea_benjamin`、`dessert_sophia`），与 `ec_cue` 叙事保持一致
+- `quality_gate` 的 EC 检查改为使用 `ec_cue` 关键词
+
+### 此前更新
+
 - 将任务 JSON 从 v1 迁移到 **v2 结构**：
   - `element1` → `element1_af.af_baseline` / `element1_af.af_high`
   - `element2.origin` → `element2_ec`
@@ -13,6 +28,7 @@
   - `placeholder` → `experiment_metadata`
 - 任务集合从旧示例任务切换为 4 个独立任务：`book1_mei`、`ticket_jack`、`tea_benjamin`、`dessert_sophia`
 - AF_high 的提示构造不再依赖运行时 diagnosticity YAML 报告，而是直接读取任务 JSON 中 `c_af_candidates[].diagnosticity`
+- AF_high 特征选择限制：最多 2 个非位置 high 特征 + 位置（固定）
 - 更新了 Stage 2 管线、质量检查、测试与使用文档；当前测试状态为 **113 passed**
 
 ---
@@ -262,12 +278,12 @@ n_variants: 10   # 从 3 改为 10
 
 ## 任务 ID 对照表
 
-| 任务 ID | 物品 | 说明 |
-|---------|------|------|
-| `book1_mei` | 书（给Mei） | 红色封面、山景插图（Erta Ale）、书房书架 |
-| `ticket_jack` | 票（给Jack） | 戏剧票×2、书房书桌抽屉 |
-| `tea_benjamin` | 茶（给Benjamin） | 红茶、红金色锡罐、英国茶品牌、厨房上柜 |
-| `dessert_sophia` | 蛋挞（给Sophia） | 酥皮、圆形、金色蛋液、厨房柜台 |
+| 任务 ID | 物品 | EC Cue | 说明 |
+|---------|------|--------|------|
+| `book1_mei` | 书（给Mei） | 一起烘焙时提到 | 红色封面、山景插图（Erta Ale）、书房书架 |
+| `ticket_jack` | 票（给Jack） | 一起看电影后提到 | 戏剧票×2、书房书桌抽屉 |
+| `tea_benjamin` | 茶（给Benjamin） | 上月来访时带来英国茶 | 红茶、红金色锡罐、英国茶品牌、厨房上柜 |
+| `dessert_sophia` | 蛋挞（给Sophia） | FaceTime通话时提到 | 酥皮、圆形、金色蛋液、厨房柜台 |
 
 > 所有 4 个任务为独立任务，任务 JSON 存放于 `data/task_schemas/` 目录。
 
