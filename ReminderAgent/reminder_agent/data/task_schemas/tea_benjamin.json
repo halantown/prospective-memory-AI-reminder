@@ -14,41 +14,38 @@
         "target_entity": {
           "entity_name": "tea",
           "domain_properties": {
-            "type": "TODO",
-            "brand": "TODO"
+            "type": "red"
           },
           "visual_cues": {
-            "color": "TODO",
-            "pattern": "TODO"
+            "packaging": "red and gold tin",
+            "label": "English tea brand"
           }
         },
         "location": {
-          "room": "TODO",
-          "spot": "TODO"
+          "room": "kitchen",
+          "spot": "upper cabinet"
         }
       },
 
       "c_af_candidates": [
-        { "feature": "TODO — feature 1", "source": "encoding_card_text + VLM", "diagnosticity": "TODO" },
-        { "feature": "TODO — feature 2", "source": "encoding_card_text + VLM", "diagnosticity": "TODO" }
+        { "feature": "red tea", "source": "encoding_card_text", "diagnosticity": "high" },
+        { "feature": "red and gold tin", "source": "encoding_card_text + VLM", "diagnosticity": "high" },
+        { "feature": "English tea brand label", "source": "encoding_card_text + VLM", "diagnosticity": "high" },
+        { "feature": "upper cabinet, kitchen", "source": "encoding_card_text", "diagnosticity": "high" }
       ],
 
       "distractors": [
-        {
-          "label": "d1",
-          "description": "TODO — distractor 1"
-        },
-        {
-          "label": "d2",
-          "description": "TODO — distractor 2"
-        }
+        { "label": "d1", "description": "green tea, green packaging" },
+        { "label": "d2", "description": "white tea, white and silver packaging" },
+        { "label": "d3", "description": "herbal tea, brown kraft packaging" },
+        { "label": "d4", "description": "oolong tea, dark blue packaging" }
       ]
     },
 
     "element2_ec": {
       "task_creator": "Benjamin",
       "creator_relationship": "friend",
-      "creation_context": "Benjamin mentioned it during a phone call about his caffeine allergy"
+      "creation_context": "Benjamin visited last month; over tea he mentioned he had recently brought back some tea from England and said it was his favourite"
     },
 
     "element3_excluded": {
@@ -58,14 +55,14 @@
 
   "agent_reasoning_context": {
 
-    "encoding_card_text": "Your friend Benjamin called you about his caffeine allergy. He mentioned he can only drink herbal tea. TODO — complete encoding episode narrative.",
+    "encoding_card_text": "Your friend Benjamin visited last month. Over a cup of tea, he mentioned he had recently brought back some tea from England and said it was his favourite. The tea comes in a red and gold tin with an English brand label. He said he'd love to have some next time he comes over. You stored it in the upper cabinet in the kitchen.",
 
     "encoding_card_image": "assets/encoding/tea_benjamin_card.png",
 
     "encoding_media": "video/tea_benjamin_encoding.mp4",
 
     "execution_protocol": {
-      "post_action_requirement": "TODO",
+      "post_action_requirement": "Brew the red tea and serve to Benjamin",
       "prerequisites": null,
       "incompatible_contexts": null
     }
@@ -75,11 +72,11 @@
 
     "trigger": {
       "type": "event_based",
-      "event": "TODO",
-      "event_description": "Benjamin arrives",
+      "event": "phone_call",
+      "event_description": "Benjamin calls to say he is on his way",
       "fake_trigger": {
-        "event": "TODO",
-        "event_description": "TODO"
+        "event": "phone_call",
+        "event_description": "Telemarketer call"
       }
     },
 
@@ -95,8 +92,8 @@
       "time_score": "0–3 based on response latency within execution window",
       "action_score": {
         "0": "no action taken",
-        "1": "wrong item selected",
-        "2": "correct item selected"
+        "1": "wrong tea selected",
+        "2": "correct tea selected"
       },
       "composite_pm_score": "time_score × action_score (0–6)"
     }

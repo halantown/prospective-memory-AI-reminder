@@ -12,43 +12,39 @@
 
       "af_high": {
         "target_entity": {
-          "entity_name": "dessert",
-          "domain_properties": {
-            "type": "TODO",
-            "flavor": "TODO"
-          },
+          "entity_name": "egg tart",
+          "domain_properties": {},
           "visual_cues": {
-            "color": "TODO",
-            "pattern": "TODO"
+            "shell": "flaky pastry",
+            "shape": "round",
+            "filling": "golden custard"
           }
         },
         "location": {
-          "room": "TODO",
-          "spot": "TODO"
+          "room": "kitchen",
+          "spot": "counter"
         }
       },
 
       "c_af_candidates": [
-        { "feature": "TODO — feature 1", "source": "encoding_card_text + VLM", "diagnosticity": "TODO" },
-        { "feature": "TODO — feature 2", "source": "encoding_card_text + VLM", "diagnosticity": "TODO" }
+        { "feature": "flaky pastry shell", "source": "encoding_card_text + VLM", "diagnosticity": "high" },
+        { "feature": "round shape", "source": "encoding_card_text + VLM", "diagnosticity": "low" },
+        { "feature": "golden custard filling", "source": "encoding_card_text + VLM", "diagnosticity": "high" },
+        { "feature": "kitchen counter", "source": "encoding_card_text", "diagnosticity": "high" }
       ],
 
       "distractors": [
-        {
-          "label": "d1",
-          "description": "TODO — distractor 1"
-        },
-        {
-          "label": "d2",
-          "description": "TODO — distractor 2"
-        }
+        { "label": "d1", "description": "pudding, smooth surface, no crust" },
+        { "label": "d2", "description": "macaron, bright colour, sandwich shape" },
+        { "label": "d3", "description": "cookie, flat, no case" },
+        { "label": "d4", "description": "muffin, tall, paper case" }
       ]
     },
 
     "element2_ec": {
       "task_creator": "Sophia",
       "creator_relationship": "friend",
-      "creation_context": "Sophia mentioned it in the group chat"
+      "creation_context": "At lunch together last week, Sophia tried your egg tart and said the pastry was incredibly flaky — she mentioned she had been craving one ever since"
     },
 
     "element3_excluded": {
@@ -58,14 +54,14 @@
 
   "agent_reasoning_context": {
 
-    "encoding_card_text": "Sophia mentioned in the group chat that she'd love a specific dessert. TODO — complete encoding episode narrative.",
+    "encoding_card_text": "Last week you had lunch with your friend Sophia. She tried your egg tart and said the pastry was incredibly flaky — she mentioned she had been craving one ever since and asked if you could prepare one for her next visit. The egg tart has a flaky pastry shell, a round shape, and golden custard filling.",
 
     "encoding_card_image": "assets/encoding/dessert_sophia_card.png",
 
     "encoding_media": "video/dessert_sophia_encoding.mp4",
 
     "execution_protocol": {
-      "post_action_requirement": "TODO",
+      "post_action_requirement": "Prepare egg tart and serve to Sophia",
       "prerequisites": null,
       "incompatible_contexts": null
     }
@@ -75,11 +71,11 @@
 
     "trigger": {
       "type": "event_based",
-      "event": "TODO",
-      "event_description": "Sophia arrives",
+      "event": "phone_call",
+      "event_description": "Sophia calls to say she is on her way",
       "fake_trigger": {
-        "event": "TODO",
-        "event_description": "TODO"
+        "event": "phone_call",
+        "event_description": "Telemarketer call"
       }
     },
 
@@ -95,8 +91,8 @@
       "time_score": "0–3 based on response latency within execution window",
       "action_score": {
         "0": "no action taken",
-        "1": "wrong item selected",
-        "2": "correct item selected"
+        "1": "wrong dessert selected",
+        "2": "correct dessert selected"
       },
       "composite_pm_score": "time_score × action_score (0–6)"
     }

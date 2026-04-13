@@ -9,7 +9,7 @@ import pytest
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "task_schemas"
 
-EXPECTED_TASK_IDS = {"book1_mei", "book2_jack", "tea_benjamin", "dessert_sophia"}
+EXPECTED_TASK_IDS = {"book1_mei", "ticket_jack", "tea_benjamin", "dessert_sophia"}
 
 
 @pytest.fixture(scope="module")
@@ -95,4 +95,4 @@ class TestTaskSchemas:
         for task in all_tasks:
             tid = task["task_id"]
             distractors = task["reminder_context"]["element1_af"]["distractors"]
-            assert len(distractors) == 2, f"{tid} should have exactly 2 distractors"
+            assert len(distractors) >= 2, f"{tid} should have at least 2 distractors"

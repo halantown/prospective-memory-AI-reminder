@@ -14,14 +14,24 @@ book1_mei:
     - "erta ale"
     - "travel"
 
-book2_jack:
+ticket_jack:
   visual_keywords: []
-  domain_keywords: []
+  domain_keywords:
+    - "theatre"
+    - "theater"
+    - "two"
 
 tea_benjamin:
-  visual_keywords: []
+  visual_keywords:
+    - "red"
+    - "gold"
+    - "tin"
   domain_keywords: []
 
 dessert_sophia:
-  visual_keywords: []
+  visual_keywords:
+    - "flaky"
+    - "golden"
+    - "custard"
+    - "round"
   domain_keywords: []

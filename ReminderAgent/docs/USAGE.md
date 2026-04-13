@@ -11,7 +11,7 @@
   - `element2.origin` → `element2_ec`
   - `element3` → `element3_excluded`
   - `placeholder` → `experiment_metadata`
-- 任务集合从旧示例任务切换为 4 个独立任务：`book1_mei`、`book2_jack`、`tea_benjamin`、`dessert_sophia`
+- 任务集合从旧示例任务切换为 4 个独立任务：`book1_mei`、`ticket_jack`、`tea_benjamin`、`dessert_sophia`
 - AF_high 的提示构造不再依赖运行时 diagnosticity YAML 报告，而是直接读取任务 JSON 中 `c_af_candidates[].diagnosticity`
 - 更新了 Stage 2 管线、质量检查、测试与使用文档；当前测试状态为 **113 passed**
 
@@ -264,10 +264,10 @@ n_variants: 10   # 从 3 改为 10
 
 | 任务 ID | 物品 | 说明 |
 |---------|------|------|
-| `book1_mei` | 书（给Mei） | 含视觉线索（红色封面、山景插图）、位置（书房书架） |
-| `book2_jack` | 书（给Jack） | TODO |
-| `tea_benjamin` | 茶（给Benjamin） | TODO |
-| `dessert_sophia` | 甜点（给Sophia） | TODO |
+| `book1_mei` | 书（给Mei） | 红色封面、山景插图（Erta Ale）、书房书架 |
+| `ticket_jack` | 票（给Jack） | 戏剧票×2、书房书桌抽屉 |
+| `tea_benjamin` | 茶（给Benjamin） | 红茶、红金色锡罐、英国茶品牌、厨房上柜 |
+| `dessert_sophia` | 蛋挞（给Sophia） | 酥皮、圆形、金色蛋液、厨房柜台 |
 
 > 所有 4 个任务为独立任务，任务 JSON 存放于 `data/task_schemas/` 目录。
 

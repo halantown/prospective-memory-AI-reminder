@@ -13,6 +13,7 @@ Implements checks from TECH_DOC v0.4 §4.2 / DEV_PLAN v0.3 S4:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -273,26 +274,57 @@ def check_ec_source_present(
     condition: str,
     task_json: dict,
 ) -> CheckResult:
-    """For EC_on conditions: verify source context appears in the text."""
+    """For EC_on conditions: verify source context appears in the text.
+
+    When the task creator is the same person as the AF recipient (e.g. both
+    "Jack"), the creator's name will appear in any reminder as the action
+    target.  Finding the name alone does not prove EC context was included.
+    In this case we rely solely on creation_context keywords (excluding the
+    creator's name and entity-name variants).
+    """
     if "EC_on" not in condition:
         return CheckResult("ec_source_present", True, "Not EC_on — skipped")
 
-    el2 = task_json.get("reminder_context", {}).get("element2_ec", {})
+    rc = task_json.get("reminder_context", {})
+    el2 = rc.get("element2_ec", {})
     creator = el2.get("task_creator", "")
     creation_ctx = el2.get("creation_context", "")
 
+    recipient = rc.get("element1_af", {}).get("af_baseline", {}).get("recipient", "")
+    entity_name = (
+        rc.get("element1_af", {})
+        .get("af_high", {})
+        .get("target_entity", {})
+        .get("entity_name", "")
+    )
+    creator_is_recipient = (
+        creator and creator.strip().lower() == recipient.strip().lower()
+    )
+
     text_lower = text.lower()
 
-    # Check creator name (use words >2 chars to handle "friend Mei" → "mei")
+    # Check 1: creator name (skip when creator == recipient — name is AF context)
     creator_found = False
-    if creator:
+    if creator and not creator_is_recipient:
         creator_words = [w.lower() for w in creator.split() if len(w) > 2]
         creator_found = any(w in text_lower for w in creator_words)
 
-    # Check creation context keywords
+    # Check 2: creation-context keywords
     context_found = False
     if creation_ctx:
-        context_words = [w.lower() for w in creation_ctx.split() if len(w) > 4]
+        creator_lower = creator.lower() if creator else ""
+        entity_lower = entity_name.lower() if entity_name else ""
+        cleaned = re.findall(r"[a-zA-Z]+", creation_ctx)
+        context_words = [
+            w.lower()
+            for w in cleaned
+            if len(w) > 4
+            and w.lower() != creator_lower
+            and not (
+                entity_lower
+                and (w.lower() in entity_lower or entity_lower in w.lower())
+            )
+        ]
         context_found = any(w in text_lower for w in context_words)
 
     if not creator_found and not context_found:
