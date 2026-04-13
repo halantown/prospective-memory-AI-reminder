@@ -22,6 +22,7 @@ from langdetect import detect, LangDetectException
 from rapidfuzz.distance import Levenshtein
 
 from reminder_agent.stage2.config_loader import GenerationConfig, load_generation_config
+from reminder_agent.stage2.prompt_constructor import select_active_high_features
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +221,7 @@ def check_cue_priority_compliance(
             .get("element1_af", {})
             .get("c_af_candidates", [])
         )
-        high_features = [c["feature"] for c in candidates if c.get("diagnosticity") == "high"]
+        high_features = select_active_high_features(task_json)
         if not high_features:
             return CheckResult("cue_priority", True, "No high-diagnosticity features — skipped")
 
