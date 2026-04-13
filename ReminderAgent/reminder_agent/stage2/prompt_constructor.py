@@ -45,12 +45,12 @@ CONDITION_DESCRIPTIONS: dict[str, dict[str, str]] = {
     "AF_low_EC_on": {
         "include": "only the intended action and the entity name",
         "exclude": "visual appearance, specific properties, location, and any reference to the user's current activity",
-        "tone": "You will be given a context cue (ec_cue). Paraphrase it naturally in one short clause. Do not add, remove, or infer any information beyond what is stated. Preserve: who, occasion, and any named anchor (e.g. a place or object). Prepend this clause to the action instruction, separated by a dash.",
+        "tone": "You MUST begin the reminder with a paraphrase of the context cue (ec_cue). This is mandatory and cannot be omitted regardless of length. Paraphrase it naturally in one short clause. Do not add, remove, or infer any information beyond what is stated. Preserve: who, occasion, and any named anchor (e.g. a place or object). Format: [context cue paraphrase] — [action instruction].",
     },
     "AF_high_EC_on": {
         "include": "the action, entity name, visual appearance of the target, specific discriminating properties, and the location (room and spot)",
         "exclude": "any reference to the user's current activity",
-        "tone": "You will be given a context cue (ec_cue). Paraphrase it naturally in one short clause. Do not add, remove, or infer any information beyond what is stated. Preserve: who, occasion, and any named anchor (e.g. a place or object). Prepend this clause to the action instruction, separated by a dash. Be specific and descriptive about the target object.",
+        "tone": "You MUST begin the reminder with a paraphrase of the context cue (ec_cue). This is mandatory and cannot be omitted regardless of length. Paraphrase it naturally in one short clause. Do not add, remove, or infer any information beyond what is stated. Preserve: who, occasion, and any named anchor (e.g. a place or object). Format: [context cue paraphrase]. [action instruction]. Be specific and descriptive about the target object.",
     },
 }
 
@@ -76,6 +76,16 @@ def build_system_prompt(condition: str) -> str:
         length_line = "The full reminder must be no longer than 20 words."
         output_line = "Output: one reminder sentence only."
 
+    # Condition-specific length examples for LLM calibration
+    examples = {
+        "AF_low_EC_off": "Remember to give Tom the umbrella.",
+        "AF_high_EC_off": "Don't forget to grab Tom's blue umbrella with the wooden handle from the hallway stand.",
+        "AF_low_EC_on": "Tom mentioned it at lunch — remember to give him the umbrella.",
+        "AF_high_EC_on": "Tom brought it up at lunch. Don't forget the blue umbrella with the wooden handle near the hallway stand.",
+    }
+    example = examples.get(condition, "")
+    example_line = f'\n- Length reference example: "{example}"' if example else ""
+
     return f"""You are generating reminder messages for a robot assistant in a cognitive psychology experiment.
 The reminder is spoken aloud by the robot (max 12 seconds of speech).
 
@@ -94,7 +104,8 @@ Use intention-reactivation framing ONLY:
 Constraints:
 - {length_line}
 - Do not use relative clauses (which / that / who). Do not use subordinate clauses.
-- {output_line}
+- Do not compress phrases into hyphenated words (e.g. 'Last-week-movie' is forbidden). Use natural spoken English only.
+- {output_line}{example_line}
 - Natural spoken English — warm and brief. Not clinical. Not robotic.
 - Do NOT use bullet points, numbering, or explanations.
 - Do NOT add quotation marks around the reminder.

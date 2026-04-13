@@ -101,7 +101,7 @@ CONDITION_MAX_WORDS: dict[str, int] = {
     "AF_low_EC_off": 15,
     "AF_high_EC_off": 22,
     "AF_low_EC_on": 22,
-    "AF_high_EC_on": 30,
+    "AF_high_EC_on": 28,
 }
 
 
@@ -245,6 +245,21 @@ def check_language(text: str) -> CheckResult:
     return CheckResult("language", False, f"Detected language: {lang} (expected en)")
 
 
+def check_hyphen_compression(text: str) -> CheckResult:
+    """Check for unnatural hyphenated word compression (e.g. 'Last-week-movie').
+
+    Detects 3+ words joined by hyphens, which indicates the LLM compressed
+    phrases to meet length constraints instead of using natural English.
+    """
+    matches = re.findall(r'\b\w+-\w+-\w+(?:-\w+)*\b', text)
+    if matches:
+        return CheckResult(
+            "hyphen_compression", False,
+            f"Hyphen-compressed phrases found: {matches}"
+        )
+    return CheckResult("hyphen_compression", True, "No hyphen compression")
+
+
 def check_cue_priority_compliance(
     text: str,
     diagnosticity_report: dict | None = None,
@@ -352,7 +367,25 @@ def check_ec_source_present(
 
     # Layer 2: occasion anchor keywords
     anchors = OCCASION_ANCHORS.get(task_id, [])
-    occasion_found = any(a.lower() in text_lower for a in anchors) if anchors else True
+    if anchors:
+        # Exclude anchors that only appear inside hyphen-compressed compounds
+        hyphen_compounds = re.findall(r'\b\w+-\w+-\w+(?:-\w+)*\b', text, re.IGNORECASE)
+
+        def _anchor_valid(anchor: str) -> bool:
+            a_low = anchor.lower()
+            if a_low not in text_lower:
+                return False
+            if not hyphen_compounds:
+                return True
+            # Remove hyphen compounds and check if anchor still present
+            cleaned = text_lower
+            for hc in hyphen_compounds:
+                cleaned = cleaned.replace(hc.lower(), " ")
+            return a_low in cleaned
+
+        occasion_found = any(_anchor_valid(a) for a in anchors)
+    else:
+        occasion_found = True
 
     if not who_found and not occasion_found:
         return CheckResult(
@@ -482,6 +515,7 @@ def check(
     results.append(check_length(text, gen_config.min_words, gen_config.max_words, condition))
     results.append(check_duplicate(text, prior_variants, gen_config.similarity_threshold))
     results.append(check_language(text))
+    results.append(check_hyphen_compression(text))
 
     if task_json is not None:
         results.append(check_ec_source_present(text, condition, task_json))

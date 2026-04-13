@@ -6,7 +6,16 @@
 
 ## 这次更新做了什么
 
-### ec_cue 重构（最新）
+### Prompt 强化 & Quality Gate 收紧（最新）
+
+- **EC_on 条件**：`ec_cue` 从可选改为强制前置，prompt 明确要求 `[context cue paraphrase] — [action instruction]` 格式
+- **禁止连字符压缩**：prompt 新增 "Do not compress phrases into hyphenated words"，防止 LLM 用 `Last-week-movie` 之类的非自然压缩规避长度限制
+- **长度校准示例**：每个条件附带一条参考示例，帮助 LLM 感知目标长度
+- **Quality Gate 新增 `check_hyphen_compression`**：检测 3+ 词连字符拼接（`\w+-\w+-\w+`），命中即 fail
+- **AF_high_EC_on 词数上限**：30 → 28 词
+- **ec_source_present 双重保险**：occasion anchor 出现在连字符压缩词内不计入有效匹配
+
+### ec_cue 重构
 
 - 在 4 个任务 JSON 中新增 `ec_cue` 字段，替代直接使用 `creation_context` 作为提醒前缀
 - EC_on 条件下，`ec_cue` 由 LLM 自然改写（paraphrase），而非逐字复制：
@@ -234,7 +243,7 @@ Method: Rule-based (no LLM)
 ```bash
 cd ReminderAgent
 pytest reminder_agent/tests -v
-# 预期: 113 passed
+# 预期: 122 passed
 ```
 
 ---

@@ -24,6 +24,7 @@ from reminder_agent.stage2.quality_gate import (
     check_ec_source_present,
     check_entity_present,
     check_forbidden_keywords,
+    check_hyphen_compression,
     check_language,
     check_length,
 )
@@ -229,6 +230,36 @@ class TestLanguage:
 
 
 # ===================================================================
+# 5b. Hyphen compression
+# ===================================================================
+
+class TestHyphenCompression:
+    """Test hyphen-compressed phrase detection."""
+
+    def test_normal_text_passes(self) -> None:
+        result = check_hyphen_compression("Remember to give Mei the book.")
+        assert result.passed
+
+    def test_single_hyphen_passes(self) -> None:
+        result = check_hyphen_compression("Remember the well-known book for Mei.")
+        assert result.passed
+
+    def test_triple_hyphen_fails(self) -> None:
+        result = check_hyphen_compression("Last-week-movie reminder — give the book to Mei.")
+        assert not result.passed
+        assert "Last-week-movie" in result.detail
+
+    def test_four_word_hyphen_fails(self) -> None:
+        result = check_hyphen_compression("Baking-together-last-week, give her the book.")
+        assert not result.passed
+
+    def test_em_dash_not_matched(self) -> None:
+        """Em-dash separated clauses are normal punctuation, not hyphen compression."""
+        result = check_hyphen_compression("Mei mentioned it while baking — remember to give her the book.")
+        assert result.passed
+
+
+# ===================================================================
 # 6. EC source present (EC_on only)
 # ===================================================================
 
@@ -283,6 +314,15 @@ class TestECSourcePresent:
         )
         assert result.passed
         assert "skipped" in result.detail.lower()
+
+    def test_anchor_in_hyphen_compound_fails(self) -> None:
+        """Occasion anchor only inside a hyphen-compressed word should not count."""
+        result = check_ec_source_present(
+            "Last-week-baking reminder — give the book to Mei.",
+            "AF_low_EC_on",
+            self.TASK_JSON,
+        )
+        assert not result.passed
 
 
 # ===================================================================
