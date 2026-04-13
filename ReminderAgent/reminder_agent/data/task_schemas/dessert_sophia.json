@@ -44,7 +44,8 @@
     "element2_ec": {
       "task_creator": "Sophia",
       "creator_relationship": "friend",
-      "creation_context": "At lunch together last week, Sophia tried your egg tart and said the pastry was incredibly flaky — she mentioned she had been craving one ever since"
+      "ec_cue": "Sophia brought it up during your FaceTime call last week",
+      "creation_context": "Sophia called over FaceTime last week and mentioned she had been craving your egg tart"
     },
 
     "element3_excluded": {

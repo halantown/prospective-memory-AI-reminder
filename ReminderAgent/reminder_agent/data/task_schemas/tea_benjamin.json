@@ -30,7 +30,7 @@
       "c_af_candidates": [
         { "feature": "red tea", "source": "encoding_card_text", "diagnosticity": "high" },
         { "feature": "red and gold tin", "source": "encoding_card_text + VLM", "diagnosticity": "high" },
-        { "feature": "English tea brand label", "source": "encoding_card_text + VLM", "diagnosticity": "high" },
+        { "feature": "blue tea brand label", "source": "encoding_card_text + VLM", "diagnosticity": "high" },
         { "feature": "upper cabinet, kitchen", "source": "encoding_card_text", "diagnosticity": "high" }
       ],
 
@@ -45,7 +45,8 @@
     "element2_ec": {
       "task_creator": "Benjamin",
       "creator_relationship": "friend",
-      "creation_context": "Benjamin visited last month; over tea he mentioned he had recently brought back some tea from England and said it was his favourite"
+      "ec_cue": "Benjamin brought it up when he visited last month with tea from England",
+      "creation_context": "Benjamin visited last month; over tea he mentioned he had recently brought back some tea from England"
     },
 
     "element3_excluded": {

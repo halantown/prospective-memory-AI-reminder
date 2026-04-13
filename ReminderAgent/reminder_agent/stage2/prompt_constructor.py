@@ -28,19 +28,6 @@ from reminder_agent.stage2.context_extractor import extract
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# [SEP] marker — separates EC prefix from action instruction in LLM output
-# ---------------------------------------------------------------------------
-
-SEP_MARKER = "[SEP]"
-
-
-def strip_sep_marker(text: str) -> str:
-    """Replace [SEP] marker with em-dash transition for final output."""
-    if SEP_MARKER not in text:
-        return text
-    return text.replace(f" {SEP_MARKER} ", " — ").replace(SEP_MARKER, " — ")
-
-# ---------------------------------------------------------------------------
 # Condition descriptions (plain English for LLM system prompt)
 # ---------------------------------------------------------------------------
 
@@ -58,12 +45,12 @@ CONDITION_DESCRIPTIONS: dict[str, dict[str, str]] = {
     "AF_low_EC_on": {
         "include": "only the intended action and the entity name",
         "exclude": "visual appearance, specific properties, location, and any reference to the user's current activity",
-        "tone": "Append the action instruction after the verbatim prefix. Do not rephrase or expand the prefix.",
+        "tone": "You will be given a context cue (ec_cue). Paraphrase it naturally in one short clause. Do not add, remove, or infer any information beyond what is stated. Preserve: who, occasion, and any named anchor (e.g. a place or object). Prepend this clause to the action instruction, separated by a dash.",
     },
     "AF_high_EC_on": {
         "include": "the action, entity name, visual appearance of the target, specific discriminating properties, and the location (room and spot)",
         "exclude": "any reference to the user's current activity",
-        "tone": "Append a descriptive action instruction after the verbatim prefix. Do not rephrase or expand the prefix.",
+        "tone": "You will be given a context cue (ec_cue). Paraphrase it naturally in one short clause. Do not add, remove, or infer any information beyond what is stated. Preserve: who, occasion, and any named anchor (e.g. a place or object). Prepend this clause to the action instruction, separated by a dash. Be specific and descriptive about the target object.",
     },
 }
 
@@ -81,6 +68,14 @@ def build_system_prompt(condition: str) -> str:
     if desc is None:
         raise ValueError(f"Unknown condition: {condition}")
 
+    # Condition-specific length / sentence constraints
+    if condition == "AF_high_EC_on":
+        length_line = "If both context cue and item features are present, you may use two sentences. Keep each sentence under 15 words."
+        output_line = "Output: one or two short sentences."
+    else:
+        length_line = "The full reminder must be no longer than 20 words."
+        output_line = "Output: one reminder sentence only."
+
     return f"""You are generating reminder messages for a robot assistant in a cognitive psychology experiment.
 The reminder is spoken aloud by the robot (max 12 seconds of speech).
 
@@ -97,9 +92,9 @@ Use intention-reactivation framing ONLY:
   ✗ Never imply the task should be executed immediately.
 
 Constraints:
-- Each reminder must be no longer than 20 words.
+- {length_line}
 - Do not use relative clauses (which / that / who). Do not use subordinate clauses.
-- Output: one reminder sentence only.
+- {output_line}
 - Natural spoken English — warm and brief. Not clinical. Not robotic.
 - Do NOT use bullet points, numbering, or explanations.
 - Do NOT add quotation marks around the reminder.
@@ -112,31 +107,26 @@ Constraints:
 # Context formatting (prose / json)
 # ---------------------------------------------------------------------------
 
-def format_context(pruned_dict: dict, style: str = "prose", skip_background: bool = False) -> str:
+def format_context(pruned_dict: dict, style: str = "prose") -> str:
     """Format pruned context for inclusion in the user prompt.
 
     Args:
         pruned_dict: Output from context_extractor.extract().
         style: "prose" for field-aware natural language, "json" for raw JSON.
-        skip_background: If True, omit background line (for EC content locking).
     """
     if style == "json":
         return json.dumps(pruned_dict, indent=2)
     elif style == "prose":
-        return _to_prose(pruned_dict, skip_background=skip_background)
+        return _to_prose(pruned_dict)
     else:
         raise ValueError(f"Unknown context format: '{style}'. Use 'prose' or 'json'.")
 
 
-def _to_prose(pruned_dict: dict, skip_background: bool = False) -> str:
+def _to_prose(pruned_dict: dict) -> str:
     """Convert pruned context dict to field-aware prose (v2 schema).
 
     Skips any field whose value (or all values in a dict) are exactly "TODO",
     to avoid forwarding placeholder content to the LLM.
-
-    Args:
-        skip_background: If True, omit the "Background: ..." line (used for
-            EC content locking, where creation_context is handled separately).
     """
     def _is_todo(v: Any) -> bool:
         """True if value is the placeholder string TODO (case-insensitive)."""
@@ -202,9 +192,9 @@ def _to_prose(pruned_dict: dict, skip_background: bool = False) -> str:
         source_str = f"Source: task from {relationship} {creator}" if relationship else f"Source: task from {creator}"
         parts.append(source_str + ".")
 
-    creation_ctx = el2.get("creation_context", "")
-    if creation_ctx and not skip_background:
-        parts.append(f"Background: {creation_ctx}.")
+    ec_cue = el2.get("ec_cue", "")
+    if ec_cue:
+        parts.append(f"Context cue: {ec_cue}")
 
     return "\n".join(parts)
 
@@ -356,36 +346,12 @@ def build_user_prompt(
         af_high_entity.get("visual_cues") or af_high_entity.get("domain_properties")
     )
 
-    # EC content locking: extract creation_context for verbatim prefix
-    is_ec_on = "EC_on" in condition
-    ec_creation_context = ""
-    if is_ec_on and task_json:
-        ec_creation_context = (
-            task_json.get("reminder_context", {})
-            .get("element2_ec", {})
-            .get("creation_context", "")
-        )
-
-    formatted = format_context(
-        pruned_context, style=context_format,
-        skip_background=bool(ec_creation_context),
-    )
+    formatted = format_context(pruned_context, style=context_format)
 
     prompt_parts = [
         "Task context:",
         formatted,
     ]
-
-    # EC verbatim prefix instruction with [SEP] marker
-    if ec_creation_context:
-        prompt_parts.append("")
-        prompt_parts.append(
-            f"The reminder must begin with this exact phrase verbatim: "
-            f"'{ec_creation_context}'. "
-            f"Insert the marker [SEP] immediately after the verbatim phrase. "
-            f"Then append only the action instruction after [SEP]. "
-            f"Do not paraphrase, expand, or infer from the verbatim phrase."
-        )
 
     # CUE PRIORITY: only for AF_high — prefer v2 static labels, fall back to legacy report
     cue_section = ""

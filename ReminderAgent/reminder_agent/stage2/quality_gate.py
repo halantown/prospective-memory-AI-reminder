@@ -107,10 +107,6 @@ def check_forbidden_keywords(
 
     For AF_low conditions, checks that visual/domain cues didn't leak into the text.
     For AF_high conditions, this check always passes.
-
-    EC_on scoping: when the text contains the [SEP] marker, only the action
-    instruction (after [SEP]) is checked.  The EC verbatim prefix may
-    legitimately contain words that overlap with AF_high features.
     """
     if "AF_low" not in condition:
         return CheckResult("forbidden_keywords", True, "Not AF_low — skipped")
@@ -122,12 +118,7 @@ def check_forbidden_keywords(
     if task_kw is None:
         return CheckResult("forbidden_keywords", True, f"No forbidden keywords for task '{task_id}'")
 
-    # For EC_on: scope to action instruction only (after [SEP])
-    check_text = text
-    if "[SEP]" in text:
-        check_text = text.split("[SEP]", 1)[1]
-
-    text_lower = check_text.lower()
+    text_lower = text.lower()
     leaked = []
     for kw in task_kw.get("visual_keywords", []) + task_kw.get("domain_keywords", []):
         if kw.lower() in text_lower:
@@ -286,10 +277,13 @@ def check_ec_source_present(
 ) -> CheckResult:
     """For EC_on conditions: verify source context appears in the text.
 
+    Uses ec_cue keywords as the primary check — these are the short,
+    AF-keyword-free cues that the LLM paraphrases into the reminder.
+
     When the task creator is the same person as the AF recipient (e.g. both
     "Jack"), the creator's name will appear in any reminder as the action
     target.  Finding the name alone does not prove EC context was included.
-    In this case we rely solely on creation_context keywords (excluding the
+    In this case we rely solely on ec_cue keywords (excluding the
     creator's name and entity-name variants).
     """
     if "EC_on" not in condition:
@@ -298,7 +292,7 @@ def check_ec_source_present(
     rc = task_json.get("reminder_context", {})
     el2 = rc.get("element2_ec", {})
     creator = el2.get("task_creator", "")
-    creation_ctx = el2.get("creation_context", "")
+    ec_cue = el2.get("ec_cue", "")
 
     recipient = rc.get("element1_af", {}).get("af_baseline", {}).get("recipient", "")
     entity_name = (
@@ -319,12 +313,12 @@ def check_ec_source_present(
         creator_words = [w.lower() for w in creator.split() if len(w) > 2]
         creator_found = any(w in text_lower for w in creator_words)
 
-    # Check 2: creation-context keywords
+    # Check 2: ec_cue keywords
     context_found = False
-    if creation_ctx:
+    if ec_cue:
         creator_lower = creator.lower() if creator else ""
         entity_lower = entity_name.lower() if entity_name else ""
-        cleaned = re.findall(r"[a-zA-Z]+", creation_ctx)
+        cleaned = re.findall(r"[a-zA-Z]+", ec_cue)
         context_words = [
             w.lower()
             for w in cleaned
@@ -340,7 +334,7 @@ def check_ec_source_present(
     if not creator_found and not context_found:
         return CheckResult(
             "ec_source_present", False,
-            f"EC_on but no source context found. Expected '{creator}' or context keywords."
+            f"EC_on but no source context found. Expected '{creator}' or ec_cue keywords."
         )
     return CheckResult("ec_source_present", True)
 
@@ -352,6 +346,7 @@ def check_ec_source_absent(
 ) -> CheckResult:
     """For EC_off conditions: verify source context did NOT leak into text.
 
+    Checks both creator name and ec_cue keywords for leaks.
     Note: if the task creator's name is the same as af_baseline.recipient the
     name is legitimately present in AF context and must not be treated as an
     EC leak.  Only flag the name when it is exclusive to element2_ec.
@@ -362,21 +357,54 @@ def check_ec_source_absent(
     rc = task_json.get("reminder_context", {})
     el2 = rc.get("element2_ec", {})
     creator = el2.get("task_creator", "")
+    ec_cue = el2.get("ec_cue", "")
 
     # If creator == recipient the name belongs to AF context too — not an EC leak
     recipient = rc.get("element1_af", {}).get("af_baseline", {}).get("recipient", "")
-    if creator and creator.strip().lower() == recipient.strip().lower():
-        return CheckResult("ec_source_absent", True, "Creator equals recipient — name is AF context, not EC leak")
+    entity_name = (
+        rc.get("element1_af", {})
+        .get("af_high", {})
+        .get("target_entity", {})
+        .get("entity_name", "")
+    )
+    creator_is_recipient = (
+        creator and creator.strip().lower() == recipient.strip().lower()
+    )
 
-    if creator and creator.lower() != "self":
+    text_lower = text.lower()
+
+    # Check creator name (skip when creator == recipient)
+    if creator and not creator_is_recipient and creator.lower() != "self":
         creator_words = [w.lower() for w in creator.split() if len(w) > 2]
-        text_lower = text.lower()
         for w in creator_words:
             if w in text_lower:
                 return CheckResult(
                     "ec_source_absent", False,
                     f"EC_off but creator word '{w}' found in text — source context leak"
                 )
+
+    # Check ec_cue keywords
+    if ec_cue:
+        creator_lower = creator.lower() if creator else ""
+        entity_lower = entity_name.lower() if entity_name else ""
+        cleaned = re.findall(r"[a-zA-Z]+", ec_cue)
+        cue_words = [
+            w.lower()
+            for w in cleaned
+            if len(w) > 4
+            and w.lower() != creator_lower
+            and not (
+                entity_lower
+                and (w.lower() in entity_lower or entity_lower in w.lower())
+            )
+        ]
+        for w in cue_words:
+            if w in text_lower:
+                return CheckResult(
+                    "ec_source_absent", False,
+                    f"EC_off but ec_cue keyword '{w}' found in text — source context leak"
+                )
+
     return CheckResult("ec_source_absent", True)
 
 

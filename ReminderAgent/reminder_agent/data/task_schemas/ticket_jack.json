@@ -42,6 +42,7 @@
     "element2_ec": {
       "task_creator": "Jack",
       "creator_relationship": "friend",
+      "ec_cue": "Jack brought it up after you watched a film together last week",
       "creation_context": "After watching a film together last week, Jack mentioned he had bought two theatre tickets — one for himself and one for his girlfriend — and asked you to hold onto them"
     },
 

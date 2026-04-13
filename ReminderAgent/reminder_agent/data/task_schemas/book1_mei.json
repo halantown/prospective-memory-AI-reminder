@@ -52,6 +52,7 @@
     "element2_ec": {
       "task_creator": "Mei",
       "creator_relationship": "friend",
+      "ec_cue": "Mei brought it up when you were baking together last week",
       "creation_context": "Mei brought it up when you were baking together last week"
     },
 

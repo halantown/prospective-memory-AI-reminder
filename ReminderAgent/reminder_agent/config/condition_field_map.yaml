@@ -54,7 +54,7 @@ AF_low_EC_on:
     - "reminder_context.element1_af.af_high.target_entity.entity_name"
     - "reminder_context.element2_ec.task_creator"
     - "reminder_context.element2_ec.creator_relationship"
-    - "reminder_context.element2_ec.creation_context"
+    - "reminder_context.element2_ec.ec_cue"
   conditional_fields: []
   excluded_fields:
     - "reminder_context.element1_af.af_high.target_entity.visual_cues"
@@ -77,7 +77,7 @@ AF_high_EC_on:
     - "reminder_context.element1_af.af_high.location"
     - "reminder_context.element2_ec.task_creator"
     - "reminder_context.element2_ec.creator_relationship"
-    - "reminder_context.element2_ec.creation_context"
+    - "reminder_context.element2_ec.ec_cue"
   conditional_fields: []
   excluded_fields:
     - "reminder_context.element1_af.c_af_candidates"

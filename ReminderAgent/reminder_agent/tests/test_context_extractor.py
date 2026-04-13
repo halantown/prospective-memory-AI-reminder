@@ -166,10 +166,10 @@ class TestAFLowECOn:
         el2 = pruned["reminder_context"]["element2_ec"]
         assert el2["task_creator"] == "Mei"
 
-    def test_extracts_creation_context(self, book_task: dict, field_map) -> None:
+    def test_extracts_ec_cue(self, book_task: dict, field_map) -> None:
         pruned = extract(book_task, "AF_low_EC_on", field_map=field_map)
-        cc = pruned["reminder_context"]["element2_ec"]["creation_context"]
-        assert "baking" in cc
+        ec_cue = pruned["reminder_context"]["element2_ec"]["ec_cue"]
+        assert "baking" in ec_cue
 
     def test_excludes_visual_cues(self, book_task: dict, field_map) -> None:
         pruned = extract(book_task, "AF_low_EC_on", field_map=field_map)
@@ -225,10 +225,10 @@ class TestAFHighECOn:
         el2 = pruned["reminder_context"]["element2_ec"]
         assert el2["task_creator"] == "Mei"
 
-    def test_extracts_creation_context(self, book_task: dict, field_map) -> None:
+    def test_extracts_ec_cue(self, book_task: dict, field_map) -> None:
         pruned = extract(book_task, "AF_high_EC_on", field_map=field_map)
-        cc = pruned["reminder_context"]["element2_ec"]["creation_context"]
-        assert "baking" in cc
+        ec_cue = pruned["reminder_context"]["element2_ec"]["ec_cue"]
+        assert "baking" in ec_cue
 
     def test_excludes_element3(self, book_task: dict, field_map) -> None:
         pruned = extract(book_task, "AF_high_EC_on", field_map=field_map)
