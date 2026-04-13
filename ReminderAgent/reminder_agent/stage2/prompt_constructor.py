@@ -89,6 +89,7 @@ Constraints:
 - Natural spoken English — warm and brief. Not clinical. Not robotic.
 - Do NOT use bullet points, numbering, or explanations.
 - Do NOT add quotation marks around the reminder.
+- Always refer to the target item by its specific name (e.g. "the book", "the dessert") — never use "it" or "the item" as a substitute.
 - When CUE PRIORITY is provided, you MUST include all high-priority cues.
   Include medium-priority cues when they fit naturally.
   Do NOT include low-priority cues unless needed for grammatical completeness.
@@ -115,7 +116,19 @@ def format_context(pruned_dict: dict, style: str = "prose") -> str:
 
 
 def _to_prose(pruned_dict: dict) -> str:
-    """Convert pruned context dict to field-aware prose (v2 schema)."""
+    """Convert pruned context dict to field-aware prose (v2 schema).
+
+    Skips any field whose value (or all values in a dict) are exactly "TODO",
+    to avoid forwarding placeholder content to the LLM.
+    """
+    def _is_todo(v: Any) -> bool:
+        """True if value is the placeholder string TODO (case-insensitive)."""
+        if isinstance(v, str):
+            return v.strip().upper() == "TODO"
+        if isinstance(v, dict):
+            return all(_is_todo(x) for x in v.values())
+        return False
+
     parts: list[str] = []
     ctx = pruned_dict.get("reminder_context", pruned_dict)
 
@@ -129,28 +142,37 @@ def _to_prose(pruned_dict: dict) -> str:
     entity = af_high.get("target_entity", {})
     entity_name = entity.get("entity_name", "")
 
-    if action and entity_name:
-        task_str = f"Task: {action} {entity_name}"
-        if recipient:
-            task_str += f" to {recipient}"
+    # Transfer verbs use "to <recipient>"; creation/preparation verbs use "for <recipient>"
+    _TRANSFER_VERBS = {"give", "bring", "deliver", "send", "take", "lend", "hand", "pass"}
+
+    if action and entity_name and not _is_todo(entity_name):
+        prep = "to" if action.lower().split()[0] in _TRANSFER_VERBS else "for"
+        task_str = f"Task: {action} the {entity_name}"
+        if recipient and not _is_todo(recipient):
+            task_str += f" {prep} {recipient}"
         parts.append(task_str + ".")
 
     # AF_high fields: visual cues, domain properties, location
     visual_cues = entity.get("visual_cues", {})
-    if visual_cues:
-        cue_parts = [v for v in visual_cues.values() if v]
+    if visual_cues and not _is_todo(visual_cues):
+        cue_parts = [v for v in visual_cues.values() if v and not _is_todo(v)]
         if cue_parts:
             parts.append(f"Target appearance: {', '.join(cue_parts)}.")
 
     domain = entity.get("domain_properties", {})
-    if domain:
-        details = ", ".join(f"{k}: {v}" for k, v in domain.items())
-        parts.append(f"Details: {details}.")
+    if domain and not _is_todo(domain):
+        details = ", ".join(
+            f"{k}: {v}" for k, v in domain.items() if not _is_todo(v)
+        )
+        if details:
+            parts.append(f"Details: {details}.")
 
     location = af_high.get("location", {})
-    if location:
+    if location and not _is_todo(location):
         room = location.get("room", "")
         spot = location.get("spot", "")
+        room = "" if _is_todo(room) else room
+        spot = "" if _is_todo(spot) else spot
         if room or spot:
             loc_str = f"{room}, {spot}" if room and spot else (room or spot)
             parts.append(f"Location: {loc_str}.")
