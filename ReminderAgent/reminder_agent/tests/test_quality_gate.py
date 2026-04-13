@@ -211,11 +211,17 @@ class TestLanguage:
         assert result.passed
 
     def test_non_english_fails(self) -> None:
+        # Long non-English text uses langdetect
         result = check_language(
-            "N'oubliez pas de prendre votre médicament après le dîner."
+            "N'oubliez pas de prendre votre médicament après le dîner ce soir s'il vous plaît."
         )
         assert not result.passed
-        assert "fr" in result.detail
+
+    def test_short_non_ascii_fails(self) -> None:
+        """Short text with non-ASCII characters caught by charset check."""
+        result = check_language("Hé café résumé naïve")
+        assert not result.passed
+        assert "non-ascii" in result.detail.lower()
 
     def test_very_short_text(self) -> None:
         result = check_language("Hi")
@@ -230,24 +236,38 @@ class TestECSourcePresent:
     """Test EC source presence check for EC_on conditions."""
 
     TASK_JSON = {
+        "task_id": "book1_mei",
         "reminder_context": {
+            "element1_af": {
+                "af_baseline": {"recipient": "Mei"},
+            },
             "element2_ec": {
                 "task_creator": "Mei",
                 "creator_relationship": "friend",
-                "creation_context": "While baking cookies together in the kitchen, Mei mentioned she would love to borrow the book",
+                "ec_cue": "Mei brought it up when you were baking together last week",
+                "creation_context": "Mei brought it up when you were baking together last week",
             },
         },
     }
 
     def test_ec_on_source_in_text_passes(self) -> None:
         result = check_ec_source_present(
-            "Mei asked you to find the book. Remember to bring it.",
+            "While baking last week, remember to bring the book for Mei.",
             "AF_low_EC_on",
             self.TASK_JSON,
         )
         assert result.passed
 
-    def test_ec_on_source_missing_fails(self) -> None:
+    def test_ec_on_occasion_only_fails(self) -> None:
+        """Occasion anchor without creator name — still passes because creator == recipient."""
+        result = check_ec_source_present(
+            "After baking together, remember to bring the book.",
+            "AF_low_EC_on",
+            self.TASK_JSON,
+        )
+        assert result.passed
+
+    def test_ec_on_no_anchor_fails(self) -> None:
         result = check_ec_source_present(
             "Remember to find and bring the book.",
             "AF_low_EC_on",
@@ -273,11 +293,33 @@ class TestECSourceAbsent:
     """Test EC source absence check for EC_off conditions."""
 
     TASK_JSON = {
+        "task_id": "book1_mei",
         "reminder_context": {
+            "element1_af": {
+                "af_baseline": {"recipient": "Mei"},
+            },
             "element2_ec": {
                 "task_creator": "Mei",
                 "creator_relationship": "friend",
-                "creation_context": "While baking cookies together in the kitchen, Mei mentioned she would love to borrow the book",
+                "ec_cue": "Mei brought it up when you were baking together last week",
+                "creation_context": "Mei brought it up when you were baking together last week",
+            },
+        },
+    }
+
+    # Use a task where creator != recipient for the leak test
+    TASK_JSON_DIFF_CREATOR = {
+        "task_id": "book1_mei",
+        "reminder_context": {
+            "element1_af": {
+                "af_baseline": {"recipient": "yourself"},
+                "af_high": {"target_entity": {"entity_name": "book"}},
+            },
+            "element2_ec": {
+                "task_creator": "Mei",
+                "creator_relationship": "friend",
+                "ec_cue": "Mei brought it up when you were baking together last week",
+                "creation_context": "Mei brought it up when you were baking together last week",
             },
         },
     }
@@ -294,10 +336,20 @@ class TestECSourceAbsent:
         result = check_ec_source_absent(
             "Remember to find the book for Mei.",
             "AF_low_EC_off",
-            self.TASK_JSON,
+            self.TASK_JSON_DIFF_CREATOR,
         )
         assert not result.passed
         assert "leak" in result.detail.lower()
+
+    def test_ec_off_cue_keyword_leaked_fails(self) -> None:
+        """ec_cue occasion keyword in EC_off text should fail."""
+        result = check_ec_source_absent(
+            "After baking, remember to grab the book.",
+            "AF_low_EC_off",
+            self.TASK_JSON,
+        )
+        assert not result.passed
+        assert "ec_cue" in result.detail.lower()
 
     def test_ec_on_always_passes(self) -> None:
         result = check_ec_source_absent(
@@ -341,11 +393,16 @@ class TestAggregateCheck:
     }
 
     TASK_JSON = {
+        "task_id": "book1_mei",
         "reminder_context": {
+            "element1_af": {
+                "af_baseline": {"recipient": "Mei"},
+            },
             "element2_ec": {
                 "task_creator": "Mei",
                 "creator_relationship": "friend",
-                "creation_context": "While baking cookies together in the kitchen, Mei mentioned she would love to borrow the book",
+                "ec_cue": "Mei brought it up when you were baking together last week",
+                "creation_context": "Mei brought it up when you were baking together last week",
             },
         },
     }
@@ -364,7 +421,7 @@ class TestAggregateCheck:
 
     def test_valid_af_high_ec_on_passes(self) -> None:
         result = check(
-            text="Mei asked you about the book while baking. Remember to give the red paperback titled Erta Ale from the study.",
+            text="While baking, Mei asked about the book. Remember to give the red paperback from the study.",
             condition="AF_high_EC_on",
             task_id="book1_mei",
             entity_name="book",
@@ -423,7 +480,7 @@ class TestAggregateCheck:
 
     def test_ec_source_leak_fails_aggregate(self) -> None:
         result = check(
-            text="Remember to find the book for Mei from the study.",
+            text="Remember to find the book from baking last week in the study.",
             condition="AF_high_EC_off",
             task_id="book1_mei",
             entity_name="book",

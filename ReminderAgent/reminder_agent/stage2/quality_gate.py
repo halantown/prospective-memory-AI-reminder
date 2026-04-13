@@ -94,6 +94,30 @@ def _clear_forbidden_cache() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Condition-specific word limits
+# ---------------------------------------------------------------------------
+
+CONDITION_MAX_WORDS: dict[str, int] = {
+    "AF_low_EC_off": 15,
+    "AF_high_EC_off": 22,
+    "AF_low_EC_on": 22,
+    "AF_high_EC_on": 30,
+}
+
+
+# ---------------------------------------------------------------------------
+# Per-task occasion anchors for ec_source_present check
+# ---------------------------------------------------------------------------
+
+OCCASION_ANCHORS: dict[str, list[str]] = {
+    "book1_mei": ["baking", "baked", "bakery"],
+    "ticket_jack": ["film", "movie", "cinema", "watched"],
+    "tea_benjamin": ["visited", "visit", "england", "english"],
+    "dessert_sophia": ["facetime", "call", "video"],
+}
+
+
+# ---------------------------------------------------------------------------
 # Individual checks
 # ---------------------------------------------------------------------------
 
@@ -148,15 +172,21 @@ def check_entity_present(text: str, entity_name: str) -> CheckResult:
 def check_length(
     text: str,
     min_words: int = 5,
-    max_words: int = 35,
+    max_words: int = 45,
+    condition: str = "",
 ) -> CheckResult:
-    """Check that word count is within [min_words, max_words]."""
+    """Check that word count is within [min_words, max_words].
+
+    When *condition* is provided, overrides max_words with the
+    condition-specific limit from CONDITION_MAX_WORDS.
+    """
+    effective_max = CONDITION_MAX_WORDS.get(condition, max_words) if condition else max_words
     word_count = len(text.split())
     if word_count < min_words:
         return CheckResult("length", False, f"Too short: {word_count} words (min {min_words})")
-    if word_count > max_words:
-        return CheckResult("length", False, f"Too long: {word_count} words (max {max_words})")
-    return CheckResult("length", True, f"{word_count} words")
+    if word_count > effective_max:
+        return CheckResult("length", False, f"Too long: {word_count} words (max {effective_max})")
+    return CheckResult("length", True, f"{word_count} words (max {effective_max})")
 
 
 def check_duplicate(
@@ -192,7 +222,19 @@ def check_duplicate(
 
 
 def check_language(text: str) -> CheckResult:
-    """Check that the text is in English using langdetect."""
+    """Check that the text is in English using langdetect.
+
+    For short texts (≤10 words), langdetect is unreliable (e.g. "Sophia's"
+    detected as Norwegian).  Fall back to ASCII character-set check instead.
+    """
+    word_count = len(text.split())
+    if word_count <= 10:
+        # ASCII check: allow letters, digits, common punctuation, smart quotes
+        non_ascii = [c for c in text if ord(c) > 127 and c not in "—–''"""]
+        if non_ascii:
+            return CheckResult("language", False, f"Non-ASCII characters in short text: {non_ascii[:5]}")
+        return CheckResult("language", True, f"Short text ({word_count} words) — ASCII check passed")
+
     try:
         lang = detect(text)
     except LangDetectException:
@@ -277,14 +319,13 @@ def check_ec_source_present(
 ) -> CheckResult:
     """For EC_on conditions: verify source context appears in the text.
 
-    Uses ec_cue keywords as the primary check — these are the short,
-    AF-keyword-free cues that the LLM paraphrases into the reminder.
+    Two-layer check — BOTH must pass:
+      Layer 1 (who): task_creator's name appears in the text.
+                     Skipped when creator == recipient (name is AF context).
+      Layer 2 (occasion anchor): at least one occasion keyword from
+                     OCCASION_ANCHORS appears in the text.
 
-    When the task creator is the same person as the AF recipient (e.g. both
-    "Jack"), the creator's name will appear in any reminder as the action
-    target.  Finding the name alone does not prove EC context was included.
-    In this case we rely solely on ec_cue keywords (excluding the
-    creator's name and entity-name variants).
+    When creator == recipient, only Layer 2 is required.
     """
     if "EC_on" not in condition:
         return CheckResult("ec_source_present", True, "Not EC_on — skipped")
@@ -292,51 +333,43 @@ def check_ec_source_present(
     rc = task_json.get("reminder_context", {})
     el2 = rc.get("element2_ec", {})
     creator = el2.get("task_creator", "")
-    ec_cue = el2.get("ec_cue", "")
+    task_id = task_json.get("task_id", "")
 
     recipient = rc.get("element1_af", {}).get("af_baseline", {}).get("recipient", "")
-    entity_name = (
-        rc.get("element1_af", {})
-        .get("af_high", {})
-        .get("target_entity", {})
-        .get("entity_name", "")
-    )
     creator_is_recipient = (
         creator and creator.strip().lower() == recipient.strip().lower()
     )
 
     text_lower = text.lower()
 
-    # Check 1: creator name (skip when creator == recipient — name is AF context)
-    creator_found = False
+    # Layer 1: creator name (skip when creator == recipient)
+    who_found = False
     if creator and not creator_is_recipient:
         creator_words = [w.lower() for w in creator.split() if len(w) > 2]
-        creator_found = any(w in text_lower for w in creator_words)
+        who_found = any(w in text_lower for w in creator_words)
+    else:
+        who_found = True  # skip layer — not checkable
 
-    # Check 2: ec_cue keywords
-    context_found = False
-    if ec_cue:
-        creator_lower = creator.lower() if creator else ""
-        entity_lower = entity_name.lower() if entity_name else ""
-        cleaned = re.findall(r"[a-zA-Z]+", ec_cue)
-        context_words = [
-            w.lower()
-            for w in cleaned
-            if len(w) > 4
-            and w.lower() != creator_lower
-            and not (
-                entity_lower
-                and (w.lower() in entity_lower or entity_lower in w.lower())
-            )
-        ]
-        context_found = any(w in text_lower for w in context_words)
+    # Layer 2: occasion anchor keywords
+    anchors = OCCASION_ANCHORS.get(task_id, [])
+    occasion_found = any(a.lower() in text_lower for a in anchors) if anchors else True
 
-    if not creator_found and not context_found:
+    if not who_found and not occasion_found:
         return CheckResult(
             "ec_source_present", False,
-            f"EC_on but no source context found. Expected '{creator}' or ec_cue keywords."
+            f"EC_on but neither creator '{creator}' nor occasion anchors {anchors} found."
         )
-    return CheckResult("ec_source_present", True)
+    if not who_found:
+        return CheckResult(
+            "ec_source_present", False,
+            f"EC_on but creator '{creator}' not found (occasion anchor present)."
+        )
+    if not occasion_found:
+        return CheckResult(
+            "ec_source_present", False,
+            f"EC_on but no occasion anchor found. Expected one of {anchors}."
+        )
+    return CheckResult("ec_source_present", True, "Creator and occasion anchor present")
 
 
 def check_ec_source_absent(
@@ -446,7 +479,7 @@ def check(
 
     results.append(check_forbidden_keywords(text, task_id, condition, forbidden_kw))
     results.append(check_entity_present(text, entity_name))
-    results.append(check_length(text, gen_config.min_words, gen_config.max_words))
+    results.append(check_length(text, gen_config.min_words, gen_config.max_words, condition))
     results.append(check_duplicate(text, prior_variants, gen_config.similarity_threshold))
     results.append(check_language(text))
 

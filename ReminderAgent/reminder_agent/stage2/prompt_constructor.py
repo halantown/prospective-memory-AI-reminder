@@ -99,6 +99,8 @@ Constraints:
 - Do NOT use bullet points, numbering, or explanations.
 - Do NOT add quotation marks around the reminder.
 - Always refer to the target item by its specific name (e.g. "the book", "the dessert") — never use "it" or "the item" as a substitute.
+- Do not use first-person plural ("we", "our", "us") — the reminder is delivered by a robot, not a participant in the events.
+- Do not introduce any objects or details not present in the task data provided.
 - When CUE PRIORITY is provided, you MUST include all listed features.
 - Output ONLY the reminder text, nothing else."""
 
