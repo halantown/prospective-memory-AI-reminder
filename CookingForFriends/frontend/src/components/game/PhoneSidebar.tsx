@@ -40,7 +40,6 @@ export default function PhoneSidebar() {
 
   const lastActivityRef = useRef(Date.now())
   const play = useSoundEffects()
-  const [panelPulse, setPanelPulse] = useState(false)
 
   const unreadCount = useMemo(
     () => phoneMessages.filter((m) => m.channel === 'chat' && !m.read).length,
@@ -58,13 +57,10 @@ export default function PhoneSidebar() {
     return () => clearInterval(interval)
   }, [locked, setPhoneLocked])
 
-  // Play chime + pulse panel on new banner
+  // Play chime on new banner (visual pulse removed)
   useEffect(() => {
     if (banner) {
       play('phoneMessage')
-      setPanelPulse(true)
-      const timer = setTimeout(() => setPanelPulse(false), 150)
-      return () => clearTimeout(timer)
     }
   }, [banner, play])
 
@@ -101,10 +97,7 @@ export default function PhoneSidebar() {
           className={`relative flex flex-col w-[380px] h-[800px] rounded-[40px] border-[3px]
                       bg-gradient-to-b from-slate-800 to-slate-900 shadow-2xl shadow-black/50
                       overflow-hidden transition-all duration-150
-                      ${panelPulse
-                        ? 'border-blue-400 shadow-blue-500/40'
-                        : 'border-slate-600'
-                      }`}
+                      border-slate-600`}
           onPointerDownCapture={handleInteraction}
         >
           {/* Kitchen Timer Modal (z-50, blocks all interaction) */}
