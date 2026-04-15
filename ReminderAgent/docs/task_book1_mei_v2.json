@@ -1,0 +1,217 @@
+{
+  "task_id": "book1_mei",
+  "task_pair": "book",
+  "pair_role": "A",
+
+  // ============================================================
+  // IV Attribution Legend:
+  //   [AF_baseline] = included in ALL conditions
+  //   [AF_high]     = included only in AF_high conditions
+  //   [EC]          = included only in EC_on conditions
+  //   [excluded]    = never enters any reminder
+  //
+  // C_AF Source Rule:
+  //   All AF candidates must originate from encoding_card_text
+  //   (explicitly presented features only).
+  //   VLM extraction from encoding_card_image is used as a
+  //   supplementary extraction tool, human-reviewed and
+  //   reconciled against encoding_card_text before entry.
+  //   Image/video serve encoding reinforcement, not independent
+  //   C_AF sourcing.
+  // ============================================================
+
+  // ──────────────────────────────────────────────
+  // ZONE 1: reminder_context
+  // The ONLY zone the reminder pipeline reads.
+  // ──────────────────────────────────────────────
+
+  "reminder_context": {
+
+    // ── Element 1: Execution Content (AF) ──
+    // Answers: WHAT to do, WHAT to find, WHERE to go
+    // Source: encoding_card_text (primary) + VLM/encoding_card_image (supplementary, human-reviewed)
+
+    "element1_af": {
+
+      "af_baseline": {
+        "action_verb": "give",                        // [AF_baseline]
+        "recipient": "Mei"                            // [AF_baseline] — part of intended action
+                                                      // NOTE: Mei is simultaneously task_creator (EC)
+                                                      // and action recipient (AF). This overlap is a
+                                                      // known limitation. Effect is uniform across all
+                                                      // four conditions → no systematic bias introduced.
+                                                      // Listed as design limitation in thesis.
+      },
+
+      "af_high": {
+        "target_entity": {
+          "entity_name": "book",                      // [AF_baseline]
+          "domain_properties": {                      // [AF_high]
+            "genre": "travel",
+            "title": "Erta Ale"
+          },
+          "visual_cues": {                            // [AF_high]
+            "color": "red cover",
+            "pattern": "mountain illustration on cover"
+          }
+        },
+        "location": {                                 // [AF_high]
+          "room": "study",
+          "spot": "second shelf of the bookcase"
+        }
+      },
+
+      // ── C_AF: Diagnosticity Ranking Input ──
+      // Flat list of all AF candidates from encoding_card_text.
+      // Input to diagnosticity scoring: D(c) = A(c→target) / ΣA(c→tᵢ)
+      // Ranked by diagnosticity across all active tasks.
+      // AF_high reminder uses top-k features from this ranked list.
+      // Human-reviewed after VLM extraction from encoding_card_image.
+
+      "c_af_candidates": [                            // [excluded from reminder — pipeline input only]
+        { "feature": "red cover",                    "source": "encoding_card_text + VLM" },
+        { "feature": "mountain illustration",        "source": "encoding_card_text + VLM" },
+        { "feature": "titled Erta Ale",              "source": "encoding_card_text" },
+        { "feature": "travel book",                  "source": "encoding_card_text" },
+        { "feature": "second shelf, bookcase",       "source": "encoding_card_text" },
+        { "feature": "study",                        "source": "encoding_card_text" }
+      ],
+
+      "distractors": [                               // [excluded] — experiment platform only
+        {
+          "label": "d1",
+          "description": "red cover, wave illustration, titled 'Blue Horizon'"
+        },
+        {
+          "label": "d2",
+          "description": "blue cover, mountain illustration, titled 'Erta Ale'"
+        }
+      ]
+    },
+
+    // ── Element 2: Source Context (EC) ──
+    // Answers: WHO told you, WHEN / HOW the intention was formed
+    // Mechanism: context reinstatement via DC-C (Smith, 1979)
+    // EC reminder contains ONLY source context — zero target object features
+    // to preserve AF/EC orthogonality.
+
+    "element2_ec": {
+      "task_creator": "Mei",                          // [EC]
+      "creator_relationship": "friend",               // [EC]
+      "creation_context": "Mei called you yesterday evening and mentioned she'd like to borrow a book"
+                                                      // [EC] — scene-level overlap with encoding episode;
+                                                      // NO target object features included (orthogonality preserved)
+    },
+
+    // ── Element 3: Runtime Activity (EXCLUDED) ──
+    // Legacy field from CB design. Retained for data completeness only.
+
+    "element3_excluded": {                            // [excluded]
+      "detected_activity_raw": null
+    }
+  },
+
+  // ──────────────────────────────────────────────
+  // ZONE 2: agent_reasoning_context
+  // Used by reminder agent pipeline. Never enters reminder output.
+  // ──────────────────────────────────────────────
+
+  "agent_reasoning_context": {                        // [excluded]
+
+    "encoding_card_text": "Your friend Mei called you yesterday evening. She mentioned she'd like to borrow a travel book when she visits tomorrow. The book is on the second shelf of the bookcase in your study — it has a red cover with a mountain illustration, titled Erta Ale.",
+
+    "encoding_card_image": "assets/encoding/book1_mei_card.png",
+                                                      // VLM extracts visual features from this image.
+                                                      // Output reconciled against encoding_card_text.
+                                                      // Reconciled features populate c_af_candidates above.
+
+    "encoding_media": "video/book1_mei_encoding.mp4",
+                                                      // Encoding reinforcement only.
+                                                      // Does not contribute independent C_AF candidates.
+
+    "execution_protocol": {
+      "post_action_requirement": "Bring book to living room and hand to Mei",
+      "prerequisites": null,
+      "incompatible_contexts": null
+    }
+  },
+
+  // ──────────────────────────────────────────────
+  // ZONE 3: experiment_metadata
+  // Platform scheduling and scoring. Never enters reminder.
+  // ──────────────────────────────────────────────
+
+  "experiment_metadata": {                            // [excluded]
+
+    "trigger": {
+      "type": "event_based",
+      "event": "doorbell",
+      "event_description": "Mei arrives at the front door",
+      "fake_trigger": {
+        "event": "doorbell",
+        "event_description": "Courier drops off a package and leaves"
+      }
+    },
+
+    "timing": {
+      "reminder_delivery_before_trigger_s": 90,
+      "execution_window": {
+        "primary_s": 30,
+        "extended_s": 60
+      }
+    },
+
+    "scoring": {
+      "time_score": "0–3 based on response latency within execution window",
+      "action_score": {
+        "0": "no action taken",
+        "1": "wrong book selected",
+        "2": "correct book selected"
+      },
+      "composite_pm_score": "time_score × action_score (0–6)"
+    }
+  }
+}
+
+// ============================================================
+// REMINDER PIPELINE OUTPUT (all four conditions)
+//
+// AF_low / EC_off:
+//   "When you see Mei, give her the book."
+//
+// AF_high / EC_off:
+//   "When you see Mei, give her the book —
+//    the red one with a mountain illustration,
+//    on the second shelf in the study."
+//
+// AF_low / EC_on:
+//   "Mei called you yesterday evening about borrowing a book —
+//    remember to give it to her when she arrives."
+//
+// AF_high / EC_on:
+//   "Mei called you yesterday evening about borrowing a book —
+//    give her the red one with the mountain illustration,
+//    on the second shelf in the study."
+// ============================================================
+
+// ============================================================
+// REMINDER PIPELINE LOGIC (pseudo-code)
+//
+// input:  task_json, condition ∈ {AF_low|AF_high} × {EC_off|EC_on}
+//
+// step 1 [VLM, one-time offline]:
+//   visual_features = VLM.extract(encoding_card_image)
+//   c_af_candidates = reconcile(visual_features, encoding_card_text)
+//   → stored in task_json.reminder_context.element1_af.c_af_candidates
+//
+// step 2 [diagnosticity ranking, one-time offline]:
+//   for each feature in c_af_candidates:
+//     D(c) = A(c → this_task) / Σ A(c → all_active_tasks)
+//   top_k_features = sort_desc(D).take(k=3)
+//
+// step 3 [reminder assembly, runtime]:
+//   base = af_baseline (action_verb + recipient)
+//   if AF_high: base += top_k_features + location
+//   if EC_on:   base += creation_context (task_creator + scene)
+//   return format(base)
+// ============================================================

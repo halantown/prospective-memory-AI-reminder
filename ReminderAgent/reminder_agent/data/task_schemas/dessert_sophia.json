@@ -55,7 +55,7 @@
 
   "agent_reasoning_context": {
 
-    "encoding_card_text": "Last week you had lunch with your friend Sophia. She tried your egg tart and said the pastry was incredibly flaky — she mentioned she had been craving one ever since and asked if you could prepare one for her next visit. The egg tart has a flaky pastry shell, a round shape, and golden custard filling.",
+    "encoding_card_text": "Last week your friend Sophia called you over FaceTime. During the call, she mentioned she still remembered your egg tart from last time and had been craving one ever since. She asked if you could prepare one for her next visit. The egg tart has a flaky pastry shell, a round shape, and golden custard filling.",
 
     "encoding_card_image": "assets/encoding/dessert_sophia_card.png",
 

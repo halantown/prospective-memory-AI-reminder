@@ -261,3 +261,80 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 ### Follow-up Actions
 > - [ ] Consider also persisting `flashResult` (correct/incorrect border flash) — currently it's also local state but is very short-lived (600ms) so loss is less noticeable
 > - [ ] Review other `ChatView` local state for similar persistence issues
+
+---
+
+## INC-006 — Ollama model store split after directory migration
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-04-13 |
+| Severity     | P2 Medium |
+| Status       | Monitoring |
+| Reported by  | Manual restart after migrating Ollama models to `/home/charmot/ollama_data/` |
+| Affected area| Ollama model storage, `ollama.service`, local inference availability |
+
+### Background
+> Ollama had been migrated from the default per-user model path to `/home/charmot/ollama_data/` to keep model files outside the home directory. After migration, restarting Ollama should still expose the same models regardless of whether Ollama is started manually or by systemd.
+
+### Incident Description
+> After restart, Ollama no longer showed the expected models from the migrated directory. Investigation showed that the running server process and the systemd service were using different execution contexts and different model paths:
+>
+> - the active process on port `11434` was a manually started `ollama serve` running as user `charmot`
+> - `systemd` was also trying to start `ollama.service` as user `ollama`, but it failed continuously because the port was already occupied
+> - the manual process was still reading the old path `~/.ollama/models`
+> - the migrated models were actually present in `/home/charmot/ollama_data/models`
+>
+> This made it appear as if the migrated models had disappeared, while in reality Ollama had fallen back to a different storage location.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 02:06 | Manual `ollama serve` process started as user `charmot` and bound to `127.0.0.1:11434` |
+| 02:08 | Restart issue reported: migrated models no longer visible after reboot/restart |
+| 02:10 | Investigation started: `ollama.service` found in crash loop with `bind: address already in use` |
+| 02:11 | Root cause identified: service user/path split between `charmot` and `ollama` contexts |
+| 02:15 | User-level path fixed by replacing `~/.ollama/models` with a symlink to `/home/charmot/ollama_data/models` |
+| 02:15 | Permanent systemd fix prepared via service override script targeting `OLLAMA_MODELS=/home/charmot/ollama_data/models` |
+
+### Root Cause
+> The migration was only partially completed. The actual model files were moved to `/home/charmot/ollama_data/models`, but the runtime configuration was not unified across all startup paths.
+>
+> `ollama.service` runs as the dedicated `ollama` system user, whose default home is `/usr/share/ollama`, while the manually started Ollama process ran as `charmot` and continued to use `~/.ollama/models`. Because the manual process occupied port `11434`, the systemd service never took over. As a result, Ollama started successfully in one context but read the wrong model directory.
+
+### Contributing Factors
+> - Migration relied on a per-user path change instead of an explicit service-level `OLLAMA_MODELS` override
+> - The dedicated `ollama` service account does not naturally share the same home-directory assumptions as the interactive user
+> - `/home/charmot` has restricted traversal permissions (`750`), so service access to migrated content is not guaranteed without ACLs or a different storage root
+> - No post-migration verification checked both `ollama list` and `systemctl status ollama`
+
+### Fix
+> **Immediate consistency fix**:
+> - Replaced `/home/charmot/.ollama/models` with a symlink to `/home/charmot/ollama_data/models`
+> - Preserved the previous directory as `/home/charmot/.ollama/models.backup-20260413-021524`
+>
+> **Permanent service fix prepared**:
+> - Added a script to create a systemd drop-in with:
+>
+> ```ini
+> [Service]
+> Environment="OLLAMA_MODELS=/home/charmot/ollama_data/models"
+> ```
+>
+> - The script also applies ACLs so the `ollama` service user can traverse `/home/charmot` and read/write `/home/charmot/ollama_data/models`
+> - The script stops the conflicting process on port `11434`, reloads systemd, and restarts `ollama.service`
+>
+> Reference script:
+> `/home/charmot/.copilot/session-state/cc44b556-0088-47e5-96dd-e83e5e9fa252/files/ollama-systemd-fix.sh`
+
+### Verification
+> - After the symlink correction, `ollama list` showed the migrated models again:
+>   `gemma3:4b`, `qwen3:latest`, `llama3.1:latest`
+> - File-system inspection confirmed the migrated store remained intact under `/home/charmot/ollama_data/models`
+> - systemd-level persistence fix was prepared but still depends on executing the root-owned service update script
+
+### Follow-up Actions
+> - [ ] Execute the prepared root script to install the systemd drop-in and ACLs permanently
+> - [ ] After deployment, verify `systemctl status ollama` shows a healthy service owned by user `ollama`
+> - [ ] Confirm that a full reboot still preserves model visibility via `ollama list`
+> - [ ] Consider relocating the shared model store to a service-neutral path such as `/var/lib/ollama/models` to avoid home-directory ACL coupling
