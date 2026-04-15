@@ -20,7 +20,7 @@ Frontend runs on **http://localhost:3000** (proxies API to :5000)
 ### 3. Login with Test Token
 - Navigate to **http://localhost:3000**
 - Enter token: **`ABC123`**
-- Click "Start Experiment"
+- Click "Start Session"
 
 ## Test Account Details
 - **Token**: `ABC123`
@@ -52,10 +52,8 @@ Frontend runs on **http://localhost:3000** (proxies API to :5000)
    - Select action (e.g., "Give to friend")
    - Hidden scoring happens server-side (0-6)
 
-5. **Micro-Break** (after game block)
-   - 60-second countdown
-   - NASA-TLX workload questionnaire (3 items)
-   - Submit → continue to next block or debrief
+5. **Micro-Break**
+   - Not shown in the single-session flow (UI skips the rest page and proceeds to the next phase)
 
 ## Admin Dashboard
 

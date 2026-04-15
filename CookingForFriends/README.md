@@ -1,4 +1,4 @@
-# Cooking for Friends — Experiment Platform
+# Cooking for Friends — Session Platform
 
 A browser-based 2D prospective memory (PM) experiment where participants cook steak dinners for friends while performing PM tasks triggered by environmental events.
 
@@ -34,7 +34,7 @@ CookingForFriends/
 │   └── data/timelines/     # JSON timeline templates
 ├── frontend/                # React 18 + TypeScript + Vite + Tailwind + Zustand
 │   ├── src/
-│   │   ├── pages/game/     # WelcomePage, EncodingPage, GamePage, MicroBreakPage, DebriefPage
+│   │   ├── pages/game/     # WelcomePage, EncodingPage, GamePage, DebriefPage
 │   │   ├── pages/admin/    # DashboardPage
 │   │   ├── components/game/ # WorldView, rooms/*, RobotAvatar, PhoneSidebar, HUD, PMTargetItems, TriggerEffects
 │   │   ├── stores/         # Zustand gameStore (central state)
@@ -244,7 +244,7 @@ All PM-related timestamps are recorded:
 | `/` | Welcome/login page (participant-facing) |
 | `/encoding` | PM task encoding phase |
 | `/game` | Main game view |
-| `/microbreak` | Micro-break + NASA-TLX |
+
 | `/debrief` | Post-experiment questionnaire |
 | `/admin` | Experimenter dashboard |
 

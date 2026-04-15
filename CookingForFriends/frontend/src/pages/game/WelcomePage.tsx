@@ -74,16 +74,14 @@ export default function WelcomePage() {
         {/* Header */}
         <div className="bg-gradient-to-r from-cooking-500 to-orange-500 px-8 py-6 text-white">
           <h1 className="text-2xl font-bold">🍳 Cooking for Friends</h1>
-          <p className="text-orange-100 text-sm mt-1">Prospective Memory Experiment</p>
+          <p className="text-orange-100 text-sm mt-1">Prospective Memory Session</p>
         </div>
 
         {/* Form */}
         <div className="px-8 py-6 space-y-5">
           <div>
             <p className="text-slate-600 text-sm mb-4">
-              Welcome! Over the next three days, you'll be preparing dinner for
-              different friends. Along the way, you'll need to remember to do a
-              few things around the house.
+              Welcome! You'll be preparing dinner and completing a few memory tasks during this session.
             </p>
           </div>
 
@@ -122,14 +120,14 @@ export default function WelcomePage() {
                        disabled:bg-cooking-200 text-white font-bold text-lg
                        rounded-xl transition-colors cursor-pointer disabled:cursor-not-allowed"
           >
-            {loading ? 'Starting…' : 'Start Experiment'}
+            {loading ? 'Starting…' : 'Start Session'}
           </button>
         </div>
 
         {/* Footer */}
         <div className="px-8 py-4 bg-slate-50 border-t border-slate-100">
           <p className="text-xs text-slate-400 text-center">
-            Cognitive Science Experiment — All data is anonymized
+            Session data is anonymized
           </p>
         </div>
       </div>

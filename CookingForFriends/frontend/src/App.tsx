@@ -7,7 +7,7 @@ import type { Phase } from './types'
 import WelcomePage from './pages/game/WelcomePage'
 import EncodingPage from './pages/game/EncodingPage'
 import GamePage from './pages/game/GamePage'
-import MicroBreakPage from './pages/game/MicroBreakPage'
+
 import DebriefPage from './pages/game/DebriefPage'
 import AdminDashboard from './pages/admin/DashboardPage'
 import ConfigPage from './pages/admin/ConfigPage'
@@ -84,7 +84,8 @@ function GameShell() {
             pending: 'encoding',
             encoding: 'encoding',
             playing: 'playing',
-            microbreak: 'microbreak',
+            // Treat microbreak/block_end as encoding so the UI skips the rest page
+            microbreak: 'encoding',
             completed: 'encoding', // next block starts with encoding
           }
           const resolvedPhase: Phase = phaseMap[status.phase || ''] || 'welcome'
@@ -113,9 +114,9 @@ function GameShell() {
     case 'playing':
       return <GamePage />
     case 'microbreak':
-      return <MicroBreakPage />
+      return <EncodingPage />
     case 'block_end':
-      return <MicroBreakPage />
+      return <EncodingPage />
     case 'debrief':
       return <DebriefPage />
     case 'complete':
@@ -132,7 +133,7 @@ function CompletePage() {
         <div className="text-5xl mb-4">🎉</div>
         <h1 className="text-2xl font-bold text-slate-800 mb-2">Thank You!</h1>
         <p className="text-slate-600">
-          You have completed the experiment. Please inform the experimenter.
+          You have completed the session. Please inform the experimenter.
         </p>
       </div>
     </div>
