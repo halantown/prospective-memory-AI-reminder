@@ -60,7 +60,7 @@ export default function LockScreen({
         <div className="mb-2">
           <div className="flex items-center gap-2 mb-1.5">
             <div className="flex-1 h-px bg-slate-600/60" />
-            <span className="text-[9px] text-slate-400 font-medium uppercase tracking-widest whitespace-nowrap">
+            <span className="text-[13px] text-slate-400 font-medium uppercase tracking-widest whitespace-nowrap">
               Messages
             </span>
             <div className="flex-1 h-px bg-slate-600/60" />
@@ -84,16 +84,16 @@ export default function LockScreen({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] font-semibold text-slate-200 leading-none">
+                    <span className="text-[13px] font-semibold text-slate-200 leading-none">
                       {preview.contact?.name || 'Unknown'}
                     </span>
                     {preview.count > 0 && (
-                      <span className="text-[8px] bg-red-500 text-white px-1 rounded-full font-bold">
+                      <span className="text-[11px] bg-red-500 text-white px-1 rounded-full font-bold">
                         {preview.count}
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-slate-400 truncate leading-tight mt-0.5">
+                  <p className="text-[13px] text-slate-400 truncate leading-tight mt-0.5">
                     {preview.latest.text}
                   </p>
                 </div>
@@ -108,7 +108,7 @@ export default function LockScreen({
         <div className="mb-2">
           <div className="flex items-center gap-2 mb-1.5">
             <div className="flex-1 h-px bg-slate-600/60" />
-            <span className="text-[9px] text-slate-400 font-medium uppercase tracking-widest whitespace-nowrap">
+            <span className="text-[13px] text-slate-400 font-medium uppercase tracking-widest whitespace-nowrap">
               System
             </span>
             <div className="flex-1 h-px bg-slate-600/60" />
@@ -126,8 +126,8 @@ export default function LockScreen({
                   📱
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="text-[9px] font-semibold text-slate-300 leading-none">{notif.sender}</span>
-                  <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{notif.text}</p>
+                  <span className="text-[13px] font-semibold text-slate-300 leading-none">{notif.sender}</span>
+                  <p className="text-[13px] text-slate-400 leading-tight mt-0.5">{notif.text}</p>
                 </div>
               </div>
             ))}

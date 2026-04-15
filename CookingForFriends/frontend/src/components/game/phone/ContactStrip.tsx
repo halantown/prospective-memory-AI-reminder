@@ -55,7 +55,7 @@ export default function ContactStrip() {
   )
 
   return (
-    <div className="flex flex-col items-center gap-1.5 py-2 px-1 w-12 border-r border-slate-700/40 shrink-0 overflow-y-auto">
+    <div className="flex flex-col items-center gap-1.5 py-2 px-1 w-[54px] border-r border-slate-700/40 shrink-0 overflow-y-auto">
       {visibleContacts.map((contact) => {
         const isActive = contact.id === activeContactId
         const badge = badgeByContact[contact.id] || { type: 'none' }
@@ -72,7 +72,7 @@ export default function ContactStrip() {
                         }`}
             title={contact.name}
           >
-            <span className="text-base leading-none">{contact.avatar}</span>
+            <span className="text-[18px] leading-none">{contact.avatar}</span>
             {/* Number badge: unread unseen messages */}
             {badge.type === 'count' && (
               <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full

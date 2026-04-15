@@ -95,10 +95,10 @@ export default function PhoneSidebar() {
   return (
     <div className="h-full flex items-center justify-center bg-slate-900 p-3">
       {/* iPhone shell */}
-      <div className="relative flex flex-col w-full max-w-[320px] h-full max-h-[680px]">
+      <div className="relative flex flex-col w-[440px] h-[820px] items-center justify-center">
         {/* Outer bezel — pulse glow on new message */}
         <div
-          className={`relative flex flex-col flex-1 rounded-[40px] border-[3px]
+          className={`relative flex flex-col w-[380px] h-[800px] rounded-[40px] border-[3px]
                       bg-gradient-to-b from-slate-800 to-slate-900 shadow-2xl shadow-black/50
                       overflow-hidden transition-all duration-150
                       ${panelPulse
@@ -115,15 +115,15 @@ export default function PhoneSidebar() {
 
           {/* Dynamic Island */}
           <div className="flex justify-center pt-2 pb-1 relative z-10">
-            <div className="w-[90px] h-[25px] bg-black rounded-full flex items-center justify-center gap-2">
+            <div className="w-[110px] h-[26px] bg-black rounded-full flex items-center justify-center gap-2">
               <div className="w-[8px] h-[8px] rounded-full bg-slate-700 ring-1 ring-slate-600" />
               <div className="w-[6px] h-[6px] rounded-full bg-slate-800" />
             </div>
           </div>
 
           {/* Status bar */}
-          <div className="flex items-center justify-between px-6 py-1 text-[10px]">
-            <span className={`text-white font-medium ${locked ? 'invisible' : ''}`}>{gameClock ?? '--:--'}</span>
+          <div className="flex items-center justify-between px-6 py-2 text-[12px]">
+            <span className={`text-white font-medium text-[13px] ${locked ? 'invisible' : ''}`}>{gameClock ?? '--:--'}</span>
             <div className="flex items-center gap-1">
               {unreadCount > 0 && (
                 <span className="bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">

@@ -63,7 +63,7 @@ export default function ChoiceButtons({
             disabled={answered}
             animate={isFlashing ? { scale: [1, 1.05, 1] } : {}}
             transition={{ duration: 0.2 }}
-            className={`w-full py-2.5 px-3 text-[11px] font-medium rounded-xl
+            className={`w-full py-2.5 px-3 text-[13px] font-medium rounded-xl
                        border transition-colors leading-tight text-left
                        ${bgClass}
                        ${answered ? 'cursor-default' : 'active:scale-95 cursor-pointer'}`}

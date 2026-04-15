@@ -32,7 +32,7 @@ export default function ChatBubble({ text, variant = 'friend', flashResult }: Ch
         initial={{ opacity: 0, y: 8, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        className={`max-w-[85%] rounded-2xl px-3 py-2 text-[12px] leading-relaxed
+        className={`max-w-[85%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed
                     ${bgClass} ${borderFlash}`}
       >
         {text}

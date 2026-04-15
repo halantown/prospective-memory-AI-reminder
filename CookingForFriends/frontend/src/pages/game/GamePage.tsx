@@ -34,8 +34,8 @@ export default function GamePage() {
 
   return (
     <div className="h-screen w-screen flex overflow-hidden bg-slate-900 select-none">
-      {/* Game main area (75%) */}
-      <div className="relative flex-1" style={{ width: '75%' }}>
+      {/* Game main area (fixed 1480px) */}
+      <div className="relative" style={{ width: '1480px' }}>
         <WorldView />
         <HUD />
         <RobotAvatar />
@@ -50,8 +50,8 @@ export default function GamePage() {
         )}
       </div>
 
-      {/* Phone sidebar (25%) */}
-      <div className="w-[25%] min-w-[280px] max-w-[360px]">
+      {/* Phone sidebar (fixed 440px) */}
+      <div style={{ width: '440px' }} className="flex-shrink-0">
         <PhoneSidebar />
       </div>
     </div>

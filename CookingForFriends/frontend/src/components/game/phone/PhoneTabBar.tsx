@@ -35,7 +35,7 @@ export default function PhoneTabBar() {
                     ${activeTab === 'chats' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-300'}`}
       >
         <span className="text-base">💬</span>
-        <span className="text-[9px] font-medium">Chats</span>
+        <span className="text-[12px] font-medium">Chats</span>
         {totalUnread > 0 && (
           <span className="absolute -top-0.5 right-1 bg-red-500 text-white text-[7px] font-bold
                           px-1 py-0 rounded-full min-w-[14px] text-center">
@@ -59,7 +59,7 @@ export default function PhoneTabBar() {
                     ${activeTab === 'recipe' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-300'}`}
       >
         <span className="text-base">📖</span>
-        <span className="text-[9px] font-medium">Recipe</span>
+        <span className="text-[12px] font-medium">Recipe</span>
         {activeTab === 'recipe' && (
           <motion.div
             layoutId="phoneTabIndicator"
