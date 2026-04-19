@@ -3,6 +3,27 @@
 
   "reminder_context": {
 
+    "baseline": {
+      "action_verb": "prepare",
+      "target": "the egg tart",
+      "recipient": "Sophia"
+    },
+
+    "episode_dimensions": {
+      "time": "last week",
+      "space": "FaceTime call",
+      "entity": ["Sophia", "egg tart", "flaky pastry", "golden custard"],
+      "causality": "Sophia remembered the egg tart and has been craving one",
+      "intentionality": "Sophia asked you to prepare one for her next visit"
+    },
+
+    "ec_priority_dimensions": ["entity", "causality"],
+
+    "ec_selected_features": {
+      "entity": ["Sophia", "egg tart"],
+      "causality": "Sophia has been craving your egg tart and asked you to prepare one"
+    },
+
     "element1_af": {
 
       "af_baseline": {

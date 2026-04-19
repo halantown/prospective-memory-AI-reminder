@@ -1,14 +1,11 @@
 """Context Extractor — prunes a full Task JSON to only condition-permitted fields.
 
+v3 EC operationalization: 2 conditions (EC_off, EC_on).
+Uses the simplified visible_fields format from condition_field_map.yaml.
+Field paths are relative to reminder_context.
+
 The LLM receives only the pruned output. It cannot leak information it never sees.
 This implements Design Principle P1 (input truncation over output filtering).
-
-2×2 factorial design: AF (low/high) × EC (off/on)
-  AF_low_EC_off:  action + entity only, no source context
-  AF_high_EC_off: + visual cues, domain properties, location
-  AF_low_EC_on:   action + entity + source context
-  AF_high_EC_on:  full information (AF features + source context)
-  Control: No reminder — never calls this module.
 """
 
 from __future__ import annotations
@@ -57,34 +54,6 @@ def _set_path(target: dict, dotted_path: str, value: Any) -> None:
     current[keys[-1]] = value
 
 
-def _evaluate_condition(condition_expr: str, task_json: dict) -> bool:
-    """Evaluate a simple condition expression against the task JSON.
-
-    Supports: "path.to.field == value"
-    """
-    parts = condition_expr.split(" == ")
-    if len(parts) != 2:
-        raise ValueError(f"Unsupported condition syntax: {condition_expr}")
-
-    field_path = parts[0].strip()
-    expected_raw = parts[1].strip()
-
-    # Parse the expected value
-    if expected_raw.lower() == "true":
-        expected: Any = True
-    elif expected_raw.lower() == "false":
-        expected = False
-    else:
-        expected = expected_raw.strip("\"'")
-
-    try:
-        actual = _resolve_path(task_json, field_path)
-    except KeyError:
-        return False
-
-    return actual == expected
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -96,7 +65,7 @@ def load_field_map(
     """Load the field whitelist for a specific condition.
 
     Args:
-        condition: One of the active condition names (e.g. "AF_only", "AF_CB").
+        condition: One of the active condition names (e.g. "EC_off", "EC_on").
         field_map: Pre-loaded field map. If None, loads from default config path.
 
     Returns:
@@ -120,59 +89,37 @@ def extract(
 ) -> dict:
     """Prune a full Task JSON to contain only fields permitted by the condition.
 
+    v3 format: visible_fields are dot-paths relative to reminder_context.
+    Returns a dict with the same structure under reminder_context.
+
     Args:
-        task_json: The complete Task JSON dict (with all 3 zones).
-        condition: One of the active condition names ("AF_only" or "AF_CB").
+        task_json: The complete Task JSON dict.
+        condition: One of the active condition names ("EC_off" or "EC_on").
         field_map: Pre-loaded field map. If None, loads from default config path.
 
     Returns:
-        A new dict containing only the whitelisted fields.
+        A new dict containing only the whitelisted fields under reminder_context.
 
     Raises:
         MissingRequiredFieldError: If a required field is absent from task_json.
     """
     entry = load_field_map(condition, field_map)
     task_id = task_json.get("task_id", "<unknown>")
-    result: dict = {}
+    rc = task_json.get("reminder_context", {})
+    result_rc: dict = {}
 
-    # 1. Include required fields
-    for field_path in entry.required_fields:
+    for field_path in entry.visible_fields:
         try:
-            value = _resolve_path(task_json, field_path)
+            value = _resolve_path(rc, field_path)
         except KeyError:
             raise MissingRequiredFieldError(
-                f"Required field '{field_path}' missing from task '{task_id}' "
-                f"for condition '{condition}'"
+                f"Required field 'reminder_context.{field_path}' missing from "
+                f"task '{task_id}' for condition '{condition}'"
             )
-        _set_path(result, field_path, value)
-        logger.debug("  [%s] INCLUDED required: %s", condition, field_path)
+        _set_path(result_rc, field_path, value)
+        logger.debug("  [%s] INCLUDED: %s", condition, field_path)
 
-    # 2. Include conditional fields (only if their condition evaluates to true)
-    for cond_field in entry.conditional_fields:
-        if _evaluate_condition(cond_field.condition, task_json):
-            try:
-                value = _resolve_path(task_json, cond_field.field)
-            except KeyError:
-                logger.warning(
-                    "Conditional field '%s' condition met but field missing in task '%s'",
-                    cond_field.field,
-                    task_id,
-                )
-                continue
-            _set_path(result, cond_field.field, value)
-            logger.debug("  [%s] INCLUDED conditional: %s", condition, cond_field.field)
-        else:
-            logger.debug(
-                "  [%s] SKIPPED conditional: %s (condition not met)",
-                condition,
-                cond_field.field,
-            )
-
-    # Log excluded fields and zones for auditability
-    for field_path in entry.excluded_fields:
-        logger.debug("  [%s] EXCLUDED field: %s", condition, field_path)
-    for zone in entry.excluded_zones:
-        logger.debug("  [%s] EXCLUDED zone: %s", condition, zone)
+    result = {"reminder_context": result_rc}
 
     logger.info(
         "Extracted context for task=%s condition=%s: %d fields included",
@@ -189,6 +136,8 @@ def _count_leaf_values(d: dict) -> int:
     for v in d.values():
         if isinstance(v, dict):
             count += _count_leaf_values(v)
+        elif isinstance(v, list):
+            count += len(v)
         else:
             count += 1
     return count
@@ -213,7 +162,7 @@ if __name__ == "__main__":
     with open(task_path) as f:
         task_json = json.load(f)
 
-    conditions = ["AF_low_EC_off", "AF_high_EC_off", "AF_low_EC_on", "AF_high_EC_on"]
+    conditions = ["EC_off", "EC_on"]
     fm = load_condition_field_map()
 
     for cond in conditions:

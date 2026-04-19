@@ -1,7 +1,6 @@
 """Batch generation orchestrator for the reminder pipeline.
 
-All 4 conditions (AF_low_EC_off, AF_low_EC_on, AF_high_EC_off, AF_high_EC_on)
-use LLM generation. No template fallback.
+v3 EC operationalization: 2 conditions (EC_off, EC_on).
 """
 
 import argparse
@@ -21,12 +20,7 @@ logger = logging.getLogger(__name__)
 
 TASK_DIR = Path(__file__).resolve().parent.parent / "data" / "task_schemas"
 
-ALL_CONDITIONS = [
-    "AF_low_EC_off",
-    "AF_high_EC_off",
-    "AF_low_EC_on",
-    "AF_high_EC_on",
-]
+EC_CONDITIONS = ["EC_off", "EC_on"]
 
 
 def load_all_task_jsons(task_dir: Path | None = None) -> list[dict]:
@@ -46,7 +40,7 @@ def run_batch(
     condition_filter: str | None = None,
     clear_db: bool = False,
 ):
-    """Full batch generation pipeline. All conditions use LLM."""
+    """Full batch generation pipeline for EC conditions."""
     model_config, gen_config, field_map = load_all_configs()
 
     backend = None
@@ -66,7 +60,7 @@ def run_batch(
             return
 
     n_variants = n_variants or gen_config.n_variants
-    conditions = [condition_filter] if condition_filter else ALL_CONDITIONS
+    conditions = [condition_filter] if condition_filter else EC_CONDITIONS
 
     total = len(tasks) * len(conditions) * n_variants
     succeeded = 0
@@ -76,7 +70,15 @@ def run_batch(
     print(f"\n=== LLM Generation ({len(tasks)} tasks × {len(conditions)} conditions × {n_variants} variants = {total} total) ===")
 
     for task in tasks:
-        entity_name = task["reminder_context"]["element1_af"]["af_high"]["target_entity"]["entity_name"]
+        # v3: read target from baseline
+        baseline = task.get("reminder_context", {}).get("baseline", {})
+        target_name = baseline.get("target", "")
+        # Extract the key noun for entity checking (e.g. "the baking book" → "book")
+        entity_name = target_name.split()[-1] if target_name else ""
+
+        # EC dimensions used (for output store)
+        ec_features = task.get("reminder_context", {}).get("ec_selected_features", {})
+        ec_dims = list(ec_features.keys()) if ec_features else []
 
         for condition in conditions:
             prior_variants: list[str] = []
@@ -93,7 +95,12 @@ def run_batch(
                     )
 
                     if dry_run:
-                        raw_output = f"[DRY RUN] Remember to {task['reminder_context']['element1_af']['af_baseline']['action_verb']} the {entity_name}. ({condition} v{v_idx})"
+                        action = baseline.get("action_verb", "do")
+                        recipient = baseline.get("recipient", "someone")
+                        if condition == "EC_on":
+                            raw_output = f"[DRY RUN] {recipient} liked {target_name}. Remember to {action} {recipient} {target_name}. ({condition} v{v_idx})"
+                        else:
+                            raw_output = f"[DRY RUN] Remember to {action} {recipient} {target_name}. ({condition} v{v_idx})"
                     else:
                         try:
                             raw_output = backend.generate(sys_prompt, usr_prompt)
@@ -139,6 +146,7 @@ def run_batch(
                             qg_failures=None,
                             model_used=model_config.model_name,
                             attempt=attempt,
+                            ec_dimensions_used=ec_dims if condition == "EC_on" else None,
                         )
                         prior_variants.append(raw_output)
                         success = True
@@ -168,12 +176,14 @@ def run_batch(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Batch generate reminder texts.")
+    parser = argparse.ArgumentParser(description="Batch generate reminder texts (v3 EC).")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--n-variants", type=int, default=None)
     parser.add_argument("--task", type=str, default=None)
-    parser.add_argument("--condition", type=str, default=None)
-    parser.add_argument("--clear", action="store_true")
+    parser.add_argument("--condition", type=str, default=None,
+                        choices=EC_CONDITIONS)
+    parser.add_argument("--clear", action="store_true",
+                        help="Clear database before running")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 

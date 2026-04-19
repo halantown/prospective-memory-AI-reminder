@@ -1,7 +1,7 @@
 """Tests for config_loader — validates that all configs load cleanly and
 that validation catches missing / invalid fields.
 
-Updated for 2×2 factorial design (AF_low_EC_off, AF_high_EC_off, AF_low_EC_on, AF_high_EC_on).
+Updated for v3 EC operationalization (2 conditions: EC_off, EC_on).
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from reminder_agent.stage2.config_loader import (
 
 @pytest.fixture()
 def tmp_config_dir(tmp_path: Path) -> Path:
-    """Create a temporary config directory with valid config files."""
+    """Create a temporary config directory with valid v3-format config files."""
     cfg = tmp_path / "config"
     cfg.mkdir()
 
@@ -40,87 +40,45 @@ def tmp_config_dir(tmp_path: Path) -> Path:
     """))
 
     (cfg / "generation_config.yaml").write_text(textwrap.dedent("""\
+        ec_conditions:
+          - EC_off
+          - EC_on
         n_variants: 3
         max_retries: 3
         min_words: 5
         max_words: 45
         similarity_threshold: 0.85
         context_format: "prose"
+        word_limits:
+          EC_off:
+            min: 5
+            max: 12
+          EC_on:
+            min: 12
+            max: 25
     """))
 
     (cfg / "condition_field_map.yaml").write_text(textwrap.dedent("""\
-        AF_low_EC_off:
-          required_fields:
-            - "reminder_context.element1_af.af_baseline.action_verb"
-            - "reminder_context.element1_af.af_baseline.recipient"
-            - "reminder_context.element1_af.af_high.target_entity.entity_name"
-          conditional_fields: []
-          excluded_fields:
-            - "reminder_context.element1_af.af_high.target_entity.visual_cues"
-            - "reminder_context.element1_af.af_high.target_entity.domain_properties"
-            - "reminder_context.element1_af.af_high.location"
-            - "reminder_context.element2_ec"
-            - "reminder_context.element3_excluded"
-          excluded_zones:
-            - "agent_reasoning_context"
-            - "experiment_metadata"
+        EC_off:
+          visible_fields:
+            - "baseline.action_verb"
+            - "baseline.target"
+            - "baseline.recipient"
 
-        AF_high_EC_off:
-          required_fields:
-            - "reminder_context.element1_af.af_baseline.action_verb"
-            - "reminder_context.element1_af.af_baseline.recipient"
-            - "reminder_context.element1_af.af_high.target_entity.entity_name"
-            - "reminder_context.element1_af.af_high.target_entity.visual_cues"
-            - "reminder_context.element1_af.af_high.target_entity.domain_properties"
-            - "reminder_context.element1_af.af_high.location"
-          conditional_fields: []
-          excluded_fields:
-            - "reminder_context.element2_ec"
-            - "reminder_context.element3_excluded"
-          excluded_zones:
-            - "agent_reasoning_context"
-            - "experiment_metadata"
-
-        AF_low_EC_on:
-          required_fields:
-            - "reminder_context.element1_af.af_baseline.action_verb"
-            - "reminder_context.element1_af.af_baseline.recipient"
-            - "reminder_context.element1_af.af_high.target_entity.entity_name"
-            - "reminder_context.element2_ec.task_creator"
-            - "reminder_context.element2_ec.creation_context"
-          conditional_fields: []
-          excluded_fields:
-            - "reminder_context.element1_af.af_high.target_entity.visual_cues"
-            - "reminder_context.element1_af.af_high.target_entity.domain_properties"
-            - "reminder_context.element1_af.af_high.location"
-            - "reminder_context.element3_excluded"
-          excluded_zones:
-            - "agent_reasoning_context"
-            - "experiment_metadata"
-
-        AF_high_EC_on:
-          required_fields:
-            - "reminder_context.element1_af.af_baseline.action_verb"
-            - "reminder_context.element1_af.af_baseline.recipient"
-            - "reminder_context.element1_af.af_high.target_entity.entity_name"
-            - "reminder_context.element1_af.af_high.target_entity.visual_cues"
-            - "reminder_context.element1_af.af_high.target_entity.domain_properties"
-            - "reminder_context.element1_af.af_high.location"
-            - "reminder_context.element2_ec.task_creator"
-            - "reminder_context.element2_ec.creation_context"
-          conditional_fields: []
-          excluded_fields:
-            - "reminder_context.element3_excluded"
-          excluded_zones:
-            - "agent_reasoning_context"
-            - "experiment_metadata"
+        EC_on:
+          visible_fields:
+            - "baseline.action_verb"
+            - "baseline.target"
+            - "baseline.recipient"
+            - "ec_selected_features.entity"
+            - "ec_selected_features.causality"
     """))
 
     return cfg
 
 
 # ---------------------------------------------------------------------------
-# Happy-path tests
+# Happy-path tests — production configs
 # ---------------------------------------------------------------------------
 
 class TestLoadFromProductionConfigs:
@@ -130,7 +88,7 @@ class TestLoadFromProductionConfigs:
         model, gen, field_map = load_all_configs()
         assert model.backend == "ollama"
         assert gen.n_variants == 3
-        assert len(field_map.conditions) == 4
+        assert len(field_map.conditions) == 2
 
     def test_model_config(self) -> None:
         cfg = load_model_config()
@@ -148,29 +106,38 @@ class TestLoadFromProductionConfigs:
         assert cfg.min_words == 5
         assert cfg.max_words == 45
         assert cfg.similarity_threshold == 0.85
+        assert cfg.context_format == "prose"
+        assert cfg.ec_conditions == ["EC_off", "EC_on"]
+        assert "EC_off" in cfg.word_limits
+        assert "EC_on" in cfg.word_limits
 
-    def test_condition_field_map_all_conditions(self) -> None:
+    def test_condition_field_map(self) -> None:
         cfg = load_condition_field_map()
-        expected = {"AF_low_EC_off", "AF_high_EC_off", "AF_low_EC_on", "AF_high_EC_on"}
-        assert set(cfg.conditions.keys()) == expected
+        assert set(cfg.conditions.keys()) == {"EC_off", "EC_on"}
 
-    def test_af_high_has_visual_cues(self) -> None:
+    def test_ec_off_has_baseline_fields(self) -> None:
         cfg = load_condition_field_map()
-        af_high = cfg.conditions["AF_high_EC_off"]
-        assert "reminder_context.element1_af.af_high.target_entity.visual_cues" in af_high.required_fields
+        fields = cfg.conditions["EC_off"].visible_fields
+        assert "baseline.action_verb" in fields
+        assert "baseline.target" in fields
+        assert "baseline.recipient" in fields
 
-    def test_all_conditions_exclude_detected_activity(self) -> None:
+    def test_ec_on_has_ec_features(self) -> None:
         cfg = load_condition_field_map()
-        for cond_name, entry in cfg.conditions.items():
-            assert "reminder_context.element3_excluded.detected_activity_raw" not in entry.required_fields, (
-                f"{cond_name} should not include detected_activity_raw"
-            )
+        fields = cfg.conditions["EC_on"].visible_fields
+        assert "ec_selected_features.entity" in fields
+        assert "ec_selected_features.causality" in fields
+        # EC_on should also include all baseline fields
+        assert "baseline.action_verb" in fields
+        assert "baseline.target" in fields
+        assert "baseline.recipient" in fields
 
-    def test_af_high_conditions_have_domain_properties(self) -> None:
-        cfg = load_condition_field_map()
-        for cond_name in ("AF_high_EC_off", "AF_high_EC_on"):
-            entry = cfg.conditions[cond_name]
-            assert "reminder_context.element1_af.af_high.target_entity.domain_properties" in entry.required_fields
+    def test_word_limits(self) -> None:
+        cfg = load_generation_config()
+        assert cfg.get_word_limits("EC_off") == (5, 12)
+        assert cfg.get_word_limits("EC_on") == (12, 25)
+        # Unknown condition falls back to global min/max
+        assert cfg.get_word_limits("unknown") == (5, 45)
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +194,7 @@ class TestValidationErrors:
     def test_missing_condition_in_field_map(self, tmp_config_dir: Path) -> None:
         path = tmp_config_dir / "condition_field_map.yaml"
         data = yaml.safe_load(path.read_text())
-        del data["AF_high_EC_on"]
+        del data["EC_on"]
         path.write_text(yaml.dump(data))
         with pytest.raises(ValueError, match="Missing condition"):
             load_condition_field_map(path)
@@ -235,7 +202,7 @@ class TestValidationErrors:
     def test_extra_condition_in_field_map(self, tmp_config_dir: Path) -> None:
         path = tmp_config_dir / "condition_field_map.yaml"
         data = yaml.safe_load(path.read_text())
-        data["BogusCondition"] = data["AF_low_EC_off"]
+        data["BogusCondition"] = data["EC_off"]
         path.write_text(yaml.dump(data))
         with pytest.raises(ValueError, match="Unexpected condition"):
             load_condition_field_map(path)
@@ -251,4 +218,6 @@ class TestTmpConfigRoundTrip:
         model, gen, field_map = load_all_configs(tmp_config_dir)
         assert model.backend == "together"
         assert gen.n_variants == 3
-        assert len(field_map.conditions) == 4
+        assert len(field_map.conditions) == 2
+        assert gen.get_word_limits("EC_off") == (5, 12)
+        assert gen.get_word_limits("EC_on") == (12, 25)

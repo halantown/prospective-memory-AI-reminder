@@ -1,88 +1,21 @@
-# Condition Field Map — 2×2 AF × EC Design (v2 schema)
+# Condition Field Map — v3 EC operationalization
 #
-# AF (within-subject): item-feature specificity
-#   AF_low  = af_baseline only (action_verb + recipient)
-#   AF_high = af_baseline + af_high (visual_cues, domain_properties, location)
+# EC (between-subject): encoding context
+#   EC_off = baseline only (action_verb + target + recipient)
+#   EC_on  = baseline + ec_selected_features (entity + causality)
 #
-# EC (between-subject): encoding context from source
-#   EC_off = no source context (element2_ec excluded)
-#   EC_on  = full element2_ec included (task_creator + creation_context)
-#
-# element3_excluded is excluded from ALL conditions (legacy field).
-# c_af_candidates and distractors are pipeline input only, excluded from all conditions.
+# Field paths are relative to reminder_context.
 
-AF_low_EC_off:
-  required_fields:
-    - "reminder_context.element1_af.af_baseline.action_verb"
-    - "reminder_context.element1_af.af_baseline.recipient"
-    - "reminder_context.element1_af.af_high.target_entity.entity_name"
-  conditional_fields: []
-  excluded_fields:
-    - "reminder_context.element1_af.af_high.target_entity.visual_cues"
-    - "reminder_context.element1_af.af_high.target_entity.domain_properties"
-    - "reminder_context.element1_af.af_high.location"
-    - "reminder_context.element1_af.c_af_candidates"
-    - "reminder_context.element1_af.distractors"
-    - "reminder_context.element2_ec"
-    - "reminder_context.element3_excluded"
-  excluded_zones:
-    - "agent_reasoning_context"
-    - "experiment_metadata"
+EC_off:
+  visible_fields:
+    - "baseline.action_verb"
+    - "baseline.target"
+    - "baseline.recipient"
 
-AF_high_EC_off:
-  required_fields:
-    - "reminder_context.element1_af.af_baseline.action_verb"
-    - "reminder_context.element1_af.af_baseline.recipient"
-    - "reminder_context.element1_af.af_high.target_entity.entity_name"
-    - "reminder_context.element1_af.af_high.target_entity.visual_cues"
-    - "reminder_context.element1_af.af_high.target_entity.domain_properties"
-    - "reminder_context.element1_af.af_high.location"
-  conditional_fields: []
-  excluded_fields:
-    - "reminder_context.element1_af.c_af_candidates"
-    - "reminder_context.element1_af.distractors"
-    - "reminder_context.element2_ec"
-    - "reminder_context.element3_excluded"
-  excluded_zones:
-    - "agent_reasoning_context"
-    - "experiment_metadata"
-
-AF_low_EC_on:
-  required_fields:
-    - "reminder_context.element1_af.af_baseline.action_verb"
-    - "reminder_context.element1_af.af_baseline.recipient"
-    - "reminder_context.element1_af.af_high.target_entity.entity_name"
-    - "reminder_context.element2_ec.task_creator"
-    - "reminder_context.element2_ec.creator_relationship"
-    - "reminder_context.element2_ec.ec_cue"
-  conditional_fields: []
-  excluded_fields:
-    - "reminder_context.element1_af.af_high.target_entity.visual_cues"
-    - "reminder_context.element1_af.af_high.target_entity.domain_properties"
-    - "reminder_context.element1_af.af_high.location"
-    - "reminder_context.element1_af.c_af_candidates"
-    - "reminder_context.element1_af.distractors"
-    - "reminder_context.element3_excluded"
-  excluded_zones:
-    - "agent_reasoning_context"
-    - "experiment_metadata"
-
-AF_high_EC_on:
-  required_fields:
-    - "reminder_context.element1_af.af_baseline.action_verb"
-    - "reminder_context.element1_af.af_baseline.recipient"
-    - "reminder_context.element1_af.af_high.target_entity.entity_name"
-    - "reminder_context.element1_af.af_high.target_entity.visual_cues"
-    - "reminder_context.element1_af.af_high.target_entity.domain_properties"
-    - "reminder_context.element1_af.af_high.location"
-    - "reminder_context.element2_ec.task_creator"
-    - "reminder_context.element2_ec.creator_relationship"
-    - "reminder_context.element2_ec.ec_cue"
-  conditional_fields: []
-  excluded_fields:
-    - "reminder_context.element1_af.c_af_candidates"
-    - "reminder_context.element1_af.distractors"
-    - "reminder_context.element3_excluded"
-  excluded_zones:
-    - "agent_reasoning_context"
-    - "experiment_metadata"
+EC_on:
+  visible_fields:
+    - "baseline.action_verb"
+    - "baseline.target"
+    - "baseline.recipient"
+    - "ec_selected_features.entity"
+    - "ec_selected_features.causality"

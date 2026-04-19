@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS reminders (
     reviewer_notes TEXT,
     model_used TEXT,
     generation_attempt INTEGER,
+    ec_dimensions_used TEXT,
     generated_at TIMESTAMP,
     reviewed_at TIMESTAMP,
     UNIQUE(task_id, condition, variant_idx)
@@ -68,16 +69,19 @@ class OutputStore:
         qg_failures: Optional[list[str]],
         model_used: Optional[str],
         attempt: int,
+        ec_dimensions_used: Optional[list[str]] = None,
     ) -> int:
         """Insert or replace a reminder. Returns the row id."""
         now = datetime.now(timezone.utc).isoformat()
         failures_json = json.dumps(qg_failures) if qg_failures else None
+        dims_json = json.dumps(ec_dimensions_used) if ec_dimensions_used else None
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 """INSERT OR REPLACE INTO reminders
                    (task_id, condition, variant_idx, text, passed_quality_gate,
-                    quality_gate_failures, model_used, generation_attempt, generated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    quality_gate_failures, model_used, generation_attempt,
+                    ec_dimensions_used, generated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     task_id,
                     condition,
@@ -87,6 +91,7 @@ class OutputStore:
                     failures_json,
                     model_used,
                     attempt,
+                    dims_json,
                     now,
                 ),
             )

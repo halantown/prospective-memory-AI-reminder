@@ -1,8 +1,34 @@
-# Generation Configuration — variant count, quality thresholds, constraints
+# Generation Configuration — v3 EC operationalization
+#
+# Condition list reduced from 4 (AF×EC) to 2 (EC only).
+# Per-condition word limits replace the single min/max.
 
-n_variants: 3                  # variants per (task, condition) pair; scale to 10 in S6
-max_retries: 3                 # retry limit per variant before flagging as failed
-min_words: 5                   # minimum word count for generated text
-max_words: 45                  # maximum word count for generated text
-similarity_threshold: 0.85     # max Levenshtein similarity between variants in same batch
-context_format: "prose"        # prose | json — how pruned context is presented to the LLM
+# EC conditions
+ec_conditions:
+  - EC_off
+  - EC_on
+
+# Variant count per condition per task
+n_variants: 3                  # dev; set to 10 for production
+
+# Retry on quality gate failure
+max_retries: 3
+
+# Per-condition word count limits
+word_limits:
+  EC_off:
+    min: 5
+    max: 12
+  EC_on:
+    min: 12
+    max: 25
+
+# Global fallback (used when condition not in word_limits)
+min_words: 5
+max_words: 45
+
+# Duplicate detection
+similarity_threshold: 0.85
+
+# Context format for LLM user prompt
+context_format: "prose"        # prose | json

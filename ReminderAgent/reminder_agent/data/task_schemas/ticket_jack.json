@@ -3,6 +3,27 @@
 
   "reminder_context": {
 
+    "baseline": {
+      "action_verb": "give",
+      "target": "the theatre tickets",
+      "recipient": "Jack"
+    },
+
+    "episode_dimensions": {
+      "time": "last week",
+      "space": "home (watching a film together)",
+      "entity": ["Jack", "theatre tickets", "two tickets", "girlfriend"],
+      "causality": "Jack bought two theatre tickets and asked you to hold onto them",
+      "intentionality": "Jack wants the tickets back when he next visits"
+    },
+
+    "ec_priority_dimensions": ["entity", "causality"],
+
+    "ec_selected_features": {
+      "entity": ["Jack", "theatre tickets"],
+      "causality": "Jack bought the tickets and asked you to hold onto them"
+    },
+
     "element1_af": {
 
       "af_baseline": {

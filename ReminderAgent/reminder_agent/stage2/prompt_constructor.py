@@ -1,13 +1,11 @@
 """Prompt Constructor — assembles system and user prompts for reminder generation.
 
-Implements the dual format strategy (prose/json) from TECH_DOC v0.3 §4.2.
-Tone constant (intention-reactivation framing) per TECH_DOC v0.4 §2.4.
+v3 EC operationalization: 2 conditions (EC_off, EC_on).
+  EC_off — baseline only: action + target + recipient
+  EC_on  — baseline + encoding context features (entity + causality)
 
-2×2 factorial design: AF (low/high) × EC (off/on)
-  AF_low_EC_off  — minimal: action + entity only
-  AF_high_EC_off — detailed item features, no source context
-  AF_low_EC_on   — minimal item + source context
-  AF_high_EC_on  — full information
+Prompt templates follow EC_Operationalization_Dev_Doc.md §4.
+Tone constant (intention-reactivation framing).
 """
 
 from __future__ import annotations
@@ -28,30 +26,62 @@ from reminder_agent.stage2.context_extractor import extract
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Condition descriptions (plain English for LLM system prompt)
+# System prompts (v3 — EC operationalization)
 # ---------------------------------------------------------------------------
 
-CONDITION_DESCRIPTIONS: dict[str, dict[str, str]] = {
-    "AF_low_EC_off": {
-        "include": "only the intended action and the entity name",
-        "exclude": "visual appearance, specific properties, location, who assigned the task, any background about when/why the task was created, and any reference to the user's current activity",
-        "tone": "Keep it minimal and brief. Just the action and the object.",
-    },
-    "AF_high_EC_off": {
-        "include": "the action, entity name, visual appearance of the target (colour, shape, distinguishing features), specific discriminating properties, and the location (room and spot)",
-        "exclude": "who assigned the task, any background about when/why the task was created, and any reference to the user's current activity",
-        "tone": "Be specific and descriptive about the target object so the user can identify it among similar items.",
-    },
-    "AF_low_EC_on": {
-        "include": "only the intended action and the entity name",
-        "exclude": "visual appearance, specific properties, location, and any reference to the user's current activity",
-        "tone": "You MUST begin the reminder with a paraphrase of the context cue (ec_cue). This is mandatory and cannot be omitted regardless of length. Paraphrase it naturally in one short clause. Do not add, remove, or infer any information beyond what is stated. Preserve: who, occasion, and any named anchor (e.g. a place or object). Format: [context cue paraphrase] — [action instruction].",
-    },
-    "AF_high_EC_on": {
-        "include": "the action, entity name, visual appearance of the target, specific discriminating properties, and the location (room and spot)",
-        "exclude": "any reference to the user's current activity",
-        "tone": "You MUST begin the reminder with a paraphrase of the context cue (ec_cue). This is mandatory and cannot be omitted regardless of length. Paraphrase it naturally in one short clause. Do not add, remove, or infer any information beyond what is stated. Preserve: who, occasion, and any named anchor (e.g. a place or object). Format: [context cue paraphrase]. [action instruction]. Be specific and descriptive about the target object.",
-    },
+EC_OFF_SYSTEM_PROMPT = """You are generating a short reminder message for a participant in a memory experiment.
+
+The reminder should contain ONLY the action and target. No context, no backstory.
+
+Rules:
+- Use intention-reactivation framing ONLY:
+  ✓ "Remember to...", "By the way, remember...", "Don't forget to..."
+  ✗ "It's time to...", "You need to now...", "Make sure you..."
+  ✗ Never imply the task should be executed immediately.
+- The full reminder must be a single sentence, no longer than 12 words.
+- Do not use relative clauses (which / that / who).
+- Do not compress phrases into hyphenated words.
+- Natural spoken English — warm and brief.
+- Do NOT use bullet points, numbering, or explanations.
+- Do NOT add quotation marks around the reminder.
+- Always refer to the target item by its specific name — never use "it" or "the item".
+- Do not introduce any objects or details not present in the task data provided.
+- Output ONLY the reminder text, nothing else.
+
+Example: "Remember to give Mei the baking book."
+"""
+
+EC_ON_SYSTEM_PROMPT = """You are generating a reminder message for a participant in a memory experiment.
+
+The reminder should have two parts:
+1. A context sentence that naturally paraphrases the encoding episode features below.
+2. The action instruction.
+
+Rules:
+- Use intention-reactivation framing for the action part:
+  ✓ "Remember to...", "By the way, remember...", "Don't forget to..."
+  ✗ "It's time to...", "You need to now...", "Make sure you..."
+  ✗ Never imply the task should be executed immediately.
+- The context sentence must paraphrase the features — do not copy verbatim.
+- Each variant should use a different paraphrase.
+- Do not invent details not present in the features.
+- Do not introduce time, space, or intentionality details unless they appear in the features.
+- Do not compress phrases into hyphenated words.
+- Total length: under 25 words.
+- Format: [context paraphrase] + [action instruction]
+- Natural spoken English — warm and brief.
+- Do NOT use bullet points, numbering, or explanations.
+- Do NOT add quotation marks around the reminder.
+- Always refer to the target item by its specific name — never use "it" or "the item".
+- Do not use first-person plural ("we", "our", "us").
+- Output ONLY the reminder text, nothing else.
+
+Example: "Last week you baked together and Mei liked your baking book. Remember to give Mei the baking book."
+"""
+
+SYSTEM_PROMPTS = {
+    "EC_off": EC_OFF_SYSTEM_PROMPT,
+    "EC_on": EC_ON_SYSTEM_PROMPT,
 }
 
 
@@ -60,270 +90,55 @@ CONDITION_DESCRIPTIONS: dict[str, dict[str, str]] = {
 # ---------------------------------------------------------------------------
 
 def build_system_prompt(condition: str) -> str:
-    """Build the system prompt for a given condition.
-
-    Includes role definition, condition rules, length constraints, and tone.
-    """
-    desc = CONDITION_DESCRIPTIONS.get(condition)
-    if desc is None:
+    """Build the system prompt for a given condition."""
+    prompt = SYSTEM_PROMPTS.get(condition)
+    if prompt is None:
         raise ValueError(f"Unknown condition: {condition}")
-
-    # Condition-specific length / sentence constraints
-    if condition == "AF_high_EC_on":
-        length_line = "If both context cue and item features are present, you may use two sentences. Keep each sentence under 15 words."
-        output_line = "Output: one or two short sentences."
-    else:
-        length_line = "The full reminder must be no longer than 20 words."
-        output_line = "Output: one reminder sentence only."
-
-    # Condition-specific length examples for LLM calibration
-    examples = {
-        "AF_low_EC_off": "Remember to give Tom the umbrella.",
-        "AF_high_EC_off": "Don't forget to grab Tom's blue umbrella with the wooden handle from the hallway stand.",
-        "AF_low_EC_on": "Tom mentioned it at lunch — remember to give him the umbrella.",
-        "AF_high_EC_on": "Tom brought it up at lunch. Don't forget the blue umbrella with the wooden handle near the hallway stand.",
-    }
-    example = examples.get(condition, "")
-    example_line = f'\n- Length reference example: "{example}"' if example else ""
-
-    return f"""You are generating reminder messages for a robot assistant in a cognitive psychology experiment.
-The reminder is spoken aloud by the robot (max 12 seconds of speech).
-
-Condition: {condition}
-You MUST include: {desc['include']}.
-You MUST NOT include: {desc['exclude']}.
-
-{desc['tone']}
-
-Tone rule (applies to ALL conditions):
-Use intention-reactivation framing ONLY:
-  ✓ "Remember to...", "By the way, remember...", "Don't forget to..."
-  ✗ "It's time to...", "You need to now...", "Make sure you..."
-  ✗ Never imply the task should be executed immediately.
-
-Constraints:
-- {length_line}
-- Do not use relative clauses (which / that / who). Do not use subordinate clauses.
-- Do not compress phrases into hyphenated words (e.g. 'Last-week-movie' is forbidden). Use natural spoken English only.
-- {output_line}{example_line}
-- Natural spoken English — warm and brief. Not clinical. Not robotic.
-- Do NOT use bullet points, numbering, or explanations.
-- Do NOT add quotation marks around the reminder.
-- Always refer to the target item by its specific name (e.g. "the book", "the dessert") — never use "it" or "the item" as a substitute.
-- Do not use first-person plural ("we", "our", "us") — the reminder is delivered by a robot, not a participant in the events.
-- Do not introduce any objects or details not present in the task data provided.
-- When CUE PRIORITY is provided, you MUST include all listed features.
-- Output ONLY the reminder text, nothing else."""
+    return prompt.strip()
 
 
 # ---------------------------------------------------------------------------
-# Context formatting (prose / json)
+# Context formatting
 # ---------------------------------------------------------------------------
 
-def format_context(pruned_dict: dict, style: str = "prose") -> str:
-    """Format pruned context for inclusion in the user prompt.
+def format_context_v3(pruned_dict: dict, condition: str) -> str:
+    """Format pruned v3 context for inclusion in the user prompt.
 
     Args:
-        pruned_dict: Output from context_extractor.extract().
-        style: "prose" for field-aware natural language, "json" for raw JSON.
+        pruned_dict: Output from context_extractor.extract() (v3 format).
+        condition: "EC_off" or "EC_on".
     """
-    if style == "json":
-        return json.dumps(pruned_dict, indent=2)
-    elif style == "prose":
-        return _to_prose(pruned_dict)
-    else:
-        raise ValueError(f"Unknown context format: '{style}'. Use 'prose' or 'json'.")
-
-
-def _to_prose(pruned_dict: dict) -> str:
-    """Convert pruned context dict to field-aware prose (v2 schema).
-
-    Skips any field whose value (or all values in a dict) are exactly "TODO",
-    to avoid forwarding placeholder content to the LLM.
-    """
-    def _is_todo(v: Any) -> bool:
-        """True if value is the placeholder string TODO (case-insensitive)."""
-        if isinstance(v, str):
-            return v.strip().upper() == "TODO"
-        if isinstance(v, dict):
-            return all(_is_todo(x) for x in v.values())
-        return False
-
+    rc = pruned_dict.get("reminder_context", pruned_dict)
+    baseline = rc.get("baseline", {})
     parts: list[str] = []
-    ctx = pruned_dict.get("reminder_context", pruned_dict)
 
-    # Element 1 AF: baseline (action + recipient) + entity
-    el1 = ctx.get("element1_af", {})
-    baseline = el1.get("af_baseline", {})
+    # Baseline is always present
     action = baseline.get("action_verb", "")
+    target = baseline.get("target", "")
     recipient = baseline.get("recipient", "")
 
-    af_high = el1.get("af_high", {})
-    entity = af_high.get("target_entity", {})
-    entity_name = entity.get("entity_name", "")
+    parts.append("Task:")
+    parts.append(f"- Action: {action}")
+    parts.append(f"- Target: {target}")
+    parts.append(f"- Recipient: {recipient}")
 
-    # Transfer verbs use "to <recipient>"; creation/preparation verbs use "for <recipient>"
-    _TRANSFER_VERBS = {"give", "bring", "deliver", "send", "take", "lend", "hand", "pass"}
+    # EC_on: add encoding context features
+    if condition == "EC_on":
+        ec_features = rc.get("ec_selected_features", {})
+        entity_features = ec_features.get("entity", [])
+        causality_features = ec_features.get("causality", "")
 
-    if action and entity_name and not _is_todo(entity_name):
-        prep = "to" if action.lower().split()[0] in _TRANSFER_VERBS else "for"
-        task_str = f"Task: {action} the {entity_name}"
-        if recipient and not _is_todo(recipient):
-            task_str += f" {prep} {recipient}"
-        parts.append(task_str + ".")
-
-    # AF_high fields: visual cues, domain properties, location
-    visual_cues = entity.get("visual_cues", {})
-    if visual_cues and not _is_todo(visual_cues):
-        cue_parts = [v for v in visual_cues.values() if v and not _is_todo(v)]
-        if cue_parts:
-            parts.append(f"Target appearance: {', '.join(cue_parts)}.")
-
-    domain = entity.get("domain_properties", {})
-    if domain and not _is_todo(domain):
-        details = ", ".join(
-            f"{k}: {v}" for k, v in domain.items() if not _is_todo(v)
-        )
-        if details:
-            parts.append(f"Details: {details}.")
-
-    location = af_high.get("location", {})
-    if location and not _is_todo(location):
-        room = location.get("room", "")
-        spot = location.get("spot", "")
-        room = "" if _is_todo(room) else room
-        spot = "" if _is_todo(spot) else spot
-        if room or spot:
-            loc_str = f"{room}, {spot}" if room and spot else (room or spot)
-            parts.append(f"Location: {loc_str}.")
-
-    # Element 2 EC: encoding context
-    el2 = ctx.get("element2_ec", {})
-    creator = el2.get("task_creator", "")
-    if creator:
-        relationship = el2.get("creator_relationship", "")
-        source_str = f"Source: task from {relationship} {creator}" if relationship else f"Source: task from {creator}"
-        parts.append(source_str + ".")
-
-    ec_cue = el2.get("ec_cue", "")
-    if ec_cue:
-        parts.append(f"Context cue: {ec_cue}")
+        parts.append("")
+        parts.append("Encoding context features:")
+        if entity_features:
+            if isinstance(entity_features, list):
+                parts.append(f"- Entity: {', '.join(entity_features)}")
+            else:
+                parts.append(f"- Entity: {entity_features}")
+        if causality_features:
+            parts.append(f"- Causality: {causality_features}")
 
     return "\n".join(parts)
-
-
-def select_active_high_features(task_json: dict, max_non_location: int = 2) -> list[str]:
-    """Select high-diagnosticity features for CUE PRIORITY.
-
-    Returns up to *max_non_location* non-location high features plus any
-    location high feature(s).  Location features are identified by matching
-    the af_high.location room/spot values against the feature text.
-    """
-    rc = task_json.get("reminder_context", {})
-    el1 = rc.get("element1_af", {})
-    candidates = el1.get("c_af_candidates", [])
-    location = el1.get("af_high", {}).get("location", {})
-
-    if not candidates:
-        return []
-
-    room = location.get("room", "").lower()
-    spot = location.get("spot", "").lower()
-
-    high_non_loc: list[str] = []
-    high_loc: list[str] = []
-
-    for c in candidates:
-        if c.get("diagnosticity") != "high":
-            continue
-        feature = c["feature"]
-        feature_lower = feature.lower()
-        is_location = (room and room in feature_lower) or (spot and spot in feature_lower)
-        if is_location:
-            high_loc.append(feature)
-        else:
-            high_non_loc.append(feature)
-
-    return high_non_loc[:max_non_location] + high_loc
-
-
-def _build_cue_priority_section(diagnosticity_report: dict | None = None,
-                                task_json: dict | None = None) -> str:
-    """Build CUE PRIORITY annotation from static c_af_candidates labels (v2).
-
-    Reads diagnosticity labels directly from task JSON c_af_candidates.
-    Limits to 2 non-location high features + location (always included).
-    Falls back to legacy diagnosticity report format if provided.
-    """
-    # v2 path: read static labels from task JSON
-    if task_json is not None:
-        candidates = (
-            task_json
-            .get("reminder_context", {})
-            .get("element1_af", {})
-            .get("c_af_candidates", [])
-        )
-        if candidates:
-            high = select_active_high_features(task_json)
-            low = [c["feature"] for c in candidates if c.get("diagnosticity") == "low"]
-
-            if not high and not low:
-                return ""
-
-            lines = ["CUE PRIORITY (based on diagnosticity analysis):"]
-            if high:
-                lines.append(f"  MUST include (high diagnosticity): {', '.join(high)}")
-            if low:
-                lines.append(f"  MAY omit (low diagnosticity): {', '.join(low)}")
-            lines.append("")
-            lines.append(
-                "The reminder MUST contain the high-diagnosticity features. "
-                "Low-diagnosticity features may be omitted."
-            )
-            return "\n".join(lines)
-
-    # Legacy path: read from external diagnosticity report
-    if diagnosticity_report is not None:
-        include = diagnosticity_report.get("recommended_cues", {}).get("include", [])
-        if not include:
-            return ""
-
-        features_by_id = {
-            f["feature_id"]: f.get("feature", f["feature_id"])
-            for f in diagnosticity_report.get("candidate_features", [])
-        }
-
-        high = []   # priority 1-2
-        medium = []  # priority 3
-        low = []     # priority 4+
-
-        for cue in include:
-            fid = cue.get("feature_id", "?")
-            feature_text = features_by_id.get(fid, fid)
-            priority = cue.get("priority", 99)
-            if priority <= 2:
-                high.append(feature_text)
-            elif priority == 3:
-                medium.append(feature_text)
-            else:
-                low.append(feature_text)
-
-        lines = ["CUE PRIORITY (based on diagnosticity analysis):"]
-        if high:
-            lines.append(f"  MUST include (high diagnosticity): {', '.join(high)}")
-        if medium:
-            lines.append(f"  SHOULD include (medium): {', '.join(medium)}")
-        if low:
-            lines.append(f"  MAY omit (low diagnosticity): {', '.join(low)}")
-
-        lines.append("")
-        lines.append(
-            "The reminder MUST contain at least the high-priority cues. "
-            "Include medium-priority cues if they fit naturally within the word limit."
-        )
-        return "\n".join(lines)
-
-    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -334,48 +149,19 @@ def build_user_prompt(
     pruned_context: dict,
     condition: str = "",
     prior_variants: list[str] | None = None,
-    context_format: str = "prose",
-    diagnosticity_report: dict | None = None,
     task_json: dict | None = None,
 ) -> str:
     """Build the user prompt with task context and optional diversity instruction.
 
     Args:
-        pruned_context: Output from context_extractor.extract().
-        condition: The experimental condition (e.g. "AF_high_EC_on").
+        pruned_context: Output from context_extractor.extract() (v3 format).
+        condition: The experimental condition ("EC_off" or "EC_on").
         prior_variants: Previously generated variants (for diversity).
-        context_format: "prose" or "json".
-        diagnosticity_report: Legacy diagnosticity report for cue prioritization.
-        task_json: Full task JSON for reading static c_af_candidates labels (v2).
+        task_json: Full task JSON (unused in v3 but kept for API compat).
     """
-    # Detect AF level from the pruned context — only AF_high conditions have
-    # visual_cues / domain_properties in their extracted output.  We must NOT
-    # emit CUE PRIORITY for AF_low conditions: doing so would instruct the LLM
-    # to include high-diagnosticity visual features, immediately tripping the
-    # forbidden_keywords quality gate.
-    el1_af = pruned_context.get("reminder_context", {}).get("element1_af", {})
-    af_high_entity = el1_af.get("af_high", {}).get("target_entity", {})
-    is_af_high = bool(
-        af_high_entity.get("visual_cues") or af_high_entity.get("domain_properties")
-    )
+    formatted = format_context_v3(pruned_context, condition)
 
-    formatted = format_context(pruned_context, style=context_format)
-
-    prompt_parts = [
-        "Task context:",
-        formatted,
-    ]
-
-    # CUE PRIORITY: only for AF_high — prefer v2 static labels, fall back to legacy report
-    cue_section = ""
-    if is_af_high:
-        cue_section = _build_cue_priority_section(
-            diagnosticity_report=diagnosticity_report,
-            task_json=task_json,
-        )
-    if cue_section:
-        prompt_parts.append("")
-        prompt_parts.append(cue_section)
+    prompt_parts = [formatted]
 
     if prior_variants:
         prompt_parts.append("")
@@ -401,7 +187,6 @@ def build_prompts(
     prior_variants: list[str] | None = None,
     field_map: ConditionFieldMap | None = None,
     gen_config: GenerationConfig | None = None,
-    diagnosticity_report: dict | None = None,
 ) -> tuple[str, str]:
     """Build system + user prompts for a (task, condition) pair.
 
@@ -417,15 +202,13 @@ def build_prompts(
     system = build_system_prompt(condition)
     user = build_user_prompt(
         pruned, condition=condition, prior_variants=prior_variants,
-        context_format=gen_config.context_format,
-        diagnosticity_report=diagnosticity_report,
         task_json=task_json,
     )
     return system, user
 
 
 # ---------------------------------------------------------------------------
-# CLI entry point — prints assembled prompt for book1_mei × AF_high_EC_on
+# CLI entry point — prints assembled prompt for book1_mei × EC_on
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -444,15 +227,14 @@ if __name__ == "__main__":
     gen_cfg = load_generation_config()
     fm = load_condition_field_map()
 
-    # Demo: AF_high_EC_on with no prior variants
-    condition = "AF_high_EC_on"
-    system, user = build_prompts(
-        task_json, condition, field_map=fm, gen_config=gen_cfg
-    )
+    for condition in ["EC_off", "EC_on"]:
+        system, user = build_prompts(
+            task_json, condition, field_map=fm, gen_config=gen_cfg
+        )
 
-    print(f"{'='*60}")
-    print(f"  Condition: {condition}")
-    print(f"  Context format: {gen_cfg.context_format}")
-    print(f"{'='*60}")
-    print(f"\n--- SYSTEM PROMPT ---\n{system}")
-    print(f"\n--- USER PROMPT ---\n{user}")
+        print(f"{'='*60}")
+        print(f"  Condition: {condition}")
+        print(f"{'='*60}")
+        print(f"\n--- SYSTEM PROMPT ---\n{system}")
+        print(f"\n--- USER PROMPT ---\n{user}")
+        print()

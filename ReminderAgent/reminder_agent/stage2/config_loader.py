@@ -1,5 +1,6 @@
 """Config loader — loads and validates all YAML configuration files on startup.
 
+Supports v3 EC operationalization (2 conditions: EC_off, EC_on).
 Raises explicit errors on missing required fields rather than silently using defaults.
 Follows guiding principle: "Fail loudly" (DEV_PLAN §Guiding Principles).
 """
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 
 VALID_BACKENDS = {"together", "ollama", "openai", "anthropic"}
-VALID_CONDITIONS = {"AF_low_EC_off", "AF_high_EC_off", "AF_low_EC_on", "AF_high_EC_on"}
+VALID_CONDITIONS = {"EC_off", "EC_on"}
 
 
 # ---------------------------------------------------------------------------
@@ -44,6 +45,11 @@ class ModelConfig(BaseModel):
 VALID_CONTEXT_FORMATS = {"prose", "json"}
 
 
+class WordLimitEntry(BaseModel):
+    min: int = Field(gt=0)
+    max: int = Field(gt=0)
+
+
 class GenerationConfig(BaseModel):
     n_variants: int = Field(gt=0)
     max_retries: int = Field(ge=0)
@@ -51,6 +57,8 @@ class GenerationConfig(BaseModel):
     max_words: int = Field(gt=0)
     similarity_threshold: float = Field(ge=0.0, le=1.0)
     context_format: str = "prose"
+    ec_conditions: list[str] = ["EC_off", "EC_on"]
+    word_limits: dict[str, WordLimitEntry] = {}
 
     @field_validator("max_words")
     @classmethod
@@ -67,38 +75,33 @@ class GenerationConfig(BaseModel):
             raise ValueError(f"context_format must be one of {VALID_CONTEXT_FORMATS}, got '{v}'")
         return v
 
+    def get_word_limits(self, condition: str) -> tuple[int, int]:
+        """Get (min_words, max_words) for a condition, falling back to global."""
+        if condition in self.word_limits:
+            entry = self.word_limits[condition]
+            return entry.min, entry.max
+        return self.min_words, self.max_words
+
 
 """
 ===========================================
-*        ConditionFieldMap schema         *
+*    ConditionFieldMap schema (v3)        *
 ===========================================
 
-2×2 factorial design: AF (low/high) × EC (off/on)
-  AF_low_EC_off:  action + entity only, no source context
-  AF_high_EC_off: + visual cues, domain properties, location
-  AF_low_EC_on:   action + entity + source context
-  AF_high_EC_on:  full information (AF features + source context)
+EC operationalization: 2 conditions
+  EC_off: baseline only (action + target + recipient)
+  EC_on:  baseline + ec_selected_features (entity + causality)
 
 ConditionFieldMap
 └── conditions (dict[str, ConditionEntry])
-    ├── AF_low_EC_off (ConditionEntry)
-    │   ├── required_fields (list[str])
-    │   ├── conditional_fields (list[ConditionalField])
-    │   ├── excluded_fields (list[str])
-    │   └── excluded_zones (list[str])
-    └── ... (3 more conditions)
+    ├── EC_off (ConditionEntry)
+    │   └── visible_fields (list[str])  — paths relative to reminder_context
+    └── EC_on (ConditionEntry)
+        └── visible_fields (list[str])
 """
 
-class ConditionalField(BaseModel):
-    field: str
-    condition: str
-
-
 class ConditionEntry(BaseModel):
-    required_fields: list[str]
-    conditional_fields: list[ConditionalField] = []
-    excluded_fields: list[str] = []
-    excluded_zones: list[str] = []
+    visible_fields: list[str]
 
 
 class ConditionFieldMap(BaseModel):

@@ -1,88 +1,42 @@
 # ReminderAgent 使用说明
 
-> 离线批量生成实验提示语的流水线工具。基于 2×2 被试间设计（AF × EC），在正式数据采集前运行一次，生成所有任务 × 条件组合的提醒文本变体并存入 SQLite 数据库。
+> 离线批量生成实验提示语的流水线工具。基于纯 EC 操作化设计（EC_off / EC_on），在正式数据采集前运行一次，生成所有任务 × 条件组合的提醒文本变体并存入 SQLite 数据库。
 
 ---
 
 ## 这次更新做了什么
 
-### Prompt 强化 & Quality Gate 收紧（最新）
+### v3 EC 操作化迁移（最新）
 
-- **EC_on 条件**：`ec_cue` 从可选改为强制前置，prompt 明确要求 `[context cue paraphrase] — [action instruction]` 格式
-- **禁止连字符压缩**：prompt 新增 "Do not compress phrases into hyphenated words"，防止 LLM 用 `Last-week-movie` 之类的非自然压缩规避长度限制
-- **长度校准示例**：每个条件附带一条参考示例，帮助 LLM 感知目标长度
-- **Quality Gate 新增 `check_hyphen_compression`**：检测 3+ 词连字符拼接（`\w+-\w+-\w+`），命中即 fail
-- **AF_high_EC_on 词数上限**：30 → 28 词
-- **ec_source_present 双重保险**：occasion anchor 出现在连字符压缩词内不计入有效匹配
-
-### ec_cue 重构
-
-- 在 4 个任务 JSON 中新增 `ec_cue` 字段，替代直接使用 `creation_context` 作为提醒前缀
-- EC_on 条件下，`ec_cue` 由 LLM 自然改写（paraphrase），而非逐字复制：
-  - 消除了 variant 间 EC 部分完全相同的问题
-  - 消除了 LLM 从 `creation_context` 自由编造细节的问题
-- 移除了 `[SEP]` 标记机制——`ec_cue` 本身不含 AF_high 的 forbidden keywords，无需分割扫描
-- 条件特定长度约束：
-  - 默认：不超过 20 词，单句
-  - `AF_high_EC_on`：可用两句，每句不超过 15 词
-- 更新了 `creation_context` 内容（`tea_benjamin`、`dessert_sophia`），与 `ec_cue` 叙事保持一致
-- `quality_gate` 的 EC 检查改为使用 `ec_cue` 关键词
+- **实验设计简化**：从 2×2 AF×EC（4 条件）迁移到纯 EC 操作化（2 条件：`EC_off` / `EC_on`）
+- **新增 v3 任务 JSON 字段**：`baseline`（action_verb / target / recipient）、`episode_dimensions`（5 维度）、`ec_selected_features`（entity + causality）、`ec_priority_dimensions`
+- **Prompt 重写**：
+  - EC_off：仅含 baseline，≤12 词，单句
+  - EC_on：encoding context paraphrase + baseline，≤25 词
+- **Quality Gate 重写**：新增 `check_baseline_present`、`check_ec_features_present`、`check_no_extra_dimensions`、`check_no_fabrication`
+- **Config 简化**：`condition_field_map.yaml` 改为 `visible_fields` 格式；`generation_config.yaml` 新增 per-condition `word_limits`
+- **Output Store**：新增 `ec_dimensions_used` 列
+- **测试全部重写**：90 tests passed
 
 ### 此前更新
 
-- 将任务 JSON 从 v1 迁移到 **v2 结构**：
-  - `element1` → `element1_af.af_baseline` / `element1_af.af_high`
-  - `element2.origin` → `element2_ec`
-  - `element3` → `element3_excluded`
-  - `placeholder` → `experiment_metadata`
-- 任务集合从旧示例任务切换为 4 个独立任务：`book1_mei`、`ticket_jack`、`tea_benjamin`、`dessert_sophia`
-- AF_high 的提示构造不再依赖运行时 diagnosticity YAML 报告，而是直接读取任务 JSON 中 `c_af_candidates[].diagnosticity`
-- AF_high 特征选择限制：最多 2 个非位置 high 特征 + 位置（固定）
-- 更新了 Stage 2 管线、质量检查、测试与使用文档；当前测试状态为 **113 passed**
+- Prompt 强化 & Quality Gate 收紧：禁止连字符压缩、长度校准示例等
+- ec_cue 重构：替代 creation_context 作为 EC 来源
+- v1 → v2 任务 JSON 迁移：element1_af / element2_ec / element3_excluded 结构
+- 独立 4 任务集合：book1_mei、ticket_jack、tea_benjamin、dessert_sophia
 
 ---
 
-## 如何启动
+## 实验设计概览（v3）
 
-### 最短路径（本地默认配置）
+| 条件 | 说明 | 词数限制 |
+|------|------|---------|
+| `EC_off` | 仅 baseline（动作 + 目标 + 接收人） | 5–12 词 |
+| `EC_on` | baseline + encoding context features（entity + causality） | 12–25 词 |
 
-```bash
-conda activate thesis_server
-cd ReminderAgent
-python -m reminder_agent.stage2.batch_runner --dry-run
-python -m reminder_agent.stage2.batch_runner
-```
-
-### 如果使用本地 Ollama
-
-```bash
-ollama serve
-ollama pull llama3.1
-conda activate thesis_server
-cd ReminderAgent
-python -m reminder_agent.stage2.batch_runner --dry-run
-python -m reminder_agent.stage2.batch_runner
-```
-
-### 生成后查看结果
-
-```bash
-python -m reminder_agent.review.review_interface --stats
-python -m reminder_agent.review.review_interface --task book1_mei
-```
-
----
-
-## 实验设计概览
-
-| | EC off（无来源信息） | EC on（含来源信息） |
-|---|---|---|
-| **AF low**（仅动作+物品） | `AF_low_EC_off` | `AF_low_EC_on` |
-| **AF high**（含视觉线索/属性/位置） | `AF_high_EC_off` | `AF_high_EC_on` |
-
-- **AF（Attention Features）**：控制提醒文本包含多少物品特征（within-subject）
-- **EC（Encoding Context）**：控制是否提及任务来源信息（between-subject）
-- **所有 4 个条件均使用 LLM 生成**（不再有模板 Baseline）
+- **EC（Encoding Context）**：控制是否在提醒中包含编码情境信息（between-subject）
+- **理论基础**：Situation Model（Zwaan & Radvansky, 1998）的 5 个维度（time, space, entity, causality, intentionality），EC_on 使用 entity + causality
+- **AF 代码保留**：v2 的 AF 字段和逻辑保留在代码中但不再使用
 
 ---
 
@@ -96,23 +50,19 @@ cd ReminderAgent
 ### 1. 验证环境（dry-run，无需 LLM）
 
 ```bash
-python -m reminder_agent.stage2.batch_runner --dry-run
+python -m reminder_agent.stage2.batch_runner --dry-run --clear
 ```
 
 输出示例：
 ```
-=== LLM Generation (4 tasks × 4 conditions × 3 variants = 48 total) ===
-  ✅ book1_mei / AF_low_EC_off / v0 (attempt 1)
-  ✅ book1_mei / AF_high_EC_off / v0 (attempt 1)
-  ✅ book1_mei / AF_low_EC_on / v0 (attempt 1)
-  ✅ book1_mei / AF_high_EC_on / v0 (attempt 1)
+=== LLM Generation (4 tasks × 2 conditions × 3 variants = 24 total) ===
+  ✅ book1_mei / EC_off / v0 (attempt 1)
+  ✅ book1_mei / EC_on / v0 (attempt 1)
   ...
 
 === Summary ===
-  Total: 48 attempted, 48 succeeded, 0 failed
+  Total: 24 attempted, 24 succeeded, 0 failed
 ```
-
-Dry-run 不调用 LLM，不写入数据库，用于检查配置和任务 JSON 是否完整。
 
 ---
 
@@ -145,7 +95,7 @@ python -m reminder_agent.stage2.batch_runner
 python -m reminder_agent.stage2.batch_runner --task book1_mei
 
 # 只生成某个条件
-python -m reminder_agent.stage2.batch_runner --condition AF_high_EC_on
+python -m reminder_agent.stage2.batch_runner --condition EC_on
 
 # 指定变体数量（覆盖配置文件）
 python -m reminder_agent.stage2.batch_runner --n-variants 5
@@ -153,8 +103,8 @@ python -m reminder_agent.stage2.batch_runner --n-variants 5
 # 清空数据库重新生成
 python -m reminder_agent.stage2.batch_runner --clear
 
-# 组合使用：重新生成 book1_mei 的 AF_low_EC_off 条件，5 个变体
-python -m reminder_agent.stage2.batch_runner --task book1_mei --condition AF_low_EC_off --n-variants 5 --clear
+# 组合使用
+python -m reminder_agent.stage2.batch_runner --task book1_mei --condition EC_off --n-variants 5 --clear
 
 # 详细日志
 python -m reminder_agent.stage2.batch_runner --verbose
@@ -167,73 +117,12 @@ python -m reminder_agent.stage2.batch_runner --verbose
 ```bash
 # 查看统计信息
 python -m reminder_agent.review.review_interface --stats
-```
 
-输出示例：
-```
-=== Review Statistics ===
-  Total reminders : 48
-  Approved        : 0
-  Pending review  : 48
-  Failed QA       : 0
-
-  By condition:
-    AF_low_EC_off  : 12
-    AF_high_EC_off : 12
-    AF_low_EC_on   : 12
-    AF_high_EC_on  : 12
-```
-
-```bash
 # 交互式审核某个任务
 python -m reminder_agent.review.review_interface --task book1_mei
 
-# 只看特定条件
-python -m reminder_agent.review.review_interface --condition AF_high_EC_on
-
 # 导出已通过审核的提示语
 python -m reminder_agent.review.review_interface --export approved_reminders.json
-
-# 指定数据库路径（非默认位置时使用）
-python -m reminder_agent.review.review_interface --db /path/to/reminders.db
-```
-
----
-
-## Stage 1：从源文本提取任务 JSON（演示）
-
-```bash
-python -m reminder_agent.stage1.demo_run
-```
-
-输出示例（使用 `doctor_email.txt`）：
-```
-=== Stage 1 Demo: Information Extraction ===
-Source: doctor_email.txt
-Type: Doctor's prescription email
-Method: Rule-based (no LLM)
-
---- Extracted Task JSON ---
-{
-  "reminder_context": {
-    "element1_af": {
-      "af_baseline": {
-        "action_verb": "take",
-        "recipient": "self"
-      },
-      "af_high": {
-        "target_entity": { "entity_name": "Doxycycline", ... },
-        "location": { "room": "kitchen", "spot": "shelf" }
-      }
-    },
-    "element2_ec": {
-      "task_creator": "Dr. Smith",
-      "creator_relationship": "doctor",
-      "creation_context": "prescription"
-    }
-  }
-}
---- Confidence: 1.0 ---
 ```
 
 ---
@@ -243,7 +132,7 @@ Method: Rule-based (no LLM)
 ```bash
 cd ReminderAgent
 pytest reminder_agent/tests -v
-# 预期: 122 passed
+# 预期: 90 passed
 ```
 
 ---
@@ -253,9 +142,8 @@ pytest reminder_agent/tests -v
 | 文件 | 作用 |
 |------|------|
 | `config/model_config.yaml` | 切换 LLM 后端、模型名、温度 |
-| `config/generation_config.yaml` | 变体数量、字数限制（8–45 词）、重试次数 |
-| `config/condition_field_map.yaml` | 4 个条件各自可见的任务 JSON 字段白名单 |
-| `config/forbidden_keywords.yaml` | AF_low 条件不能出现的关键词（按任务） |
+| `config/generation_config.yaml` | 变体数量、per-condition 字数限制、重试次数 |
+| `config/condition_field_map.yaml` | 2 个 EC 条件各自可见的任务 JSON 字段白名单 |
 
 ### 切换到云端 LLM
 
@@ -271,30 +159,20 @@ api_key_env: "OPENAI_API_KEY"
 
 ```bash
 export OPENAI_API_KEY=sk-...
-python -m reminder_agent.stage2.batch_runner --dry-run  # 先验证
+python -m reminder_agent.stage2.batch_runner --dry-run
 python -m reminder_agent.stage2.batch_runner
-```
-
-### 增加变体数量（正式数据采集用）
-
-编辑 `config/generation_config.yaml`：
-
-```yaml
-n_variants: 10   # 从 3 改为 10
 ```
 
 ---
 
 ## 任务 ID 对照表
 
-| 任务 ID | 物品 | EC Cue | 说明 |
-|---------|------|--------|------|
-| `book1_mei` | 书（给Mei） | 一起烘焙时提到 | 红色封面、山景插图（Erta Ale）、书房书架 |
-| `ticket_jack` | 票（给Jack） | 一起看电影后提到 | 戏剧票×2、书房书桌抽屉 |
-| `tea_benjamin` | 茶（给Benjamin） | 上月来访时带来英国茶 | 红茶、红金色锡罐、英国茶品牌、厨房上柜 |
-| `dessert_sophia` | 蛋挞（给Sophia） | FaceTime通话时提到 | 酥皮、圆形、金色蛋液、厨房柜台 |
-
-> 所有 4 个任务为独立任务，任务 JSON 存放于 `data/task_schemas/` 目录。
+| 任务 ID | 物品 | EC Features | 说明 |
+|---------|------|-------------|------|
+| `book1_mei` | 烘焙书（给Mei） | entity: Mei, baking book; causality: liked & wanted to borrow | 红色封面、Erta Ale |
+| `ticket_jack` | 戏剧票（给Jack） | entity: Jack, theatre tickets; causality: bought tickets & asked to hold | 两张票 |
+| `tea_benjamin` | 茶（给Benjamin） | entity: Benjamin, tea; causality: brought tea from England | 红金色锡罐、英国品牌 |
+| `dessert_sophia` | 蛋挞（给Sophia） | entity: Sophia, egg tart; causality: craving & asked to prepare | 酥皮、金色蛋液 |
 
 ---
 
@@ -304,11 +182,12 @@ n_variants: 10   # 从 3 改为 10
 
 ```sql
 -- 生成的提示语
-SELECT task_id, condition, variant_idx, text, quality_passed, human_approved
+SELECT task_id, condition, variant_idx, text, passed_quality_gate,
+       ec_dimensions_used
 FROM reminders;
 
--- 生成日志（成功 / 失败记录）
-SELECT task_id, condition, status, error_msg, created_at
+-- 生成日志
+SELECT task_id, condition, variant_idx, attempt, quality_gate_passed
 FROM generation_log;
 ```
 
@@ -319,9 +198,9 @@ FROM generation_log;
 ```
 1. 配置 LLM         → config/model_config.yaml
 2. 设置变体数       → config/generation_config.yaml (n_variants: 10)
-3. 验证环境         → python -m reminder_agent.stage2.batch_runner --dry-run
-4. 正式生成         → python -m reminder_agent.stage2.batch_runner
+3. 验证环境         → python -m reminder_agent.stage2.batch_runner --dry-run --clear
+4. 正式生成         → python -m reminder_agent.stage2.batch_runner --clear
 5. 人工审核         → python -m reminder_agent.review.review_interface
 6. 导出结果         → python -m reminder_agent.review.review_interface --export reminders.json
-7. SaturdayAtHome 使用 reminders.db 在实验中按 (task_id, condition) 查询并随机选取变体
+7. SaturdayAtHome 使用 reminders.db 按 (task_id, condition) 查询并随机选取变体
 ```

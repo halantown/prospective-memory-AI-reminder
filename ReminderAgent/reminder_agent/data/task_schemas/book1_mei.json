@@ -3,6 +3,27 @@
 
   "reminder_context": {
 
+    "baseline": {
+      "action_verb": "give",
+      "target": "the baking book",
+      "recipient": "Mei"
+    },
+
+    "episode_dimensions": {
+      "time": "last week",
+      "space": "kitchen (baking together)",
+      "entity": ["Mei", "baking book", "red cover", "cake illustration"],
+      "causality": "Mei liked the book and expressed a wish to borrow it",
+      "intentionality": "Mei wants to borrow; implicit agreement to lend"
+    },
+
+    "ec_priority_dimensions": ["entity", "causality"],
+
+    "ec_selected_features": {
+      "entity": ["Mei", "baking book"],
+      "causality": "Mei liked the book and wanted to borrow it"
+    },
+
     "element1_af": {
 
       "af_baseline": {

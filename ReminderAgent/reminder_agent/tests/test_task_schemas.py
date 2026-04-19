@@ -96,3 +96,61 @@ class TestTaskSchemas:
             tid = task["task_id"]
             distractors = task["reminder_context"]["element1_af"]["distractors"]
             assert len(distractors) >= 2, f"{tid} should have at least 2 distractors"
+
+    # ── v3 field assertions ──────────────────────────────────────────
+
+    def test_all_v3_baseline_present(self, all_tasks):
+        for task in all_tasks:
+            tid = task["task_id"]
+            baseline = task["reminder_context"]["baseline"]
+            for key in ("action_verb", "target", "recipient"):
+                assert key in baseline, f"{tid} baseline missing {key}"
+            assert isinstance(baseline["target"], str) and baseline["target"], (
+                f"{tid} baseline.target must be a non-empty string"
+            )
+
+    def test_all_v3_episode_dimensions_present(self, all_tasks):
+        expected = {"time", "space", "entity", "causality", "intentionality"}
+        for task in all_tasks:
+            tid = task["task_id"]
+            ep = task["reminder_context"]["episode_dimensions"]
+            assert set(ep.keys()) >= expected, (
+                f"{tid} episode_dimensions missing keys: {expected - set(ep.keys())}"
+            )
+
+    def test_all_v3_ec_priority_dimensions(self, all_tasks):
+        for task in all_tasks:
+            tid = task["task_id"]
+            prio = task["reminder_context"]["ec_priority_dimensions"]
+            assert isinstance(prio, list), f"{tid} ec_priority_dimensions is not a list"
+            assert "entity" in prio, f"{tid} ec_priority_dimensions missing 'entity'"
+            assert "causality" in prio, f"{tid} ec_priority_dimensions missing 'causality'"
+
+    def test_all_v3_ec_selected_features(self, all_tasks):
+        for task in all_tasks:
+            tid = task["task_id"]
+            sf = task["reminder_context"]["ec_selected_features"]
+            assert "entity" in sf, f"{tid} ec_selected_features missing 'entity'"
+            assert "causality" in sf, f"{tid} ec_selected_features missing 'causality'"
+            assert isinstance(sf["entity"], list), f"{tid} ec_selected_features.entity is not a list"
+            assert len(sf["entity"]) >= 1, f"{tid} ec_selected_features.entity is empty"
+            assert isinstance(sf["causality"], str) and sf["causality"], (
+                f"{tid} ec_selected_features.causality must be a non-empty string"
+            )
+
+    def test_baseline_target_is_natural_language(self, all_tasks):
+        for task in all_tasks:
+            tid = task["task_id"]
+            target = task["reminder_context"]["baseline"]["target"]
+            assert target.startswith("the "), (
+                f"{tid} baseline.target should start with 'the ', got: {target!r}"
+            )
+
+    def test_ec_selected_features_subset_of_episode_dimensions(self, all_tasks):
+        for task in all_tasks:
+            tid = task["task_id"]
+            ep_keys = set(task["reminder_context"]["episode_dimensions"].keys())
+            sf_keys = set(task["reminder_context"]["ec_selected_features"].keys())
+            assert sf_keys <= ep_keys, (
+                f"{tid} ec_selected_features keys {sf_keys - ep_keys} not in episode_dimensions"
+            )

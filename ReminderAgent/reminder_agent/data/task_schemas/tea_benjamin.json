@@ -3,6 +3,27 @@
 
   "reminder_context": {
 
+    "baseline": {
+      "action_verb": "prepare",
+      "target": "the English tea",
+      "recipient": "Benjamin"
+    },
+
+    "episode_dimensions": {
+      "time": "last month",
+      "space": "home (over a cup of tea)",
+      "entity": ["Benjamin", "tea", "red and gold tin", "English brand"],
+      "causality": "Benjamin brought back tea from England and said it was his favourite",
+      "intentionality": "Benjamin wants to have some next time he visits"
+    },
+
+    "ec_priority_dimensions": ["entity", "causality"],
+
+    "ec_selected_features": {
+      "entity": ["Benjamin", "tea"],
+      "causality": "Benjamin brought back tea from England and wants some next visit"
+    },
+
     "element1_af": {
 
       "af_baseline": {
