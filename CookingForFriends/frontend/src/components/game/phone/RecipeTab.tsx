@@ -68,22 +68,27 @@ export default function RecipeTab() {
         )}
       </div>
 
-      {/* Recipe overlay — shown while holding */}
+      {/* Recipe overlay — shown while holding; captures release events too */}
       <AnimatePresence>
         {isHolding && (
           <motion.div
-            className="absolute inset-0 z-20 bg-slate-900/95 overflow-y-auto p-3"
+            className="absolute inset-0 z-20 bg-slate-900/95 overflow-hidden p-3 flex flex-col"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
+            onMouseUp={handleHoldEnd}
+            onMouseLeave={handleHoldEnd}
+            onTouchEnd={handleHoldEnd}
+            onTouchCancel={handleHoldEnd}
           >
-            <div className="text-center mb-3">
+            <div className="text-center mb-2 shrink-0">
               <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
                 📖 Recipes — Release to close
               </span>
             </div>
-            <div className="flex flex-col gap-3">
+            {/* 2×2 grid, no scroll */}
+            <div className="grid grid-cols-2 gap-2 flex-1 min-h-0">
               {DISH_ORDER.map(dishId => (
                 <DishRecipeCard key={dishId} dish={dishes[dishId]} />
               ))}
@@ -101,23 +106,23 @@ function DishRecipeCard({ dish }: { dish: DishState }) {
   const isDone = dish.phase === 'served'
 
   return (
-    <div className={`rounded-lg border p-2.5 ${
+    <div className={`rounded-lg border p-2 flex flex-col min-h-0 overflow-hidden ${
       isActive ? 'border-cooking-400/50 bg-slate-800/80' :
       isDone ? 'border-slate-600/30 bg-slate-800/40' :
       'border-slate-700/40 bg-slate-800/30'
     }`}>
       {/* Dish header */}
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-sm">{dish.emoji}</span>
-        <span className={`text-xs font-semibold ${isActive ? 'text-slate-100' : 'text-slate-400'}`}>
+      <div className="flex items-center gap-1.5 mb-1.5 shrink-0">
+        <span className="text-xs">{dish.emoji}</span>
+        <span className={`text-[11px] font-semibold truncate ${isActive ? 'text-slate-100' : 'text-slate-400'}`}>
           {dish.label}
         </span>
-        {isDone && <span className="text-[9px] text-green-400 ml-auto">✓ Done</span>}
-        {dish.phase === 'idle' && <span className="text-[9px] text-slate-500 ml-auto">Upcoming</span>}
+        {isDone && <span className="text-[9px] text-green-400 ml-auto shrink-0">✓</span>}
+        {dish.phase === 'idle' && <span className="text-[9px] text-slate-500 ml-auto shrink-0">…</span>}
       </div>
 
-      {/* Step list */}
-      <div className="flex flex-col gap-1">
+      {/* Step list — scrollable if too many steps */}
+      <div className="flex flex-col gap-0.5 overflow-y-auto min-h-0 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-slate-600">
         {dish.steps.map((step, idx) => {
           const isCurrent = idx === dish.currentStepIndex && isActive
           const isCompleted = idx < dish.currentStepIndex
