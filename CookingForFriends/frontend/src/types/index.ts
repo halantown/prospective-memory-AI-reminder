@@ -68,6 +68,47 @@ export interface DishState {
   stepReady: boolean
   startedAt: number | null
   completedAt: number | null
+  /** Results for completed steps */
+  stepResults: CookingStepResult[]
+}
+
+// ── Cooking: Backend-driven distractor system ──
+
+export interface CookingStepOption {
+  id: string
+  text: string
+}
+
+export type CookingStepResultType = 'correct' | 'wrong' | 'missed'
+
+export interface CookingStepResult {
+  dishId: DishId
+  stepIndex: number
+  result: CookingStepResultType
+  chosenOptionId?: string
+  responseTimeMs?: number
+}
+
+export interface ActiveCookingStep {
+  dishId: DishId
+  stepIndex: number
+  stepLabel: string
+  stepDescription: string
+  station: KitchenStationId
+  options: CookingStepOption[]
+  activatedAt: number
+  windowSeconds: number
+  stepType: 'active' | 'wait'
+  waitDurationS?: number
+}
+
+export interface CookingWaitStep {
+  dishId: DishId
+  stepIndex: number
+  stepLabel: string
+  station: KitchenStationId
+  startedAt: number
+  durationS: number
 }
 
 // ── PM Tasks ──

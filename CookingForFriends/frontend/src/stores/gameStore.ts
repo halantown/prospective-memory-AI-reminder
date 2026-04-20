@@ -5,6 +5,7 @@ import type {
   Phase, Condition, RoomId, Pan, PhoneNotification, PhoneMessage, RobotState, SessionData,
   ActivePMTrial, PMTaskConfig, DiningPhase, SteakState, SeatState, UtensilType,
   DishId, DishState, KitchenStationId, Contact,
+  ActiveCookingStep, CookingStepResult, CookingStepOption, CookingWaitStep,
 } from '../types'
 
 const EMPTY_SEAT: SeatState = { plate: false, knife: false, fork: false, glass: false }
@@ -34,6 +35,12 @@ interface GameState {
   dishes: Record<DishId, DishState>
   /** Which station's popup is currently open */
   activeStation: KitchenStationId | null
+  /** Active cooking steps sent by backend (awaiting participant action) */
+  activeCookingSteps: ActiveCookingStep[]
+  /** Currently running wait steps (auto-progressing) */
+  cookingWaitSteps: CookingWaitStep[]
+  /** Accumulated results for scoring display */
+  cookingScore: { correct: number; wrong: number; missed: number }
 
   // ── Dining ──
   diningPhase: DiningPhase
@@ -95,6 +102,12 @@ interface GameState {
   advanceDishStep: (dishId: DishId) => void
   setDishStepReady: (dishId: DishId, ready: boolean) => void
   setDishPhase: (dishId: DishId, phase: DishState['phase']) => void
+  handleCookingStepActivate: (data: Record<string, unknown>) => void
+  handleCookingStepResult: (data: Record<string, unknown>) => void
+  handleCookingStepTimeout: (data: Record<string, unknown>) => void
+  handleCookingWaitStart: (data: Record<string, unknown>) => void
+  handleCookingWaitEnd: (data: Record<string, unknown>) => void
+  getActiveStepForStation: (station: KitchenStationId) => ActiveCookingStep | undefined
 
   // Dining actions
   setDiningPhase: (phase: DiningPhase) => void
@@ -215,22 +228,22 @@ function createInitialDishes(): Record<DishId, DishState> {
     spaghetti: {
       id: 'spaghetti', label: 'Spaghetti', emoji: '🍝',
       phase: 'idle', currentStepIndex: 0, steps: SPAGHETTI_STEPS,
-      stepReady: true, startedAt: null, completedAt: null,
+      stepReady: true, startedAt: null, completedAt: null, stepResults: [],
     },
     steak: {
       id: 'steak', label: 'Steak', emoji: '🥩',
       phase: 'idle', currentStepIndex: 0, steps: STEAK_STEPS,
-      stepReady: false, startedAt: null, completedAt: null,
+      stepReady: false, startedAt: null, completedAt: null, stepResults: [],
     },
     tomato_soup: {
       id: 'tomato_soup', label: 'Tomato Soup', emoji: '🍅',
       phase: 'idle', currentStepIndex: 0, steps: SOUP_STEPS,
-      stepReady: false, startedAt: null, completedAt: null,
+      stepReady: false, startedAt: null, completedAt: null, stepResults: [],
     },
     roasted_vegetables: {
       id: 'roasted_vegetables', label: 'Roasted Vegetables', emoji: '🥕',
       phase: 'idle', currentStepIndex: 0, steps: VEGGIE_STEPS,
-      stepReady: false, startedAt: null, completedAt: null,
+      stepReady: false, startedAt: null, completedAt: null, stepResults: [],
     },
   }
 }
@@ -256,6 +269,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   // ── Cooking (new multi-dish) ──
   dishes: createInitialDishes(),
   activeStation: null,
+  activeCookingSteps: [],
+  cookingWaitSteps: [],
+  cookingScore: { correct: 0, wrong: 0, missed: 0 },
 
   // ── Dining ──
   diningPhase: 'idle',
@@ -389,6 +405,133 @@ export const useGameStore = create<GameState>((set, get) => ({
       [dishId]: { ...s.dishes[dishId], phase },
     },
   })),
+
+  handleCookingStepActivate: (data) => {
+    const step: ActiveCookingStep = {
+      dishId: data.dish as DishId,
+      stepIndex: data.step_index as number,
+      stepLabel: data.step_label as string,
+      stepDescription: data.step_description as string || '',
+      station: data.station as KitchenStationId,
+      options: (data.options as CookingStepOption[]) || [],
+      activatedAt: data.activated_at as number || Date.now(),
+      windowSeconds: data.window_seconds as number || 30,
+      stepType: (data.step_type as 'active' | 'wait') || 'active',
+      waitDurationS: data.wait_duration_s as number | undefined,
+    }
+    set((s) => ({
+      activeCookingSteps: [...s.activeCookingSteps, step],
+      dishes: {
+        ...s.dishes,
+        [step.dishId]: {
+          ...s.dishes[step.dishId],
+          phase: step.stepType === 'wait' ? 'waiting' : 'cooking',
+          currentStepIndex: step.stepIndex,
+          stepReady: true,
+          startedAt: s.dishes[step.dishId].startedAt ?? Date.now(),
+        },
+      },
+    }))
+  },
+
+  handleCookingStepResult: (data) => {
+    const dishId = data.dish as DishId
+    const stepIndex = data.step_index as number
+    const result = data.result as 'correct' | 'wrong'
+    const responseTimeMs = data.response_time_ms as number | undefined
+
+    const stepResult: CookingStepResult = {
+      dishId,
+      stepIndex,
+      result,
+      chosenOptionId: data.chosen_option_id as string | undefined,
+      responseTimeMs,
+    }
+
+    set((s) => {
+      const dish = s.dishes[dishId]
+      const score = { ...s.cookingScore }
+      if (result === 'correct') score.correct++
+      else score.wrong++
+
+      return {
+        // Remove from active steps
+        activeCookingSteps: s.activeCookingSteps.filter(
+          st => !(st.dishId === dishId && st.stepIndex === stepIndex)
+        ),
+        // Add result to dish
+        dishes: {
+          ...s.dishes,
+          [dishId]: {
+            ...dish,
+            stepResults: [...dish.stepResults, stepResult],
+            stepReady: false,
+          },
+        },
+        cookingScore: score,
+      }
+    })
+  },
+
+  handleCookingStepTimeout: (data) => {
+    const dishId = data.dish as DishId
+    const stepIndex = data.step_index as number
+
+    const stepResult: CookingStepResult = {
+      dishId,
+      stepIndex,
+      result: 'missed',
+    }
+
+    set((s) => {
+      const dish = s.dishes[dishId]
+      const score = { ...s.cookingScore }
+      score.missed++
+
+      return {
+        activeCookingSteps: s.activeCookingSteps.filter(
+          st => !(st.dishId === dishId && st.stepIndex === stepIndex)
+        ),
+        dishes: {
+          ...s.dishes,
+          [dishId]: {
+            ...dish,
+            stepResults: [...dish.stepResults, stepResult],
+            stepReady: false,
+          },
+        },
+        cookingScore: score,
+      }
+    })
+  },
+
+  handleCookingWaitStart: (data) => {
+    const waitStep: CookingWaitStep = {
+      dishId: data.dish as DishId,
+      stepIndex: data.step_index as number,
+      stepLabel: data.step_label as string || '',
+      station: data.station as KitchenStationId,
+      startedAt: data.started_at as number || Date.now(),
+      durationS: data.duration_s as number || 60,
+    }
+    set((s) => ({
+      cookingWaitSteps: [...s.cookingWaitSteps, waitStep],
+    }))
+  },
+
+  handleCookingWaitEnd: (data) => {
+    const dishId = data.dish as DishId
+    const stepIndex = data.step_index as number
+    set((s) => ({
+      cookingWaitSteps: s.cookingWaitSteps.filter(
+        w => !(w.dishId === dishId && w.stepIndex === stepIndex)
+      ),
+    }))
+  },
+
+  getActiveStepForStation: (station) => {
+    return get().activeCookingSteps.find(s => s.station === station)
+  },
 
   // Dining
   setDiningPhase: (phase) => set({ diningPhase: phase }),
@@ -544,40 +687,41 @@ export const useGameStore = create<GameState>((set, get) => ({
     const event = data.event as string
 
     if (task === 'steak') {
-      if (event === 'place_steak' || event === 'auto_place' || event === 'place_meat') {
-        const panId = data.pan as number | undefined
-        const pans = get().pans
-        const targetPan = panId
-          ? pans.find(p => p.id === panId && p.state === 'empty')
-          : pans.find(p => p.state === 'empty')
-        if (targetPan) {
-          set({
-            pans: pans.map(p =>
-              p.id === targetPan.id
-                ? { ...p, state: 'cooking' as const, placedAt: Date.now() }
-                : p
-            ),
-          })
-        }
-      }
+      // Legacy steak system — disabled, replaced by multi-dish cooking
+      return
     } else if (task === 'dining') {
       if (event === 'table_ready') {
         set({ diningPhase: 'active' as const })
       }
     } else if (task === 'cooking') {
-      // New multi-dish cooking events from backend
-      const dishId = data.dish as DishId | undefined
-      if (!dishId) return
-
-      if (event === 'step_ready') {
-        // Backend signals that the next step can be performed
-        get().setDishStepReady(dishId, true)
+      // Backend-driven cooking events
+      if (event === 'step_activate') {
+        get().handleCookingStepActivate(data)
+      } else if (event === 'step_result') {
+        get().handleCookingStepResult(data)
+      } else if (event === 'step_timeout') {
+        get().handleCookingStepTimeout(data)
+      } else if (event === 'wait_start') {
+        get().handleCookingWaitStart(data)
+      } else if (event === 'wait_end') {
+        get().handleCookingWaitEnd(data)
+      } else if (event === 'step_ready') {
+        const dishId = data.dish as DishId | undefined
+        if (dishId) get().setDishStepReady(dishId, true)
       } else if (event === 'phase_change') {
+        const dishId = data.dish as DishId | undefined
         const phase = data.phase as DishState['phase']
-        if (phase) get().setDishPhase(dishId, phase)
-      } else if (event === 'unlock_dish') {
-        // Backend unlocks a dish for cooking
-        get().setDishStepReady(dishId, true)
+        if (dishId && phase) get().setDishPhase(dishId, phase)
+      } else if (event === 'dish_complete') {
+        const dishId = data.dish as DishId | undefined
+        if (dishId) {
+          set((s) => ({
+            dishes: {
+              ...s.dishes,
+              [dishId]: { ...s.dishes[dishId], phase: 'served', completedAt: Date.now() },
+            },
+          }))
+        }
       }
     }
   },
@@ -606,6 +750,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     kitchenScore: 0,
     dishes: createInitialDishes(),
     activeStation: null,
+    activeCookingSteps: [],
+    cookingWaitSteps: [],
+    cookingScore: { correct: 0, wrong: 0, missed: 0 },
     diningPhase: 'idle',
     diningSeats: [{ ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }],
     diningSelectedUtensil: null,
