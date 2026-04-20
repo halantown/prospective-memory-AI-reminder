@@ -60,8 +60,8 @@ export default function RecipeTab() {
         {!isHolding && (
           <div className="flex flex-col items-center text-slate-400">
             <span className="text-3xl mb-3">📖</span>
-            <p className="text-xs text-center font-medium mb-1">Recipe Book</p>
-            <p className="text-[10px] text-center text-slate-500 leading-relaxed">
+            <p className="text-sm text-center font-medium mb-1">Recipe Book</p>
+            <p className="text-xs text-center text-slate-500 leading-relaxed">
               Press and hold to view recipes
             </p>
           </div>
@@ -83,7 +83,7 @@ export default function RecipeTab() {
             onTouchCancel={handleHoldEnd}
           >
             <div className="text-center mb-2 shrink-0">
-              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
+              <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">
                 📖 Recipes — Release to close
               </span>
             </div>
@@ -161,16 +161,16 @@ function StepRow({
     : null
 
   return (
-    <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] ${
+    <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${
       isCurrent
         ? 'bg-cooking-900/40 border border-cooking-400/40 text-slate-100 font-medium'
         : isCompleted
           ? 'text-slate-500 line-through'
           : 'text-slate-400'
     }`}>
-      {resultIcon && <span className="text-[9px]">{resultIcon}</span>}
-      {isCurrent && !resultIcon && <span className="text-[9px]">▶</span>}
-      {!isCurrent && !isCompleted && !resultIcon && <span className="text-[9px] text-slate-600">○</span>}
+      {resultIcon && <span className="text-[11px]">{resultIcon}</span>}
+      {isCurrent && !resultIcon && <span className="text-[11px]">▶</span>}
+      {!isCurrent && !isCompleted && !resultIcon && <span className="text-[11px] text-slate-600">○</span>}
       <span className="truncate">{label}</span>
     </div>
   )
