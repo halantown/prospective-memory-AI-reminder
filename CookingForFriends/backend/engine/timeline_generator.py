@@ -20,12 +20,7 @@ from engine.pm_tasks import (
     NEUTRAL_UTTERANCES,
     PMTaskDef,
 )
-from config import REMINDER_LEAD_S, MESSAGE_COOLDOWN_S
-
-
-# Steak placement cadence: every 20s, 3 pans cycling
-_STEAK_INTERVAL_S = 20
-_NUM_PANS = 3
+from config import REMINDER_LEAD_S, MESSAGE_COOLDOWN_S, COOKING_TOTAL_DURATION_S
 
 # Fake trigger definitions per block
 _FAKE_TRIGGERS: dict[int, list[dict]] = {
@@ -68,22 +63,9 @@ def generate_block_timeline(
     # ── Block start ──
     events.append({"t": 0, "type": "block_start", "data": {}})
 
-    # ── Ongoing task events (steaks): place every 20s across 3 pans ──
-    pan = 1
-    for t in range(0, 600, _STEAK_INTERVAL_S):
-        events.append({
-            "t": t,
-            "type": "ongoing_task_event",
-            "data": {"task": "steak", "event": "place_steak", "pan": pan, "room": "kitchen"},
-        })
-        pan = (pan % _NUM_PANS) + 1
-
-    # ── Table setting readiness (t=5) ──
-    events.append({
-        "t": 5,
-        "type": "ongoing_task_event",
-        "data": {"task": "dining", "event": "table_ready", "room": "dining_room"},
-    })
+    # ── Cooking events are now driven by CookingEngine (started via game_handler).
+    #    No steak/dining events are generated here. The CookingEngine runs its own
+    #    timeline in parallel and emits ongoing_task_event messages directly. ──
 
     # ── PM reminders + triggers ──
     for task_id in trigger_order:
@@ -220,13 +202,13 @@ def generate_block_timeline(
 
         # Cap message times to stay within block duration
         for msg_event in msg_events:
-            if msg_event["t"] >= 900:
-                msg_event["t"] = 899
+            if msg_event["t"] >= COOKING_TOTAL_DURATION_S:
+                msg_event["t"] = COOKING_TOTAL_DURATION_S - 1
 
         events.extend(msg_events)
 
     # ── Block end ──
-    events.append({"t": 900, "type": "block_end", "data": {}})
+    events.append({"t": COOKING_TOTAL_DURATION_S, "type": "block_end", "data": {}})
 
     # Sort by time, then by type priority (block_start first, block_end last)
     type_priority = {"block_start": 0, "block_end": 99}
@@ -236,7 +218,7 @@ def generate_block_timeline(
         "block_number": block_number,
         "condition": condition,
         "guest": guest,
-        "day_story": f"Day {block_number}: Cooking steak dinner for {guest}",
-        "duration_seconds": 900,
+        "day_story": f"Day {block_number}: Cooking dinner for {guest}",
+        "duration_seconds": COOKING_TOTAL_DURATION_S,
         "events": events,
     }

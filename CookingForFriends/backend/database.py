@@ -15,6 +15,7 @@ async def init_db():
     import models.experiment  # noqa: F401
     import models.block       # noqa: F401
     import models.logging     # noqa: F401
+    import models.cooking     # noqa: F401
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

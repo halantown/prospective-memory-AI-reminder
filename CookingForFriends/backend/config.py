@@ -33,7 +33,7 @@ TOKEN_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # No 0/O/1/I ambiguity
 # Experiment
 BLOCKS_PER_PARTICIPANT = 3
 PM_TASKS_PER_BLOCK = 4
-BLOCK_DURATION_S = 600  # 10 minutes
+BLOCK_DURATION_S = 900  # 15 minutes (matches COOKING_TOTAL_DURATION_S)
 EXECUTION_WINDOW_S = 30
 LATE_WINDOW_S = 60
 REMINDER_LEAD_S = 120  # Reminder fires ~120s before trigger
@@ -46,6 +46,16 @@ PHONE_MESSAGE_EXPIRY_MS = 20_000  # Per-message expiry (20s), must match fronten
 # Mouse tracking
 MOUSE_SAMPLE_INTERVAL_MS = 200
 MOUSE_BATCH_INTERVAL_S = 5
+
+# Cooking system
+COOKING_STEP_WINDOW_S = 30        # Default window for participant to act on a cooking step
+COOKING_TOTAL_DURATION_S = 900    # 15-minute cooking session per block
+COOKING_DISHES = ["roasted_vegetables", "tomato_soup", "spaghetti", "steak"]
+COOKING_STATIONS = [
+    "fridge", "cutting_board", "spice_rack",
+    "burner1", "burner2", "burner3",
+    "oven", "plating_area",
+]
 
 # Snapshot
 SNAPSHOT_INTERVAL_S = 15
