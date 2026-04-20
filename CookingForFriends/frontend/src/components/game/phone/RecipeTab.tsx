@@ -46,18 +46,20 @@ export default function RecipeTab() {
   }, [isHolding, dishes, wsSend])
 
   return (
-    <div className="flex-1 flex flex-col relative select-none">
-      {/* Hold trigger area */}
-      <div
-        className="flex-1 flex flex-col items-center justify-center px-4 cursor-pointer active:bg-slate-700/30 transition-colors"
-        onMouseDown={handleHoldStart}
-        onMouseUp={handleHoldEnd}
-        onMouseLeave={handleHoldEnd}
-        onTouchStart={handleHoldStart}
-        onTouchEnd={handleHoldEnd}
-        onTouchCancel={handleHoldEnd}
-      >
-        {!isHolding && (
+    /* All press/release handlers on the outermost div so that the overlay
+       appearing on top never triggers a spurious mouseleave on an inner div */
+    <div
+      className="flex-1 flex flex-col relative select-none cursor-pointer"
+      onMouseDown={handleHoldStart}
+      onMouseUp={handleHoldEnd}
+      onMouseLeave={handleHoldEnd}
+      onTouchStart={handleHoldStart}
+      onTouchEnd={handleHoldEnd}
+      onTouchCancel={handleHoldEnd}
+    >
+      {/* Resting state */}
+      {!isHolding && (
+        <div className="flex-1 flex flex-col items-center justify-center px-4 active:bg-slate-700/30 transition-colors">
           <div className="flex flex-col items-center text-slate-400">
             <span className="text-3xl mb-3">📖</span>
             <p className="text-sm text-center font-medium mb-1">Recipe Book</p>
@@ -65,10 +67,10 @@ export default function RecipeTab() {
               Press and hold to view recipes
             </p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Recipe overlay — shown while holding; captures release events too */}
+      {/* Recipe overlay — shown while holding */}
       <AnimatePresence>
         {isHolding && (
           <motion.div
@@ -77,10 +79,6 @@ export default function RecipeTab() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            onMouseUp={handleHoldEnd}
-            onMouseLeave={handleHoldEnd}
-            onTouchEnd={handleHoldEnd}
-            onTouchCancel={handleHoldEnd}
           >
             <div className="text-center mb-2 shrink-0">
               <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">
