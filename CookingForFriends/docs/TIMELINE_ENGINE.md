@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-The **Timeline Engine** drives all game events during a 10-minute experiment block. It reads a JSON timeline (either generated per-participant or loaded from a static file), then fires events over WebSocket at precise real-time offsets. Each event triggers frontend behavior: placing steaks, robot speech, phone messages, PM task triggers, etc.
+The **Timeline Engine** drives all game events during a 15-minute experiment block. It reads a JSON timeline (either generated per-participant or loaded from a static file), then fires events over WebSocket at precise real-time offsets. Each event triggers frontend behavior: cooking steps, robot speech, phone messages, PM task triggers, etc.
 
 ```
 Timeline JSON  ─→  TimelineEngine._run()  ─→  send_fn()  ─→  ConnectionManager  ─→  WebSocket  ─→  Frontend
@@ -126,12 +126,14 @@ The ConnectionManager uses per-connection asyncio Queues with a pump coroutine. 
 ### 3.3 `ongoing_task_event`
 | Field | Type | Description |
 |-------|------|-------------|
-| `task` | string | Task type: `"steak"` or `"dining"` |
-| `event` | string | Event name: `"place_steak"`, `"table_ready"` |
-| `pan` | int | Pan number 1–3 (for steak tasks) |
-| `room` | string | Room where event occurs: `"kitchen"`, `"bedroom"` |
+| `task` | string | Task type: `"cooking"` or `"dining"` |
+| `event` | string | Event name: `"step_activate"`, `"step_result"`, `"step_timeout"`, `"wait_start"`, `"wait_end"`, `"dish_complete"`, `"table_ready"` |
+| `dish` | string | Dish ID (for cooking tasks): `"spaghetti"`, `"steak"`, `"tomato_soup"`, `"roasted_vegetables"` |
+| `step_index` | int | Step index within the dish recipe |
+| `options` | array | Distractor options `[{id, text}]` (for `step_activate`) |
+| `room` | string | Room where event occurs: `"kitchen"`, `"dining_room"` |
 
-Steaks are placed every 20 seconds, cycling through 3 pans. This is the ongoing task participants perform throughout the block.
+Cooking steps are driven by a separate `CookingEngine` (not the main timeline). The engine runs its own async timeline loop, activating steps at predetermined times (see `data/cooking_timeline.py`). Each active step gives the participant 30 seconds to choose from distractor options. The main timeline only fires dining events.
 
 ### 3.4 `robot_speak`
 | Field | Type | Description |

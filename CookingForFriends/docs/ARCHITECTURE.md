@@ -53,10 +53,10 @@ welcome → [block 1..3]:
 4. Wrong answers → re-show card with highlight → retry (max 2 fails then auto-pass)
 
 ### Playing Phase
-- **Duration**: 600 real seconds = 60 game minutes (17:00–18:00)
-- **Time ticks**: emitted every 10 real seconds (= 1 game minute)
+- **Duration**: 900 real seconds = 60 game minutes (17:00–18:00)
+- **Time ticks**: emitted every 15 real seconds (= 1 game minute)
 - **Layout**: 75/25 split — WorldView (room panorama) + PhoneSidebar
-- **Ongoing tasks**: Steak cooking (every 20s), table setting (t=5)
+- **Ongoing tasks**: Multi-dish cooking (4 dishes, backend-driven steps with distractors), table setting
 - **PM triggers**: 4 per block, at predefined times or activity-based
 - **Phone messages**: Chat, ads, social — arrive on schedule from JSON pool
 - **Robot**: Moves between rooms, speaks reminders/neutral utterances
@@ -89,7 +89,7 @@ ws://host/ws/game/{session_id}/{block_number}?auto_start={bool}
 | `kitchen_timer` | `{id, icon, message}` | Kitchen timer modal (blocking) |
 | `robot_speak` | `{text}` | Robot speech bubble |
 | `robot_move` | `{to_room}` | Robot changes room |
-| `ongoing_task_event` | `{task, event, ...}` | Steak/dining state change |
+| `ongoing_task_event` | `{task, event, ...}` | Cooking step activate/result/timeout, dining state change |
 | `block_end` | `{}` | Block complete |
 | `keepalive` | `{}` | Connection keepalive (every 5s) |
 
