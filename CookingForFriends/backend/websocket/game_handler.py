@@ -13,6 +13,7 @@ from engine.execution_window import (
     start_window, cancel_window, get_active_trigger, clear_active_trigger,
     record_room_switch, get_room_sequence, get_first_pm_room_entry,
 )
+from engine.cooking_engine import CookingEngine
 from models.logging import InteractionLog, MouseTrack, PhoneMessageLog
 from models.block import PMTrial, PMAttemptRecord
 
@@ -20,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 # Per-participant locks for PM attempt deduplication
 _pm_attempt_locks: dict[str, asyncio.Lock] = {}
+
+# Per-participant CookingEngine instances
+_cooking_engines: dict[str, CookingEngine] = {}
 
 
 async def handle_game_ws(
@@ -122,6 +126,11 @@ async def handle_game_ws(
             cancel_timeline(participant_id, block_number)
             from engine.execution_window import cancel_all_windows_for_participant
             cancel_all_windows_for_participant(participant_id)
+            # Stop and save cooking engine
+            cooking = _cooking_engines.pop(participant_id, None)
+            if cooking:
+                await cooking.save_dish_scores()
+                await cooking.stop()
         else:
             logger.info(f"Skipping timeline/window cleanup for {participant_id} — superseded by newer connection")
         # Clean up per-participant PM attempt lock
@@ -180,6 +189,10 @@ async def _ws_receiver(
                     await _handle_interaction(participant_id, block_number, "phone_tab_switch", data, db_factory)
                 elif msg_type == "kitchen_timer_acknowledged":
                     await _handle_interaction(participant_id, block_number, "kitchen_timer_acknowledged", data, db_factory)
+                elif msg_type == "cooking_action":
+                    await _handle_cooking_action(participant_id, block_number, data, db_factory)
+                elif msg_type == "recipe_view":
+                    await _handle_interaction(participant_id, block_number, "recipe_view", data, db_factory)
                 elif msg_type == "mouse_position":
                     await _handle_mouse(participant_id, block_number, data, db_factory)
                 else:
@@ -233,6 +246,13 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
     async def _on_block_complete():
         """Mark block as completed when timeline finishes normally."""
         try:
+            # Save cooking scores before marking block complete
+            cooking = _cooking_engines.pop(participant_id, None)
+            if cooking:
+                await cooking.save_dish_scores()
+                await cooking.stop()
+                logger.info(f"[GAME_HANDLER] CookingEngine scores saved for {participant_id}")
+
             async with db_factory() as db:
                 from sqlalchemy import select
                 from models.block import Block, BlockStatus
@@ -273,6 +293,20 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
             )
             await db.commit()
         raise
+
+    # Start the CookingEngine for this block
+    try:
+        cooking = CookingEngine(
+            participant_id=participant_id,
+            block_id=block_id,
+            send_fn=send_fn,
+            db_factory=db_factory,
+        )
+        _cooking_engines[participant_id] = cooking
+        cooking.start()
+        logger.info(f"[GAME_HANDLER] CookingEngine started for {participant_id} block {block_number}")
+    except Exception as e:
+        logger.error(f"[GAME_HANDLER] CookingEngine start failed: {e}")
 
 
 async def _handle_heartbeat(participant_id: str, db_factory):
@@ -322,6 +356,39 @@ async def _handle_task_action(participant_id, block_number, data, db_factory):
     await _check_activity_conditions(participant_id, task, event, data)
 
     await _handle_interaction(participant_id, block_number, "task_action", data, db_factory)
+
+
+async def _handle_cooking_action(participant_id, block_number, data, db_factory):
+    """Route a cooking action to the CookingEngine and log it."""
+    cooking = _cooking_engines.get(participant_id)
+    if not cooking:
+        logger.warning(f"[GAME_HANDLER] cooking_action but no CookingEngine for {participant_id}")
+        return
+
+    dish_id = data.get("dish", "")
+    chosen_option_id = data.get("chosen_option_id", "")
+    chosen_option_text = data.get("chosen_option_text", "")
+    station = data.get("station", "")
+    ts = data.get("timestamp", time.time())
+
+    await cooking.handle_action(
+        dish_id=dish_id,
+        chosen_option_id=chosen_option_id,
+        chosen_option_text=chosen_option_text,
+        station=station,
+        timestamp=ts,
+    )
+
+    # Also log as interaction for general event tracking
+    await _handle_interaction(participant_id, block_number, "cooking_action", data, db_factory)
+
+    # Check resumption lag (cooking action counts as returning to ongoing task)
+    trigger = get_active_trigger(participant_id)
+    if trigger and trigger.get("pm_completed"):
+        pm_completed_at = trigger.get("pm_completed_at", 0)
+        resumption_lag_ms = int((ts - pm_completed_at) * 1000)
+        await _record_resumption_lag(trigger["trial_id"], resumption_lag_ms, db_factory)
+        clear_active_trigger(participant_id)
 
 
 async def _handle_trigger_ack(participant_id, data, db_factory):
