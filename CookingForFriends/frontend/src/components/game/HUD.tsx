@@ -11,13 +11,15 @@ export default function HUD() {
 
   return (
     <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
-      {/* Clock */}
+      {/* Clock — hidden in floor plan view */}
+      {false && (
       <div className="bg-slate-800/80 backdrop-blur rounded-lg px-4 py-2 flex items-center">
         <span className="text-white text-sm font-mono font-bold relative">
           {gameClock}
           <ClockTriggerEffect />
         </span>
       </div>
+      )}
 
       {/* Score */}
       {false && (

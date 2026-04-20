@@ -1,10 +1,10 @@
-/** Main game page — 75/25 layout with world view + phone sidebar. */
+/** Main game page — floor plan view replacing WorldView, phone sidebar preserved. */
 
 import { useEffect } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { useMouseTracker } from '../../hooks/useMouseTracker'
-import WorldView from '../../components/game/WorldView'
+import FloorPlanView from '../../components/game/FloorPlanView'
 import PhoneSidebar from '../../components/game/PhoneSidebar'
 import HUD from '../../components/game/HUD'
 import RobotAvatar from '../../components/game/RobotAvatar'
@@ -17,32 +17,27 @@ export default function GamePage() {
   const wsConnected = useGameStore((s) => s.wsConnected)
   const setPhase = useGameStore((s) => s.setPhase)
 
-  // Guard: redirect to welcome if no session
   useEffect(() => {
-    if (!sessionId) {
-      setPhase('welcome')
-    }
+    if (!sessionId) setPhase('welcome')
   }, [sessionId, setPhase])
 
-  // Connect WebSocket
   useWebSocket(sessionId, blockNumber)
-
-  // Start mouse tracking
   useMouseTracker()
 
   if (!sessionId) return null
 
   return (
     <div className="h-screen w-screen flex overflow-hidden bg-slate-900 select-none">
-      {/* Game main area (fixed 1480px) */}
-      <div className="relative" style={{ width: '1480px' }}>
-        <WorldView />
+      {/* World area — FloorPlanView replaces old WorldView tile layout.
+           RobotAvatar is suppressed here; Pepper is rendered inside FloorPlanView. */}
+      <div className="relative flex-1 min-w-0">
+        <FloorPlanView />
         <HUD />
-        <RobotAvatar />
+        {/* RobotAvatar hidden — robot sprite lives inside FloorPlanView on the map */}
+        {/* <RobotAvatar /> */}
         <PMInteraction />
         <TriggerEffects />
 
-        {/* WS status indicator */}
         {!wsConnected && (
           <div className="absolute top-0 left-0 right-0 bg-red-600 text-white text-center text-sm py-1 z-50">
             Reconnecting to server...
