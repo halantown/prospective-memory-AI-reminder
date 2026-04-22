@@ -1,75 +1,124 @@
-/** Kitchen furniture — top-down floor plan with all cooking stations.
- *  Stations: fridge (top-right), cutting board (upper counter),
- *  3 burners (center), oven (bottom-right), spice rack (lower-left),
- *  plating area (upper counter, right of cutting board).
+/** Kitchen furniture — image sprites for each cooking station.
+ *
+ *  Each station renders an <img> from /assets/kitchen/<station>.png.
+ *  If the image hasn't been created yet the component falls back to a
+ *  labelled placeholder div so the layout is always visible.
+ *
+ *  Positions exactly mirror STATION_POSITIONS in KitchenRoom.tsx so that
+ *  the transparent hotspot buttons overlay each furniture image correctly.
+ *
+ *  To swap in a real asset: drop the PNG at public/assets/kitchen/<id>.png
+ *  — no code changes needed.
  */
 
-import { C } from './furniture/styles'
+import { useState } from 'react'
+
+interface StationDef {
+  id: string
+  label: string
+  emoji: string
+  style: React.CSSProperties
+  /** Accent colour for the placeholder fallback */
+  accent: string
+}
+
+const STATIONS: StationDef[] = [
+  {
+    id: 'fridge',
+    label: 'Fridge',
+    emoji: '🧊',
+    style: { left: '78%', top: '2%', width: '20%', height: '32%' },
+    accent: '#3A5A7A',
+  },
+  {
+    id: 'cutting_board',
+    label: 'Cutting Board',
+    emoji: '🔪',
+    style: { left: '22%', top: '2%', width: '28%', height: '14%' },
+    accent: '#6B4C2A',
+  },
+  {
+    id: 'spice_rack',
+    label: 'Spice Rack',
+    emoji: '🧂',
+    style: { left: '2%', top: '72%', width: '25%', height: '20%' },
+    accent: '#5A4A3A',
+  },
+  {
+    id: 'burner1',
+    label: 'Burner 1',
+    emoji: '🔥',
+    style: { left: '18%', top: '32%', width: '20%', height: '30%' },
+    accent: '#6A3A1A',
+  },
+  {
+    id: 'burner2',
+    label: 'Burner 2',
+    emoji: '🔥',
+    style: { left: '40%', top: '32%', width: '20%', height: '30%' },
+    accent: '#6A3A1A',
+  },
+  {
+    id: 'burner3',
+    label: 'Burner 3',
+    emoji: '🔥',
+    style: { left: '60%', top: '32%', width: '20%', height: '30%' },
+    accent: '#6A3A1A',
+  },
+  {
+    id: 'oven',
+    label: 'Oven',
+    emoji: '♨️',
+    style: { left: '65%', top: '70%', width: '33%', height: '28%' },
+    accent: '#3A3A5A',
+  },
+  {
+    id: 'plating_area',
+    label: 'Plating',
+    emoji: '🍽️',
+    style: { left: '52%', top: '2%', width: '24%', height: '14%' },
+    accent: '#4A5A4A',
+  },
+]
+
+function StationSprite({ station }: { station: StationDef }) {
+  const [imgFailed, setImgFailed] = useState(false)
+
+  return (
+    <div
+      className="absolute"
+      style={station.style}
+    >
+      {!imgFailed ? (
+        <img
+          src={`/assets/kitchen/${station.id}.png`}
+          alt={station.label}
+          className="w-full h-full object-contain"
+          onError={() => setImgFailed(true)}
+          draggable={false}
+        />
+      ) : (
+        /* Placeholder shown until real asset is added */
+        <div
+          className="w-full h-full rounded flex flex-col items-center justify-center gap-0.5 border border-white/10"
+          style={{ backgroundColor: station.accent + 'CC' }}
+        >
+          <span className="text-base leading-none">{station.emoji}</span>
+          <span className="text-[8px] text-white/60 font-medium text-center leading-tight px-0.5">
+            {station.label}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function KitchenFurniture() {
   return (
-    <svg
-      className="absolute inset-0 w-full h-full"
-      viewBox="0 0 400 300"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      {/* ── Counter along top ── */}
-      <rect x="0" y="0" width="310" height="42" rx="2" fill={C.cabinet} />
-
-      {/* Sink (left of counter) */}
-      <rect x="8" y="5" width="55" height="32" rx="3" fill={C.sinkOuter} />
-      <ellipse cx="36" cy="21" rx="18" ry="10" fill={C.sinkInner} stroke={C.sinkRim} strokeWidth="1" />
-
-      {/* Cutting board station */}
-      <rect x="88" y="5" width="110" height="32" rx="2" fill="#C4A46C" />
-      <rect x="92" y="9" width="102" height="24" rx="1" fill="#D4B87A" />
-      <text x="143" y="25" textAnchor="middle" fill="#7A5C30" fontSize="8" fontFamily="sans-serif">🔪 CUTTING BOARD</text>
-
-      {/* Plating area station */}
-      <rect x="208" y="5" width="96" height="32" rx="2" fill={C.counter} />
-      <rect x="214" y="9" width="84" height="24" rx="1" fill="#E0E5EA" stroke="#B0B8C2" strokeWidth="0.5" />
-      <text x="256" y="25" textAnchor="middle" fill="#6A7A8A" fontSize="8" fontFamily="sans-serif">🍽️ PLATING</text>
-
-      {/* ── Fridge (top-right) ── */}
-      <rect x="318" y="0" width="82" height="95" rx="3" fill={C.fridge} />
-      <line x1="359" y1="4" x2="359" y2="91" stroke="#6A7A8A" strokeWidth="1" />
-      <circle cx="352" cy="28" r="2.5" fill="#9AAABA" />
-      <circle cx="352" cy="62" r="2.5" fill="#9AAABA" />
-      <text x="359" y="50" textAnchor="middle" fill="#B0C0D0" fontSize="9" fontFamily="sans-serif">🧊</text>
-
-      {/* ── Stovetop (center) — 3 burners ── */}
-      <rect x="70" y="95" width="260" height="95" rx="4" fill={C.stovetop} />
-
-      {/* Burner 1 */}
-      <circle cx="135" cy="142" r="32" fill="none" stroke={C.burnerActive} strokeWidth="2.5" opacity="0.5" />
-      <circle cx="135" cy="142" r="18" fill={C.burnerGlow} opacity="0.25" />
-      <text x="135" y="147" textAnchor="middle" fill="#FF8844" fontSize="8" fontFamily="sans-serif" opacity="0.7">B1</text>
-
-      {/* Burner 2 */}
-      <circle cx="210" cy="142" r="32" fill="none" stroke={C.burnerActive} strokeWidth="2.5" opacity="0.5" />
-      <circle cx="210" cy="142" r="18" fill={C.burnerGlow} opacity="0.25" />
-      <text x="210" y="147" textAnchor="middle" fill="#FF8844" fontSize="8" fontFamily="sans-serif" opacity="0.7">B2</text>
-
-      {/* Burner 3 */}
-      <circle cx="285" cy="142" r="32" fill="none" stroke={C.burnerIdle} strokeWidth="1.5" strokeDasharray="5 4" />
-      <text x="285" y="147" textAnchor="middle" fill="#8899AA" fontSize="8" fontFamily="sans-serif" opacity="0.7">B3</text>
-
-      {/* ── Spice rack (bottom-left shelf) ── */}
-      <rect x="8" y="218" width="100" height="60" rx="2" fill={C.shelf} />
-      <rect x="8" y="218" width="100" height="3" fill={C.shelfEdge} />
-      <text x="58" y="237" textAnchor="middle" fill={C.label} fontSize="8" fontFamily="sans-serif">🧂 SPICE RACK</text>
-      {/* Bottles */}
-      <rect x="18" y="243" width="12" height="18" rx="2" fill={C.bottleRed} />
-      <rect x="36" y="245" width="12" height="16" rx="2" fill={C.bottleBlue} />
-      <rect x="54" y="244" width="12" height="17" rx="2" fill={C.bottleGreen} />
-      <rect x="72" y="246" width="10" height="15" rx="2" fill={C.bottleNeutral} />
-      <rect x="88" y="243" width="12" height="18" rx="2" fill={C.bottleNeutral} />
-
-      {/* ── Oven (bottom-right) ── */}
-      <rect x="262" y="210" width="135" height="85" rx="3" fill={C.oven} />
-      <rect x="274" y="224" width="111" height="50" rx="2" fill={C.ovenDoor} stroke="#5A6575" strokeWidth="1" />
-      <circle cx="360" cy="285" r="3.5" fill={C.burnerActive} opacity="0.5" />
-      <text x="330" y="252" textAnchor="middle" fill={C.label} fontSize="10" fontFamily="sans-serif">♨️ OVEN</text>
-    </svg>
+    <div className="absolute inset-0">
+      {STATIONS.map((s) => (
+        <StationSprite key={s.id} station={s} />
+      ))}
+    </div>
   )
 }
