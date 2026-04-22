@@ -338,3 +338,75 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > - [ ] After deployment, verify `systemctl status ollama` shows a healthy service owned by user `ollama`
 > - [ ] Confirm that a full reboot still preserves model visibility via `ollama list`
 > - [ ] Consider relocating the shared model store to a service-neutral path such as `/var/lib/ollama/models` to avoid home-directory ACL coupling
+
+---
+
+## INC-007 — Cooking task UI shows no signals (field name contract mismatch)
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-04-22 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | Manual testing — kitchen stations never glowed, popups showed blank |
+| Affected area| `backend/engine/cooking_engine.py`, `frontend/src/stores/gameStore.ts` |
+
+### Background
+> The multi-dish cooking task uses a backend CookingEngine that fires `ongoing_task_event` messages to drive the frontend. The frontend gameStore handlers parse these events and populate `activeCookingSteps`, which KitchenRoom reads to show station glows and option popups.
+
+### Incident Description
+> The frontend appeared to receive no cooking signals at all. Kitchen stations did not glow, no popups appeared. The CookingEngine was confirmed running (engine started, timeline fired), and WebSocket routing was correct. The actual events were arriving at the frontend but producing empty/broken state.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 21:02 | User reports frontend receives no cooking signals |
+| 21:05 | Full end-to-end audit launched |
+| 21:10 | Audit confirms engine running, WS routing correct |
+| 21:12 | Field name mismatches identified between backend event payload and frontend handler |
+| 21:14 | Fixes applied to both files, TS compiles clean |
+| 21:14 | Committed as `fix(cooking): fix field name mismatches between backend events and frontend handlers` |
+
+### Root Cause
+> The `step_activate` and `wait_start` event payloads sent by `CookingEngine` used different field names than what the frontend `handleCookingStepActivate` and `handleCookingWaitStart` handlers expected. The mismatch was introduced when the two sides were developed independently without a shared contract definition.
+>
+> Specific mismatches:
+>
+> | Field | Backend sent | Frontend read | Effect |
+> |-------|-------------|---------------|--------|
+> | Step title | `label` | `step_label` | `undefined` → popup title blank |
+> | Step description | `description` | `step_description` | `undefined` |
+> | Timer window | `window_s` | `window_seconds` | defaulted to 30 (accidentally correct) |
+> | Activation time | not sent | `activated_at \|\| Date.now()` | used wall clock (close enough) |
+> | Wait station | not sent | `station` | `undefined` → yellow oven glow never appeared |
+> | Wait duration | `wait_duration_s` | `duration_s` | defaulted to 60 instead of actual value |
+
+### Contributing Factors
+> - Backend and frontend developed in the same session without a shared TypeScript type for the WS event shape
+> - The `station` field on `step_activate` was correct (so stations DID receive active step info), making the bug non-obvious — stations glowed but popup content was blank, giving the impression of "no signals"
+> - No integration test sends a synthetic `step_activate` and asserts the store fields
+
+### Fix
+> **`backend/engine/cooking_engine.py`** — `_activate_entry()`:
+> - Added `"activated_at": activated_at` to `step_activate` event payload
+> - Added `"station": step_def.station` to `wait_start` event payload
+>
+> **`frontend/src/stores/gameStore.ts`** — `handleCookingStepActivate()`:
+> - `data.step_label` → `data.label`
+> - `data.step_description` → `data.description`
+> - `data.window_seconds` → `data.window_s`
+> - `data.activated_at` converted from Unix seconds to ms: `data.activated_at ? data.activated_at * 1000 : Date.now()`
+>
+> **`frontend/src/stores/gameStore.ts`** — `handleCookingWaitStart()`:
+> - `data.step_label` → `data.label`
+> - `data.started_at` → `Date.now()` (not sent by backend; wall clock acceptable)
+> - `data.duration_s` → `data.wait_duration_s`
+
+### Verification
+> - TypeScript compiles with no errors (`tsc --noEmit`)
+> - Manual code review confirms all field names now match between engine payload and store handler
+> - Cooking timeline validated: all 32 entries have valid dish IDs and step indices (`python3` check passed)
+
+### Follow-up Actions
+> - [ ] Define a shared `CookingEventPayload` TypeScript type or Pydantic model to enforce the contract at build time
+> - [ ] Add a unit test in `test_cooking_engine.py` that asserts the exact keys present in each event type sent via mock send_fn
