@@ -155,6 +155,7 @@ class CookingEngine:
                 "step_index": entry.step_index,
                 "label": step_def.label,
                 "description": step_def.description,
+                "station": step_def.station,
                 "wait_duration_s": step_def.wait_duration_s,
             })
         else:
@@ -184,6 +185,7 @@ class CookingEngine:
                 "station": step_def.station,
                 "options": options,
                 "window_s": COOKING_STEP_WINDOW_S,
+                "activated_at": activated_at,
             })
 
             # Start timeout timer

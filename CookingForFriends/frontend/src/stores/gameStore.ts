@@ -410,12 +410,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const step: ActiveCookingStep = {
       dishId: data.dish as DishId,
       stepIndex: data.step_index as number,
-      stepLabel: data.step_label as string,
-      stepDescription: data.step_description as string || '',
+      stepLabel: data.label as string,
+      stepDescription: data.description as string || '',
       station: data.station as KitchenStationId,
       options: (data.options as CookingStepOption[]) || [],
-      activatedAt: data.activated_at as number || Date.now(),
-      windowSeconds: data.window_seconds as number || 30,
+      activatedAt: data.activated_at ? (data.activated_at as number) * 1000 : Date.now(),
+      windowSeconds: data.window_s as number || 30,
       stepType: (data.step_type as 'active' | 'wait') || 'active',
       waitDurationS: data.wait_duration_s as number | undefined,
     }
@@ -509,10 +509,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const waitStep: CookingWaitStep = {
       dishId: data.dish as DishId,
       stepIndex: data.step_index as number,
-      stepLabel: data.step_label as string || '',
+      stepLabel: data.label as string || '',
       station: data.station as KitchenStationId,
-      startedAt: data.started_at as number || Date.now(),
-      durationS: data.duration_s as number || 60,
+      startedAt: Date.now(),
+      durationS: data.wait_duration_s as number || 60,
     }
     set((s) => ({
       cookingWaitSteps: [...s.cookingWaitSteps, waitStep],
