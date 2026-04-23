@@ -11,11 +11,14 @@
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  Frontend  (React 18 + Vite + TypeScript + Tailwind + Zustand)         │
 │  ├── EncodingPage   — task card study + quiz                           │
-│  ├── GamePage       — WorldView (75%) + PhoneSidebar (25%)             │
-│  │   ├── 5 rooms: kitchen, bedroom, living_room, study, bathroom       │
-│  │   ├── Ongoing tasks: steaks (kitchen), table setting (bedroom)      │
-│  │   └── PM interaction: furniture popup → item select → confirm       │
-│  └── MicroBreak / Debrief pages                                        │
+│  ├── GamePage       — FloorPlanView (flex-1) + PhoneSidebar (440px)    │
+│  │   ├── FloorPlanView: zoomable floorplan.png, room navigation,       │
+│  │   │     KitchenFurniture + KitchenRoom overlay, character/robot     │
+│  │   ├── PhoneSidebar: iPhone shell with chat, recipes, timers         │
+│  │   ├── HUD: game clock overlay                                       │
+│  │   ├── PMInteraction: PM task popup (room + item select)             │
+│  │   └── TriggerEffects: visual/audio effects for PM triggers          │
+│  └── MicroBreak / Debrief / Welcome / Admin pages                     │
 │                                                                         │
 │            REST (api.ts)        WebSocket (useWebSocket.ts)             │
 │              ↕                        ↕                                 │
@@ -55,8 +58,8 @@ welcome → [block 1..3]:
 ### Playing Phase
 - **Duration**: 900 real seconds = 60 game minutes (17:00–18:00)
 - **Time ticks**: emitted every 15 real seconds (= 1 game minute)
-- **Layout**: 75/25 split — WorldView (room panorama) + PhoneSidebar
-- **Ongoing tasks**: Multi-dish cooking (4 dishes, backend-driven steps with distractors), table setting
+- **Layout**: `FloorPlanView` (flex-1) + `PhoneSidebar` (440px fixed)
+- **Ongoing tasks**: Multi-dish cooking engine (4 dishes, backend-driven steps with distractors at kitchen stations)
 - **PM triggers**: 4 per block, at predefined times or activity-based
 - **Phone messages**: Chat, ads, social — arrive on schedule from JSON pool
 - **Robot**: Moves between rooms, speaks reminders/neutral utterances
@@ -140,7 +143,7 @@ ws://host/ws/game/{session_id}/{block_number}?auto_start={bool}
 Key state sections:
 - **Session**: sessionId, participantId, group, conditionOrder, blockNumber, phase
 - **Room**: currentRoom, previousRoom, avatarMoving
-- **Kitchen**: pans (3 pan states), kitchenScore
+- **Kitchen**: activeCookingSteps, cookingWaitSteps, completedDishes (cooking engine state)
 - **Dining**: diningPhase, seats (6), utensils, round, score
 - **Phone**:
   - `phoneMessages: PhoneMessage[]` — chat messages (channel `"chat"`) only; notifications are banner-only
@@ -174,7 +177,107 @@ Key state sections:
 
 ---
 
-## 6. Timeline Engine
+## 6. Frontend Architecture
+
+### Page Layout (`GamePage`)
+
+```
+┌────────────────────────────────────────────┬──────────────┐
+│  FloorPlanView  (flex-1, relative)          │ PhoneSidebar │
+│  ┌──────────────────────────────────────┐  │   (440px)    │
+│  │  zoomable div (transform: scale/translate) │         │
+│  │  ├── <img floorplan.png>             │  │  iPhone shell│
+│  │  ├── Kitchen overlay div (0%,0%,44%,41%)  │         │
+│  │  │   ├── KitchenFurniture (sprites)  │  │  LockScreen  │
+│  │  │   └── KitchenRoom (hotspots)      │  │  ContactStrip│
+│  │  ├── Room click targets (overview)   │  │  ChatView    │
+│  │  ├── Virtual character sprite        │  │  RecipeTab   │
+│  │  └── Pepper robot sprite             │  │  TimerModal  │
+│  └──────────────────────────────────────┘  │  NofifBanner │
+│  ├── HUD (clock overlay)                   └──────────────┘
+│  ├── PMInteraction (PM popup)
+│  └── TriggerEffects (visual effects)
+└────────────────────────────────────────────────────────────
+```
+
+### FloorPlanView — Two Modes
+
+**Overview mode** (initial state):
+- Full 1536×1024 floorplan visible at 1:1 scale
+- 5 transparent room click targets overlaid at correct positions
+- Hover shows room label + amber highlight
+- Click enters room (zoom in)
+
+**Zoomed mode** (after room click):
+- `ZOOM_SCALE = 1.6×`, `transform-origin: 0 0`
+- Room center is brought to viewport center; translation is clamped so image never shows black borders
+- Room click targets are hidden
+- Edge navigation buttons appear (direction-aware, based on `ADJACENCY` map)
+- If `currentRoom === 'kitchen'`: `KitchenRoom` hotspots become active
+
+### Room Definitions (`ROOM_DEFS`)
+
+| Room | Bounding box (% of 1536×1024) | Center |
+|------|-------------------------------|--------|
+| kitchen | x=0, y=0, w=44%, h=41% | cx=21%, cy=20% |
+| dining_hall | x=56%, y=0, w=44%, h=33% | cx=78%, cy=16% |
+| bedroom | x=0, y=52%, w=33%, h=48% | cx=16%, cy=76% |
+| bathroom | x=33%, y=56%, w=25%, h=44% | cx=45%, cy=78% |
+| living_room | x=56%, y=34%, w=44%, h=66% | cx=77%, cy=65% |
+
+### Kitchen Overlay Layer
+
+Rendered at `position:absolute, left:0%, top:0%, width:44%, height:41%` (kitchen bounding box).
+
+```
+Kitchen overlay div
+├── KitchenFurniture    — always visible (sprite images or dashed outlines)
+│     Station assets: public/assets/kitchen/<station_id>.png (256×256 PNG)
+│     Fallback: transparent dashed outline placeholder
+└── KitchenRoom         — only rendered when currentRoom === 'kitchen'
+      ├── Station hotspot buttons (positioned by STATION_POSITIONS %)
+      │     Glow ring when a step is active at that station
+      │     Click → opens StationPopup
+      ├── StationPopup  — option picker (2–4 choices)
+      │     Sends task_action {event:"step_attempt"} on click
+      └── CountdownBar + DishProgressStrip (top of kitchen area)
+```
+
+**Station positions** (% of kitchen bounding box):
+
+| Station | left | top | width | height |
+|---------|------|-----|-------|--------|
+| burner1 | 13% | 1% | 12% | 15% |
+| burner2 | 25% | 1% | 12% | 15% |
+| burner3 | 13% | 16% | 12% | 14% |
+| oven | 15% | 23% | 23% | 19% |
+| fridge | 37% | 1% | 17% | 31% |
+| cutting_board | 63% | 1% | 22% | 31% |
+| spice_rack | 85% | 1% | 14% | 23% |
+| plating_area | 48% | 68% | 30% | 18% |
+
+### PhoneSidebar Components
+
+```
+PhoneSidebar
+├── LockScreen          — per-contact notification summaries, unlock on interact
+├── ContactStrip        — avatar list (hidden until first message from contact)
+├── ChatView            — WhatsApp-style thread with question cards
+├── RecipeTab           — long-press recipe viewer (4 dishes, 2×2 grid)
+├── PhoneTabBar         — Chats / Recipe toggle
+├── KitchenTimerModal   — blocking overlay, must be manually dismissed
+└── NotificationBanner  — top-of-screen toast (auto-dismiss)
+```
+
+Lock timeout: **15 seconds** of inactivity.
+
+### WorldView (Not Used)
+
+`WorldView.tsx` still exists in the codebase (CSS grid room layout) but is **not imported anywhere**. It is kept for reference and may be removed in a future cleanup. All active development is on `FloorPlanView`.
+
+---
+
+## 7. Timeline Engine
 
 ### Event Generation (`timeline_generator.py`)
 Builds a sorted event list per block:
@@ -206,7 +309,7 @@ Some PM triggers fire on game-state conditions (e.g., "all steaks plated"):
 
 ---
 
-## 7. Condition Counterbalancing
+## 8. Condition Counterbalancing
 
 **Latin Square** (6 groups × 3 blocks):
 
@@ -225,7 +328,7 @@ Some PM triggers fire on game-state conditions (e.g., "all steaks plated"):
 
 ---
 
-## 8. Database Schema
+## 9. Database Schema
 
 ### Core Tables
 - `experiment` — experiment metadata
@@ -247,7 +350,7 @@ Some PM triggers fire on game-state conditions (e.g., "all steaks plated"):
 
 ---
 
-## 9. Deployment
+## 10. Deployment
 
 ### Development
 ```bash
