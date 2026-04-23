@@ -94,6 +94,55 @@ TypeScript build passes (`tsc --noEmit` clean). Logic reviewed: on reconnect, `r
 
 ---
 
+## INC-003 — WebSocket reconnect loop when block has stale started_at
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-04-23 |
+| Severity     | P0 Critical |
+| Status       | Resolved |
+| Reported by  | User (game stuck on "Reconnecting to server", constant WS requests in F12) |
+| Affected area| `game_handler.py` / `timeline.py` / WebSocket lifecycle |
+
+### Background
+INC-001 fix introduced `block_start_time` parameter to `run_timeline` so that past events are skipped on reconnect. The reconnect path in `game_handler.py` passes `block.started_at.timestamp()` as the real block origin.
+
+### Incident Description
+After entering the game, the UI permanently showed "Reconnecting to server" and F12 showed a constant stream of new WebSocket connection attempts.
+
+### Root Cause
+Block 2 had `started_at = 2026-04-15` (8 days old — stale test session never cleaned up). The new INC-001 code passed this timestamp to `run_timeline`:
+
+```
+resume_offset = time.time() - block.started_at.timestamp() ≈ 691,200s
+duration = 900s
+```
+
+Since `resume_offset >> duration`:
+1. All 64 timeline events were skipped (all have `t <= 900 << resume_offset`)
+2. `remaining = 900 - 691,200 = -690,300` → tail wait loop skipped
+3. `block_end` fired and timeline task completed **instantly**
+4. `asyncio.wait(return_when=FIRST_COMPLETED)` returned immediately (timeline task done)
+5. `ws_pump` and receiver were cancelled — `block_end` in the queue was never flushed
+6. Frontend: WS closed, never received `block_end` → showed "Reconnecting" and retried
+7. Same scenario on every retry → **infinite reconnect loop**
+
+### Fix
+**`backend/websocket/game_handler.py`** — Two changes (commit `3ed9888`):
+
+1. **Stale block guard**: Before passing `block_start_ts` to `run_timeline`, compare `age_s = time.time() - block.started_at.timestamp()` against `COOKING_TOTAL_DURATION_S`. If `age_s >= duration`, log a warning and set `block_start_ts = None` (fall back to fresh timeline).
+
+2. **Remove timeline from asyncio.wait**: `timeline_task` removed from `tasks_to_watch`. WS connection lifetime is now controlled exclusively by `pump_task` / `receiver_task` (i.e. the client disconnecting). Timeline completion no longer tears down the WS, ensuring `block_end` is always flushed to the client before the connection closes.
+
+### Verification
+Server restarted; HTTP 200 health check confirmed. Backend imports clean.
+
+### Follow-up Actions
+- [ ] Add admin tool or cron job to mark stale PLAYING blocks as COMPLETED (age > 2× duration)
+- [ ] Consider adding a flush-before-cancel step in the WS teardown so queued messages are always delivered
+
+---
+
 ## INC-002 — CookingEngine not restarted after WebSocket reconnect
 
 | Field        | Detail |
