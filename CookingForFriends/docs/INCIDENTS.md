@@ -46,6 +46,49 @@ Template (copy for each new incident):
 
 ---
 
+## INC-004 — `participants.condition` column missing after multi-block removal migration
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-04-23 |
+| Severity     | P0 Critical |
+| Status       | Resolved |
+| Reported by  | User — 500 on POST /api/session/start |
+| Affected area| `/api/session/start` endpoint; all participant queries |
+
+### Background
+> Refactor removed Latin Square design (multi-block). ORM model `Participant` had `latin_square_group`, `condition_order`, `current_block` replaced with a new `condition` field.
+
+### Incident Description
+> `POST /api/session/start` returned 500. asyncpg raised `UndefinedColumnError: column participants.condition does not exist`. Login page was completely unusable.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 11:26 | 500 error observed on login |
+| 11:29 | Root cause identified: new column never added to DB |
+| 11:30 | `ALTER TABLE participants ADD COLUMN condition VARCHAR NOT NULL DEFAULT 'CONTROL'` executed |
+| 11:30 | Confirmed resolved |
+
+### Root Cause
+> The refactor script dropped 3 old columns (`latin_square_group`, `condition_order`, `current_block`) but did not execute `ADD COLUMN condition`. SQLAlchemy ORM silently ignores extra DB columns (so drops weren't noticed), but it crashes when a mapped column is absent from the DB.
+
+### Contributing Factors
+> - No migration framework (Alembic) — schema changes are manual SQL scripts
+> - Drop and add happened in separate steps; the add was omitted
+
+### Fix
+> Ran: `ALTER TABLE participants ADD COLUMN IF NOT EXISTS condition VARCHAR NOT NULL DEFAULT 'CONTROL'`
+
+### Verification
+> Column visible in `SELECT participant_id, condition FROM participants`. Server restarts and login succeeds.
+
+### Follow-up Actions
+> - [ ] Consider adding Alembic for tracked schema migrations
+> - [ ] Add a startup check that validates DB schema matches ORM models
+
+---
+
 ## INC-001 — Duplicate phone messages + wrong-contact routing on WebSocket reconnect
 
 | Field        | Detail |
