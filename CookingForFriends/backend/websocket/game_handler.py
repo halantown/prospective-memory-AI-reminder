@@ -80,6 +80,7 @@ async def handle_game_ws(
             if block and block.status == BlockStatus.PLAYING:
                 # Resume timeline for reconnecting client
                 condition = block.condition
+                block_id = block.id
                 logger.info(f"[GAME_HANDLER] Auto-starting timeline (block already PLAYING) for {participant_id} block {block_number}")
                 timeline_task = await run_timeline(
                     participant_id=participant_id,
@@ -89,6 +90,23 @@ async def handle_game_ws(
                     db_factory=db_factory,
                 )
                 logger.info(f"[GAME_HANDLER] Timeline resumed for {participant_id} block {block_number}")
+
+                # Also restart CookingEngine — it was stopped when the previous connection closed
+                if participant_id not in _cooking_engines:
+                    try:
+                        cooking = CookingEngine(
+                            participant_id=participant_id,
+                            block_id=block_id,
+                            send_fn=send_event,
+                            db_factory=db_factory,
+                        )
+                        _cooking_engines[participant_id] = cooking
+                        cooking.start()
+                        logger.info(f"[GAME_HANDLER] CookingEngine restarted on reconnect for {participant_id} block {block_number}")
+                    except Exception as ce:
+                        logger.error(f"[GAME_HANDLER] CookingEngine restart failed on reconnect: {ce}")
+                else:
+                    logger.info(f"[GAME_HANDLER] CookingEngine already running for {participant_id}, skipping restart")
             else:
                 block_status = block.status if block else "NO_BLOCK"
                 logger.info(f"[GAME_HANDLER] Block status on connect: {block_status} (not auto-starting)")
