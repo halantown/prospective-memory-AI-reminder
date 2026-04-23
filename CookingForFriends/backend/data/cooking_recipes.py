@@ -7,8 +7,8 @@ Each step has:
 - description: fuller description shown in recipe view
 - step_type: 'active' (needs participant action) or 'wait' (auto-progresses)
 - wait_duration_s: only for 'wait' steps — how long the wait lasts
-- correct_option: the correct action text
-- distractors: list of wrong option texts (2-3 per step)
+- options: ordered list of all option texts (correct + distractors), in the fixed display order
+- correct_index: index into `options` that is the correct answer
 
 Source: cooking_system_design.md Section 3.
 """
@@ -24,8 +24,8 @@ class CookingStepDef:
     station: str
     description: str
     step_type: Literal["active", "wait"]
-    correct_option: str = ""
-    distractors: list[str] = field(default_factory=list)
+    options: list[str] = field(default_factory=list)
+    correct_index: int = 0
     wait_duration_s: int = 0
 
 
@@ -38,8 +38,8 @@ ROASTED_VEGETABLES_STEPS: list[CookingStepDef] = [
         station="fridge",
         description="Get bell peppers, zucchini, and cherry tomatoes from the fridge.",
         step_type="active",
-        correct_option="Bell peppers, zucchini & tomatoes",
-        distractors=["Lettuce & cucumber", "Mushrooms & spinach", "Frozen peas & corn"],
+        options=["Lettuce & cucumber", "Bell peppers, zucchini & tomatoes", "Mushrooms & spinach", "Frozen peas & corn"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="rv_chop",
@@ -47,8 +47,8 @@ ROASTED_VEGETABLES_STEPS: list[CookingStepDef] = [
         station="cutting_board",
         description="Cut the vegetables into bite-sized pieces.",
         step_type="active",
-        correct_option="Chop into pieces",
-        distractors=["Blend into paste", "Peel and leave whole", "Grate finely"],
+        options=["Blend into paste", "Peel and leave whole", "Chop into pieces", "Grate finely"],
+        correct_index=2,
     ),
     CookingStepDef(
         id="rv_season",
@@ -56,8 +56,8 @@ ROASTED_VEGETABLES_STEPS: list[CookingStepDef] = [
         station="spice_rack",
         description="Drizzle olive oil and sprinkle dried herbs over the vegetables.",
         step_type="active",
-        correct_option="Olive oil + dried herbs",
-        distractors=["Butter + sugar", "Vinegar + mustard", "Soy sauce + sesame oil"],
+        options=["Butter + sugar", "Olive oil + dried herbs", "Vinegar + mustard", "Soy sauce + sesame oil"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="rv_oven_place",
@@ -65,8 +65,8 @@ ROASTED_VEGETABLES_STEPS: list[CookingStepDef] = [
         station="oven",
         description="Put the baking tray in the oven and set to 200°C.",
         step_type="active",
-        correct_option="Set oven to 200°C",
-        distractors=["Set oven to 100°C", "Set oven to 300°C", "Turn on the grill"],
+        options=["Set oven to 100°C", "Turn on the grill", "Set oven to 300°C", "Set oven to 200°C"],
+        correct_index=3,
     ),
     CookingStepDef(
         id="rv_wait_oven",
@@ -82,8 +82,8 @@ ROASTED_VEGETABLES_STEPS: list[CookingStepDef] = [
         station="oven",
         description="Take the roasted vegetables out of the oven.",
         step_type="active",
-        correct_option="Remove tray from oven",
-        distractors=["Increase temperature", "Add more oil", "Turn on fan mode"],
+        options=["Increase temperature", "Remove tray from oven", "Add more oil", "Turn on fan mode"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="rv_plate",
@@ -91,8 +91,8 @@ ROASTED_VEGETABLES_STEPS: list[CookingStepDef] = [
         station="plating_area",
         description="Arrange the roasted vegetables on a serving plate.",
         step_type="active",
-        correct_option="Plate vegetables",
-        distractors=["Put back in fridge", "Blend into soup"],
+        options=["Put back in fridge", "Blend into soup", "Plate vegetables"],
+        correct_index=2,
     ),
 ]
 
@@ -105,8 +105,8 @@ TOMATO_SOUP_STEPS: list[CookingStepDef] = [
         station="fridge",
         description="Get fresh tomatoes and an onion from the fridge.",
         step_type="active",
-        correct_option="Tomatoes & onion",
-        distractors=["Potatoes & carrots", "Lettuce & cucumber", "Cream & cheese"],
+        options=["Potatoes & carrots", "Cream & cheese", "Tomatoes & onion", "Lettuce & cucumber"],
+        correct_index=2,
     ),
     CookingStepDef(
         id="ts_chop",
@@ -114,8 +114,8 @@ TOMATO_SOUP_STEPS: list[CookingStepDef] = [
         station="cutting_board",
         description="Dice the onion and roughly chop the tomatoes.",
         step_type="active",
-        correct_option="Dice onion, chop tomatoes",
-        distractors=["Blend raw", "Peel and leave whole", "Grate finely"],
+        options=["Blend raw", "Dice onion, chop tomatoes", "Peel and leave whole", "Grate finely"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="ts_saute",
@@ -123,8 +123,8 @@ TOMATO_SOUP_STEPS: list[CookingStepDef] = [
         station="burner2",
         description="Heat the pot and sauté onion and tomatoes together.",
         step_type="active",
-        correct_option="Sauté in pot",
-        distractors=["Deep fry in pan", "Bake in oven", "Steam in microwave"],
+        options=["Bake in oven", "Deep fry in pan", "Steam in microwave", "Sauté in pot"],
+        correct_index=3,
     ),
     CookingStepDef(
         id="ts_add_water",
@@ -132,8 +132,8 @@ TOMATO_SOUP_STEPS: list[CookingStepDef] = [
         station="burner2",
         description="Pour water into the pot to make the soup base.",
         step_type="active",
-        correct_option="Add water",
-        distractors=["Add milk", "Add orange juice", "Add vinegar"],
+        options=["Add milk", "Add water", "Add orange juice", "Add vinegar"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="ts_wait_simmer1",
@@ -149,8 +149,8 @@ TOMATO_SOUP_STEPS: list[CookingStepDef] = [
         station="burner2",
         description="Give the soup a good stir to prevent sticking.",
         step_type="active",
-        correct_option="Stir the soup",
-        distractors=["Drain the liquid", "Add ice cubes", "Turn off heat"],
+        options=["Add ice cubes", "Turn off heat", "Drain the liquid", "Stir the soup"],
+        correct_index=3,
     ),
     CookingStepDef(
         id="ts_wait_simmer2",
@@ -166,8 +166,8 @@ TOMATO_SOUP_STEPS: list[CookingStepDef] = [
         station="spice_rack",
         description="Season the soup with salt and freshly ground pepper.",
         step_type="active",
-        correct_option="Salt + pepper",
-        distractors=["Cinnamon + sugar", "Chili flakes + paprika", "Vanilla extract"],
+        options=["Cinnamon + sugar", "Salt + pepper", "Chili flakes + paprika", "Vanilla extract"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="ts_plate",
@@ -175,8 +175,8 @@ TOMATO_SOUP_STEPS: list[CookingStepDef] = [
         station="plating_area",
         description="Ladle the finished soup into a serving bowl.",
         step_type="active",
-        correct_option="Ladle into bowl",
-        distractors=["Pour into mug", "Strain and discard"],
+        options=["Strain and discard", "Pour into mug", "Ladle into bowl"],
+        correct_index=2,
     ),
 ]
 
@@ -189,8 +189,8 @@ SPAGHETTI_STEPS: list[CookingStepDef] = [
         station="burner1",
         description="Fill a pot with water and place it on the burner.",
         step_type="active",
-        correct_option="Pot with water on burner",
-        distractors=["Pan with oil on burner", "Empty pot on burner", "Kettle on burner"],
+        options=["Pan with oil on burner", "Pot with water on burner", "Empty pot on burner", "Kettle on burner"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="sp_wait_boil",
@@ -206,8 +206,8 @@ SPAGHETTI_STEPS: list[CookingStepDef] = [
         station="burner1",
         description="Add the spaghetti to the boiling water.",
         step_type="active",
-        correct_option="Add spaghetti",
-        distractors=["Add rice", "Add potatoes", "Add flour"],
+        options=["Add rice", "Add flour", "Add spaghetti", "Add potatoes"],
+        correct_index=2,
     ),
     CookingStepDef(
         id="sp_wait_cook",
@@ -223,8 +223,8 @@ SPAGHETTI_STEPS: list[CookingStepDef] = [
         station="burner1",
         description="Drain the water from the cooked pasta.",
         step_type="active",
-        correct_option="Drain pasta",
-        distractors=["Add more water", "Mash the pasta", "Rinse with cold water"],
+        options=["Add more water", "Rinse with cold water", "Drain pasta", "Mash the pasta"],
+        correct_index=2,
     ),
     CookingStepDef(
         id="sp_add_sauce",
@@ -232,8 +232,8 @@ SPAGHETTI_STEPS: list[CookingStepDef] = [
         station="spice_rack",
         description="Add tomato sauce to the drained pasta.",
         step_type="active",
-        correct_option="Add tomato sauce",
-        distractors=["Add chocolate sauce", "Add plain yoghurt", "Add mustard"],
+        options=["Add chocolate sauce", "Add tomato sauce", "Add plain yoghurt", "Add mustard"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="sp_toss",
@@ -241,8 +241,8 @@ SPAGHETTI_STEPS: list[CookingStepDef] = [
         station="burner1",
         description="Toss the spaghetti to coat evenly with sauce.",
         step_type="active",
-        correct_option="Toss pasta with sauce",
-        distractors=["Deep fry the pasta", "Blend the pasta", "Bake in oven"],
+        options=["Blend the pasta", "Deep fry the pasta", "Bake in oven", "Toss pasta with sauce"],
+        correct_index=3,
     ),
     CookingStepDef(
         id="sp_plate",
@@ -250,8 +250,8 @@ SPAGHETTI_STEPS: list[CookingStepDef] = [
         station="plating_area",
         description="Serve the spaghetti onto a plate.",
         step_type="active",
-        correct_option="Plate spaghetti",
-        distractors=["Put in storage container", "Discard leftover"],
+        options=["Discard leftover", "Plate spaghetti", "Put in storage container"],
+        correct_index=1,
     ),
 ]
 
@@ -264,8 +264,8 @@ STEAK_STEPS: list[CookingStepDef] = [
         station="fridge",
         description="Take the steak out of the fridge.",
         step_type="active",
-        correct_option="Beef sirloin steak",
-        distractors=["Chicken breast", "Pork chop", "Fish fillet"],
+        options=["Chicken breast", "Beef sirloin steak", "Pork chop", "Fish fillet"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="st_season",
@@ -273,8 +273,8 @@ STEAK_STEPS: list[CookingStepDef] = [
         station="cutting_board",
         description="Season the steak with salt and pepper.",
         step_type="active",
-        correct_option="Season with salt & pepper",
-        distractors=["Slice into strips", "Marinate overnight", "Coat in flour"],
+        options=["Marinate overnight", "Coat in flour", "Season with salt & pepper", "Slice into strips"],
+        correct_index=2,
     ),
     CookingStepDef(
         id="st_heat_pan",
@@ -282,8 +282,8 @@ STEAK_STEPS: list[CookingStepDef] = [
         station="burner3",
         description="Heat up the pan with a little oil.",
         step_type="active",
-        correct_option="Heat pan with oil",
-        distractors=["Heat pot with water", "Heat wok on high", "Turn on oven grill"],
+        options=["Heat pot with water", "Turn on oven grill", "Heat wok on high", "Heat pan with oil"],
+        correct_index=3,
     ),
     CookingStepDef(
         id="st_place",
@@ -291,8 +291,8 @@ STEAK_STEPS: list[CookingStepDef] = [
         station="burner3",
         description="Place the seasoned steak in the hot pan.",
         step_type="active",
-        correct_option="Place steak in pan",
-        distractors=["Place steak in oven", "Place steak in pot", "Place steak on plate"],
+        options=["Place steak in oven", "Place steak in pan", "Place steak in pot", "Place steak on plate"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="st_wait_side1",
@@ -308,8 +308,8 @@ STEAK_STEPS: list[CookingStepDef] = [
         station="burner3",
         description="Flip the steak to cook the other side.",
         step_type="active",
-        correct_option="Flip steak",
-        distractors=["Remove from pan", "Press down with spatula", "Add water to pan"],
+        options=["Press down with spatula", "Flip steak", "Add water to pan", "Remove from pan"],
+        correct_index=1,
     ),
     CookingStepDef(
         id="st_wait_side2",
@@ -325,8 +325,8 @@ STEAK_STEPS: list[CookingStepDef] = [
         station="plating_area",
         description="Place the finished steak on a plate.",
         step_type="active",
-        correct_option="Plate steak",
-        distractors=["Put back in fridge", "Cut into tiny pieces"],
+        options=["Put back in fridge", "Cut into tiny pieces", "Plate steak"],
+        correct_index=2,
     ),
 ]
 

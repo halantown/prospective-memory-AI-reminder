@@ -165,12 +165,8 @@ class CookingEngine:
             activated_at = time.time()
             self._step_activated_at[entry.dish_id] = activated_at
 
-            # Build shuffled option list (correct + distractors)
-            import random
-            options = [{"id": "correct", "text": step_def.correct_option}]
-            for i, d in enumerate(step_def.distractors):
-                options.append({"id": f"distractor_{i}", "text": d})
-            random.shuffle(options)
+            # Build option list from config (fixed order, no shuffle)
+            options = [{"id": f"option_{i}", "text": t} for i, t in enumerate(step_def.options)]
 
             await self._send("ongoing_task_event", {
                 "task": "cooking",
@@ -221,7 +217,7 @@ class CookingEngine:
             station=step_def.station,
             result="missed",
             chosen_option=None,
-            correct_option=step_def.correct_option,
+            correct_option=step_def.options[step_def.correct_index] if step_def.options else "",
             activated_at=activated_at,
             completed_at=now,
             response_time_ms=None,
@@ -282,10 +278,11 @@ class CookingEngine:
 
         # Determine correctness
         activated_at = self._step_activated_at.get(dish_id, timestamp)
-        is_correct = chosen_option_id == "correct"
+        is_correct = chosen_option_id == f"option_{step_def.correct_index}"
         now = time.time()
         response_time_ms = int((now - activated_at) * 1000)
 
+        correct_option_text = step_def.options[step_def.correct_index] if step_def.options else ""
         result_str: Literal["correct", "wrong"] = "correct" if is_correct else "wrong"
         result = StepResult(
             dish_id=dish_id,
@@ -294,7 +291,7 @@ class CookingEngine:
             station=step_def.station,
             result=result_str,
             chosen_option=chosen_option_text,
-            correct_option=step_def.correct_option,
+            correct_option=correct_option_text,
             activated_at=activated_at,
             completed_at=now,
             response_time_ms=response_time_ms,
@@ -313,7 +310,7 @@ class CookingEngine:
             "step_index": entry.step_index,
             "step_id": step_def.id,
             "result": result_str,
-            "correct_option": step_def.correct_option,
+            "correct_option": correct_option_text,
             "response_time_ms": response_time_ms,
         }
         await self._send("ongoing_task_event", event_data)
