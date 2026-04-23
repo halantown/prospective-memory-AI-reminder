@@ -81,6 +81,11 @@ async def handle_game_ws(
                 # Resume timeline for reconnecting client
                 condition = block.condition
                 block_id = block.id
+                # Use the block's real start time so past events are skipped instead
+                # of re-fired (prevents duplicate phone messages on reconnect).
+                block_start_ts: float | None = None
+                if block.started_at:
+                    block_start_ts = block.started_at.timestamp()
                 logger.info(f"[GAME_HANDLER] Auto-starting timeline (block already PLAYING) for {participant_id} block {block_number}")
                 timeline_task = await run_timeline(
                     participant_id=participant_id,
@@ -88,6 +93,7 @@ async def handle_game_ws(
                     condition=condition,
                     send_fn=send_event,
                     db_factory=db_factory,
+                    block_start_time=block_start_ts,
                 )
                 logger.info(f"[GAME_HANDLER] Timeline resumed for {participant_id} block {block_number}")
 

@@ -563,6 +563,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // Phone
   addPhoneMessage: (msg) => set((s) => {
+    // Deduplicate by id — prevents re-delivered messages on reconnect
+    if (s.phoneMessages.some((m) => m.id === msg.id)) return s
     const messages = [...s.phoneMessages, msg]
     return { phoneMessages: messages }
   }),

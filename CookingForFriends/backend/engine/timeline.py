@@ -81,11 +81,17 @@ async def run_timeline(
     send_fn,
     on_complete=None,
     db_factory=None,
+    block_start_time: float | None = None,
 ):
     """Start and run a block timeline.
 
     send_fn(event_type: str, data: dict) — pushes to the participant's WS.
     db_factory — async session factory for execution window callbacks.
+    block_start_time — if provided (reconnect case), treat this as the real t=0
+        so that events already past their scheduled time are skipped instead of
+        re-fired.  phone_message events that have already been delivered are the
+        primary concern; other one-shot events (pm_trigger, block_end, etc.) are
+        also skipped to avoid double-firing.
     """
     key = _timeline_key(participant_id, block_number)
 
@@ -117,8 +123,10 @@ async def run_timeline(
 
     async def _run():
         try:
-            start_time = time.time()
-            logger.info(f"[TIMELINE] _run started: {key} ({len(events)} events, {duration}s)")
+            start_time = block_start_time if block_start_time else time.time()
+            # How far into the block are we already?  0 on first start, >0 on reconnect.
+            resume_offset = time.time() - start_time if block_start_time else 0.0
+            logger.info(f"[TIMELINE] _run started: {key} ({len(events)} events, {duration}s, resume_offset={resume_offset:.1f}s)")
 
             # Send contacts list for phone chat UI
             contacts = get_contacts(block_number)
@@ -149,6 +157,13 @@ async def run_timeline(
 
                 t = event.get("t", 0)
                 elapsed = time.time() - start_time
+
+                # On reconnect, skip events whose scheduled time has already passed.
+                # phone_message events in particular must not be re-delivered; other
+                # one-shot events (pm_trigger, block_end, etc.) would also double-fire.
+                if resume_offset > 0 and t <= resume_offset:
+                    logger.debug(f"[TIMELINE] Skipping past event t={t}s (resume_offset={resume_offset:.1f}s): {event.get('type')}")
+                    continue
 
                 # While waiting for next event, emit time_tick every 10 real seconds
                 while t - elapsed > 1.0:
