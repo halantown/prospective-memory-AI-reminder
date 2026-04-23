@@ -18,8 +18,9 @@
  */
 
 import { useCallback, useRef, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
+import CharacterSprite from './CharacterSprite'
+import { useCharacterSprite } from '../../hooks/useCharacterSprite'
 import KitchenRoom from './rooms/KitchenRoom'
 import DiningRoom from './rooms/DiningRoom'
 import LivingRoom from './rooms/LivingRoom'
@@ -96,6 +97,8 @@ export default function WorldView() {
   const setCurrentRoom = useGameStore((s) => s.setCurrentRoom)
   const setAvatarMoving = useGameStore((s) => s.setAvatarMoving)
 
+  const character = useCharacterSprite(currentRoom)
+
   const switchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => { if (switchTimeout.current) clearTimeout(switchTimeout.current) }, [])
@@ -106,6 +109,7 @@ export default function WorldView() {
 
     setAvatarMoving(true)
     setCurrentRoom(roomId)
+    character.walkTo(roomId)
 
     switchTimeout.current = setTimeout(() => {
       setAvatarMoving(false)
@@ -167,43 +171,14 @@ export default function WorldView() {
 
                 {/* PM trigger glow effect */}
                 <TriggerRoomGlow room={room.id} />
-
-                {/* Character avatar — shown in active room */}
-                {isActive && !avatarMoving && (
-                  <motion.div
-                    className="absolute bottom-2 right-2 text-2xl z-[5] pointer-events-none"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1, y: [0, -4, 0] }}
-                    transition={{ y: { repeat: Infinity, duration: 2 }, opacity: { duration: 0.2 } }}
-                  >
-                    🧑
-                  </motion.div>
-                )}
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* Walking animation overlay */}
-      <AnimatePresence>
-        {avatarMoving && (
-          <motion.div
-            className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="text-4xl drop-shadow-lg"
-              animate={{ x: [0, 30, 0], y: [0, -12, 0] }}
-              transition={{ duration: 0.4, ease: 'easeInOut' }}
-            >
-              🚶
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Character sprite — floats over all rooms, position driven by useCharacterSprite */}
+      <CharacterSprite state={character} />
     </div>
   )
 }
