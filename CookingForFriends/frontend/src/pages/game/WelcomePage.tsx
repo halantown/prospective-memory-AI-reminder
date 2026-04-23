@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { startSession, getSessionStatus } from '../../services/api'
-import type { Condition } from '../../types'
 
 export default function WelcomePage() {
   const [token, setToken] = useState('')
@@ -12,7 +11,6 @@ export default function WelcomePage() {
 
   const setSession = useGameStore((s) => s.setSession)
   const setPhase = useGameStore((s) => s.setPhase)
-  const setBlockNumber = useGameStore((s) => s.setBlockNumber)
 
   const handleStart = async () => {
     const t = token.trim().toUpperCase()
@@ -31,19 +29,14 @@ export default function WelcomePage() {
       setSession({
         session_id: data.session_id,
         participant_id: data.participant_id,
-        group: data.group,
-        condition_order: data.condition_order as Condition[],
-        current_block: data.current_block,
+        condition: data.condition,
       })
       // Persist session for page refresh recovery
       sessionStorage.setItem('cff_session', JSON.stringify({
         session_id: data.session_id,
         participant_id: data.participant_id,
-        group: data.group,
-        condition_order: data.condition_order,
-        current_block: data.current_block,
+        condition: data.condition,
       }))
-      setBlockNumber(data.current_block > 0 ? data.current_block : 1)
 
       // Check session status to resume at correct phase for returning participants
       try {
@@ -52,8 +45,6 @@ export default function WelcomePage() {
           setPhase('complete')
         } else if (status.phase === 'playing') {
           setPhase('playing')
-        } else if (status.phase === 'microbreak') {
-          setPhase('microbreak')
         } else {
           setPhase('encoding')
         }

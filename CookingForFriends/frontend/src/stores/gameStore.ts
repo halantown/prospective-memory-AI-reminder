@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import type {
-  Phase, Condition, RoomId, Pan, PhoneNotification, PhoneMessage, RobotState, SessionData,
+  Phase, RoomId, Pan, PhoneNotification, PhoneMessage, RobotState, SessionData,
   ActivePMTrial, PMTaskConfig, DiningPhase, SteakState, SeatState, UtensilType,
   DishId, DishState, KitchenStationId, Contact,
   ActiveCookingStep, CookingStepResult, CookingStepOption, CookingWaitStep,
@@ -17,9 +17,7 @@ interface GameState {
   // ── Session ──
   sessionId: string | null
   participantId: string | null
-  group: string | null
-  conditionOrder: Condition[]
-  blockNumber: number
+  condition: string | null
   phase: Phase
 
   // ── Room ──
@@ -88,7 +86,6 @@ interface GameState {
   // ── Actions ──
   setSession: (data: SessionData) => void
   setPhase: (phase: Phase) => void
-  setBlockNumber: (n: number) => void
   setCurrentRoom: (room: RoomId) => void
   setAvatarMoving: (moving: boolean) => void
 
@@ -252,9 +249,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   // ── Session ──
   sessionId: null,
   participantId: null,
-  group: null,
-  conditionOrder: [],
-  blockNumber: 1,
+  condition: null,
   phase: 'welcome',
 
   // ── Room ──
@@ -320,13 +315,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   setSession: (data) => set({
     sessionId: data.session_id,
     participantId: data.participant_id,
-    group: data.group,
-    conditionOrder: data.condition_order,
-    blockNumber: data.current_block,
+    condition: data.condition,
   }),
 
   setPhase: (phase) => set({ phase }),
-  setBlockNumber: (n) => set({ blockNumber: n }),
 
   setCurrentRoom: (room) => {
     const prev = get().currentRoom

@@ -177,7 +177,6 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
   const completePMTrial = useGameStore((s) => s.completePMTrial)
   const wsSend = useGameStore((s) => s.wsSend)
   const currentRoom = useGameStore((s) => s.currentRoom)
-  const blockNumber = useGameStore((s) => s.blockNumber)
 
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null)
   const [actionPhase, setActionPhase] = useState<'browse' | 'confirm' | 'done'>('browse')
@@ -192,10 +191,10 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
     }
   }, [])
 
-  // Task groups for this room in the current block
+  // Task groups for this room (single-block experiment, always block 1)
   const roomTaskGroups = useMemo(() => {
-    return TASK_ITEMS.filter(g => g.room === room && g.block === blockNumber)
-  }, [room, blockNumber])
+    return TASK_ITEMS.filter(g => g.room === room && g.block === 1)
+  }, [room])
 
   // Find the active PM trial for this room (at most one at a time)
   const activeTrial = useMemo(() => {

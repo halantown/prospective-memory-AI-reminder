@@ -8,7 +8,7 @@ const HEARTBEAT_INTERVAL = 10_000
 const RECONNECT_BASE_MS = 500
 const RECONNECT_MAX_MS = 5_000
 
-export function useWebSocket(sessionId: string | null, blockNumber: number) {
+export function useWebSocket(sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null)
   const retryCount = useRef(0)
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -194,7 +194,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
         break
 
       case 'block_end':
-        store.setPhase('microbreak')
+        store.setPhase('debrief')
         break
 
       case 'pm_received':
@@ -217,14 +217,14 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
   }, [])   // no deps — reads from getState() so always stable
 
   const connect = useCallback(() => {
-    if (!sessionId || blockNumber < 1) return
+    if (!sessionId) return
 
     const myConnId = ++connIdRef.current
 
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
     const autoStart = useGameStore.getState().phase === 'playing'
-    const url = `${proto}//${host}/ws/game/${sessionId}/${blockNumber}?auto_start=${autoStart}`
+    const url = `${proto}//${host}/ws/game/${sessionId}?auto_start=${autoStart}`
 
     console.log('[WS] Connecting:', url)
     const ws = new WebSocket(url)
@@ -243,7 +243,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
       useGameStore.getState().setWsSend(sendFn)
 
       if (useGameStore.getState().phase === 'playing') {
-        sendFn({ type: 'start_game', data: { block_number: blockNumber } })
+        sendFn({ type: 'start_game', data: {} })
       }
 
       heartbeatRef.current = setInterval(() => {
@@ -273,7 +273,7 @@ export function useWebSocket(sessionId: string | null, blockNumber: number) {
     ws.onerror = (err) => {
       console.error('[WS] Error:', err)
     }
-  }, [sessionId, blockNumber, handleMessage])
+  }, [sessionId, handleMessage])
 
   useEffect(() => {
     connect()

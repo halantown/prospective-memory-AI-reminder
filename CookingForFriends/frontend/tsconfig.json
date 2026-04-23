@@ -19,5 +19,5 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src"],
-  "exclude": ["src/**/_archive/**"]
+  "exclude": ["src/**/_archive/**", "src/archive/**"]
 }

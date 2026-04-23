@@ -1,28 +1,23 @@
-"""Condition assignment via Latin Square (3 levels, 6 groups)."""
+"""Condition assignment — round-robin over CONTROL / AF / AFCB."""
 
 import secrets
-import string
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.experiment import Participant
-from config import LATIN_SQUARE, GROUPS, TOKEN_LENGTH, TOKEN_CHARSET
+from config import CONDITIONS, TOKEN_LENGTH, TOKEN_CHARSET
 
 
-async def assign_group(db: AsyncSession) -> str:
-    """Round-robin group assignment to balance Latin Square."""
+async def assign_condition(db: AsyncSession) -> str:
+    """Round-robin condition assignment to keep groups balanced."""
     result = await db.execute(
-        select(Participant.latin_square_group, func.count())
-        .group_by(Participant.latin_square_group)
+        select(Participant.condition, func.count())
+        .group_by(Participant.condition)
     )
-    counts = {g: 0 for g in GROUPS}
+    counts = {c: 0 for c in CONDITIONS}
     for row in result:
-        counts[row[0]] = row[1]
+        if row[0] in counts:
+            counts[row[0]] = row[1]
     return min(counts, key=counts.get)
-
-
-def get_condition_order(group: str) -> list[str]:
-    """Return the condition sequence for a Latin Square group."""
-    return LATIN_SQUARE[group]
 
 
 async def generate_token(db: AsyncSession) -> str:

@@ -29,16 +29,10 @@ _cooking_engines: dict[str, CookingEngine] = {}
 async def handle_game_ws(
     ws: WebSocket,
     participant_id: str,
-    block_number: int,
     db_factory,
 ):
-    """Handle a game WebSocket connection for a participant block."""
-    from config import BLOCKS_PER_PARTICIPANT
-
-    # Validate block_number range
-    if not (1 <= block_number <= BLOCKS_PER_PARTICIPANT):
-        await ws.close(code=4001, reason=f"Invalid block_number: {block_number}")
-        return
+    """Handle a game WebSocket connection for a participant."""
+    block_number = 1  # single-session: always block 1
 
     # Validate participant exists before accepting connection
     try:

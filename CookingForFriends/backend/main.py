@@ -110,10 +110,10 @@ from websocket.game_handler import handle_game_ws
 from websocket.connection_manager import manager, ws_pump
 
 
-@app.websocket("/ws/game/{session_id}/{block_num}")
-async def websocket_game(ws: _WebSocket, session_id: str, block_num: int):
+@app.websocket("/ws/game/{session_id}")
+async def websocket_game(ws: _WebSocket, session_id: str):
     """WebSocket endpoint for game communication."""
-    await handle_game_ws(ws, session_id, block_num, async_session)
+    await handle_game_ws(ws, session_id, async_session)
 
 
 @app.websocket("/ws/monitor")

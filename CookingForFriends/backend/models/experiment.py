@@ -49,12 +49,10 @@ class Participant(Base):
     )
     participant_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)  # P001
     token: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
-    latin_square_group: Mapped[str] = mapped_column(String(10), nullable=False)
-    condition_order: Mapped[list] = mapped_column(JSON, nullable=False)  # ["CONTROL","AF","AFCB"]
+    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # CONTROL / AF / AFCB
     status: Mapped[str] = mapped_column(
         Enum(ParticipantStatus), default=ParticipantStatus.REGISTERED, nullable=False,
     )
-    current_block: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

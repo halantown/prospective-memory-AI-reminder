@@ -1,4 +1,4 @@
-"""Session router — token login, block config, quiz, status, WebSocket."""
+"""Session router — token login, encoding config, quiz, status, WebSocket."""
 
 import uuid
 import time
@@ -14,13 +14,12 @@ from models.experiment import Participant, ParticipantStatus
 from models.block import Block, BlockStatus, PMTrial, EncodingQuizAttempt
 from models.schemas import (
     TokenStartRequest, SessionStartResponse, BlockEncodingResponse,
-    NasaTLXRequest, DebriefRequest, StatusResponse,
+    DebriefRequest, StatusResponse,
     QuizSubmitRequest, QuizSubmitResponse, QuizResultItem,
     EncodingQuizAttemptRequest,
 )
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
-from config import BLOCKS_PER_PARTICIPANT
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -29,12 +28,6 @@ router = APIRouter(prefix="/api")
 _token_attempts: dict[str, list[float]] = collections.defaultdict(list)
 _RATE_LIMIT_WINDOW = 60  # seconds
 _RATE_LIMIT_MAX = 10     # max attempts per window
-
-
-def _validate_block_num(block_num: int):
-    """Validate block number is within expected range."""
-    if not (1 <= block_num <= BLOCKS_PER_PARTICIPANT):
-        raise HTTPException(400, f"block_num must be 1-{BLOCKS_PER_PARTICIPANT}")
 
 
 @router.post("/session/start", response_model=SessionStartResponse)
@@ -66,11 +59,10 @@ async def start_session(req: TokenStartRequest, request: Request, db: AsyncSessi
     if participant.status == ParticipantStatus.REGISTERED:
         participant.status = ParticipantStatus.IN_PROGRESS
         participant.started_at = datetime.now(timezone.utc)
-        participant.current_block = 1
         participant.is_online = True
         participant.last_heartbeat = time.time()
         await db.commit()
-        logger.info(f"Session started: {participant.participant_id} (group={participant.latin_square_group})")
+        logger.info(f"Session started: {participant.participant_id} (condition={participant.condition})")
     else:
         # Re-join
         participant.is_online = True
@@ -81,9 +73,7 @@ async def start_session(req: TokenStartRequest, request: Request, db: AsyncSessi
     return SessionStartResponse(
         session_id=participant.id,
         participant_id=participant.participant_id,
-        group=participant.latin_square_group,
-        condition_order=participant.condition_order,
-        current_block=participant.current_block or 1,
+        condition=participant.condition,
     )
 
 
@@ -97,34 +87,31 @@ async def get_session_status(session_id: str, db: AsyncSession = Depends(get_db)
     if not p:
         raise HTTPException(404, "Session not found")
 
-    # Find current block phase
+    # Find the single block's phase
     phase = "welcome"
-    if p.current_block:
-        result = await db.execute(
-            select(Block).where(
-                Block.participant_id == session_id,
-                Block.block_number == p.current_block,
-            )
+    result = await db.execute(
+        select(Block).where(
+            Block.participant_id == session_id,
+            Block.block_number == 1,
         )
-        block = result.scalar_one_or_none()
-        if block:
-            phase = block.status.value if isinstance(block.status, BlockStatus) else block.status
+    )
+    block = result.scalar_one_or_none()
+    if block:
+        phase = block.status.value if isinstance(block.status, BlockStatus) else block.status
 
     return StatusResponse(
         status=p.status.value if isinstance(p.status, ParticipantStatus) else p.status,
-        current_block=p.current_block,
         phase=phase,
     )
 
 
-@router.get("/session/{session_id}/block/{block_num}/encoding", response_model=BlockEncodingResponse)
-async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = Depends(get_db)):
-    """Get encoding card data for a block."""
-    _validate_block_num(block_num)
+@router.get("/session/{session_id}/encoding", response_model=BlockEncodingResponse)
+async def get_encoding_data(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Get encoding card data for the session block."""
     result = await db.execute(
         select(Block).where(
             Block.participant_id == session_id,
-            Block.block_number == block_num,
+            Block.block_number == 1,
         )
     )
     block = result.scalar_one_or_none()
@@ -171,24 +158,22 @@ async def get_encoding_data(session_id: str, block_num: int, db: AsyncSession = 
         })
 
     return BlockEncodingResponse(
-        block_number=block.block_number,
         condition=block.condition,
         day_story=block.day_story,
         cards=pm_tasks,
     )
 
 
-@router.post("/session/{session_id}/block/{block_num}/encoding/quiz")
+@router.post("/session/{session_id}/encoding/quiz")
 async def submit_encoding_quiz_attempt(
-    session_id: str, block_num: int, req: EncodingQuizAttemptRequest,
+    session_id: str, req: EncodingQuizAttemptRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """Record a single encoding quiz attempt (fire-and-forget from frontend)."""
-    _validate_block_num(block_num)
     result = await db.execute(
         select(Block).where(
             Block.participant_id == session_id,
-            Block.block_number == block_num,
+            Block.block_number == 1,
         )
     )
     block = result.scalar_one_or_none()
@@ -221,17 +206,16 @@ async def submit_encoding_quiz_attempt(
     return {"status": "recorded"}
 
 
-@router.post("/session/{session_id}/block/{block_num}/quiz", response_model=QuizSubmitResponse)
+@router.post("/session/{session_id}/quiz", response_model=QuizSubmitResponse)
 async def submit_quiz(
-    session_id: str, block_num: int, req: QuizSubmitRequest,
+    session_id: str, req: QuizSubmitRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """Submit encoding quiz answers — validates and records attempts."""
-    _validate_block_num(block_num)
     result = await db.execute(
         select(Block).where(
             Block.participant_id == session_id,
-            Block.block_number == block_num,
+            Block.block_number == 1,
         )
     )
     block = result.scalar_one_or_none()
@@ -318,42 +302,6 @@ def _get_correct_answer(question_type: str, task_config: dict, encoding_card: di
     elif question_type == "action":
         return encoding_card.get("action_description", task_config.get("target_action", ""))
     return ""
-
-
-@router.post("/session/{session_id}/block/{block_num}/nasa-tlx")
-async def submit_nasa_tlx(
-    session_id: str, block_num: int, req: NasaTLXRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    """Submit NASA-TLX for a micro-break."""
-    _validate_block_num(block_num)
-    result = await db.execute(
-        select(Block).where(
-            Block.participant_id == session_id,
-            Block.block_number == block_num,
-        )
-    )
-    block = result.scalar_one_or_none()
-    if not block:
-        raise HTTPException(404, "Block not found")
-
-    # Idempotency: prevent double submission
-    if block.nasa_tlx is not None:
-        raise HTTPException(400, "NASA-TLX already submitted for this block")
-
-    block.nasa_tlx = req.model_dump()
-    block.status = BlockStatus.COMPLETED
-    block.ended_at = datetime.now(timezone.utc)
-    await db.commit()
-
-    # Advance to next block
-    p_result = await db.execute(select(Participant).where(Participant.id == session_id))
-    participant = p_result.scalar_one_or_none()
-    if participant and participant.current_block and participant.current_block < BLOCKS_PER_PARTICIPANT:
-        participant.current_block += 1
-        await db.commit()
-
-    return {"status": "ok", "next_block": block_num + 1 if block_num < BLOCKS_PER_PARTICIPANT else None}
 
 
 @router.post("/session/{session_id}/debrief")

@@ -33,8 +33,8 @@ interface ExperimentConfig {
     heartbeat_timeout_s: number
     token_length: number
   }
-  latin_square: Record<string, string[]>
-  groups: string[]
+  latin_square?: Record<string, string[]>
+  groups?: string[]
 }
 
 interface PMTask {
@@ -65,8 +65,7 @@ interface Reminder {
 
 interface Assignment {
   participant_id: string
-  group: string
-  condition_order: string[]
+  condition: string
   blocks: { block_number: number; condition: string; unreminded_task: string }[]
 }
 
@@ -249,7 +248,7 @@ export default function ConfigPage() {
     )
   }
 
-  const { experiment, phone, mouse_tracking, system, latin_square, groups } = config
+  const { experiment, phone, mouse_tracking, system } = config
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -307,38 +306,6 @@ export default function ConfigPage() {
               ['Heartbeat Timeout', formatSeconds(system.heartbeat_timeout_s)],
               ['Token Length', `${system.token_length} chars`],
             ]} />
-          </div>
-        </Section>
-
-        {/* Section 2: Latin Square */}
-        <Section id="latin" icon={Grid3X3} title="Latin Square" subtitle={`${groups.length} groups × ${experiment.blocks_per_participant} blocks`}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left px-4 py-3 font-medium text-slate-600">Group</th>
-                  {Array.from({ length: experiment.blocks_per_participant }, (_, i) => (
-                    <th key={i} className="text-left px-4 py-3 font-medium text-slate-600">
-                      Block {i + 1}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map((g) => (
-                  <tr key={g} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-semibold text-slate-700">{g}</td>
-                    {(latin_square[g] || []).map((cond, i) => (
-                      <td key={i} className="px-4 py-3">
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${conditionBadge(cond)}`}>
-                          {cond}
-                        </span>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </Section>
 
@@ -460,8 +427,8 @@ export default function ConfigPage() {
         <Section
           id="assignments"
           icon={Database}
-          title="Counterbalancing Assignments"
-          subtitle="Participant → group → condition mapping"
+          title="Condition Assignments"
+          subtitle="Participant → condition mapping"
           onExpand={loadAssignments}
         >
           {!assignmentsLoaded ? (
@@ -472,8 +439,7 @@ export default function ConfigPage() {
                 <thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-left px-4 py-3 font-medium text-slate-600">Participant</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Group</th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">Conditions</th>
+                    <th className="text-left px-4 py-3 font-medium text-slate-600">Condition</th>
                     <th className="text-left px-4 py-3 font-medium text-slate-600">Unreminded Tasks</th>
                   </tr>
                 </thead>
@@ -481,15 +447,10 @@ export default function ConfigPage() {
                   {assignments.map((a) => (
                     <tr key={a.participant_id} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="px-4 py-3 font-medium text-slate-700">{a.participant_id}</td>
-                      <td className="px-4 py-3">{a.group}</td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-1">
-                          {a.condition_order.map((c, i) => (
-                            <span key={i} className={`text-xs px-1.5 py-0.5 rounded ${conditionBadge(c)}`}>
-                              {c}
-                            </span>
-                          ))}
-                        </div>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${conditionBadge(a.condition)}`}>
+                          {a.condition}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1">

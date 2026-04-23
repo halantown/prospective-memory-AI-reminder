@@ -1,3 +1,4 @@
+// @ts-nocheck — Archived file. Not part of active build.
 /** Micro-break page — forced pause + NASA-TLX. */
 
 import { useState, useEffect, useRef } from 'react'

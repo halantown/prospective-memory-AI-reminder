@@ -16,13 +16,13 @@ from models.experiment import Experiment, ExperimentStatus, Participant, Partici
 from models.block import Block, BlockStatus, PMTrial, PMAttemptRecord, ReminderMessage
 from models.logging import InteractionLog, PhoneMessageLog, GameStateSnapshot
 from models.schemas import ParticipantCreateResponse, ReminderImportItem
-from engine.condition_assigner import assign_group, get_condition_order, generate_token, next_participant_id
+from engine.condition_assigner import assign_condition, generate_token, next_participant_id
 from engine.pm_tasks import (
-    get_tasks_for_block, get_task, BLOCK_TRIGGER_ORDER, BLOCK_GUESTS,
+    get_task, BLOCK_TRIGGER_ORDER,
     task_def_to_config, task_def_to_encoding_card,
 )
 from websocket.connection_manager import manager
-from config import LATIN_SQUARE, ADMIN_API_KEY
+from config import ADMIN_API_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -37,32 +37,10 @@ async def verify_admin(x_admin_key: str | None = Header(None, alias="X-Admin-Key
 
 router = APIRouter(prefix="/api/admin", dependencies=[Depends(verify_admin)])
 
-# Day stories per block, using the real guest names
-DAY_STORIES = {
-    1: f"Day 1: Cooking steak dinner for {BLOCK_GUESTS[1]}",
-    2: f"Day 2: Cooking steak dinner for {BLOCK_GUESTS[2]}",
-    3: f"Day 3: Cooking steak dinner for {BLOCK_GUESTS[3]}",
-}
+DAY_STORY = "Cooking dinner for a friend"
 
-# 24 unique counterbalancing assignments:
-# 6 Latin Square sequences × 4 unreminded positions per block
-_UNREMINDED_POSITIONS = list(range(4))  # 0, 1, 2, 3 → which trial in trigger order is unreminded
-
-
-def _get_assignment_combo(participant_index: int) -> tuple[str, list[int]]:
-    """Return (group, [unreminded_pos_b1, _b2, _b3]) using round-robin over 24 combos."""
-    groups = list(LATIN_SQUARE.keys())
-    combo_index = participant_index % 24
-    group_index = combo_index // 4
-    unreminded_offset = combo_index % 4
-    group = groups[group_index]
-    # Rotate unreminded position across blocks for variety
-    positions = [
-        (unreminded_offset + 0) % 4,
-        (unreminded_offset + 1) % 4,
-        (unreminded_offset + 2) % 4,
-    ]
-    return group, positions
+# Rotate unreminded trial position across participants (0..3) for balance
+_UNREMINDED_CYCLE = list(range(4))
 
 
 @router.post("/participant/create", response_model=ParticipantCreateResponse)
@@ -74,20 +52,20 @@ async def create_participant(db: AsyncSession = Depends(get_db)):
     )
     experiment = result.scalar_one_or_none()
     if not experiment:
-        experiment = Experiment(name="Cooking for Friends v3", status=ExperimentStatus.ACTIVE)
+        experiment = Experiment(name="Cooking for Friends", status=ExperimentStatus.ACTIVE)
         db.add(experiment)
         await db.flush()
 
-    # Count existing participants for round-robin
+    # Count existing participants for round-robin unreminded position
     count_result = await db.execute(select(func.count(Participant.id)))
     participant_count = count_result.scalar() or 0
 
-    # Generate IDs
+    # Generate IDs and assign condition
     pid = str(uuid.uuid4())[:8]
     participant_id = await next_participant_id(db)
-    group, unreminded_positions = _get_assignment_combo(participant_count)
+    condition = await assign_condition(db)
     token = await generate_token(db)
-    condition_order = get_condition_order(group)
+    unreminded_pos = _UNREMINDED_CYCLE[participant_count % len(_UNREMINDED_CYCLE)]
     af_variant_index = random.randint(0, 9)
     target_position_seed = random.randint(0, 99999)
 
@@ -97,44 +75,39 @@ async def create_participant(db: AsyncSession = Depends(get_db)):
         experiment_id=experiment.id,
         participant_id=participant_id,
         token=token,
-        latin_square_group=group,
-        condition_order=condition_order,
+        condition=condition,
         status=ParticipantStatus.REGISTERED,
     )
     db.add(participant)
 
-    # Pre-create blocks with real PM task data
-    for block_num, condition in enumerate(condition_order, start=1):
-        block = Block(
-            participant_id=pid,
-            block_number=block_num,
-            condition=condition,
-            day_story=DAY_STORIES[block_num],
-            status=BlockStatus.PENDING,
+    # Pre-create single block (block_number=1) with PM task data
+    block = Block(
+        participant_id=pid,
+        block_number=1,
+        condition=condition,
+        day_story=DAY_STORY,
+        status=BlockStatus.PENDING,
+    )
+    db.add(block)
+    await db.flush()
+
+    trigger_order = BLOCK_TRIGGER_ORDER[1]
+    for trial_idx, task_id in enumerate(trigger_order):
+        task_def = get_task(task_id)
+        is_unreminded = (trial_idx == unreminded_pos)
+        has_reminder = (condition != "CONTROL") and (not is_unreminded)
+
+        trial = PMTrial(
+            block_id=block.id,
+            trial_number=trial_idx + 1,
+            has_reminder=has_reminder,
+            is_filler=is_unreminded and condition != "CONTROL",
+            task_config=task_def_to_config(task_def),
+            encoding_card=task_def_to_encoding_card(task_def),
+            reminder_text=task_def.baseline_reminder if has_reminder else None,
+            reminder_condition=condition if has_reminder else None,
         )
-        db.add(block)
-        await db.flush()
-
-        trigger_order = BLOCK_TRIGGER_ORDER[block_num]
-        unreminded_pos = unreminded_positions[block_num - 1]
-
-        for trial_idx, task_id in enumerate(trigger_order):
-            task_def = get_task(task_id)
-            is_unreminded = (trial_idx == unreminded_pos)
-            # CONTROL: all unreminded. AF/AFCB: 3 reminded + 1 unreminded
-            has_reminder = (condition != "CONTROL") and (not is_unreminded)
-
-            trial = PMTrial(
-                block_id=block.id,
-                trial_number=trial_idx + 1,
-                has_reminder=has_reminder,
-                is_filler=is_unreminded and condition != "CONTROL",
-                task_config=task_def_to_config(task_def),
-                encoding_card=task_def_to_encoding_card(task_def),
-                reminder_text=task_def.baseline_reminder if has_reminder else None,
-                reminder_condition=condition if has_reminder else None,
-            )
-            db.add(trial)
+        db.add(trial)
 
     await db.commit()
 
@@ -142,13 +115,13 @@ async def create_participant(db: AsyncSession = Depends(get_db)):
     await manager.broadcast_admin({
         "event_type": "participant_created",
         "participant_id": participant_id,
-        "group": group,
+        "condition": condition,
         "token": token,
     })
 
     return ParticipantCreateResponse(
         participant_id=participant_id,
-        group=group,
+        condition=condition,
         token=token,
         session_id=pid,
     )
@@ -165,10 +138,8 @@ async def list_participants(db: AsyncSession = Depends(get_db)):
         {
             "session_id": p.id,
             "participant_id": p.participant_id,
-            "group": p.latin_square_group,
-            "condition_order": p.condition_order,
+            "condition": p.condition,
             "status": p.status.value if isinstance(p.status, ParticipantStatus) else p.status,
-            "current_block": p.current_block,
             "token": p.token,
             "is_online": p.is_online,
             "created_at": p.created_at.isoformat() if p.created_at else None,
@@ -214,7 +185,6 @@ async def experiment_overview(db: AsyncSession = Depends(get_db)):
         "total_participants": total.scalar() or 0,
         "completed": completed.scalar() or 0,
         "in_progress": in_progress.scalar() or 0,
-        "latin_square": LATIN_SQUARE,
     }
 
 
@@ -260,37 +230,29 @@ async def list_reminders(db: AsyncSession = Depends(get_db)):
 
 @router.get("/assignments")
 async def list_assignments(db: AsyncSession = Depends(get_db)):
-    """List all participant assignments for checking counterbalancing."""
+    """List all participant assignments."""
     result = await db.execute(
         select(Participant).order_by(Participant.created_at)
     )
     participants = result.scalars().all()
     assignments = []
     for p in participants:
-        # Fetch blocks to show unreminded info
-        blocks_result = await db.execute(
-            select(Block).where(Block.participant_id == p.id).order_by(Block.block_number)
+        block_result = await db.execute(
+            select(Block).where(Block.participant_id == p.id).limit(1)
         )
-        blocks = blocks_result.scalars().all()
-        block_info = []
-        for b in blocks:
+        block = block_result.scalar_one_or_none()
+        unreminded = None
+        if block:
             trials_result = await db.execute(
-                select(PMTrial).where(PMTrial.block_id == b.id).order_by(PMTrial.trial_number)
+                select(PMTrial).where(PMTrial.block_id == block.id).order_by(PMTrial.trial_number)
             )
             trials = trials_result.scalars().all()
-            unreminded = [t for t in trials if not t.has_reminder and t.is_filler]
-            block_info.append({
-                "block_number": b.block_number,
-                "condition": b.condition,
-                "unreminded_task": (
-                    unreminded[0].task_config.get("task_id") if unreminded else None
-                ),
-            })
+            filler = next((t for t in trials if not t.has_reminder and t.is_filler), None)
+            unreminded = filler.task_config.get("task_id") if filler else None
         assignments.append({
             "participant_id": p.participant_id,
-            "group": p.latin_square_group,
-            "condition_order": p.condition_order,
-            "blocks": block_info,
+            "condition": p.condition,
+            "unreminded_task": unreminded,
         })
     return assignments
 
@@ -339,10 +301,8 @@ async def get_participant_detail(session_id: str, db: AsyncSession = Depends(get
     return {
         "session_id": p.id,
         "participant_id": p.participant_id,
-        "group": p.latin_square_group,
-        "condition_order": p.condition_order,
+        "condition": p.condition,
         "status": p.status.value if isinstance(p.status, ParticipantStatus) else p.status,
-        "current_block": p.current_block,
         "token": p.token,
         "is_online": p.is_online,
         "created_at": p.created_at.isoformat() if p.created_at else None,
@@ -362,7 +322,6 @@ async def reset_participant(session_id: str, db: AsyncSession = Depends(get_db))
 
     # Reset participant status
     p.status = ParticipantStatus.REGISTERED
-    p.current_block = None
 
     # Reset all blocks to PENDING and clear trial runtime data
     blocks_result = await db.execute(
@@ -407,16 +366,16 @@ async def drop_participant(session_id: str, db: AsyncSession = Depends(get_db)):
 async def get_config():
     """Return current experiment configuration."""
     from config import (
-        BLOCKS_PER_PARTICIPANT, PM_TASKS_PER_BLOCK, BLOCK_DURATION_S,
+        CONDITIONS, PM_TASKS_PER_BLOCK, BLOCK_DURATION_S,
         EXECUTION_WINDOW_S, LATE_WINDOW_S, REMINDER_LEAD_S,
         PHONE_LOCK_TIMEOUT_S, MESSAGE_COOLDOWN_S,
         MOUSE_SAMPLE_INTERVAL_MS, MOUSE_BATCH_INTERVAL_S,
         SNAPSHOT_INTERVAL_S, HEARTBEAT_INTERVAL_S, HEARTBEAT_TIMEOUT_S,
-        LATIN_SQUARE, GROUPS, TOKEN_LENGTH,
+        TOKEN_LENGTH,
     )
     return {
         "experiment": {
-            "blocks_per_participant": BLOCKS_PER_PARTICIPANT,
+            "conditions": CONDITIONS,
             "pm_tasks_per_block": PM_TASKS_PER_BLOCK,
             "block_duration_s": BLOCK_DURATION_S,
             "execution_window_s": EXECUTION_WINDOW_S,
@@ -437,8 +396,6 @@ async def get_config():
             "heartbeat_timeout_s": HEARTBEAT_TIMEOUT_S,
             "token_length": TOKEN_LENGTH,
         },
-        "latin_square": LATIN_SQUARE,
-        "groups": GROUPS,
     }
 
 
@@ -518,8 +475,7 @@ async def export_data(db: AsyncSession = Depends(get_db)):
         export.append({
             "participant_id": p.participant_id,
             "session_id": p.id,
-            "group": p.latin_square_group,
-            "condition_order": p.condition_order,
+            "condition": p.condition,
             "status": p.status.value if isinstance(p.status, ParticipantStatus) else p.status,
             "created_at": p.created_at.isoformat() if p.created_at else None,
             "blocks": block_data,

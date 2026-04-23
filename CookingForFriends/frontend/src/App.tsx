@@ -41,7 +41,6 @@ function GameShell() {
   const sessionId = useGameStore((s) => s.sessionId)
   const setSession = useGameStore((s) => s.setSession)
   const setPhase = useGameStore((s) => s.setPhase)
-  const setBlockNumber = useGameStore((s) => s.setBlockNumber)
 
   // Prevent browser back-button during experiment
   useEffect(() => {
@@ -72,21 +71,18 @@ function GameShell() {
 
     try {
       const data = JSON.parse(saved)
-      if (!data.session_id || !data.participant_id || !data.group || !data.condition_order) return
+      if (!data.session_id || !data.participant_id || !data.condition) return
 
       // Restore session and fetch current status
       setSession(data)
       getSessionStatus(data.session_id)
         .then((status) => {
-          if (status.current_block) setBlockNumber(status.current_block)
           // Map backend status/phase to frontend phase
           const phaseMap: Record<string, Phase> = {
             pending: 'encoding',
             encoding: 'encoding',
             playing: 'playing',
-            // Treat microbreak/block_end as encoding so the UI skips the rest page
-            microbreak: 'encoding',
-            completed: 'encoding', // next block starts with encoding
+            completed: 'debrief',
           }
           const resolvedPhase: Phase = phaseMap[status.phase || ''] || 'welcome'
           if (status.status === 'completed') {
@@ -113,10 +109,6 @@ function GameShell() {
       return <EncodingPage />
     case 'playing':
       return <GamePage />
-    case 'microbreak':
-      return <EncodingPage />
-    case 'block_end':
-      return <EncodingPage />
     case 'debrief':
       return <DebriefPage />
     case 'complete':

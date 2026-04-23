@@ -8,10 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface ParticipantDetail {
   session_id: string
   participant_id: string
-  group: string
-  condition_order: string[]
+  condition: string
   status: string
-  current_block: number | null
   token: string
   is_online: boolean
   created_at: string | null
@@ -275,9 +273,7 @@ export default function ParticipantControlPage({ participantId }: { participantI
                   )}
                 </h1>
                 <p className="text-sm text-slate-500">
-                  Group {detail.group} · Token <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">{detail.token}</code>
-                  {detail.current_block && ` · Block ${detail.current_block}`}
-                  · Conditions: {detail.condition_order.join(' → ')}
+                  Condition: {detail.condition} · Token <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">{detail.token}</code>
                 </p>
               </div>
             </div>
@@ -398,8 +394,8 @@ function OverviewTab({ detail }: { detail: ParticipantDetail }) {
       <div className="grid grid-cols-4 gap-4">
         <InfoCard label="Session ID" value={detail.session_id} mono />
         <InfoCard label="Created" value={fmtDate(detail.created_at)} />
-        <InfoCard label="Latin Square" value={`Group ${detail.group}`} />
-        <InfoCard label="Current Block" value={detail.current_block?.toString() || 'N/A'} />
+        <InfoCard label="Condition" value={detail.condition} />
+        <InfoCard label="Status" value={detail.status} />
       </div>
 
       {/* Blocks */}

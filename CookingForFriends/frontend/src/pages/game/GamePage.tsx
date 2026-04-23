@@ -13,7 +13,6 @@ import TriggerEffects from '../../components/game/TriggerEffects'
 
 export default function GamePage() {
   const sessionId = useGameStore((s) => s.sessionId)
-  const blockNumber = useGameStore((s) => s.blockNumber)
   const wsConnected = useGameStore((s) => s.wsConnected)
   const setPhase = useGameStore((s) => s.setPhase)
 
@@ -21,7 +20,7 @@ export default function GamePage() {
     if (!sessionId) setPhase('welcome')
   }, [sessionId, setPhase])
 
-  useWebSocket(sessionId, blockNumber)
+  useWebSocket(sessionId)
   useMouseTracker()
 
   if (!sessionId) return null

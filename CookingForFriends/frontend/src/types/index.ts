@@ -8,17 +8,13 @@ export type Phase =
   | 'onboarding'
   | 'encoding'
   | 'playing'
-  | 'microbreak'
-  | 'block_end'
   | 'debrief'
   | 'complete'
 
 export interface SessionData {
   session_id: string
   participant_id: string
-  group: string
-  condition_order: Condition[]
-  current_block: number
+  condition: string
 }
 
 // ── Rooms ──
@@ -137,7 +133,6 @@ export interface PMEncodingCard {
 }
 
 export interface BlockEncoding {
-  block_number: number
   condition: string
   day_story: string
   cards: PMEncodingCard[]

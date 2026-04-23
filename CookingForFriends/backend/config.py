@@ -31,8 +31,8 @@ TOKEN_LENGTH = 6
 TOKEN_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # No 0/O/1/I ambiguity
 
 # Experiment
-BLOCKS_PER_PARTICIPANT = 3
 PM_TASKS_PER_BLOCK = 4
+CONDITIONS = ["CONTROL", "AF", "AFCB"]
 BLOCK_DURATION_S = 900  # 15 minutes (matches COOKING_TOTAL_DURATION_S)
 EXECUTION_WINDOW_S = 30
 LATE_WINDOW_S = 60
@@ -73,14 +73,3 @@ if DEV_TOKEN and ENVIRONMENT == "production":
         "DEV_TOKEN must not be set in production! "
         "Unset the DEV_TOKEN environment variable."
     )
-
-# Latin Square — 3 conditions, 6 possible orderings (3×3 Latin Square)
-LATIN_SQUARE = {
-    "A": ["CONTROL", "AF", "AFCB"],
-    "B": ["AF", "AFCB", "CONTROL"],
-    "C": ["AFCB", "CONTROL", "AF"],
-    "D": ["CONTROL", "AFCB", "AF"],
-    "E": ["AF", "CONTROL", "AFCB"],
-    "F": ["AFCB", "AF", "CONTROL"],
-}
-GROUPS = list(LATIN_SQUARE.keys())

@@ -32,7 +32,6 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
 
 export default function EncodingPage() {
   const sessionId = useGameStore((s) => s.sessionId)
-  const blockNumber = useGameStore((s) => s.blockNumber)
   const setPhase = useGameStore((s) => s.setPhase)
   const resetBlock = useGameStore((s) => s.resetBlock)
   const wsSend = useGameStore((s) => s.wsSend)
@@ -110,7 +109,7 @@ export default function EncodingPage() {
     resetBlock()
     setLoading(true)
 
-    getBlockEncoding(sessionId, blockNumber)
+    getBlockEncoding(sessionId)
       .then((data) => {
         setDayStory(data.day_story)
         setCards(data.cards)
@@ -122,7 +121,7 @@ export default function EncodingPage() {
         setError(err.message || 'Failed to load task cards')
         setLoading(false)
       })
-  }, [sessionId, blockNumber, resetBlock, startReadTimer])
+  }, [sessionId, resetBlock, startReadTimer])
 
   // ── Derived values ──
 
@@ -181,7 +180,7 @@ export default function EncodingPage() {
       responseTimeMs: number,
     ) => {
       if (!sessionId || !card) return
-      submitEncodingQuiz(sessionId, blockNumber, {
+      submitEncodingQuiz(sessionId, {
         trial_number: card.trial_number,
         question_type: qType,
         attempt_number: attempt,
@@ -193,7 +192,7 @@ export default function EncodingPage() {
         console.warn('[Encoding] Quiz attempt logging failed:', err instanceof Error ? err.message : err)
       })
     },
-    [sessionId, blockNumber, card],
+    [sessionId, card],
   )
 
   // ── Navigation helpers ──
@@ -314,7 +313,7 @@ export default function EncodingPage() {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
 
     if (wsSend) {
-      wsSend({ type: 'start_game', data: { block_number: blockNumber } })
+      wsSend({ type: 'start_game', data: {} })
     }
     setPhase('playing')
   }
@@ -429,7 +428,7 @@ export default function EncodingPage() {
       {/* Compact Header */}
       <div className="shrink-0 px-6 pt-4 pb-2 text-center">
         <div className="flex items-center justify-center gap-3 mb-1">
-          <h1 className="text-xl font-bold text-slate-800">Block {blockNumber}</h1>
+          <h1 className="text-xl font-bold text-slate-800">Today's Tasks</h1>
           <span className="text-slate-400">·</span>
           <p className="text-slate-600 text-sm">{dayStory}</p>
         </div>

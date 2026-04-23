@@ -27,7 +27,7 @@ async def seed_dev_participant():
     Set config.DEV_TOKEN = None to disable.
     """
     import logging
-    from config import DEV_TOKEN, LATIN_SQUARE
+    from config import DEV_TOKEN
     from models.experiment import Participant, ParticipantStatus
 
     if not DEV_TOKEN:
@@ -54,12 +54,11 @@ async def seed_dev_participant():
         if p:
             # Reset to REGISTERED so it can be reused
             p.status = ParticipantStatus.REGISTERED
-            p.current_block = None
             p.started_at = None
             p.completed_at = None
             p.is_online = False
 
-            # Also reset all blocks back to PENDING and clear runtime data
+            # Also reset block back to PENDING and clear runtime data
             from sqlalchemy import update as sql_update
             from models.block import Block, BlockStatus, PMTrial
             await db.execute(
@@ -95,11 +94,11 @@ async def seed_dev_participant():
 
             await db.commit()
             logger.warning(
-                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' reset to REGISTERED (blocks reset to PENDING) — "
+                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' reset to REGISTERED (block reset to PENDING) — "
                 "remove config.DEV_TOKEN before production!"
             )
         else:
-            group = list(LATIN_SQUARE.keys())[0]
+            condition = "AF"  # default dev condition
             pid = str(uuid.uuid4())[:8]
             p = Participant(
                 id=pid,
@@ -107,54 +106,49 @@ async def seed_dev_participant():
                 participant_id="DEV_TESTER",
                 token=DEV_TOKEN,
                 status=ParticipantStatus.REGISTERED,
-                latin_square_group=group,
-                condition_order=LATIN_SQUARE[group],
+                condition=condition,
             )
             db.add(p)
             await db.flush()
 
-            # Pre-create blocks and PM trials using real task registry
+            # Pre-create block and PM trials using real task registry
             from models.block import Block, BlockStatus, PMTrial
-            from engine.pm_tasks import (
-                get_task, BLOCK_TRIGGER_ORDER, BLOCK_GUESTS,
-            )
+            from engine.pm_tasks import get_task, BLOCK_TRIGGER_ORDER
             from engine.pm_tasks import task_def_to_config, task_def_to_encoding_card
 
-            for i, condition in enumerate(LATIN_SQUARE[group], start=1):
-                block = Block(
-                    participant_id=pid,
-                    block_number=i,
-                    condition=condition,
-                    day_story=f"Day {i}: Cooking steak dinner for {BLOCK_GUESTS[i]}",
-                    status=BlockStatus.PENDING,
+            block = Block(
+                participant_id=pid,
+                block_number=1,
+                condition=condition,
+                day_story="Cooking dinner for a friend",
+                status=BlockStatus.PENDING,
+            )
+            db.add(block)
+            await db.flush()
+
+            trigger_order = BLOCK_TRIGGER_ORDER[1]
+            for trial_idx, task_id in enumerate(trigger_order):
+                task_def = get_task(task_id)
+                is_unreminded = (trial_idx == 3)  # last trial unreminded in AF
+                has_reminder = (condition != "CONTROL") and (not is_unreminded)
+
+                trial = PMTrial(
+                    block_id=block.id,
+                    trial_number=trial_idx + 1,
+                    has_reminder=has_reminder,
+                    is_filler=(is_unreminded and condition != "CONTROL"),
+                    task_config=task_def_to_config(task_def),
+                    encoding_card=task_def_to_encoding_card(task_def),
+                    reminder_text=(
+                        task_def.baseline_reminder if has_reminder else None
+                    ),
+                    reminder_condition=condition if has_reminder else None,
                 )
-                db.add(block)
-                await db.flush()
-
-                trigger_order = BLOCK_TRIGGER_ORDER[i]
-                # For dev: trial 4 (last) is unreminded in AF/AFCB
-                for trial_idx, task_id in enumerate(trigger_order):
-                    task_def = get_task(task_id)
-                    is_unreminded = (trial_idx == 3)  # last trial
-                    has_reminder = (condition != "CONTROL") and (not is_unreminded)
-
-                    trial = PMTrial(
-                        block_id=block.id,
-                        trial_number=trial_idx + 1,
-                        has_reminder=has_reminder,
-                        is_filler=(is_unreminded and condition != "CONTROL"),
-                        task_config=task_def_to_config(task_def),
-                        encoding_card=task_def_to_encoding_card(task_def),
-                        reminder_text=(
-                            task_def.baseline_reminder if has_reminder else None
-                        ),
-                        reminder_condition=condition if has_reminder else None,
-                    )
-                    db.add(trial)
+                db.add(trial)
 
             await db.commit()
             logger.warning(
-                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' created (group={group}) — "
+                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' created (condition={condition}) — "
                 "remove config.DEV_TOKEN before production!"
             )
 

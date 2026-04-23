@@ -27,10 +27,8 @@ import {
 interface ParticipantRow {
   session_id: string
   participant_id: string
-  group: string
-  condition_order: string[]
+  condition: string
   status: 'registered' | 'in_progress' | 'completed' | 'dropped'
-  current_block: number | null
   token: string
   is_online: boolean
   created_at: string | null
@@ -40,7 +38,6 @@ interface Overview {
   total_participants: number
   completed: number
   in_progress: number
-  latin_square: unknown
 }
 
 interface Trial {
@@ -66,10 +63,8 @@ interface Block {
 interface ParticipantDetail {
   session_id: string
   participant_id: string
-  group: string
-  condition_order: string[]
+  condition: string
   status: string
-  current_block: number | null
   token: string
   is_online: boolean
   created_at: string | null
@@ -632,10 +627,8 @@ export default function AdminDashboard() {
                 <th className="w-8" />
                 <SortHeader label="ID" sortKeyName="participant_id" />
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Token</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Group</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Conditions</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600">Condition</th>
                 <SortHeader label="Status" sortKeyName="status" />
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Block</th>
                 <th className="text-center px-4 py-3 font-medium text-slate-600">Online</th>
                 <SortHeader label="Created" sortKeyName="created_at" />
                 <th className="text-center px-4 py-3 font-medium text-slate-600">Actions</th>
@@ -679,28 +672,13 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 font-mono tracking-wider text-cooking-600 text-xs">
                           {p.token}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{p.group}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-1">
-                            {p.condition_order.map((c, i) => (
-                              <span
-                                key={i}
-                                className={`text-xs px-1.5 py-0.5 rounded font-medium ${conditionColor(c)}`}
-                              >
-                                {c}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
+                        <td className="px-4 py-3 text-slate-600">{p.condition}</td>
                         <td className="px-4 py-3">
                           <span
                             className={`text-xs font-medium px-2 py-1 rounded-full ${statusBadge(p.status)}`}
                           >
                             {p.status}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {p.current_block ?? '—'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {p.is_online ? (

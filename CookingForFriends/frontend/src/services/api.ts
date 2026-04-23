@@ -22,9 +22,7 @@ export async function startSession(token: string) {
   return request<{
     session_id: string
     participant_id: string
-    group: string
-    condition_order: string[]
-    current_block: number
+    condition: string
   }>('/session/start', {
     method: 'POST',
     body: JSON.stringify({ token }),
@@ -34,18 +32,16 @@ export async function startSession(token: string) {
 export async function getSessionStatus(sessionId: string) {
   return request<{
     status: string
-    current_block: number | null
     phase: string | null
   }>(`/session/${sessionId}/status`)
 }
 
-export async function getBlockEncoding(sessionId: string, blockNum: number) {
-  return request<BlockEncoding>(`/session/${sessionId}/block/${blockNum}/encoding`)
+export async function getBlockEncoding(sessionId: string) {
+  return request<BlockEncoding>(`/session/${sessionId}/encoding`)
 }
 
 export async function submitEncodingQuiz(
   sessionId: string,
-  blockNum: number,
   data: {
     trial_number: number
     question_type: string
@@ -57,18 +53,7 @@ export async function submitEncodingQuiz(
   },
 ) {
   return request<{ status: string }>(
-    `/session/${sessionId}/block/${blockNum}/encoding/quiz`,
-    { method: 'POST', body: JSON.stringify(data) },
-  )
-}
-
-export async function submitNasaTLX(sessionId: string, blockNum: number, data: {
-  mental_demand: number
-  effort: number
-  frustration: number
-}) {
-  return request<{ status: string; next_block: number | null }>(
-    `/session/${sessionId}/block/${blockNum}/nasa-tlx`,
+    `/session/${sessionId}/encoding/quiz`,
     { method: 'POST', body: JSON.stringify(data) },
   )
 }
@@ -87,7 +72,7 @@ export async function submitDebrief(sessionId: string, data: {
 
 // ── Quiz endpoints ──
 
-export async function submitQuiz(sessionId: string, blockNum: number, answers: Array<{
+export async function submitQuiz(sessionId: string, answers: Array<{
   trial_number: number
   question_type: string
   selected_answer: string
@@ -103,7 +88,7 @@ export async function submitQuiz(sessionId: string, blockNum: number, answers: A
     }>
     all_correct: boolean
     failed_trials: number[]
-  }>(`/session/${sessionId}/block/${blockNum}/quiz`, {
+  }>(`/session/${sessionId}/quiz`, {
     method: 'POST',
     body: JSON.stringify({ answers }),
   })
@@ -124,10 +109,8 @@ export async function listParticipants() {
   return request<Array<{
     session_id: string
     participant_id: string
-    group: string
-    condition_order: string[]
+    condition: string
     status: string
-    current_block: number | null
     token: string
     is_online: boolean
     created_at: string | null
@@ -139,6 +122,5 @@ export async function getExperimentOverview() {
     total_participants: number
     completed: number
     in_progress: number
-    latin_square: Record<string, string[]>
   }>('/admin/experiment/overview')
 }

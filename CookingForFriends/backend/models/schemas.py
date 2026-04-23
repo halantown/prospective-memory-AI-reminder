@@ -11,29 +11,20 @@ class TokenStartRequest(BaseModel):
 class SessionStartResponse(BaseModel):
     session_id: str
     participant_id: str
-    group: str
-    condition_order: list[str]
-    current_block: int
+    condition: str
 
 
 class ParticipantCreateResponse(BaseModel):
     participant_id: str
-    group: str
+    condition: str
     token: str
     session_id: str
 
 
 class BlockEncodingResponse(BaseModel):
-    block_number: int
     condition: str
     day_story: str
     cards: list[dict]
-
-
-class NasaTLXRequest(BaseModel):
-    mental_demand: int = Field(ge=1, le=21)
-    effort: int = Field(ge=1, le=21)
-    frustration: int = Field(ge=1, le=21)
 
 
 class DebriefRequest(BaseModel):
@@ -98,6 +89,5 @@ class ReminderImportItem(BaseModel):
 
 class StatusResponse(BaseModel):
     status: str
-    current_block: Optional[int] = None
     phase: Optional[str] = None
 
