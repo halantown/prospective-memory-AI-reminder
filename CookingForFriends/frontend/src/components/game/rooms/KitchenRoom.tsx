@@ -23,16 +23,36 @@ const STATION_INFO: Record<KitchenStationId, { label: string; emoji: string }> =
   plating_area: { label: 'Plating Area', emoji: '🍽️' },
 }
 
-/** Station visual positions in the kitchen (% of room area) */
+/**
+ * Station hotspot positions as % of the kitchen bounding box.
+ * Kitchen box = ROOM_DEFS.kitchen: x:0, y:0, w:44%, h:41% of the 1536×1024 floorplan.
+ * Positions calibrated to the pixel-art furniture visible in the image.
+ *
+ *  Floorplan furniture layout (top-down, top-left = kitchen):
+ *   ┌ burners 1+2 ┬ fridge ─────────── ┬ cutting board ─ ┬ spice shelf ┐
+ *   ├ burner 3    │                     │                 │             │
+ *   ├ oven ───────┤         (floor)     │                 │             │
+ *   │             │                     │                 │             │
+ *   ├ sink(no btn)├──────── lower counter / plating area ─┴─────────────┤
+ *   └─────────────┴─────────────────────────────────────────────────────┘
+ */
 const STATION_POSITIONS: Record<KitchenStationId, { left: string; top: string; width: string; height: string }> = {
-  fridge:        { left: '78%', top: '2%',  width: '20%', height: '32%' },
-  cutting_board: { left: '22%', top: '2%',  width: '28%', height: '14%' },
-  spice_rack:    { left: '2%',  top: '72%', width: '25%', height: '20%' },
-  burner1:       { left: '18%', top: '32%', width: '20%', height: '30%' },
-  burner2:       { left: '40%', top: '32%', width: '20%', height: '30%' },
-  burner3:       { left: '60%', top: '32%', width: '20%', height: '30%' },
-  oven:          { left: '65%', top: '70%', width: '33%', height: '28%' },
-  plating_area:  { left: '52%', top: '2%',  width: '24%', height: '14%' },
+  // Two-door fridge — top row, left-center
+  fridge:        { left: '37%', top: '1%',  width: '17%', height: '31%' },
+  // Wooden cutting board + knife — top row, right-center
+  cutting_board: { left: '63%', top: '1%',  width: '22%', height: '31%' },
+  // Jar shelf (spice rack) — top-right corner
+  spice_rack:    { left: '85%', top: '1%',  width: '14%', height: '23%' },
+  // Burner 1 (circle "1", top-left of stove 2×2 grid)
+  burner1:       { left: '13%', top: '1%',  width: '12%', height: '15%' },
+  // Burner 2 (circle "2", top-right of 2×2 grid)
+  burner2:       { left: '25%', top: '1%',  width: '12%', height: '15%' },
+  // Burner 3 (circle "3", bottom-left of 2×2 grid)
+  burner3:       { left: '13%', top: '16%', width: '12%', height: '14%' },
+  // Oven — below the burner cluster
+  oven:          { left: '15%', top: '23%', width: '23%', height: '19%' },
+  // Plating area — lower counter, center-right
+  plating_area:  { left: '48%', top: '68%', width: '30%', height: '18%' },
 }
 
 /** Feedback flash types */

@@ -98,15 +98,11 @@ function StationSprite({ station }: { station: StationDef }) {
           draggable={false}
         />
       ) : (
-        /* Placeholder shown until real asset is added */
+        /* Placeholder — dashed outline only, won't obscure floorplan */
         <div
-          className="w-full h-full rounded flex flex-col items-center justify-center gap-0.5 border border-white/10"
-          style={{ backgroundColor: station.accent + 'CC' }}
+          className="w-full h-full rounded flex flex-col items-center justify-center gap-0.5 border border-dashed border-white/20"
         >
-          <span className="text-base leading-none">{station.emoji}</span>
-          <span className="text-[8px] text-white/60 font-medium text-center leading-tight px-0.5">
-            {station.label}
-          </span>
+          <span className="text-[10px] leading-none opacity-50">{station.emoji}</span>
         </div>
       )}
     </div>

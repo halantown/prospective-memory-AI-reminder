@@ -22,6 +22,8 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
+import KitchenRoom from './rooms/KitchenRoom'
+import KitchenFurniture from './rooms/KitchenFurniture'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -246,6 +248,23 @@ export default function FloorPlanView() {
           className="absolute inset-0 w-full h-full pointer-events-none"
           style={{ objectFit: 'fill' }}
         />
+
+        {/* ── Kitchen overlay — furniture sprites + interactive hotspots ── */}
+        {(() => {
+          const k = ROOM_DEFS.kitchen
+          const inKitchen = currentRoom === 'kitchen'
+          return (
+            <div
+              className="absolute"
+              style={{ left: `${k.x}%`, top: `${k.y}%`, width: `${k.w}%`, height: `${k.h}%` }}
+            >
+              {/* Sprite layer — transparent placeholders until PNGs added */}
+              <KitchenFurniture />
+              {/* Interactive hotspot layer — only when zoomed into kitchen */}
+              {inKitchen && <KitchenRoom isActive={true} />}
+            </div>
+          )
+        })()}
 
         {/* Room click targets (overview mode) */}
         {!isZoomed && ALL_ROOMS.map((rid) => {
