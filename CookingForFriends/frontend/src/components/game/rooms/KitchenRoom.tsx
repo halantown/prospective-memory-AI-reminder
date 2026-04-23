@@ -64,7 +64,6 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
   const cookingWaitSteps = useGameStore((s) => s.cookingWaitSteps)
-  const cookingScore = useGameStore((s) => s.cookingScore)
   const wsSend = useGameStore((s) => s.wsSend)
 
   const [feedback, setFeedback] = useState<{ station: KitchenStationId; type: FeedbackType }>({ station: 'fridge', type: null })
@@ -119,13 +118,6 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="absolute inset-0">
-      {/* Score indicator */}
-      <div className="absolute top-1 right-2 z-10 pointer-events-none">
-        <span className="text-[10px] text-slate-300/80 bg-slate-900/60 rounded px-1.5 py-0.5">
-          ✅{cookingScore.correct} ❌{cookingScore.wrong} ⏭{cookingScore.missed}
-        </span>
-      </div>
-
       {/* Station instruction */}
       <div className="absolute top-9 left-2 z-10 pointer-events-none">
         <span className="text-[10px] text-slate-300/80 bg-slate-900/50 rounded px-1.5 py-0.5">
