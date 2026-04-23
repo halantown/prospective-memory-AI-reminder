@@ -63,7 +63,6 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
   const activeStation = useGameStore((s) => s.activeStation)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
-  const cookingWaitSteps = useGameStore((s) => s.cookingWaitSteps)
   const wsSend = useGameStore((s) => s.wsSend)
 
   const [feedback, setFeedback] = useState<{ station: KitchenStationId; type: FeedbackType }>({ station: 'fridge', type: null })
@@ -102,36 +101,13 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
     return activeCookingSteps.find(s => s.station === activeStation)
   }, [activeStation, activeCookingSteps])
 
-  // Check which stations have active steps
-  const stationsWithActiveSteps = useMemo(() => {
-    const set = new Set<KitchenStationId>()
-    activeCookingSteps.forEach(s => set.add(s.station))
-    return set
-  }, [activeCookingSteps])
-
-  // Check which stations have wait steps
-  const stationsWithWaitSteps = useMemo(() => {
-    const set = new Set<KitchenStationId>()
-    cookingWaitSteps.forEach(s => set.add(s.station))
-    return set
-  }, [cookingWaitSteps])
-
   return (
     <div className="absolute inset-0">
-      {/* Station instruction */}
-      <div className="absolute top-9 left-2 z-10 pointer-events-none">
-        <span className="text-[10px] text-slate-300/80 bg-slate-900/50 rounded px-1.5 py-0.5">
-          Click glowing stations to cook
-        </span>
-      </div>
-
       {/* Clickable station hotspots */}
       {(Object.entries(STATION_POSITIONS) as [KitchenStationId, typeof STATION_POSITIONS[KitchenStationId]][]).map(
         ([stationId, pos]) => {
           const info = STATION_INFO[stationId]
           const isOpen = activeStation === stationId
-          const hasActiveStep = stationsWithActiveSteps.has(stationId)
-          const hasWaitStep = stationsWithWaitSteps.has(stationId)
           const showFeedback = feedback.station === stationId && feedback.type
 
           return (
@@ -141,11 +117,7 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
                 ${isActive ? 'cursor-pointer' : 'cursor-default pointer-events-none'}
                 ${isOpen
                   ? 'border-cooking-400 bg-cooking-900/30'
-                  : hasActiveStep
-                    ? 'border-green-400/60 bg-green-900/20 hover:bg-green-900/30'
-                    : hasWaitStep
-                      ? 'border-yellow-400/40 bg-yellow-900/10'
-                      : 'border-transparent hover:border-slate-500/20 bg-transparent hover:bg-slate-800/20'
+                  : 'border-transparent hover:border-slate-500/20 bg-transparent hover:bg-slate-800/20'
                 }
                 ${showFeedback === 'correct' ? '!border-green-400 !bg-green-500/30' : ''}
                 ${showFeedback === 'wrong' ? '!border-red-400 !bg-red-500/30' : ''}
@@ -153,8 +125,6 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
               `}
               style={pos}
               onClick={() => handleStationClick(stationId)}
-              animate={hasActiveStep ? { boxShadow: ['0 0 0px rgba(74,222,128,0)', '0 0 14px rgba(74,222,128,0.5)', '0 0 0px rgba(74,222,128,0)'] } : {}}
-              transition={hasActiveStep ? { repeat: Infinity, duration: 1.5 } : {}}
             >
               <div className="absolute bottom-0.5 left-1 text-[8px] text-slate-400/70 font-medium whitespace-nowrap">
                 {info.emoji} {info.label}
