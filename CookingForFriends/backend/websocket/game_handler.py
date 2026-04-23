@@ -83,9 +83,20 @@ async def handle_game_ws(
                 block_id = block.id
                 # Use the block's real start time so past events are skipped instead
                 # of re-fired (prevents duplicate phone messages on reconnect).
+                # Guard: if the block started longer ago than the block duration (stale
+                # test session / block never properly closed), fall back to a fresh
+                # timeline so the WS doesn't immediately fire block_end and close.
                 block_start_ts: float | None = None
                 if block.started_at:
-                    block_start_ts = block.started_at.timestamp()
+                    age_s = time.time() - block.started_at.timestamp()
+                    from config import COOKING_TOTAL_DURATION_S
+                    if age_s < COOKING_TOTAL_DURATION_S:
+                        block_start_ts = block.started_at.timestamp()
+                    else:
+                        logger.warning(
+                            f"[GAME_HANDLER] Block {block_number} started {age_s:.0f}s ago "
+                            f"(> {COOKING_TOTAL_DURATION_S}s), ignoring stale start time"
+                        )
                 logger.info(f"[GAME_HANDLER] Auto-starting timeline (block already PLAYING) for {participant_id} block {block_number}")
                 timeline_task = await run_timeline(
                     participant_id=participant_id,
@@ -126,12 +137,12 @@ async def handle_game_ws(
     )
 
     try:
-        # Wait for either task to complete (usually due to disconnect)
-        tasks_to_watch = [pump_task, receiver_task]
-        if timeline_task:
-            tasks_to_watch.append(timeline_task)
+        # Wait for pump or receiver to end (i.e. client disconnects).
+        # The timeline task is NOT included here: timeline completion (e.g.
+        # block_end) must be delivered to the client before the WS closes, so
+        # the connection lifetime is controlled by the client, not the server.
         done, pending = await asyncio.wait(
-            tasks_to_watch,
+            [pump_task, receiver_task],
             return_when=asyncio.FIRST_COMPLETED,
         )
         for task in pending:
