@@ -114,6 +114,7 @@ async def create_participant(
         token=participant.token,
         session_id=participant.id,
         entry_url=f"/?token={participant.token}",
+        is_test=False,
     )
 
 
@@ -132,6 +133,7 @@ async def create_test_session(
         token=participant.token,
         session_id=participant.id,
         entry_url=f"/?token={participant.token}",
+        is_test=True,
     )
 
 
@@ -451,9 +453,18 @@ async def get_config():
 
 @router.get("/tasks")
 async def list_pm_tasks():
-    """Return the full PM task definitions."""
-    from config import TASK_DEFINITIONS
-    return {"tasks": TASK_DEFINITIONS}
+    """Return the full PM task definitions as a list."""
+    from engine.pm_tasks import TASK_DEFINITIONS
+    return [
+        {
+            "task_id": task_def.task_id,
+            "guest_name": task_def.guest_name,
+            "trigger_type": task_def.trigger_type,
+            "target_room": task_def.target_room,
+            "action_type": task_def.action_type,
+        }
+        for task_def in TASK_DEFINITIONS.values()
+    ]
 
 
 @router.get("/data/export")
@@ -738,32 +749,38 @@ async def export_per_participant(
     include_test: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    """CSV export — one row per PMTaskEvent."""
-    query = select(PMTaskEvent).order_by(PMTaskEvent.id)
+    """CSV export — one row per PMTaskEvent, joined with participant for token/task_order."""
+    query = (
+        select(PMTaskEvent, Participant.token, Participant.task_order)
+        .join(Participant, Participant.id == PMTaskEvent.session_id)
+        .order_by(PMTaskEvent.id)
+    )
     if not include_test:
-        query = query.join(Participant, Participant.id == PMTaskEvent.session_id).where(
-            Participant.is_test == False  # noqa: E712
-        )
+        query = query.where(Participant.is_test == False)  # noqa: E712
     result = await db.execute(query)
-    events = result.scalars().all()
+    rows = result.all()
 
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow([
-        "session_id", "task_id", "trigger_fired_at", "condition", "task_order",
+        "token", "session_id", "task_id", "position_in_order", "condition", "task_order",
+        "trigger_type", "trigger_scheduled_game_time", "trigger_actual_game_time",
         "greeting_complete_time", "reminder_display_time", "reminder_acknowledge_time",
         "decoy_options_order", "decoy_selected_option", "decoy_correct", "decoy_response_time",
         "confidence_rating", "confidence_response_time",
         "action_animation_start_time", "action_animation_complete_time",
+        "pipeline_was_interrupted",
     ])
-    for e in events:
+    for e, token, p_task_order in rows:
         w.writerow([
-            e.session_id, e.task_id, e.trigger_fired_at, e.condition, e.task_order,
+            token, e.session_id, e.task_id, e.position_in_order, e.condition, p_task_order,
+            e.trigger_type, e.trigger_scheduled_game_time, e.trigger_actual_game_time,
             e.greeting_complete_time, e.reminder_display_time, e.reminder_acknowledge_time,
             json.dumps(e.decoy_options_order) if e.decoy_options_order else "",
             e.decoy_selected_option, e.decoy_correct, e.decoy_response_time,
             e.confidence_rating, e.confidence_response_time,
             e.action_animation_start_time, e.action_animation_complete_time,
+            e.pipeline_was_interrupted,
         ])
     buf.seek(0)
     return StreamingResponse(
@@ -788,7 +805,7 @@ async def export_aggregated(
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow([
-        "participant_id", "session_id", "condition", "task_order", "status",
+        "participant_id", "token", "session_id", "condition", "task_order", "status",
         "is_test", "created_at", "started_at", "completed_at",
         "pm_events_count", "pm_actions_completed",
     ])
@@ -805,7 +822,7 @@ async def export_aggregated(
         )
         done_events = done_result.scalar() or 0
         w.writerow([
-            p.participant_id, p.id, p.condition, p.task_order,
+            p.participant_id, p.token, p.id, p.condition, p.task_order,
             p.status.value if hasattr(p.status, "value") else p.status,
             p.is_test,
             p.created_at.isoformat() if p.created_at else "",

@@ -57,6 +57,12 @@ TRIGGER_SCHEDULE: list[dict] = [
 # Seconds of game time after last real trigger pipeline completes before → post_questionnaire
 SESSION_END_DELAY_AFTER_LAST_TRIGGER_S = 60
 
+# Legacy execution-window constants (kept for timeline.py backward-compat)
+EXECUTION_WINDOW_S = 120   # Primary window: participant has 2 min to act
+LATE_WINDOW_S = 60         # Extended window after EXECUTION_WINDOW_S
+REMINDER_LEAD_S = 30       # How early before trigger to show reminder
+BLOCK_DURATION_S = 900     # Single-block game duration (seconds)
+
 # Seconds of wall-clock disconnect before session is flagged incomplete
 MAX_DISCONNECT_DURATION_S = 300
 

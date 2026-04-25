@@ -5,6 +5,7 @@ import time
 import logging
 import collections
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, Request
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,14 +13,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, async_session
 from models.experiment import Participant, ParticipantStatus
 from models.block import Block, BlockStatus, PMTrial, EncodingQuizAttempt
+from models.pm_module import PhaseEvent, CutsceneEvent, IntentionCheckEvent, PMTaskEvent
 from models.schemas import (
     TokenStartRequest, SessionStartResponse, BlockEncodingResponse,
     DebriefRequest, StatusResponse,
     QuizSubmitRequest, QuizSubmitResponse, QuizResultItem,
     EncodingQuizAttemptRequest,
+    PhaseUpdateRequest, CutsceneEventRequest, IntentionCheckRequest, SessionStateResponse,
 )
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
+from engine.game_time import unfreeze_game_time, get_current_game_time
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -61,6 +65,7 @@ async def start_session(req: TokenStartRequest, request: Request, db: AsyncSessi
         participant.started_at = datetime.now(timezone.utc)
         participant.is_online = True
         participant.last_heartbeat = time.time()
+        unfreeze_game_time(participant)
         await db.commit()
         logger.info(f"Session started: {participant.participant_id} (condition={participant.condition})")
     else:
@@ -74,6 +79,9 @@ async def start_session(req: TokenStartRequest, request: Request, db: AsyncSessi
         session_id=participant.id,
         participant_id=participant.participant_id,
         condition=participant.condition,
+        task_order=participant.task_order,
+        is_test=participant.is_test,
+        current_phase=participant.current_phase or "welcome",
     )
 
 
@@ -101,7 +109,131 @@ async def get_session_status(session_id: str, db: AsyncSession = Depends(get_db)
 
     return StatusResponse(
         status=p.status.value if isinstance(p.status, ParticipantStatus) else p.status,
-        phase=phase,
+        phase=p.current_phase or "welcome",
+    )
+
+
+@router.post("/session/{session_id}/phase")
+async def update_phase(
+    session_id: str, req: PhaseUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Log a phase transition event and update participant.current_phase."""
+    result = await db.execute(select(Participant).where(Participant.id == session_id))
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, "Session not found")
+
+    now = time.time()
+    if req.event_type == "start":
+        evt = PhaseEvent(
+            session_id=session_id,
+            phase_name=req.phase_name,
+            start_time=now,
+        )
+        db.add(evt)
+        p.current_phase = req.phase_name
+    else:  # "end"
+        evt_result = await db.execute(
+            select(PhaseEvent).where(
+                PhaseEvent.session_id == session_id,
+                PhaseEvent.phase_name == req.phase_name,
+                PhaseEvent.end_time.is_(None),
+            ).order_by(PhaseEvent.id.desc()).limit(1)
+        )
+        evt = evt_result.scalar_one_or_none()
+        if evt:
+            evt.end_time = now
+
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/session/{session_id}/cutscene-event")
+async def log_cutscene_event(
+    session_id: str, req: CutsceneEventRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Log a cutscene playback event (view + optional detail-check)."""
+    import time as _time
+    now = _time.time()
+    display_t = req.viewed_at if req.viewed_at is not None else now
+    dismiss_t = (display_t + req.duration_ms / 1000.0) if req.duration_ms is not None else None
+
+    evt = CutsceneEvent(
+        session_id=session_id,
+        task_id=req.task_id,
+        segment_number=req.segment_index + 1,   # store 1-based
+        display_time=display_t,
+        dismiss_time=dismiss_t,
+        detailcheck_question=req.placeholder,
+        detailcheck_answer=str(req.detail_check_selected) if req.detail_check_selected is not None else None,
+        detailcheck_correct=req.detail_check_correct,
+    )
+    db.add(evt)
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/session/{session_id}/intention-check")
+async def log_intention_check(
+    session_id: str, req: IntentionCheckRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Log a post-encoding intention check response."""
+    evt = IntentionCheckEvent(
+        session_id=session_id,
+        task_id=req.task_id,
+        position=req.task_position,
+        selected_option_index=req.selected_index,
+        correct_option_index=req.correct_index,
+        response_time_ms=req.response_time_ms,
+    )
+    db.add(evt)
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.get("/session/{token}/state", response_model=SessionStateResponse)
+async def get_session_state(token: str, db: AsyncSession = Depends(get_db)):
+    """Lightweight state endpoint — looks up by token, returns current pipeline step."""
+    result = await db.execute(select(Participant).where(Participant.token == token))
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, "Token not found")
+
+    # Find the active PMTaskEvent (most recent with no action_animation_complete_time)
+    evt_result = await db.execute(
+        select(PMTaskEvent).where(
+            PMTaskEvent.session_id == p.id,
+            PMTaskEvent.action_animation_complete_time.is_(None),
+        ).order_by(PMTaskEvent.id.desc()).limit(1)
+    )
+    evt = evt_result.scalar_one_or_none()
+
+    pipeline_step: Optional[str] = None
+    if evt:
+        if evt.action_animation_start_time is not None:
+            pipeline_step = "action_animating"
+        elif evt.confidence_rating is not None:
+            pipeline_step = "action_pending"
+        elif evt.decoy_selected_option is not None:
+            pipeline_step = "confidence"
+        elif evt.reminder_acknowledge_time is not None:
+            pipeline_step = "decoy"
+        elif evt.greeting_complete_time is not None:
+            pipeline_step = "reminder"
+        else:
+            pipeline_step = "greeting"
+
+    return SessionStateResponse(
+        session_id=p.id,
+        phase=p.current_phase or "welcome",
+        frozen=p.frozen_since is not None,
+        game_time_elapsed_s=get_current_game_time(p),
+        pipeline_step=pipeline_step,
+        is_test=bool(p.is_test),
+        incomplete=bool(p.incomplete),
     )
 
 

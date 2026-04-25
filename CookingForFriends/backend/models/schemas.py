@@ -52,20 +52,22 @@ class PhaseUpdateRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 class CutsceneEventRequest(BaseModel):
-    task_id: str             # "T1" – "T4"
-    segment_number: int      # 1 – 4
-    display_time: float      # client-side game time (s)
-    dismiss_time: float
-    detailcheck_question: Optional[str] = None
-    detailcheck_answer: Optional[str] = None
-    detailcheck_correct: Optional[bool] = None
+    task_id: str                              # "T1" – "T4"
+    segment_index: int                        # 0-based index (stored as segment_number=index+1)
+    viewed_at: Optional[float] = None         # client-side game time (s) when shown
+    duration_ms: Optional[float] = None       # how long it was displayed
+    placeholder: Optional[str] = None        # placeholder constant string (for audit)
+    detail_check_selected: Optional[int] = None   # 0-based option index selected
+    detail_check_correct: Optional[bool] = None
+    detail_check_correct_index: Optional[int] = None
 
 
 class IntentionCheckRequest(BaseModel):
-    task_id: str             # "T1" – "T4"
-    position: int            # 0-indexed in task_order
-    selected_option_index: int
-    correct_option_index: int
+    task_id: str                  # "T1" – "T4"
+    task_position: int            # 1-based position in task_order
+    selected_index: int           # 0-based option index selected
+    correct_index: int            # 0-based correct option index
+    is_correct: bool
     response_time_ms: Optional[int] = None
 
 
@@ -125,6 +127,7 @@ class ParticipantCreateResponse(BaseModel):
     token: str
     session_id: str
     entry_url: str
+    is_test: bool = False
 
 
 class TestSessionRequest(BaseModel):

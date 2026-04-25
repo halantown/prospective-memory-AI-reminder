@@ -539,3 +539,99 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 
 ### Follow-up Actions
 > - [x] Remove `allow_credentials=True` — done
+
+---
+
+## INC-011 — PM module field-name mismatches between schema, handlers, and frontend
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2025-07-17 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | E2E test script (`/tmp/e2e_test.py`) during Phase 7 testing |
+| Affected area| `routers/session.py`, `websocket/game_handler.py`, `models/schemas.py`, `routers/admin.py` |
+
+### Background
+> The PM task module (Phases 1–6) was implemented with backend schemas, WS handlers, and HTTP endpoints.
+> The frontend sends specific JSON field names; the backend must match them exactly.
+> E2E testing (Phase 7) revealed multiple field-name mismatches that prevented event logging.
+
+### Incident Description
+> Running the E2E test script returned HTTP 422 (Unprocessable Entity) or wrong data on:
+> - `POST /api/session/{id}/phase` — handler read `req.action` but schema defined `event_type`
+> - `GET /api/session/{token}/state` — response returned `current_phase`/`is_frozen` but schema defined `phase`/`frozen`
+> - `POST /api/session/{id}/cutscene-event` — handler used `req.segment_number`, `req.display_time` but frontend sends `segment_index` (0-based), `viewed_at`, `duration_ms`
+> - `POST /api/session/{id}/intention-check` — handler used `req.check_type`, `req.responses` but frontend sends `selected_index`, `correct_index`, `task_position`, `is_correct`
+> - WS `pm_greeting_complete` — handler read `data.get("timestamp")` but frontend sends `game_time`
+> - WS `pm_decoy_selected` — handler read `options_order`/`correct` but frontend sends `decoy_options_order`/`decoy_correct`
+> - WS `pm_confidence_rated` — handler read `rating`/`response_time_s` but frontend sends `confidence_rating`/`response_time_ms`
+> - WS `pm_action_complete` — handler read `start_time`/`timestamp` but frontend sends `action_animation_start_time`/`action_animation_complete_time`
+> - `GET /api/admin/tasks` — returned `{"tasks": {...}}` dict wrapper; test expected a flat list
+> - `GET /api/admin/export/per-participant` — used wrong model field names (`trigger_fired_at`, `task_order` which don't exist on `PMTaskEvent`); missing `token` column; missing JOIN with `Participant`
+> - `GET /api/admin/export/aggregated` — missing `token` column
+> - `POST /api/admin/participant/create` and `test-session` — response missing `is_test` field
+> - Test script issues: checked `url` instead of `entry_url`; checked `isinstance(ac, dict)` instead of `list`; used `ac.values()` on a list; sent `event` instead of `event_type` in phase transitions
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| ~14:00 | Phase 7 E2E test script first run; 7 checks failing |
+| ~14:10 | Root cause identified: field names diverged between schema/handler/frontend during parallel implementation |
+| ~14:20 | `session.py` handlers and `schemas.py` fixed (phase, cutscene-event, intention-check, state endpoint) |
+| ~14:25 | `game_handler.py` fixed (all 6 WS PM pipeline handlers) |
+| ~14:30 | Server restarted; test re-run: 5 backend issues + 4 test script issues remaining |
+| ~14:45 | `admin.py` fixed (tasks list, export field names, export JOIN, is_test response field) |
+| ~14:50 | `schemas.py` `ParticipantCreateResponse` updated to include `is_test` |
+| ~14:55 | Test script fixed (entry_url, event_type, list checks, relative count comparison) |
+| ~15:00 | 44/44 E2E checks passing |
+
+### Root Cause
+> The backend and frontend were implemented in parallel by separate agents during Phases 2–5.
+> Without a shared type-contract document checked by both, field names drifted:
+> - Backend handlers used snake_case names from the DB model (`segment_number`, `display_time`)
+>   while the frontend used more explicit names (`segment_index`, `viewed_at`, `duration_ms`)
+> - WS message field names were chosen independently in the frontend (prefixed: `decoy_options_order`,
+>   `confidence_rating`) vs the backend handler (bare: `options_order`, `rating`)
+> - Response schemas were not kept in sync with the handler's `return` statements
+
+### Contributing Factors
+> - Parallel implementation without a shared API contract document
+> - No static type-checking across the WS boundary (WS uses `data.get("key")` — no schema validation)
+> - Schema defined `TestSessionResponse` but handler returned `ParticipantCreateResponse` (shape mismatch)
+> - Test script was written before backend was finalized, then not updated to match final field names
+
+### Fix
+> **`backend/models/schemas.py`**:
+> - `CutsceneEventRequest`: added `segment_index`, `viewed_at`, `duration_ms` (replaced old fields)
+> - `IntentionCheckRequest`: added `selected_index`, `correct_index`, `task_position`, `is_correct`
+> - `SessionStateResponse`: renamed `current_phase`→`phase`, `is_frozen`→`frozen`
+> - `ParticipantCreateResponse`: added `is_test: bool = False`
+>
+> **`backend/routers/session.py`**:
+> - `update_phase`: changed `req.action` → `req.event_type`
+> - `log_cutscene_event`: rewrote mapping from new schema fields to model fields
+> - `log_intention_check`: rewrote mapping from new schema fields to model fields
+> - `get_session_state`: changed response keys to match schema (`phase`, `frozen`)
+>
+> **`backend/websocket/game_handler.py`**:
+> - All 6 PM pipeline handlers updated to use correct frontend field names
+>
+> **`backend/routers/admin.py`**:
+> - `list_pm_tasks`: returns flat list instead of `{"tasks": {...}}` dict wrapper
+> - `export_per_participant`: fixed field names (used correct model attributes), added JOIN with Participant for token, added token/task_order columns to CSV
+> - `export_aggregated`: added `token` column
+> - `create_participant`/`create_test_session`: return `is_test` in response
+>
+> **`/tmp/e2e_test.py`**:
+> - Fixed `url` → `entry_url`, `event` → `event_type`
+> - Fixed `isinstance(ac, dict)` → `isinstance(ac, list)`
+> - Removed `.values()` call on list; used relative count comparison
+
+### Verification
+> E2E test script passes 44/44 checks after all fixes applied.
+
+### Follow-up Actions
+> - [ ] Document the WS message field names in `docs/ARCHITECTURE.md` API contract section
+> - [ ] Consider adding a Pydantic model for WS inbound messages to catch field mismatches at parse time
+> - [x] All field names aligned and E2E verified

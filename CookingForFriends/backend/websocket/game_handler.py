@@ -431,7 +431,7 @@ async def _handle_pm_greeting_complete(participant_id: str, data: dict, db_facto
         )
         evt = result.scalar_one_or_none()
         if evt:
-            evt.greeting_complete_time = data.get("timestamp", time.time())
+            evt.greeting_complete_time = data.get("game_time", time.time())
             await db.commit()
 
 
@@ -452,7 +452,7 @@ async def _handle_pm_reminder_ack(participant_id: str, data: dict, db_factory):
         )
         evt = result.scalar_one_or_none()
         if evt:
-            ts = data.get("timestamp", time.time())
+            ts = data.get("game_time", time.time())
             if evt.reminder_display_time is None:
                 evt.reminder_display_time = ts
             evt.reminder_acknowledge_time = ts
@@ -476,9 +476,9 @@ async def _handle_pm_decoy_selected(participant_id: str, data: dict, db_factory)
         )
         evt = result.scalar_one_or_none()
         if evt:
-            evt.decoy_options_order = data.get("options_order", [])
+            evt.decoy_options_order = data.get("decoy_options_order", [])
             evt.decoy_selected_option = data.get("selected_option", "")
-            evt.decoy_correct = data.get("correct", False)
+            evt.decoy_correct = data.get("decoy_correct", False)
             rt_ms = data.get("response_time_ms")
             evt.decoy_response_time = rt_ms / 1000.0 if rt_ms is not None else None
             await db.commit()
@@ -501,14 +501,14 @@ async def _handle_pm_confidence_rated(participant_id: str, data: dict, db_factor
         )
         evt = result.scalar_one_or_none()
         if evt:
-            evt.confidence_rating = data.get("rating")
-            evt.confidence_response_time = data.get("response_time_s")
+            evt.confidence_rating = data.get("confidence_rating")
+            rt_ms = data.get("response_time_ms")
+            evt.confidence_response_time = rt_ms / 1000.0 if rt_ms is not None else None
             await db.commit()
 
     # Tell the frontend to start the avatar action animation
     await manager.send_to_participant(participant_id, "avatar_action", {
         "task_id": task_id,
-        "action": data.get("action", ""),
     })
 
 
@@ -531,8 +531,8 @@ async def _handle_pm_action_complete(participant_id: str, data: dict, db_factory
         evt = result.scalar_one_or_none()
         now = time.time()
         if evt:
-            evt.action_animation_start_time = data.get("start_time", now)
-            evt.action_animation_complete_time = data.get("timestamp", now)
+            evt.action_animation_start_time = data.get("action_animation_start_time", now)
+            evt.action_animation_complete_time = data.get("action_animation_complete_time", now)
             await db.commit()
 
         # Unfreeze game time

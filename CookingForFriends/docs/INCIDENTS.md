@@ -539,3 +539,47 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 
 ### Follow-up Actions
 > - [x] Remove `allow_credentials=True` — done
+
+## INC-011 — admin.py crashed at import time (broken `assign_condition` name)
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2025-07-15 |
+| Severity     | P0 Critical |
+| Status       | Resolved |
+| Reported by  | Static analysis during Phase 2+3 implementation |
+| Affected area| `routers/admin.py` — all admin endpoints |
+
+### Background
+> The admin router registers all participant management, monitoring, and export endpoints. It is imported by `main.py` at startup. A broken module-level import causes the entire FastAPI application to fail to start.
+
+### Incident Description
+> `routers/admin.py` line 19 imported `assign_condition` from `engine/condition_assigner.py`. That function was renamed `assign_condition_and_order` during Phase 1 refactoring to return both condition and task_order. The import was never updated, causing an `ImportError` at startup. All admin endpoints were unreachable.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| — | Phase 1 refactored `condition_assigner.py`, renamed function to `assign_condition_and_order` |
+| — | `admin.py` line 19 left referencing old name `assign_condition` |
+| 2025-07-15 | Discovered during Phase 2+3 pre-flight static analysis |
+| 2025-07-15 | Fixed in Phase 2+3 implementation pass |
+
+### Root Cause
+> Function was renamed during a Phase 1 refactor but the sole call site in `admin.py` was not updated. No integration test covered admin router startup.
+
+### Contributing Factors
+> - No automated import test for routers
+> - `admin.py` also imported removed helpers (`task_def_to_config`, `task_def_to_encoding_card`, `asdict`, `_UNREMINDED_CYCLE`) that were not caught sooner because the file crashed before reaching them
+
+### Fix
+> - `routers/admin.py` line 19: `assign_condition` → `assign_condition_and_order`
+> - Removed stale imports: `task_def_to_config`, `task_def_to_encoding_card`, `dataclasses.asdict`, `random`
+> - Rewrote `create_participant` to use `assign_condition_and_order` which returns `(condition, task_order)` tuple
+> - Added `_create_participant_row` helper shared with new `/test-session` endpoint
+
+### Verification
+> `conda run -n thesis_server python -c "from routers.admin import router as admin_router; print('OK')"` passes without error.
+
+### Follow-up Actions
+> - [x] Added verification import test to Phase 2+3 completion checklist
+> - [ ] Add `pytest` import smoke-test covering all routers to CI
