@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
+import { getSessionState } from '../services/api'
 import type { ActivePMTrial, PMTaskConfig, RoomId } from '../types'
 
-const HEARTBEAT_INTERVAL = 10_000
+const HEARTBEAT_INTERVAL = 30_000
 const RECONNECT_BASE_MS = 500
-const RECONNECT_MAX_MS = 5_000
+const RECONNECT_MAX_MS = 15_000
 
 export function useWebSocket(sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null)
@@ -61,55 +62,45 @@ export function useWebSocket(sessionId: string | null) {
       }
 
       case 'pm_trigger': {
-        const receivedAt = Date.now() / 1000
-        const triggerId = data.trigger_id as string
-        const triggerEvent = data.trigger_event as string
-        const serverTs = (data.server_trigger_ts as number) || msg.server_ts || receivedAt
-        const taskConfig = (data.task_config as PMTaskConfig) || {
-          task_id: triggerId,
-          trigger_event: triggerEvent,
-          target_room: (data.target_room as string) || '',
-          target_object: (data.target_object as string) || '',
-          target_action: (data.target_action as string) || '',
-          distractor_object: (data.distractor_object as string) || '',
-          action_destination: (data.action_destination as string) || '',
-          discriminating_cue: (data.discriminating_cue as string) || '',
-        }
+        // New format: is_fake, task_id, trigger_type, position, schedule_index, game_time_fired
+        const isFake = Boolean(data.is_fake)
+        const taskId = (data.task_id as string) || null
+        const triggerType = (data.trigger_type as 'doorbell' | 'phone_call') || 'doorbell'
+        const taskPosition = data.position != null ? (data.position as number) : null
+        const scheduleIndex = (data.schedule_index as number) || 0
 
-        store.addPMTrial({
-          triggerId,
-          triggerEvent,
-          serverTriggerTs: serverTs,
-          receivedAt,
-          taskConfig,
+        store.setPMPipelineState({
+          step: 'trigger_affordance',
+          taskId: isFake ? null : taskId,
+          triggerType,
+          isFake,
+          taskPosition: isFake ? null : taskPosition,
+          scheduleIndex,
+          firedAt: Date.now() / 1000,
+          wasInterrupted: false,
         })
+        store.setGameTimeFrozen(true)
 
-        store.addTriggerEffect(triggerEvent)
-
-        const send = useGameStore.getState().wsSend
-        if (send) {
-          send({
-            type: 'trigger_ack',
-            data: { trigger_id: triggerId, received_at: receivedAt },
-          })
-        }
+        // Also add legacy trigger effect for visual feedback
+        store.addTriggerEffect(triggerType === 'doorbell' ? 'visitor_arrival' : 'phone_message_banner')
         break
       }
 
-      case 'fake_trigger': {
-        const triggerType = data.trigger_type as string
-        const duration = (data.duration as number) || 4
+      case 'avatar_action': {
+        // Signal PMTriggerModal via custom DOM event
+        window.dispatchEvent(new CustomEvent('pm:avatar_action', { detail: data }))
+        break
+      }
 
-        // Map trigger_type to a default trigger_visual for audio/display lookup
-        const visualMap: Record<string, string> = {
-          visitor: 'visitor_arrival',
-          communication: 'phone_message_banner',
-          appliance: 'dishwasher_indicator_done',
-          activity: 'steak_all_plated',
+      case 'session_end': {
+        store.setPhase('post_questionnaire')
+        break
+      }
+
+      case 'heartbeat_ack': {
+        if (data.frozen !== undefined && data.frozen !== store.gameTimeFrozen) {
+          store.setGameTimeFrozen(Boolean(data.frozen))
         }
-        const triggerEvent = visualMap[triggerType] || triggerType
-
-        store.addTriggerEffect(triggerEvent, { isFake: true, duration })
         break
       }
 
@@ -244,6 +235,27 @@ export function useWebSocket(sessionId: string | null) {
 
       if (useGameStore.getState().phase === 'playing') {
         sendFn({ type: 'start_game', data: {} })
+      }
+
+      // On reconnect: restore PM pipeline state if server reports active pipeline
+      if (retryCount.current > 0 && sessionId) {
+        getSessionState(sessionId).then((state) => {
+          if (state?.pipeline_step && state.pipeline_step !== 'idle') {
+            useGameStore.getState().setPMPipelineState({
+              step: 'trigger_affordance',
+              taskId: (state.task_id as string) || null,
+              triggerType: (state.trigger_type as 'doorbell' | 'phone_call') || 'doorbell',
+              isFake: Boolean(state.is_fake),
+              taskPosition: (state.task_position as number) || null,
+              scheduleIndex: (state.schedule_index as number) || 0,
+              firedAt: Date.now() / 1000,
+              wasInterrupted: true,
+            })
+            useGameStore.getState().setGameTimeFrozen(true)
+          }
+        }).catch(() => {
+          // Non-critical — ignore state restore failure on reconnect
+        })
       }
 
       heartbeatRef.current = setInterval(() => {

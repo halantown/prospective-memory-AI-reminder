@@ -85,11 +85,12 @@ app = FastAPI(
 )
 
 # CORS — restrict origins via config (default "*" for dev, set CORS_ORIGINS in production)
+# allow_credentials is not needed: session tokens are passed in request bodies, not cookies.
 from config import CORS_ORIGINS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

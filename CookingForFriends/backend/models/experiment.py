@@ -61,5 +61,19 @@ class Participant(Base):
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     last_heartbeat: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    # PM Task Module — EC+/EC- experiment
+    task_order: Mapped[str] = mapped_column(String(2), nullable=False, default="A")
+    is_test: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    current_phase: Mapped[str] = mapped_column(String(30), nullable=False, default="welcome")
+
+    # Game time freeze mechanism (all values are epoch-seconds floats)
+    game_time_elapsed_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    frozen_since: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_unfreeze_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Disconnect tracking
+    disconnected_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    incomplete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     experiment: Mapped["Experiment"] = relationship(back_populates="participants")
     blocks: Mapped[list["Block"]] = relationship("Block", back_populates="participant", cascade="all, delete-orphan")

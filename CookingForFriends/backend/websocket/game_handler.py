@@ -5,25 +5,20 @@ import json
 import logging
 import time
 from fastapi import WebSocket, WebSocketDisconnect
-from sqlalchemy.ext.asyncio import AsyncSession
 from websocket.connection_manager import manager, ws_pump
 from engine.timeline import run_timeline, cancel_timeline
-from engine.pm_scorer import score_pm_attempt
-from engine.execution_window import (
-    start_window, cancel_window, get_active_trigger, clear_active_trigger,
-    record_room_switch, get_room_sequence, get_first_pm_room_entry,
-)
 from engine.cooking_engine import CookingEngine
+from engine.game_time import unfreeze_game_time, get_current_game_time
+from engine.pm_session import run_pm_session, signal_pipeline_complete
 from models.logging import InteractionLog, MouseTrack, PhoneMessageLog
-from models.block import PMTrial, PMAttemptRecord
 
 logger = logging.getLogger(__name__)
 
-# Per-participant locks for PM attempt deduplication
-_pm_attempt_locks: dict[str, asyncio.Lock] = {}
-
 # Per-participant CookingEngine instances
 _cooking_engines: dict[str, CookingEngine] = {}
+
+# Per-participant PM session tasks
+_pm_session_tasks: dict[str, asyncio.Task] = {}
 
 
 async def handle_game_ws(
@@ -147,23 +142,23 @@ async def handle_game_ws(
         manager.disconnect_participant(participant_id, ws)
         pump_task.cancel()
         receiver_task.cancel()
-        # Only cancel timeline/windows if this connection is still the latest.
+        # Only cancel timeline/pm_session if this connection is still the latest.
         # A newer connection may have already started a new timeline.
         if manager.is_latest_connection(participant_id, conn_id):
             if timeline_task and not timeline_task.done():
                 timeline_task.cancel()
             cancel_timeline(participant_id, block_number)
-            from engine.execution_window import cancel_all_windows_for_participant
-            cancel_all_windows_for_participant(participant_id)
             # Stop and save cooking engine
             cooking = _cooking_engines.pop(participant_id, None)
             if cooking:
                 await cooking.save_dish_scores()
                 await cooking.stop()
+            # Cancel PM session task
+            pm_task = _pm_session_tasks.pop(participant_id, None)
+            if pm_task and not pm_task.done():
+                pm_task.cancel()
         else:
-            logger.info(f"Skipping timeline/window cleanup for {participant_id} — superseded by newer connection")
-        # Clean up per-participant PM attempt lock
-        _pm_attempt_locks.pop(participant_id, None)
+            logger.info(f"Skipping timeline/pm_session cleanup for {participant_id} — superseded by newer connection")
         # Only mark offline if no active connections remain
         if not manager.has_active_connections(participant_id):
             await _set_participant_offline(participant_id, db_factory)
@@ -190,7 +185,8 @@ async def _ws_receiver(
             # Each handler is wrapped so one failure never kills the receiver loop
             try:
                 if msg_type == "heartbeat":
-                    await _handle_heartbeat(participant_id, db_factory)
+                    ack_data = await _handle_heartbeat(participant_id, db_factory)
+                    await ws.send_text(json.dumps({"event": "heartbeat_ack", "data": ack_data}))
                 elif msg_type == "start_game":
                     logger.info(f"[GAME_HANDLER] Received start_game from {participant_id} block {block_number}")
                     await _handle_start_game(participant_id, block_number, db_factory,
@@ -199,11 +195,18 @@ async def _ws_receiver(
                     await _handle_room_switch(participant_id, block_number, data, db_factory)
                 elif msg_type == "task_action":
                     await _handle_task_action(participant_id, block_number, data, db_factory)
-                elif msg_type == "pm_attempt":
-                    await _handle_pm_attempt(participant_id, block_number, data, db_factory)
-                    await ws.send_text(json.dumps({"event": "pm_received", "data": {}}))
-                elif msg_type == "trigger_ack":
-                    await _handle_trigger_ack(participant_id, data, db_factory)
+                elif msg_type == "pm_greeting_complete":
+                    await _handle_pm_greeting_complete(participant_id, data, db_factory)
+                elif msg_type == "pm_reminder_ack":
+                    await _handle_pm_reminder_ack(participant_id, data, db_factory)
+                elif msg_type == "pm_decoy_selected":
+                    await _handle_pm_decoy_selected(participant_id, data, db_factory)
+                elif msg_type == "pm_confidence_rated":
+                    await _handle_pm_confidence_rated(participant_id, data, db_factory)
+                elif msg_type == "pm_action_complete":
+                    await _handle_pm_action_complete(participant_id, data, db_factory)
+                elif msg_type == "fake_trigger_ack":
+                    await _handle_fake_trigger_ack(participant_id, data, db_factory)
                 elif msg_type == "phone_unlock":
                     await _handle_interaction(participant_id, block_number, "phone_unlock", data, db_factory)
                 elif msg_type == "phone_action":
@@ -268,6 +271,16 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
 
         block.status = BlockStatus.PLAYING
         block.started_at = block.started_at or datetime.now(timezone.utc)
+
+        # Load participant to get task_order and initialise game time
+        from models.experiment import Participant
+        p_result = await db.execute(select(Participant).where(Participant.id == participant_id))
+        participant = p_result.scalar_one_or_none()
+        task_order = "A"
+        if participant:
+            task_order = participant.task_order
+            unfreeze_game_time(participant)
+
         await db.commit()
         condition = block.condition
         block_id = block.id
@@ -337,53 +350,42 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
     except Exception as e:
         logger.error(f"[GAME_HANDLER] CookingEngine start failed: {e}")
 
-
-async def _handle_heartbeat(participant_id: str, db_factory):
-    """Update heartbeat timestamp."""
-    async with db_factory() as db:
-        from sqlalchemy import update
-        from models.experiment import Participant
-        await db.execute(
-            update(Participant)
-            .where(Participant.id == participant_id)
-            .values(last_heartbeat=time.time(), is_online=True)
+    # Start the PM session task
+    try:
+        pm_task = asyncio.create_task(
+            run_pm_session(participant_id, task_order, send_fn, db_factory)
         )
+        _pm_session_tasks[participant_id] = pm_task
+        logger.info(f"[GAME_HANDLER] PM session task started for {participant_id} (order={task_order})")
+    except Exception as e:
+        logger.error(f"[GAME_HANDLER] PM session start failed: {e}")
+
+
+async def _handle_heartbeat(participant_id: str, db_factory) -> dict:
+    """Update heartbeat timestamp. Returns state dict for heartbeat_ack."""
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.experiment import Participant
+        result = await db.execute(select(Participant).where(Participant.id == participant_id))
+        p = result.scalar_one_or_none()
+        if not p:
+            return {"frozen": False, "game_time_elapsed_s": 0.0}
+        p.last_heartbeat = time.time()
+        p.is_online = True
+        p.disconnected_at = None
+        frozen = p.frozen_since is not None
+        game_time = get_current_game_time(p)
         await db.commit()
+    return {"frozen": frozen, "game_time_elapsed_s": game_time}
 
 
 async def _handle_room_switch(participant_id, block_number, data, db_factory):
-    """Log a room switch and track for PM execution window."""
-    ts = data.get("timestamp", time.time())
-    to_room = data.get("to", "")
-
-    # Track room switches for active PM execution window
-    record_room_switch(participant_id, to_room, ts)
-
-    # Log interaction
+    """Log a room switch."""
     await _handle_interaction(participant_id, block_number, "room_switch", data, db_factory)
 
 
 async def _handle_task_action(participant_id, block_number, data, db_factory):
-    """Log ongoing task action — also used for resumption lag detection
-    and activity watcher condition checking."""
-    ts = data.get("timestamp", time.time())
-
-    # Check if this is a resumption event (returning to ongoing task after PM)
-    trigger = get_active_trigger(participant_id)
-    if trigger and trigger.get("pm_completed"):
-        # This is the first ongoing task action after PM completion
-        pm_completed_at = trigger.get("pm_completed_at", 0)
-        resumption_lag_ms = int((ts - pm_completed_at) * 1000)
-        await _record_resumption_lag(
-            trigger["trial_id"], resumption_lag_ms, db_factory,
-        )
-        clear_active_trigger(participant_id)
-
-    # Check activity watchers for condition-based PM triggers
-    task = data.get("task", "")
-    event = data.get("event", "")
-    await _check_activity_conditions(participant_id, task, event, data)
-
+    """Log ongoing task action."""
     await _handle_interaction(participant_id, block_number, "task_action", data, db_factory)
 
 
@@ -411,26 +413,177 @@ async def _handle_cooking_action(participant_id, block_number, data, db_factory)
     # Also log as interaction for general event tracking
     await _handle_interaction(participant_id, block_number, "cooking_action", data, db_factory)
 
-    # Check resumption lag (cooking action counts as returning to ongoing task)
-    trigger = get_active_trigger(participant_id)
-    if trigger and trigger.get("pm_completed"):
-        pm_completed_at = trigger.get("pm_completed_at", 0)
-        resumption_lag_ms = int((ts - pm_completed_at) * 1000)
-        await _record_resumption_lag(trigger["trial_id"], resumption_lag_ms, db_factory)
-        clear_active_trigger(participant_id)
 
-
-async def _handle_trigger_ack(participant_id, data, db_factory):
-    """Handle trigger acknowledgment from frontend — records trigger_received_at."""
-    trigger_id = data.get("trigger_id")
-    received_at = data.get("received_at", time.time())
-
-    if not trigger_id:
+async def _handle_pm_greeting_complete(participant_id: str, data: dict, db_factory):
+    """Mark PM greeting animation as complete."""
+    task_id = data.get("task_id")
+    if not task_id:
         return
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.pm_module import PMTaskEvent
+        result = await db.execute(
+            select(PMTaskEvent).where(
+                PMTaskEvent.session_id == participant_id,
+                PMTaskEvent.task_id == task_id,
+                PMTaskEvent.action_animation_complete_time.is_(None),
+            ).order_by(PMTaskEvent.id.desc()).limit(1)
+        )
+        evt = result.scalar_one_or_none()
+        if evt:
+            evt.greeting_complete_time = data.get("timestamp", time.time())
+            await db.commit()
 
-    trigger = get_active_trigger(participant_id)
-    if trigger:
-        trigger["trigger_received_at"] = received_at
+
+async def _handle_pm_reminder_ack(participant_id: str, data: dict, db_factory):
+    """Record reminder display + acknowledge times."""
+    task_id = data.get("task_id")
+    if not task_id:
+        return
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.pm_module import PMTaskEvent
+        result = await db.execute(
+            select(PMTaskEvent).where(
+                PMTaskEvent.session_id == participant_id,
+                PMTaskEvent.task_id == task_id,
+                PMTaskEvent.action_animation_complete_time.is_(None),
+            ).order_by(PMTaskEvent.id.desc()).limit(1)
+        )
+        evt = result.scalar_one_or_none()
+        if evt:
+            ts = data.get("timestamp", time.time())
+            if evt.reminder_display_time is None:
+                evt.reminder_display_time = ts
+            evt.reminder_acknowledge_time = ts
+            await db.commit()
+
+
+async def _handle_pm_decoy_selected(participant_id: str, data: dict, db_factory):
+    """Record decoy task selection."""
+    task_id = data.get("task_id")
+    if not task_id:
+        return
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.pm_module import PMTaskEvent
+        result = await db.execute(
+            select(PMTaskEvent).where(
+                PMTaskEvent.session_id == participant_id,
+                PMTaskEvent.task_id == task_id,
+                PMTaskEvent.action_animation_complete_time.is_(None),
+            ).order_by(PMTaskEvent.id.desc()).limit(1)
+        )
+        evt = result.scalar_one_or_none()
+        if evt:
+            evt.decoy_options_order = data.get("options_order", [])
+            evt.decoy_selected_option = data.get("selected_option", "")
+            evt.decoy_correct = data.get("correct", False)
+            rt_ms = data.get("response_time_ms")
+            evt.decoy_response_time = rt_ms / 1000.0 if rt_ms is not None else None
+            await db.commit()
+
+
+async def _handle_pm_confidence_rated(participant_id: str, data: dict, db_factory):
+    """Record confidence rating and trigger avatar action."""
+    task_id = data.get("task_id")
+    if not task_id:
+        return
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.pm_module import PMTaskEvent
+        result = await db.execute(
+            select(PMTaskEvent).where(
+                PMTaskEvent.session_id == participant_id,
+                PMTaskEvent.task_id == task_id,
+                PMTaskEvent.action_animation_complete_time.is_(None),
+            ).order_by(PMTaskEvent.id.desc()).limit(1)
+        )
+        evt = result.scalar_one_or_none()
+        if evt:
+            evt.confidence_rating = data.get("rating")
+            evt.confidence_response_time = data.get("response_time_s")
+            await db.commit()
+
+    # Tell the frontend to start the avatar action animation
+    await manager.send_to_participant(participant_id, "avatar_action", {
+        "task_id": task_id,
+        "action": data.get("action", ""),
+    })
+
+
+async def _handle_pm_action_complete(participant_id: str, data: dict, db_factory):
+    """Record action animation completion; resume cooking and signal PM pipeline."""
+    task_id = data.get("task_id")
+    if not task_id:
+        return
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.experiment import Participant
+        from models.pm_module import PMTaskEvent
+        result = await db.execute(
+            select(PMTaskEvent).where(
+                PMTaskEvent.session_id == participant_id,
+                PMTaskEvent.task_id == task_id,
+                PMTaskEvent.action_animation_complete_time.is_(None),
+            ).order_by(PMTaskEvent.id.desc()).limit(1)
+        )
+        evt = result.scalar_one_or_none()
+        now = time.time()
+        if evt:
+            evt.action_animation_start_time = data.get("start_time", now)
+            evt.action_animation_complete_time = data.get("timestamp", now)
+            await db.commit()
+
+        # Unfreeze game time
+        p_result = await db.execute(select(Participant).where(Participant.id == participant_id))
+        p = p_result.scalar_one_or_none()
+        if p:
+            unfreeze_game_time(p)
+            await db.commit()
+
+    # Resume cooking engine
+    cooking = _cooking_engines.get(participant_id)
+    if cooking:
+        cooking.resume()
+
+    # Advance PM session to next trigger
+    signal_pipeline_complete(participant_id)
+
+
+async def _handle_fake_trigger_ack(participant_id: str, data: dict, db_factory):
+    """Acknowledge a fake trigger and resume the game."""
+    trigger_type = data.get("trigger_type", "")
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.experiment import Participant
+        from models.pm_module import FakeTriggerEvent
+        result = await db.execute(
+            select(FakeTriggerEvent).where(
+                FakeTriggerEvent.session_id == participant_id,
+                FakeTriggerEvent.trigger_type == trigger_type,
+                FakeTriggerEvent.acknowledged == False,  # noqa: E712
+            ).order_by(FakeTriggerEvent.id.desc()).limit(1)
+        )
+        evt = result.scalar_one_or_none()
+        if evt:
+            evt.acknowledged = True
+            await db.commit()
+
+        # Unfreeze game time
+        p_result = await db.execute(
+            select(Participant).where(Participant.id == participant_id)
+        )
+        p = p_result.scalar_one_or_none()
+        if p:
+            unfreeze_game_time(p)
+            await db.commit()
+
+    cooking = _cooking_engines.get(participant_id)
+    if cooking:
+        cooking.resume()
+
+    signal_pipeline_complete(participant_id)
 
 
 async def _handle_interaction(participant_id, block_number, event_type, data, db_factory):
@@ -458,138 +611,6 @@ async def _handle_interaction(participant_id, block_number, event_type, data, db
         )
         db.add(log)
         await db.commit()
-
-
-async def _handle_pm_attempt(participant_id, block_number, data, db_factory):
-    """Process a PM attempt — build detailed record and score silently."""
-    # Per-participant lock to prevent concurrent duplicate scoring
-    lock = _pm_attempt_locks.setdefault(participant_id, asyncio.Lock())
-    async with lock:
-        trigger = get_active_trigger(participant_id)
-        if trigger and trigger.get("attempt_received"):
-            logger.warning(f"Duplicate PM attempt from {participant_id}, ignoring")
-            return
-
-        if trigger:
-            trigger["attempt_received"] = True
-
-        async with db_factory() as db:
-            from sqlalchemy import select, update
-            from models.block import Block
-
-            result = await db.execute(
-                select(Block).where(
-                    Block.participant_id == participant_id,
-                    Block.block_number == block_number,
-                )
-            )
-            block = result.scalar_one_or_none()
-            if not block:
-                return
-
-            # Find the active PM trial (most recently triggered, unscored)
-            result = await db.execute(
-                select(PMTrial).where(
-                    PMTrial.block_id == block.id,
-                    PMTrial.trigger_fired_at.isnot(None),
-                    PMTrial.score.is_(None),
-                ).order_by(PMTrial.trigger_fired_at.desc()).limit(1)
-            )
-            trial = result.scalar_one_or_none()
-            if not trial:
-                logger.debug(f"PM attempt: no unscored trial found for {participant_id}")
-                return
-
-            # Cancel the execution window timer
-            cancel_window(participant_id, trial.id)
-
-            # Gather timing data
-            room_seq = get_room_sequence(participant_id)
-            first_pm_room_ts = get_first_pm_room_entry(participant_id)
-            first_room_switch_ts = room_seq[0]["timestamp"] if room_seq else None
-
-            attempt_time = data.get("timestamp", time.time())
-            action_step = data.get("action_step", data.get("action", ""))
-            target_selected = data.get("target_selected", "")
-            attempt_room = data.get("room", "")
-
-            # Score using the new scorer
-            score, rt_ms = score_pm_attempt(
-                trigger_fired_at=trial.trigger_fired_at,
-                attempt_time=attempt_time,
-                room=attempt_room,
-                target_selected=target_selected,
-                action_performed=action_step,
-                task_config=trial.task_config or {},
-            )
-
-            # Determine action correctness
-            correct_action = trial.task_config.get("target_action", "")
-            action_correct = action_step.lower() == correct_action.lower() if action_step else False
-
-            # Create detailed attempt record
-            attempt_record = PMAttemptRecord(
-                trial_id=trial.id,
-                participant_id=participant_id,
-                block_id=block.id,
-                trigger_fired_at=trial.trigger_fired_at,
-                trigger_received_at=(
-                    trigger.get("trigger_received_at") if trigger else None
-                ),
-                first_action_time=attempt_time,
-                first_room_switch_at=first_room_switch_ts,
-                first_pm_room_entered_at=first_pm_room_ts,
-                target_selected_at=data.get("target_selected_at"),
-                action_completed_at=data.get("action_completed_at", attempt_time),
-                room_sequence=[e["room"] for e in room_seq],
-                room=attempt_room,
-                target_selected=target_selected,
-                action_performed=action_step,
-                action_correct=action_correct,
-                total_elapsed_ms=rt_ms,
-                score=score,
-            )
-            db.add(attempt_record)
-
-            # Atomic update: only score if still unscored (prevents race with window expiry)
-            update_result = await db.execute(
-                update(PMTrial)
-                .where(PMTrial.id == trial.id, PMTrial.score.is_(None))
-                .values(
-                    user_actions=[data],
-                    score=score,
-                    response_time_ms=rt_ms,
-                    exec_window_end=attempt_time,
-                )
-            )
-            if update_result.rowcount == 0:
-                logger.warning(f"PM attempt: trial {trial.id} already scored (race condition prevented)")
-                await db.rollback()
-                return
-            await db.commit()
-
-            # Mark trigger as PM-completed for resumption lag tracking
-            if trigger:
-                trigger["pm_completed"] = True
-                trigger["pm_completed_at"] = data.get("action_completed_at", attempt_time)
-
-            logger.info(
-                f"PM scored: participant={participant_id} trial={trial.id} "
-                f"score={score} rt={rt_ms}ms"
-            )
-
-
-async def _record_resumption_lag(trial_id: int, lag_ms: int, db_factory):
-    """Record the resumption lag for a completed PM trial."""
-    async with db_factory() as db:
-        from sqlalchemy import update
-        await db.execute(
-            update(PMTrial)
-            .where(PMTrial.id == trial_id)
-            .values(resumption_lag_ms=lag_ms)
-        )
-        await db.commit()
-        logger.info(f"Resumption lag recorded: trial={trial_id} lag={lag_ms}ms")
 
 
 async def _handle_phone_reply(participant_id, block_number, data, db_factory):
@@ -731,42 +752,16 @@ async def _set_participant_offline(participant_id: str, db_factory):
     """Mark participant as offline when WebSocket disconnects."""
     try:
         async with db_factory() as db:
-            from sqlalchemy import update
+            from sqlalchemy import select, update
             from models.experiment import Participant
-            await db.execute(
-                update(Participant)
-                .where(Participant.id == participant_id)
-                .values(is_online=False)
-            )
-            await db.commit()
+            result = await db.execute(select(Participant).where(Participant.id == participant_id))
+            p = result.scalar_one_or_none()
+            if p:
+                p.is_online = False
+                if p.disconnected_at is None:
+                    p.disconnected_at = time.time()
+                await db.commit()
             logger.info(f"Participant {participant_id} marked offline")
     except Exception as e:
         logger.error(f"Failed to mark participant offline: {e}")
-
-
-async def _check_activity_conditions(
-    participant_id: str, task: str, event: str, data: dict
-):
-    """Map game state changes to activity watcher conditions.
-
-    Conditions:
-    - all_steaks_plated: all 3 steak pans reach 'plated' state
-    - table_full_set: all 4 dining seats have all utensils placed
-    - message_batch_end: a phone message with batch_end flag arrives
-    """
-    from engine.timeline import check_activity_watchers
-
-    condition = None
-    if task == "steak" and event == "steak_plated":
-        # Check if all steaks are now plated (data may contain pan states)
-        all_plated = data.get("all_plated", False)
-        if all_plated:
-            condition = "all_steaks_plated"
-    elif task == "dining" and event == "table_complete":
-        condition = "table_full_set"
-    elif task == "phone" and event == "batch_end":
-        condition = "message_batch_end"
-
-    if condition:
-        await check_activity_watchers(participant_id, condition)
 

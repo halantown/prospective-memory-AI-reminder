@@ -18,7 +18,19 @@ import {
   Plus,
   Download,
   ExternalLink,
+  FlaskConical,
+  BarChart2,
+  RadioTower,
 } from 'lucide-react'
+import {
+  createParticipant,
+  getAssignmentCounts,
+  getLiveSessions,
+  exportPerParticipant,
+  exportAggregated,
+  createTestSession,
+} from '../../services/api'
+import { TRIGGER_SCHEDULE } from '../../constants/pmTasks'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -73,6 +85,7 @@ interface ParticipantDetail {
 
 type SortKey = 'status' | 'created_at' | 'participant_id'
 type SortDir = 'asc' | 'desc'
+type AdminTab = 'participants' | 'token_management' | 'latin_square' | 'live_sessions' | 'data_export' | 'test_mode'
 
 interface ConfirmAction {
   kind: 'reset' | 'drop'
@@ -347,10 +360,441 @@ function ParticipantDetailView({ sessionId }: { sessionId: string }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Token Management Tab                                              */
+/* ------------------------------------------------------------------ */
+
+function TokenManagementTab() {
+  const [creating, setCreating] = useState(false)
+  const [lastCreated, setLastCreated] = useState<{ participant_id: string; token: string; entry_url?: string; task_order?: string } | null>(null)
+  const [participants, setParticipants] = useState<ParticipantRow[]>([])
+  const [copiedToken, setCopiedToken] = useState<string | null>(null)
+  const [manualCondition, setManualCondition] = useState<string>('EC+')
+  const [manualOrder, setManualOrder] = useState<string>('A')
+  const [manualCreating, setManualCreating] = useState(false)
+  const [manualResult, setManualResult] = useState<{ participant_id: string; token: string; entry_url?: string } | null>(null)
+
+  const load = useCallback(async () => {
+    const r = await fetch('/api/admin/participants')
+    if (r.ok) setParticipants(await r.json())
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleCreate = async () => {
+    setCreating(true)
+    try {
+      const result = await createParticipant()
+      setLastCreated({ participant_id: result.participant_id, token: result.token, entry_url: result.entry_url, task_order: result.task_order })
+      load()
+    } catch (e) { console.error(e) }
+    setCreating(false)
+  }
+
+  const handleManualCreate = async () => {
+    setManualCreating(true)
+    try {
+      const result = await createParticipant({ condition: manualCondition, order: manualOrder })
+      setManualResult({ participant_id: result.participant_id, token: result.token, entry_url: result.entry_url })
+      load()
+    } catch (e) { console.error(e) }
+    setManualCreating(false)
+  }
+
+  const copy = async (text: string) => {
+    await copyToClipboard(text)
+    setCopiedToken(text)
+    setTimeout(() => setCopiedToken(null), 2000)
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Create participant */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-slate-800">Auto-assign participant</p>
+          <p className="text-sm text-slate-500">Latin-square assigns condition + order</p>
+        </div>
+        <button onClick={handleCreate} disabled={creating}
+          className="flex items-center gap-2 px-5 py-2 bg-cooking-500 hover:bg-cooking-600 disabled:bg-cooking-200 text-white font-medium rounded-lg transition-colors text-sm">
+          <Plus className="w-4 h-4" />
+          {creating ? 'Creating…' : 'Create Participant'}
+        </button>
+      </div>
+
+      {lastCreated && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-5 space-y-2">
+          <p className="font-semibold text-green-800">✓ Created: {lastCreated.participant_id}</p>
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-2xl font-bold text-green-700 tracking-widest">{lastCreated.token}</span>
+            <button onClick={() => copy(lastCreated.token)}
+              className="text-xs px-2 py-1 bg-green-200 hover:bg-green-300 text-green-800 rounded">
+              {copiedToken === lastCreated.token ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          {lastCreated.entry_url && (
+            <p className="text-xs text-green-600 font-mono truncate">{lastCreated.entry_url}</p>
+          )}
+        </div>
+      )}
+
+      {/* Manual override */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <p className="font-semibold text-slate-800 mb-3">Manual Override</p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">Condition</label>
+            <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm">
+              <option value="EC+">EC+</option>
+              <option value="EC-">EC-</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">Order</label>
+            <select value={manualOrder} onChange={(e) => setManualOrder(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm">
+              {['A','B','C','D'].map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div className="pt-4">
+            <button onClick={handleManualCreate} disabled={manualCreating}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-800 disabled:bg-slate-300 text-white rounded-lg text-sm">
+              {manualCreating ? 'Creating…' : 'Create'}
+            </button>
+          </div>
+        </div>
+        {manualResult && (
+          <div className="mt-3 p-3 bg-slate-50 rounded-lg text-sm">
+            <span className="font-medium">{manualResult.participant_id}</span>
+            {' — '}
+            <span className="font-mono font-bold">{manualResult.token}</span>
+            {manualResult.entry_url && <p className="text-xs text-slate-500 truncate mt-1">{manualResult.entry_url}</p>}
+          </div>
+        )}
+      </div>
+
+      {/* Participants table */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="text-left px-4 py-3 font-medium text-slate-600">ID</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-600">Token</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-600">Condition</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-600">Status</th>
+              <th className="text-center px-4 py-3 font-medium text-slate-600">Copy URL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {participants.map((p) => (
+              <tr key={p.session_id} className="border-b border-slate-100 hover:bg-slate-50">
+                <td className="px-4 py-2 font-medium text-slate-800 text-xs">{p.participant_id}</td>
+                <td className="px-4 py-2 font-mono text-xs text-cooking-600">{p.token}</td>
+                <td className="px-4 py-2 text-xs">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${conditionColor(p.condition)}`}>
+                    {p.condition}
+                  </span>
+                </td>
+                <td className="px-4 py-2">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusBadge(p.status)}`}>
+                    {p.status}
+                  </span>
+                </td>
+                <td className="px-4 py-2 text-center">
+                  <button
+                    onClick={() => copy(`${window.location.origin}/?token=${p.token}`)}
+                    className="p-1.5 rounded hover:bg-slate-100 text-slate-500">
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Latin Square Tab                                                   */
+/* ------------------------------------------------------------------ */
+
+function LatinSquareTab() {
+  const [counts, setCounts] = useState<Record<string, Record<string, number>>>({})
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getAssignmentCounts().then((d) => { setCounts(d); setLoading(false) }).catch(() => setLoading(false))
+  }, [])
+
+  const conditions = ['EC+', 'EC-']
+  const orders = ['A', 'B', 'C', 'D']
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <h3 className="font-semibold text-slate-800 mb-4">Assignment Counts (Condition × Order)</h3>
+        {loading ? (
+          <div className="text-slate-400 text-sm flex items-center gap-2"><RefreshCw className="w-4 h-4 animate-spin" /> Loading…</div>
+        ) : (
+          <table className="text-sm">
+            <thead>
+              <tr>
+                <th className="text-left px-3 py-2 font-medium text-slate-500" />
+                {orders.map((o) => (
+                  <th key={o} className="px-6 py-2 font-semibold text-slate-700 text-center">{o}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {conditions.map((c) => (
+                <tr key={c} className="border-t border-slate-100">
+                  <td className="px-3 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${conditionColor(c)}`}>{c}</span>
+                  </td>
+                  {orders.map((o) => (
+                    <td key={o} className="px-6 py-3 text-center font-bold text-slate-800">
+                      {counts[c]?.[o] ?? 0}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <h3 className="font-semibold text-slate-800 mb-4">Trigger Schedule</h3>
+        <div className="space-y-2">
+          {TRIGGER_SCHEDULE.map((entry, i) => (
+            <div key={i} className="flex items-center gap-3 text-sm bg-slate-50 rounded-lg px-4 py-2">
+              <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-xs flex items-center justify-center font-bold">{i + 1}</span>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${entry.type === 'real' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                {entry.type === 'real' ? `Real (pos ${entry.task_position})` : `Fake (${entry.trigger_type})`}
+              </span>
+              <span className="text-slate-500">+{entry.delay_after_previous_s}s after previous</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Live Sessions Tab                                                  */
+/* ------------------------------------------------------------------ */
+
+function LiveSessionsTab() {
+  const [sessions, setSessions] = useState<Array<{
+    session_id: string; participant_id: string; condition: string; task_order: string;
+    current_phase: string; elapsed_s: number; disconnected_at: number | null;
+  }>>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const data = await getLiveSessions()
+      setSessions(data)
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    load()
+    const interval = setInterval(load, 10_000)
+    return () => clearInterval(interval)
+  }, [load])
+
+  if (loading) return <div className="text-slate-400 flex items-center gap-2 p-4"><RefreshCw className="w-4 h-4 animate-spin" /> Loading…</div>
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-slate-50 border-b border-slate-200">
+            <th className="text-left px-4 py-3 font-medium text-slate-600">Participant</th>
+            <th className="text-left px-4 py-3 font-medium text-slate-600">Condition</th>
+            <th className="text-left px-4 py-3 font-medium text-slate-600">Order</th>
+            <th className="text-left px-4 py-3 font-medium text-slate-600">Phase</th>
+            <th className="text-left px-4 py-3 font-medium text-slate-600">Elapsed</th>
+            <th className="text-center px-4 py-3 font-medium text-slate-600">Connection</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sessions.length === 0 ? (
+            <tr><td colSpan={6} className="text-center py-12 text-slate-400">No active sessions</td></tr>
+          ) : sessions.map((s) => (
+            <tr key={s.session_id} className="border-b border-slate-100 hover:bg-slate-50">
+              <td className="px-4 py-3 font-medium text-slate-800 text-xs">{s.participant_id}</td>
+              <td className="px-4 py-3">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${conditionColor(s.condition)}`}>{s.condition}</span>
+              </td>
+              <td className="px-4 py-3 text-slate-600 font-medium">{s.task_order}</td>
+              <td className="px-4 py-3 text-slate-600 text-xs">{s.current_phase}</td>
+              <td className="px-4 py-3 text-slate-600 text-xs">
+                {s.elapsed_s > 0 ? `${Math.floor(s.elapsed_s / 60)}m ${s.elapsed_s % 60}s` : '—'}
+              </td>
+              <td className="px-4 py-3 text-center">
+                {s.disconnected_at ? (
+                  <span title="Disconnected"><WifiOff className="w-4 h-4 text-red-400 mx-auto" /></span>
+                ) : (
+                  <span title="Connected"><Wifi className="w-4 h-4 text-green-500 mx-auto" /></span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Data Export Tab                                                    */
+/* ------------------------------------------------------------------ */
+
+function DataExportTab() {
+  const [includeTest, setIncludeTest] = useState(false)
+  const [loading, setLoading] = useState<string | null>(null)
+
+  const download = async (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handlePerParticipant = async () => {
+    setLoading('per')
+    try {
+      const blob = await exportPerParticipant(includeTest)
+      download(blob, `per-participant-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch (e) { console.error(e) }
+    setLoading(null)
+  }
+
+  const handleAggregated = async () => {
+    setLoading('agg')
+    try {
+      const blob = await exportAggregated(includeTest)
+      download(blob, `aggregated-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch (e) { console.error(e) }
+    setLoading(null)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-3">
+        <input type="checkbox" id="include-test" checked={includeTest} onChange={(e) => setIncludeTest(e.target.checked)}
+          className="w-4 h-4 rounded" />
+        <label htmlFor="include-test" className="text-sm text-slate-700 cursor-pointer">Include test sessions</label>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <button onClick={handlePerParticipant} disabled={loading !== null}
+          className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl transition-colors">
+          <Download className="w-5 h-5" />
+          {loading === 'per' ? 'Exporting…' : 'Export Per-Participant CSV'}
+        </button>
+        <button onClick={handleAggregated} disabled={loading !== null}
+          className="flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold rounded-xl transition-colors">
+          <Download className="w-5 h-5" />
+          {loading === 'agg' ? 'Exporting…' : 'Export Aggregated CSV'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Test Mode Tab                                                      */
+/* ------------------------------------------------------------------ */
+
+function TestModeTab() {
+  const [condition, setCondition] = useState('EC+')
+  const [order, setOrder] = useState('A')
+  const [startPhase, setStartPhase] = useState('welcome')
+  const [creating, setCreating] = useState(false)
+  const [result, setResult] = useState<{ session_id: string; token: string; entry_url: string } | null>(null)
+
+  const PHASES = ['welcome', 'consent', 'introduction', 'encoding', 'playing', 'post_questionnaire', 'debrief']
+
+  const handleCreate = async () => {
+    setCreating(true)
+    try {
+      const r = await createTestSession({ condition, order, start_phase: startPhase })
+      setResult(r)
+    } catch (e) { console.error(e) }
+    setCreating(false)
+  }
+
+  const handleOpen = () => {
+    if (result?.entry_url) window.open(result.entry_url, '_blank')
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+        ⚠️ Test sessions are excluded from real data by default. Use the Data Export tab to include them if needed.
+      </div>
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+        <h3 className="font-semibold text-slate-800">Create Test Session</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">Condition</label>
+            <select value={condition} onChange={(e) => setCondition(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="EC+">EC+</option>
+              <option value="EC-">EC-</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">Order</label>
+            <select value={order} onChange={(e) => setOrder(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm">
+              {['A','B','C','D'].map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">Start Phase</label>
+            <select value={startPhase} onChange={(e) => setStartPhase(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm">
+              {PHASES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+        <button onClick={handleCreate} disabled={creating}
+          className="px-6 py-2 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white font-semibold rounded-xl transition-colors text-sm">
+          {creating ? 'Creating…' : 'Create Test Session'}
+        </button>
+
+        {result && (
+          <div className="mt-4 p-4 bg-slate-50 rounded-xl space-y-2">
+            <p className="text-sm font-medium text-slate-800">Session created!</p>
+            <p className="text-xs text-slate-500">Token: <span className="font-mono font-bold text-slate-700">{result.token}</span></p>
+            <p className="text-xs font-mono text-slate-500 truncate">{result.entry_url}</p>
+            <button onClick={handleOpen}
+              className="flex items-center gap-2 text-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+              <ExternalLink className="w-4 h-4" />
+              Open in New Tab
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Dashboard                                                     */
 /* ------------------------------------------------------------------ */
 
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<AdminTab>('participants')
   const [participants, setParticipants] = useState<ParticipantRow[]>([])
   const [overview, setOverview] = useState<Overview | null>(null)
   const [creating, setCreating] = useState(false)
@@ -432,9 +876,7 @@ export default function AdminDashboard() {
   const handleCreate = async () => {
     setCreating(true)
     try {
-      const res = await fetch('/api/admin/participant/create', { method: 'POST' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const result = await res.json()
+      const result = await createParticipant()
       setLastCreated({ participant_id: result.participant_id, token: result.token })
       refresh()
     } catch (err) {
@@ -554,6 +996,31 @@ export default function AdminDashboard() {
             />
           </div>
         </div>
+
+        {/* ---- Tab bar ---- */}
+        <div className="max-w-7xl mx-auto px-6 border-t border-slate-100 flex gap-1 overflow-x-auto">
+          {([
+            { id: 'participants', label: 'Participants', icon: Users },
+            { id: 'token_management', label: 'Token Management', icon: Copy },
+            { id: 'latin_square', label: 'Latin Square', icon: BarChart2 },
+            { id: 'live_sessions', label: 'Live Sessions', icon: RadioTower },
+            { id: 'data_export', label: 'Data Export', icon: Download },
+            { id: 'test_mode', label: 'Test Mode', icon: FlaskConical },
+          ] as { id: AdminTab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === id
+                  ? 'border-cooking-500 text-cooking-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
@@ -590,7 +1057,7 @@ export default function AdminDashboard() {
           )}
         </AnimatePresence>
 
-        {/* ---- Overview cards ---- */}
+        {/* ---- Overview cards (always visible) ---- */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
             label="Total"
@@ -619,7 +1086,8 @@ export default function AdminDashboard() {
           />
         </div>
 
-        {/* ---- Participant table ---- */}
+        {/* ---- Tab content ---- */}
+        {activeTab === 'participants' && (
         <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
           <table className="w-full text-sm table-fixed">
             <thead>
@@ -769,6 +1237,13 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
+        )}
+
+        {activeTab === 'token_management' && <TokenManagementTab />}
+        {activeTab === 'latin_square' && <LatinSquareTab />}
+        {activeTab === 'live_sessions' && <LiveSessionsTab />}
+        {activeTab === 'data_export' && <DataExportTab />}
+        {activeTab === 'test_mode' && <TestModeTab />}
       </main>
 
       {/* ---- Confirmation Modal ---- */}

@@ -410,3 +410,132 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 ### Follow-up Actions
 > - [ ] Define a shared `CookingEventPayload` TypeScript type or Pydantic model to enforce the contract at build time
 > - [ ] Add a unit test in `test_cooking_engine.py` that asserts the exact keys present in each event type sent via mock send_fn
+
+---
+
+## INC-008 — PM attempt record silently dropped on race-condition rollback
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-04-23 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | Code review |
+| Affected area| `backend/websocket/game_handler.py` — PM attempt handler |
+
+### Background
+> When a participant submits a PM attempt, the handler records a `PMAttemptRecord` and atomically updates the `PMTrial` row. If the trial was already scored (race with window expiry), the update is rejected by a rowcount check and the transaction is rolled back.
+
+### Incident Description
+> `db.add(attempt_record)` was called **before** the atomic `PMTrial` rowcount check. When the check failed (`rowcount == 0`) and `await db.rollback()` was issued, the `PMAttemptRecord` — which had only been added to the session, never committed — was silently discarded along with the rolled-back update. Any PM attempt that arrived in a race with window expiry produced no research record.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 21:59 | Identified during automated code review |
+| 22:08 | Root cause confirmed by code inspection |
+| 22:08 | Fix applied and committed |
+
+### Root Cause
+> SQLAlchemy's `db.add()` stages a row in the current transaction. `db.rollback()` discards all staged changes, including the attempt record that was added before the update was attempted. Because race conditions are rare, the data loss went undetected.
+
+### Contributing Factors
+> - `db.add(attempt_record)` placed before the guard that could trigger rollback
+> - Race conditions occur infrequently, so missing records are hard to notice without explicit monitoring
+
+### Fix
+> **`backend/websocket/game_handler.py`** — Moved `db.add(attempt_record)` to **after** the `rowcount == 0` early-return check. The attempt record is now only added to the session when the atomic update has confirmed success, ensuring rollbacks on race conditions leave no partial state.
+
+### Verification
+> Code inspection confirms `db.add(attempt_record)` now executes only on the success path (rowcount ≥ 1), immediately before `await db.commit()`.
+
+### Follow-up Actions
+> - [ ] Add monitoring/counter for `rowcount == 0` warnings to detect pathological race rates in production
+
+---
+
+## INC-009 — Admin endpoints unprotected when `ADMIN_API_KEY` unset in production
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-04-23 |
+| Severity     | P2 Medium |
+| Status       | Resolved |
+| Reported by  | Code review |
+| Affected area| `backend/routers/admin.py`, `backend/main.py` (`/ws/monitor`) |
+
+### Background
+> Admin endpoints (`/api/admin/*`) allow creating/deleting participants, exporting all experiment data, and resetting study state. They are protected by `X-Admin-Key` header verification when `ADMIN_API_KEY` is set. When `ADMIN_API_KEY` is unset, the guard short-circuits and skips all authentication — intended for local development.
+
+### Incident Description
+> No startup guard prevented deploying to production without setting `ADMIN_API_KEY`. Unlike `DEV_TOKEN` (which raises `RuntimeError` if set in production), the absence of `ADMIN_API_KEY` in production was silently tolerated, leaving all admin routes completely unauthenticated.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 21:59 | Identified during automated code review |
+| 22:08 | Fix applied to `config.py` |
+
+### Root Cause
+> `DEV_TOKEN` had an explicit production guard added (correctly), but the same pattern was never applied to `ADMIN_API_KEY`.
+
+### Contributing Factors
+> - Asymmetric treatment of development-only configuration values
+> - No integration test exercises the auth guard under production-like settings
+
+### Fix
+> **`backend/config.py`** — Added startup guard:
+> ```python
+> if ENVIRONMENT == "production" and ADMIN_API_KEY is None:
+>     raise RuntimeError("ADMIN_API_KEY must be set in production! ...")
+> ```
+> The server now refuses to start in production without an admin key set.
+
+### Verification
+> Code inspection confirms the guard follows the same pattern as the existing `DEV_TOKEN` check.
+
+### Follow-up Actions
+> - [ ] Add similar guards for any future credentials/secrets introduced to `config.py`
+
+---
+
+## INC-010 — CORS wildcard + credentials allowed in production without guard
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-04-23 |
+| Severity     | P2 Medium |
+| Status       | Resolved |
+| Reported by  | Code review |
+| Affected area| `backend/config.py`, `backend/main.py` — CORS middleware |
+
+### Background
+> The CORS middleware is configured with `allow_credentials=True`. The allowed origins default to `"*"` (wildcard) when `CORS_ORIGINS` is not set in the environment. Browsers enforce that `allow_credentials=True` is incompatible with a wildcard origin — they reject such responses. However, a wildcard config in production would still allow unauthenticated cross-origin requests from any domain.
+
+### Incident Description
+> `config.py` defaulted `CORS_ORIGINS` to `["*"]` with no production guard. Deploying without setting `CORS_ORIGINS` would leave the API reachable from any origin (non-credentialed requests) and silently break credentialed CORS requests (browsers reject `*` + credentials). No startup check prevented this misconfiguration.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 21:59 | Identified during automated code review |
+| 22:08 | Fix applied to `config.py` |
+
+### Root Cause
+> The comment in `config.py` said "restrict in production" but relied solely on the operator remembering to set the environment variable. No enforcement existed.
+
+### Contributing Factors
+> - Default of `"*"` is convenient for development but dangerous if carried to production
+> - `allow_credentials=True` + `"*"` is non-functional in browsers, masking the issue during testing
+
+### Fix
+> **`backend/main.py`** — Changed `allow_credentials=True` → `allow_credentials=False`.
+> Session tokens are passed in request bodies, not cookies, so credentials mode is not required.
+> This resolves the wildcard incompatibility at its root: `allow_origins=["*"]` is now valid and
+> the CORS guard in `config.py` is not needed.
+
+### Verification
+> `allow_credentials=False` + `allow_origins=["*"]` is a valid, browser-accepted CORS configuration.
+
+### Follow-up Actions
+> - [x] Remove `allow_credentials=True` — done

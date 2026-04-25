@@ -1,13 +1,15 @@
 """Admin router — participant management, monitoring, data export."""
 
+import io
+import csv
 import uuid
 import json
 import time
-import random
 import logging
-from dataclasses import asdict
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, Header
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,14 +17,15 @@ from database import get_db, async_session
 from models.experiment import Experiment, ExperimentStatus, Participant, ParticipantStatus
 from models.block import Block, BlockStatus, PMTrial, PMAttemptRecord, ReminderMessage
 from models.logging import InteractionLog, PhoneMessageLog, GameStateSnapshot
-from models.schemas import ParticipantCreateResponse, ReminderImportItem
-from engine.condition_assigner import assign_condition, generate_token, next_participant_id
-from engine.pm_tasks import (
-    get_task, BLOCK_TRIGGER_ORDER,
-    task_def_to_config, task_def_to_encoding_card,
+from models.pm_module import PMTaskEvent, FakeTriggerEvent, PhaseEvent, IntentionCheckEvent
+from models.schemas import (
+    ParticipantCreateResponse, ReminderImportItem,
+    AdminParticipantCreateRequest,
 )
+from engine.condition_assigner import assign_condition_and_order, generate_token, next_participant_id
+from engine.pm_tasks import get_task, BLOCK_TRIGGER_ORDER
 from websocket.connection_manager import manager
-from config import ADMIN_API_KEY
+from config import ADMIN_API_KEY, CONDITIONS, TASK_ORDERS
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +42,11 @@ router = APIRouter(prefix="/api/admin", dependencies=[Depends(verify_admin)])
 
 DAY_STORY = "Cooking dinner for a friend"
 
-# Rotate unreminded trial position across participants (0..3) for balance
-_UNREMINDED_CYCLE = list(range(4))
 
-
-@router.post("/participant/create", response_model=ParticipantCreateResponse)
-async def create_participant(db: AsyncSession = Depends(get_db)):
-    """Create a new participant with a unique token."""
-    # Ensure an active experiment exists
+async def _create_participant_row(
+    db: AsyncSession, is_test: bool = False, req: Optional[AdminParticipantCreateRequest] = None
+) -> Participant:
+    """Shared logic for creating a participant + bare block."""
     result = await db.execute(
         select(Experiment).where(Experiment.status == ExperimentStatus.ACTIVE).limit(1)
     )
@@ -56,31 +56,28 @@ async def create_participant(db: AsyncSession = Depends(get_db)):
         db.add(experiment)
         await db.flush()
 
-    # Count existing participants for round-robin unreminded position
-    count_result = await db.execute(select(func.count(Participant.id)))
-    participant_count = count_result.scalar() or 0
-
-    # Generate IDs and assign condition
     pid = str(uuid.uuid4())[:8]
     participant_id = await next_participant_id(db)
-    condition = await assign_condition(db)
     token = await generate_token(db)
-    unreminded_pos = _UNREMINDED_CYCLE[participant_count % len(_UNREMINDED_CYCLE)]
-    af_variant_index = random.randint(0, 9)
-    target_position_seed = random.randint(0, 99999)
 
-    # Create participant
+    if is_test:
+        condition = (req.condition if req and req.condition else CONDITIONS[0])
+        task_order = (req.task_order if req and req.task_order else list(TASK_ORDERS.keys())[0])
+    else:
+        condition, task_order = await assign_condition_and_order(db)
+
     participant = Participant(
         id=pid,
         experiment_id=experiment.id,
         participant_id=participant_id,
         token=token,
         condition=condition,
+        task_order=task_order,
         status=ParticipantStatus.REGISTERED,
+        is_test=is_test,
     )
     db.add(participant)
 
-    # Pre-create single block (block_number=1) with PM task data
     block = Block(
         participant_id=pid,
         block_number=1,
@@ -90,41 +87,94 @@ async def create_participant(db: AsyncSession = Depends(get_db)):
     )
     db.add(block)
     await db.flush()
+    return participant
 
-    trigger_order = BLOCK_TRIGGER_ORDER[1]
-    for trial_idx, task_id in enumerate(trigger_order):
-        task_def = get_task(task_id)
-        is_unreminded = (trial_idx == unreminded_pos)
-        has_reminder = (condition != "CONTROL") and (not is_unreminded)
 
-        trial = PMTrial(
-            block_id=block.id,
-            trial_number=trial_idx + 1,
-            has_reminder=has_reminder,
-            is_filler=is_unreminded and condition != "CONTROL",
-            task_config=task_def_to_config(task_def),
-            encoding_card=task_def_to_encoding_card(task_def),
-            reminder_text=task_def.baseline_reminder if has_reminder else None,
-            reminder_condition=condition if has_reminder else None,
-        )
-        db.add(trial)
-
+@router.post("/participant/create", response_model=ParticipantCreateResponse)
+async def create_participant(
+    req: Optional[AdminParticipantCreateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new real participant with round-robin condition assignment."""
+    participant = await _create_participant_row(db, is_test=False, req=req)
     await db.commit()
 
-    # Broadcast to admin dashboard
     await manager.broadcast_admin({
         "event_type": "participant_created",
-        "participant_id": participant_id,
-        "condition": condition,
-        "token": token,
+        "participant_id": participant.participant_id,
+        "condition": participant.condition,
+        "task_order": participant.task_order,
+        "token": participant.token,
     })
 
     return ParticipantCreateResponse(
-        participant_id=participant_id,
-        condition=condition,
-        token=token,
-        session_id=pid,
+        participant_id=participant.participant_id,
+        condition=participant.condition,
+        task_order=participant.task_order,
+        token=participant.token,
+        session_id=participant.id,
+        entry_url=f"/?token={participant.token}",
     )
+
+
+@router.post("/test-session", response_model=ParticipantCreateResponse)
+async def create_test_session(
+    req: Optional[AdminParticipantCreateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a test participant (excluded from analysis by default)."""
+    participant = await _create_participant_row(db, is_test=True, req=req)
+    await db.commit()
+    return ParticipantCreateResponse(
+        participant_id=participant.participant_id,
+        condition=participant.condition,
+        task_order=participant.task_order,
+        token=participant.token,
+        session_id=participant.id,
+        entry_url=f"/?token={participant.token}",
+    )
+
+
+@router.get("/assignment-counts")
+async def get_assignment_counts(db: AsyncSession = Depends(get_db)):
+    """Return participant counts grouped by condition × task_order (real participants only)."""
+    result = await db.execute(
+        select(
+            Participant.condition,
+            Participant.task_order,
+            func.count(Participant.id).label("count"),
+        )
+        .where(Participant.is_test == False)  # noqa: E712
+        .group_by(Participant.condition, Participant.task_order)
+    )
+    rows = result.all()
+    return [
+        {"condition": r.condition, "task_order": r.task_order, "count": r.count}
+        for r in rows
+    ]
+
+
+@router.get("/live-sessions")
+async def get_live_sessions(db: AsyncSession = Depends(get_db)):
+    """Return participants currently in progress."""
+    result = await db.execute(
+        select(Participant).where(Participant.status == ParticipantStatus.IN_PROGRESS)
+        .order_by(Participant.started_at.desc())
+    )
+    participants = result.scalars().all()
+    return [
+        {
+            "session_id": p.id,
+            "participant_id": p.participant_id,
+            "condition": p.condition,
+            "task_order": p.task_order,
+            "is_online": p.is_online,
+            "is_test": p.is_test,
+            "started_at": p.started_at.isoformat() if p.started_at else None,
+            "last_heartbeat": p.last_heartbeat,
+        }
+        for p in participants
+    ]
 
 
 @router.get("/participants")
@@ -139,6 +189,9 @@ async def list_participants(db: AsyncSession = Depends(get_db)):
             "session_id": p.id,
             "participant_id": p.participant_id,
             "condition": p.condition,
+            "task_order": p.task_order,
+            "is_test": p.is_test,
+            "current_phase": p.current_phase,
             "status": p.status.value if isinstance(p.status, ParticipantStatus) else p.status,
             "token": p.token,
             "is_online": p.is_online,
@@ -366,21 +419,18 @@ async def drop_participant(session_id: str, db: AsyncSession = Depends(get_db)):
 async def get_config():
     """Return current experiment configuration."""
     from config import (
-        CONDITIONS, PM_TASKS_PER_BLOCK, BLOCK_DURATION_S,
-        EXECUTION_WINDOW_S, LATE_WINDOW_S, REMINDER_LEAD_S,
+        CONDITIONS, BLOCK_DURATION_S,
         PHONE_LOCK_TIMEOUT_S, MESSAGE_COOLDOWN_S,
         MOUSE_SAMPLE_INTERVAL_MS, MOUSE_BATCH_INTERVAL_S,
         SNAPSHOT_INTERVAL_S, HEARTBEAT_INTERVAL_S, HEARTBEAT_TIMEOUT_S,
-        TOKEN_LENGTH,
+        TOKEN_LENGTH, TRIGGER_SCHEDULE, TASK_ORDERS,
     )
     return {
         "experiment": {
             "conditions": CONDITIONS,
-            "pm_tasks_per_block": PM_TASKS_PER_BLOCK,
+            "task_orders": TASK_ORDERS,
             "block_duration_s": BLOCK_DURATION_S,
-            "execution_window_s": EXECUTION_WINDOW_S,
-            "late_window_s": LATE_WINDOW_S,
-            "reminder_lead_s": REMINDER_LEAD_S,
+            "trigger_schedule": TRIGGER_SCHEDULE,
         },
         "phone": {
             "lock_timeout_s": PHONE_LOCK_TIMEOUT_S,
@@ -401,29 +451,9 @@ async def get_config():
 
 @router.get("/tasks")
 async def list_pm_tasks():
-    """Return the full PM task registry grouped by block."""
-    from engine.pm_tasks import (
-        BLOCK_TRIGGER_ORDER, BLOCK_TRIGGER_TIMES, ACTIVITY_WATCH_CONFIG,
-        get_task, get_task_config,
-    )
-    blocks = {}
-    for block_num in (1, 2, 3):
-        tasks = []
-        for task_id in BLOCK_TRIGGER_ORDER[block_num]:
-            task_def = get_task(task_id)
-            cfg = get_task_config(task_id)
-            trigger_time = BLOCK_TRIGGER_TIMES.get(block_num, {}).get(task_id)
-            watch = ACTIVITY_WATCH_CONFIG.get(task_id)
-            tasks.append({
-                **cfg,
-                "trigger_time": trigger_time,
-                "trigger_audio": task_def.trigger_audio,
-                "trigger_visual": task_def.trigger_visual,
-                "encoding_text": task_def.encoding_text,
-                "activity_watch": watch,
-            })
-        blocks[str(block_num)] = tasks
-    return blocks
+    """Return the full PM task definitions."""
+    from config import TASK_DEFINITIONS
+    return {"tasks": TASK_DEFINITIONS}
 
 
 @router.get("/data/export")
@@ -682,13 +712,9 @@ async def advance_block(session_id: str, db: AsyncSession = Depends(get_db)):
     block.status = BlockStatus.COMPLETED
     block.ended_at = datetime.now(timezone.utc)
 
-    # Advance participant to next block
-    next_block_num = block.block_number + 1
-    if next_block_num <= 3:
-        p.current_block = next_block_num
-    else:
-        p.status = ParticipantStatus.COMPLETED
-        p.completed_at = datetime.now(timezone.utc)
+    # Single-session design: mark participant completed
+    p.status = ParticipantStatus.COMPLETED
+    p.completed_at = datetime.now(timezone.utc)
 
     await db.commit()
 
@@ -704,8 +730,92 @@ async def advance_block(session_id: str, db: AsyncSession = Depends(get_db)):
     return {
         "status": "advanced",
         "completed_block": block.block_number,
-        "next_block": next_block_num if next_block_num <= 3 else None,
     }
 
 
-# WebSocket endpoint moved to main.py (no /api prefix needed)
+@router.get("/export/per-participant")
+async def export_per_participant(
+    include_test: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    """CSV export — one row per PMTaskEvent."""
+    query = select(PMTaskEvent).order_by(PMTaskEvent.id)
+    if not include_test:
+        query = query.join(Participant, Participant.id == PMTaskEvent.session_id).where(
+            Participant.is_test == False  # noqa: E712
+        )
+    result = await db.execute(query)
+    events = result.scalars().all()
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([
+        "session_id", "task_id", "trigger_fired_at", "condition", "task_order",
+        "greeting_complete_time", "reminder_display_time", "reminder_acknowledge_time",
+        "decoy_options_order", "decoy_selected_option", "decoy_correct", "decoy_response_time",
+        "confidence_rating", "confidence_response_time",
+        "action_animation_start_time", "action_animation_complete_time",
+    ])
+    for e in events:
+        w.writerow([
+            e.session_id, e.task_id, e.trigger_fired_at, e.condition, e.task_order,
+            e.greeting_complete_time, e.reminder_display_time, e.reminder_acknowledge_time,
+            json.dumps(e.decoy_options_order) if e.decoy_options_order else "",
+            e.decoy_selected_option, e.decoy_correct, e.decoy_response_time,
+            e.confidence_rating, e.confidence_response_time,
+            e.action_animation_start_time, e.action_animation_complete_time,
+        ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=pm_events.csv"},
+    )
+
+
+@router.get("/export/aggregated")
+async def export_aggregated(
+    include_test: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    """CSV export — one row per participant with aggregated PM metrics."""
+    p_query = select(Participant).order_by(Participant.created_at)
+    if not include_test:
+        p_query = p_query.where(Participant.is_test == False)  # noqa: E712
+    p_result = await db.execute(p_query)
+    participants = p_result.scalars().all()
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([
+        "participant_id", "session_id", "condition", "task_order", "status",
+        "is_test", "created_at", "started_at", "completed_at",
+        "pm_events_count", "pm_actions_completed",
+    ])
+    for p in participants:
+        evt_result = await db.execute(
+            select(func.count(PMTaskEvent.id)).where(PMTaskEvent.session_id == p.id)
+        )
+        total_events = evt_result.scalar() or 0
+        done_result = await db.execute(
+            select(func.count(PMTaskEvent.id)).where(
+                PMTaskEvent.session_id == p.id,
+                PMTaskEvent.action_animation_complete_time.isnot(None),
+            )
+        )
+        done_events = done_result.scalar() or 0
+        w.writerow([
+            p.participant_id, p.id, p.condition, p.task_order,
+            p.status.value if hasattr(p.status, "value") else p.status,
+            p.is_test,
+            p.created_at.isoformat() if p.created_at else "",
+            p.started_at.isoformat() if p.started_at else "",
+            p.completed_at.isoformat() if p.completed_at else "",
+            total_events, done_events,
+        ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=participants_aggregated.csv"},
+    )

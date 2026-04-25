@@ -16,6 +16,7 @@ async def init_db():
     import models.block       # noqa: F401
     import models.logging     # noqa: F401
     import models.cooking     # noqa: F401
+    import models.pm_module   # noqa: F401
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -23,7 +24,8 @@ async def init_db():
 async def seed_dev_participant():
     """Auto-create or reset the dev test participant defined in config.DEV_TOKEN.
 
-    This runs on every startup so the token always works even after DB resets.
+    Creates a EC+ / Order A / is_test=True participant plus a bare Block shim
+    (block_number=1) required as an FK anchor for existing logging tables.
     Set config.DEV_TOKEN = None to disable.
     """
     import logging
@@ -45,60 +47,30 @@ async def seed_dev_participant():
         if experiment is None:
             experiment = Experiment(name="DEV Experiment", status=ExperimentStatus.ACTIVE)
             db.add(experiment)
-            await db.flush()  # get experiment.id
+            await db.flush()
 
         result = await db.execute(
             select(Participant).where(Participant.token == DEV_TOKEN)
         )
         p = result.scalar_one_or_none()
         if p:
-            # Reset to REGISTERED so it can be reused
+            # Reset to initial state so the token can be reused across dev restarts
             p.status = ParticipantStatus.REGISTERED
             p.started_at = None
             p.completed_at = None
             p.is_online = False
-
-            # Also reset block back to PENDING and clear runtime data
-            from sqlalchemy import update as sql_update
-            from models.block import Block, BlockStatus, PMTrial
-            await db.execute(
-                sql_update(Block)
-                .where(Block.participant_id == p.id)
-                .values(
-                    status=BlockStatus.PENDING,
-                    started_at=None,
-                    ended_at=None,
-                    nasa_tlx=None,
-                )
-            )
-            # Reset PM trial runtime fields (scores, timing)
-            block_result = await db.execute(
-                select(Block.id).where(Block.participant_id == p.id)
-            )
-            block_ids = [r[0] for r in block_result.all()]
-            if block_ids:
-                await db.execute(
-                    sql_update(PMTrial)
-                    .where(PMTrial.block_id.in_(block_ids))
-                    .values(
-                        trigger_fired_at=None,
-                        exec_window_start=None,
-                        exec_window_end=None,
-                        user_actions=None,
-                        score=None,
-                        response_time_ms=None,
-                        resumption_lag_ms=None,
-                        reminder_played_at=None,
-                    )
-                )
-
+            p.current_phase = "welcome"
+            p.game_time_elapsed_s = 0.0
+            p.frozen_since = None
+            p.last_unfreeze_at = None
+            p.disconnected_at = None
+            p.incomplete = False
             await db.commit()
             logger.warning(
-                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' reset to REGISTERED (block reset to PENDING) — "
-                "remove config.DEV_TOKEN before production!"
+                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' reset to REGISTERED — "
+                "remove DEV_TOKEN before production!"
             )
         else:
-            condition = "AF"  # default dev condition
             pid = str(uuid.uuid4())[:8]
             p = Participant(
                 id=pid,
@@ -106,50 +78,28 @@ async def seed_dev_participant():
                 participant_id="DEV_TESTER",
                 token=DEV_TOKEN,
                 status=ParticipantStatus.REGISTERED,
-                condition=condition,
+                condition="EC+",
+                task_order="A",
+                is_test=True,
+                current_phase="welcome",
             )
             db.add(p)
             await db.flush()
 
-            # Pre-create block and PM trials using real task registry
-            from models.block import Block, BlockStatus, PMTrial
-            from engine.pm_tasks import get_task, BLOCK_TRIGGER_ORDER
-            from engine.pm_tasks import task_def_to_config, task_def_to_encoding_card
-
+            # Bare Block shim — no PMTrials; exists only as FK anchor for logging tables
+            from models.block import Block, BlockStatus
             block = Block(
                 participant_id=pid,
                 block_number=1,
-                condition=condition,
-                day_story="Cooking dinner for a friend",
+                condition="EC+",
+                day_story="DEV seed block",
                 status=BlockStatus.PENDING,
             )
             db.add(block)
-            await db.flush()
-
-            trigger_order = BLOCK_TRIGGER_ORDER[1]
-            for trial_idx, task_id in enumerate(trigger_order):
-                task_def = get_task(task_id)
-                is_unreminded = (trial_idx == 3)  # last trial unreminded in AF
-                has_reminder = (condition != "CONTROL") and (not is_unreminded)
-
-                trial = PMTrial(
-                    block_id=block.id,
-                    trial_number=trial_idx + 1,
-                    has_reminder=has_reminder,
-                    is_filler=(is_unreminded and condition != "CONTROL"),
-                    task_config=task_def_to_config(task_def),
-                    encoding_card=task_def_to_encoding_card(task_def),
-                    reminder_text=(
-                        task_def.baseline_reminder if has_reminder else None
-                    ),
-                    reminder_condition=condition if has_reminder else None,
-                )
-                db.add(trial)
-
             await db.commit()
             logger.warning(
-                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' created (condition={condition}) — "
-                "remove config.DEV_TOKEN before production!"
+                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' created (EC+ / Order A / is_test=True) — "
+                "remove DEV_TOKEN before production!"
             )
 
 

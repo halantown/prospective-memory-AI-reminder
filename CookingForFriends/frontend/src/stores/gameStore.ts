@@ -6,6 +6,7 @@ import type {
   ActivePMTrial, PMTaskConfig, DiningPhase, SteakState, SeatState, UtensilType,
   DishId, DishState, KitchenStationId, Contact,
   ActiveCookingStep, CookingStepResult, CookingStepOption, CookingWaitStep,
+  TaskOrder, PMPipelineState, PMPipelineStep,
 } from '../types'
 
 const EMPTY_SEAT: SeatState = { plate: false, knife: false, fork: false, glass: false }
@@ -71,6 +72,15 @@ interface GameState {
   completedPMTrialIds: Set<string>
   pmTargetSelected: string | null
   pmActionPhase: 'idle' | 'target_select' | 'action_confirm' | 'completed'
+
+  // ── PM Module ──
+  taskOrder: TaskOrder | null
+  isTest: boolean
+  currentPhase: string  // server-authoritative phase string
+  pmPipelineState: PMPipelineState | null
+  gameTimeFrozen: boolean
+  cutsceneTaskIndex: number  // 0-3, which task we're showing in encoding
+  cutsceneSegmentIndex: number  // 0-3
 
   // ── Trigger Effects ──
   activeTriggerEffects: Array<{ triggerEvent: string; timestamp: number; isFake?: boolean; duration?: number }>
@@ -146,6 +156,15 @@ interface GameState {
   completePMTrial: (triggerId: string) => void
   setPMTargetSelected: (target: string | null) => void
   setPMActionPhase: (phase: 'idle' | 'target_select' | 'action_confirm' | 'completed') => void
+
+  // PM pipeline (new module)
+  setTaskOrder: (order: TaskOrder) => void
+  setIsTest: (isTest: boolean) => void
+  setPMPipelineState: (state: PMPipelineState | null) => void
+  advancePMPipelineStep: (step: PMPipelineStep) => void
+  setGameTimeFrozen: (frozen: boolean) => void
+  setCutsceneTaskIndex: (i: number) => void
+  setCutsceneSegmentIndex: (i: number) => void
 
   // Trigger effects
   addTriggerEffect: (triggerEvent: string, opts?: { isFake?: boolean; duration?: number }) => void
@@ -300,6 +319,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   pmTargetSelected: null,
   pmActionPhase: 'idle',
 
+  // ── PM Module ──
+  taskOrder: null,
+  isTest: false,
+  currentPhase: 'welcome',
+  pmPipelineState: null,
+  gameTimeFrozen: false,
+  cutsceneTaskIndex: 0,
+  cutsceneSegmentIndex: 0,
+
   // ── Trigger Effects ──
   activeTriggerEffects: [],
 
@@ -316,6 +344,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     sessionId: data.session_id,
     participantId: data.participant_id,
     condition: data.condition,
+    taskOrder: (data.task_order as TaskOrder) || null,
+    isTest: data.is_test ?? false,
+    currentPhase: data.current_phase ?? 'welcome',
   }),
 
   setPhase: (phase) => set({ phase }),
@@ -655,6 +686,18 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setPMTargetSelected: (target) => set({ pmTargetSelected: target }),
   setPMActionPhase: (phase) => set({ pmActionPhase: phase }),
+
+  // PM pipeline (new module)
+  setTaskOrder: (order) => set({ taskOrder: order }),
+  setIsTest: (isTest) => set({ isTest }),
+  setPMPipelineState: (state) => set({ pmPipelineState: state }),
+  advancePMPipelineStep: (step) => set((s) => {
+    if (!s.pmPipelineState) return s
+    return { pmPipelineState: { ...s.pmPipelineState, step } }
+  }),
+  setGameTimeFrozen: (frozen) => set({ gameTimeFrozen: frozen }),
+  setCutsceneTaskIndex: (i) => set({ cutsceneTaskIndex: i }),
+  setCutsceneSegmentIndex: (i) => set({ cutsceneSegmentIndex: i }),
 
   // Trigger effects
   addTriggerEffect: (triggerEvent, opts) => set((s) => ({

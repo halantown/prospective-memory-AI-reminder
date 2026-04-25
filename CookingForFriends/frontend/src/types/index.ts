@@ -2,19 +2,64 @@
 
 // ── Session & Experiment ──
 
-export type Condition = 'CONTROL' | 'AF' | 'AFCB'
+/** @deprecated Legacy conditions — use Condition ('EC+' | 'EC-') for new code */
+export type ConditionLegacy = 'CONTROL' | 'AF' | 'AFCB'
+export type Condition = 'EC+' | 'EC-'
+
 export type Phase =
   | 'welcome'
-  | 'onboarding'
+  | 'onboarding'       // kept for backward compat
+  | 'consent'
+  | 'introduction'
   | 'encoding'
   | 'playing'
+  | 'post_questionnaire'
   | 'debrief'
   | 'complete'
+
+export type TaskOrder = 'A' | 'B' | 'C' | 'D'
+
+export type PMPipelineStep =
+  | 'idle'
+  | 'trigger_affordance'
+  | 'greeting'
+  | 'reminder'
+  | 'fake_reminder'
+  | 'decoy'
+  | 'confidence'
+  | 'avatar_action'
+  | 'completed'
+
+export interface PMPipelineState {
+  step: PMPipelineStep
+  taskId: string | null         // null for fake triggers
+  triggerType: 'doorbell' | 'phone_call'
+  isFake: boolean
+  taskPosition: number | null   // 1-4 for real, null for fake
+  scheduleIndex: number
+  firedAt: number               // client-side Date.now()/1000
+  wasInterrupted: boolean
+}
+
+export interface DecoyOption {
+  id: string
+  label: string
+  isTarget: boolean
+}
+
+export interface CutsceneSegment {
+  taskId: string
+  segmentIndex: number   // 0-3
+  placeholder: string    // placeholder constant string
+}
 
 export interface SessionData {
   session_id: string
   participant_id: string
   condition: string
+  task_order?: string
+  is_test?: boolean
+  current_phase?: string
 }
 
 // ── Rooms ──

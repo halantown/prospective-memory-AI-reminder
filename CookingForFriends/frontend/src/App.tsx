@@ -5,9 +5,11 @@ import { useGameStore } from './stores/gameStore'
 import { getSessionStatus } from './services/api'
 import type { Phase } from './types'
 import WelcomePage from './pages/game/WelcomePage'
-import EncodingPage from './pages/game/EncodingPage'
+import ConsentPage from './pages/game/ConsentPage'
+import IntroductionPage from './pages/game/IntroductionPage'
+import CutsceneEncodingPage from './pages/game/CutsceneEncodingPage'
 import GamePage from './pages/game/GamePage'
-
+import PostQuestionnairePage from './pages/game/PostQuestionnairePage'
 import DebriefPage from './pages/game/DebriefPage'
 import AdminDashboard from './pages/admin/DashboardPage'
 import ConfigPage from './pages/admin/ConfigPage'
@@ -53,9 +55,10 @@ function GameShell() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [phase])
 
-  // Warn before tab close during active gameplay
+  // Warn before tab close during active gameplay or early phases
   useEffect(() => {
-    if (phase !== 'playing' && phase !== 'encoding') return
+    const activePhases: Phase[] = ['playing', 'encoding', 'consent', 'introduction']
+    if (!activePhases.includes(phase)) return
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
     }
@@ -83,6 +86,10 @@ function GameShell() {
             encoding: 'encoding',
             playing: 'playing',
             completed: 'debrief',
+            consent: 'consent',
+            introduction: 'introduction',
+            post_questionnaire: 'post_questionnaire',
+            debrief: 'debrief',
           }
           const resolvedPhase: Phase = phaseMap[status.phase || ''] || 'welcome'
           if (status.status === 'completed') {
@@ -105,10 +112,16 @@ function GameShell() {
       return <WelcomePage />
     case 'onboarding':
       return <WelcomePage />
+    case 'consent':
+      return <ConsentPage />
+    case 'introduction':
+      return <IntroductionPage />
     case 'encoding':
-      return <EncodingPage />
+      return <CutsceneEncodingPage />
     case 'playing':
       return <GamePage />
+    case 'post_questionnaire':
+      return <PostQuestionnairePage />
     case 'debrief':
       return <DebriefPage />
     case 'complete':

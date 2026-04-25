@@ -23,6 +23,9 @@ export async function startSession(token: string) {
     session_id: string
     participant_id: string
     condition: string
+    task_order?: string
+    is_test?: boolean
+    current_phase?: string
   }>('/session/start', {
     method: 'POST',
     body: JSON.stringify({ token }),
@@ -70,6 +73,57 @@ export async function submitDebrief(sessionId: string, data: {
   })
 }
 
+// ── Phase tracking ──
+
+export async function updatePhase(sessionId: string, phaseName: string, eventType: 'start' | 'end') {
+  return request<{ status: string }>(`/session/${sessionId}/phase`, {
+    method: 'POST',
+    body: JSON.stringify({ phase_name: phaseName, event_type: eventType }),
+  })
+}
+
+// ── Encoding events ──
+
+export interface CutsceneEventData {
+  task_id: string
+  segment_index: number
+  placeholder?: string
+  viewed_at?: number
+  duration_ms?: number
+  detail_check_selected?: number
+  detail_check_correct?: boolean
+  detail_check_correct_index?: number
+}
+
+export async function logCutsceneEvent(sessionId: string, data: CutsceneEventData) {
+  return request<{ status: string }>(`/session/${sessionId}/cutscene-event`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export interface IntentionCheckData {
+  task_id: string
+  selected_index: number
+  correct_index: number
+  is_correct: boolean
+  response_time_ms: number
+  task_position: number
+}
+
+export async function logIntentionCheck(sessionId: string, data: IntentionCheckData) {
+  return request<{ status: string }>(`/session/${sessionId}/intention-check`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+// ── Session state (for reconnect restore) ──
+
+export async function getSessionState(sessionId: string) {
+  return request<Record<string, unknown>>(`/session/${sessionId}/state`)
+}
+
 // ── Quiz endpoints ──
 
 export async function submitQuiz(sessionId: string, answers: Array<{
@@ -96,13 +150,18 @@ export async function submitQuiz(sessionId: string, answers: Array<{
 
 // ── Admin endpoints ──
 
-export async function createParticipant() {
+export async function createParticipant(data?: { condition?: string; order?: string }) {
   return request<{
     participant_id: string
     group: string
     token: string
     session_id: string
-  }>('/admin/participant/create', { method: 'POST' })
+    task_order?: string
+    entry_url?: string
+  }>('/admin/participant/create', {
+    method: 'POST',
+    body: data ? JSON.stringify(data) : undefined,
+  })
 }
 
 export async function listParticipants() {
@@ -123,4 +182,44 @@ export async function getExperimentOverview() {
     completed: number
     in_progress: number
   }>('/admin/experiment/overview')
+}
+
+export async function getAssignmentCounts() {
+  return request<Record<string, Record<string, number>>>('/admin/assignment-counts')
+}
+
+export async function getLiveSessions() {
+  return request<Array<{
+    session_id: string
+    participant_id: string
+    condition: string
+    task_order: string
+    current_phase: string
+    elapsed_s: number
+    disconnected_at: number | null
+  }>>('/admin/live-sessions')
+}
+
+export async function exportPerParticipant(includeTest = false): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/admin/export/per-participant?include_test=${includeTest}`)
+  if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+  return res.blob()
+}
+
+export async function exportAggregated(includeTest = false): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/admin/export/aggregated?include_test=${includeTest}`)
+  if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+  return res.blob()
+}
+
+export async function createTestSession(data: { condition: string; order: string; start_phase: string }) {
+  return request<{
+    session_id: string
+    participant_id: string
+    token: string
+    entry_url: string
+  }>('/admin/test-session', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }

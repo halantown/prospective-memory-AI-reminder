@@ -88,6 +88,7 @@ class CookingEngine:
         self._timeline_task: asyncio.Task | None = None
         self._running = False
         self._block_start_time: float = 0.0
+        self._paused_at: float | None = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -106,6 +107,27 @@ class CookingEngine:
         self._timeout_tasks.clear()
         if self._timeline_task and not self._timeline_task.done():
             self._timeline_task.cancel()
+
+    def pause(self):
+        """Pause all cooking timers (called during PM pipeline freeze)."""
+        if self._paused_at is not None:
+            return  # already paused
+        self._paused_at = time.time()
+        self._running = False
+        for task in self._timeout_tasks.values():
+            task.cancel()
+        self._timeout_tasks.clear()
+
+    def resume(self):
+        """Resume cooking timers (called when game time unfreezes)."""
+        if self._paused_at is None:
+            return  # not paused
+        offset = time.time() - self._paused_at
+        self._block_start_time += offset
+        self._paused_at = None
+        self._running = True
+        if self._timeline_task and self._timeline_task.done():
+            self._timeline_task = asyncio.create_task(self._run_timeline())
 
     # ── Timeline Runner ───────────────────────────────────────────────────────
 
