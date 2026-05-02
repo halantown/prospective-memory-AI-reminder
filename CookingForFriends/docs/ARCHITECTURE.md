@@ -190,7 +190,7 @@ ws://host/ws/game/{session_id}/{block_number}?auto_start={bool}
 │  ┌──────────────────────────────────────┐  │   (440px)    │
 │  │  zoomable div (transform: scale/translate) │         │
 │  │  ├── <img floorplan.png>             │  │  iPhone shell│
-│  │  ├── Kitchen overlay div (0%,0%,44%,41%)  │         │
+│  │  ├── Kitchen overlay div (0%,0%,49.5%,41%)│         │
 │  │  │   ├── KitchenFurniture (sprites)  │  │  LockScreen  │
 │  │  │   └── KitchenRoom (hotspots)      │  │  ContactStrip│
 │  │  ├── Room click targets (overview)   │  │  ChatView    │
@@ -230,7 +230,7 @@ ws://host/ws/game/{session_id}/{block_number}?auto_start={bool}
 
 ### Kitchen Overlay Layer
 
-Rendered at `position:absolute, left:0%, top:0%, width:44%, height:41%` (kitchen bounding box).
+Rendered at `position:absolute, left:0%, top:0%, width:49.5%, height:41%` (kitchen bounding box).
 
 ```
 Kitchen overlay div
@@ -250,14 +250,27 @@ Kitchen overlay div
 
 | Station | left | top | width | height |
 |---------|------|-----|-------|--------|
-| burner1 | 13% | 1% | 12% | 15% |
-| burner2 | 25% | 1% | 12% | 15% |
-| burner3 | 13% | 16% | 12% | 14% |
-| oven | 15% | 23% | 23% | 19% |
-| fridge | 37% | 1% | 17% | 31% |
-| cutting_board | 63% | 1% | 22% | 31% |
-| spice_rack | 85% | 1% | 14% | 23% |
-| plating_area | 48% | 68% | 30% | 18% |
+| burner1 | 29.1% | 12.25% | 12% | 16.5% |
+| burner2 | hidden | hidden | 0% | 0% |
+| burner3 | hidden | hidden | 0% | 0% |
+| oven | 13.1% | 24% | 12% | 12% |
+| fridge | 84.4% | 5% | 9% | 28% |
+| cutting_board | 54.2% | 15.5% | 15.1% | 9% |
+| spice_rack | 77.3% | 13% | 8% | 12% |
+| plating_area | 51.5% | 51% | 14.2% | 19% |
+
+### Character Waypoint Movement
+
+Avatar movement is driven by `frontend/src/stores/characterStore.ts` and
+`frontend/src/data/waypoints.json`.
+
+- Kitchen top-row stations (`oven`, `burner1`, `cutting_board`, `spice_rack`,
+  `fridge`) share the same waypoint y-coordinate and are connected horizontally,
+  so moving between them does not detour through the lower kitchen center.
+- `kitchen_center` is the vertical transfer point for `plating_area`; it shares
+  the same x-coordinate as `plating_area`.
+- Routes to `plating_area` go through `kitchen_center`, then vertically down to
+  the plating waypoint.
 
 ### PhoneSidebar Components
 
