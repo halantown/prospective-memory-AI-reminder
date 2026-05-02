@@ -255,6 +255,18 @@ async def run_timeline(
 
                 # Handle PM trigger events — start execution window
                 if event_type == "pm_trigger":
+                    # EC+/EC- sessions use engine.pm_session as the authoritative
+                    # PM trigger scheduler. Static timeline JSON still contains
+                    # legacy pm_trigger entries without task_id/is_fake; forwarding
+                    # them overwrites the frontend PM state with taskId=null and
+                    # leaves the modal stuck on an empty decoy step.
+                    if condition in ("EC+", "EC-"):
+                        logger.debug(
+                            "[TIMELINE] Skipping legacy pm_trigger for EC PM session: %s",
+                            event_data,
+                        )
+                        continue
+
                     trigger_id = event_data.get("trigger_id", "")
                     trigger_time = time.time()
                     event_data["server_trigger_ts"] = trigger_time
@@ -724,4 +736,3 @@ def _resolve_reminder(task_id: str, condition: str) -> str | None:
         return task_def.baseline_reminder
     except KeyError:
         return f"[Unknown task: {task_id}]"
-

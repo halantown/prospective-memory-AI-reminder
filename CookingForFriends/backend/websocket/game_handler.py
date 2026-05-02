@@ -8,7 +8,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from websocket.connection_manager import manager, ws_pump
 from engine.timeline import run_timeline, cancel_timeline
 from engine.cooking_engine import CookingEngine
-from engine.game_time import unfreeze_game_time, get_current_game_time
+from engine.game_time import start_game_time, unfreeze_game_time, get_current_game_time
 from engine.pm_session import run_pm_session, signal_pipeline_complete
 from models.logging import InteractionLog, MouseTrack, PhoneMessageLog
 
@@ -19,6 +19,20 @@ _cooking_engines: dict[str, CookingEngine] = {}
 
 # Per-participant PM session tasks
 _pm_session_tasks: dict[str, asyncio.Task] = {}
+
+
+def _ensure_pm_session_task(participant_id: str, task_order: str, send_fn, db_factory) -> None:
+    """Start or resume the PM scheduler if this process is not already running one."""
+    existing = _pm_session_tasks.get(participant_id)
+    if existing and not existing.done():
+        logger.info(f"[GAME_HANDLER] PM session task already running for {participant_id}, skipping restart")
+        return
+
+    pm_task = asyncio.create_task(
+        run_pm_session(participant_id, task_order, send_fn, db_factory)
+    )
+    _pm_session_tasks[participant_id] = pm_task
+    logger.info(f"[GAME_HANDLER] PM session task ensured for {participant_id} (order={task_order})")
 
 
 async def handle_game_ws(
@@ -70,6 +84,15 @@ async def handle_game_ws(
                 # Resume timeline for reconnecting client
                 condition = block.condition
                 block_id = block.id
+                task_order = "A"
+                participant_result = await db.execute(
+                    select(Participant).where(Participant.id == participant_id)
+                )
+                participant = participant_result.scalar_one_or_none()
+                if participant:
+                    task_order = participant.task_order
+                    start_game_time(participant)
+                    await db.commit()
                 # Use the block's real start time so past events are skipped instead
                 # of re-fired (prevents duplicate phone messages on reconnect).
                 # Guard: if the block started longer ago than the block duration (stale
@@ -113,6 +136,11 @@ async def handle_game_ws(
                         logger.error(f"[GAME_HANDLER] CookingEngine restart failed on reconnect: {ce}")
                 else:
                     logger.info(f"[GAME_HANDLER] CookingEngine already running for {participant_id}, skipping restart")
+
+                try:
+                    _ensure_pm_session_task(participant_id, task_order, send_event, db_factory)
+                except Exception as pe:
+                    logger.error(f"[GAME_HANDLER] PM session resume failed on reconnect: {pe}")
             else:
                 block_status = block.status if block else "NO_BLOCK"
                 logger.info(f"[GAME_HANDLER] Block status on connect: {block_status} (not auto-starting)")
@@ -279,7 +307,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         task_order = "A"
         if participant:
             task_order = participant.task_order
-            unfreeze_game_time(participant)
+            start_game_time(participant)
 
         await db.commit()
         condition = block.condition
@@ -352,11 +380,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
 
     # Start the PM session task
     try:
-        pm_task = asyncio.create_task(
-            run_pm_session(participant_id, task_order, send_fn, db_factory)
-        )
-        _pm_session_tasks[participant_id] = pm_task
-        logger.info(f"[GAME_HANDLER] PM session task started for {participant_id} (order={task_order})")
+        _ensure_pm_session_task(participant_id, task_order, send_fn, db_factory)
     except Exception as e:
         logger.error(f"[GAME_HANDLER] PM session start failed: {e}")
 
@@ -489,24 +513,34 @@ async def _handle_pm_confidence_rated(participant_id: str, data: dict, db_factor
     task_id = data.get("task_id")
     if not task_id:
         return
-    async with db_factory() as db:
-        from sqlalchemy import select
-        from models.pm_module import PMTaskEvent
-        result = await db.execute(
-            select(PMTaskEvent).where(
-                PMTaskEvent.session_id == participant_id,
-                PMTaskEvent.task_id == task_id,
-                PMTaskEvent.action_animation_complete_time.is_(None),
-            ).order_by(PMTaskEvent.id.desc()).limit(1)
-        )
-        evt = result.scalar_one_or_none()
-        if evt:
-            evt.confidence_rating = data.get("confidence_rating")
-            rt_ms = data.get("response_time_ms")
-            evt.confidence_response_time = rt_ms / 1000.0 if rt_ms is not None else None
-            await db.commit()
 
-    # Tell the frontend to start the avatar action animation
+    # DB logging is best-effort — a failure must NOT block avatar_action from being sent
+    try:
+        async with db_factory() as db:
+            from sqlalchemy import select
+            from models.pm_module import PMTaskEvent
+            result = await db.execute(
+                select(PMTaskEvent).where(
+                    PMTaskEvent.session_id == participant_id,
+                    PMTaskEvent.task_id == task_id,
+                    PMTaskEvent.action_animation_complete_time.is_(None),
+                ).order_by(PMTaskEvent.id.desc()).limit(1)
+            )
+            evt = result.scalar_one_or_none()
+            if evt:
+                evt.confidence_rating = data.get("confidence_rating")
+                rt_ms = data.get("response_time_ms")
+                evt.confidence_response_time = rt_ms / 1000.0 if rt_ms is not None else None
+                await db.commit()
+    except Exception:
+        logger.exception(
+            "[GAME_HANDLER] pm_confidence_rated DB error (participant=%s task=%s) — "
+            "avatar_action will still be sent",
+            participant_id, task_id,
+        )
+
+    # Tell the frontend to start the avatar action animation.
+    # This is sent regardless of DB outcome so the modal never blocks permanently.
     await manager.send_to_participant(participant_id, "avatar_action", {
         "task_id": task_id,
     })
@@ -764,4 +798,3 @@ async def _set_participant_offline(participant_id: str, db_factory):
             logger.info(f"Participant {participant_id} marked offline")
     except Exception as e:
         logger.error(f"Failed to mark participant offline: {e}")
-

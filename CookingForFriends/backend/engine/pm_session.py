@@ -55,6 +55,48 @@ async def _wait_game_seconds(session_id: str, seconds: float, db_factory) -> Non
             logger.exception("_wait_game_seconds: poll error for %s", session_id)
 
 
+async def _get_current_game_time(session_id: str, db_factory) -> float:
+    """Return participant game time, or 0 if the participant no longer exists."""
+    from sqlalchemy import select
+    from models.experiment import Participant
+
+    async with db_factory() as db:
+        result = await db.execute(select(Participant).where(Participant.id == session_id))
+        participant = result.scalar_one_or_none()
+        if not participant:
+            return 0.0
+        return get_current_game_time(participant)
+
+
+async def _get_resume_state(session_id: str, db_factory) -> tuple[int, float | None]:
+    """Return (fired_count, last_trigger_game_time) across real and fake PM events.
+
+    This lets a restarted PM scheduler continue from the next schedule entry
+    instead of waiting from zero again.  Game time is monotonic across trigger
+    events, so the maximum actual_game_time is the most recent fired trigger.
+    """
+    from sqlalchemy import select
+    from models.pm_module import FakeTriggerEvent, PMTaskEvent
+
+    async with db_factory() as db:
+        real_result = await db.execute(
+            select(PMTaskEvent.trigger_actual_game_time).where(
+                PMTaskEvent.session_id == session_id,
+            )
+        )
+        fake_result = await db.execute(
+            select(FakeTriggerEvent.actual_game_time).where(
+                FakeTriggerEvent.session_id == session_id,
+            )
+        )
+
+    trigger_times = [
+        t for t in [*real_result.scalars().all(), *fake_result.scalars().all()]
+        if t is not None
+    ]
+    return len(trigger_times), max(trigger_times) if trigger_times else None
+
+
 async def run_pm_session(session_id: str, task_order: str, send_fn, db_factory):
     """Drive the PM trigger schedule for one session as a background task.
 
@@ -84,16 +126,27 @@ async def run_pm_session(session_id: str, task_order: str, send_fn, db_factory):
                 return
             condition = participant.condition
 
-        schedule_index = 0
-        for entry in TRIGGER_SCHEDULE:
-            schedule_index += 1
+        fired_count, last_trigger_game_time = await _get_resume_state(session_id, db_factory)
+        if fired_count:
+            logger.info(
+                "[PM_SESSION] Resuming after %d fired trigger(s), last_game_time=%s (session=%s)",
+                fired_count, last_trigger_game_time, session_id,
+            )
+
+        for entry_index, entry in enumerate(TRIGGER_SCHEDULE[fired_count:], start=fired_count + 1):
+            schedule_index = entry_index
             delay = entry["delay_after_previous_s"]
+            current_gt = await _get_current_game_time(session_id, db_factory)
+            if last_trigger_game_time is None:
+                delay_remaining = max(0.0, delay - current_gt)
+            else:
+                delay_remaining = max(0.0, delay - (current_gt - last_trigger_game_time))
 
             logger.info(
-                "[PM_SESSION] Waiting %ds game time before trigger %d (session=%s)",
-                delay, schedule_index, session_id,
+                "[PM_SESSION] Waiting %.1fs game time before trigger %d (delay=%ds, current_gt=%.1f, last_trigger_gt=%s, session=%s)",
+                delay_remaining, schedule_index, delay, current_gt, last_trigger_game_time, session_id,
             )
-            await _wait_game_seconds(session_id, delay, db_factory)
+            await _wait_game_seconds(session_id, delay_remaining, db_factory)
 
             # Freeze game time and snapshot the fired game time
             async with db_factory() as db:
@@ -119,6 +172,7 @@ async def run_pm_session(session_id: str, task_order: str, send_fn, db_factory):
                         task_id=task_id,
                         position_in_order=task_position,
                         condition=condition,
+                        trigger_scheduled_game_time=game_time_fired,
                         trigger_actual_game_time=game_time_fired,
                         trigger_type=task_def.trigger_type,
                     )
@@ -145,6 +199,7 @@ async def run_pm_session(session_id: str, task_order: str, send_fn, db_factory):
                 async with db_factory() as db:
                     event_row = FakeTriggerEvent(
                         session_id=session_id,
+                        scheduled_game_time=game_time_fired,
                         actual_game_time=game_time_fired,
                         trigger_type=trigger_type,
                     )
@@ -164,6 +219,7 @@ async def run_pm_session(session_id: str, task_order: str, send_fn, db_factory):
 
             # Wait for the frontend pipeline to complete
             await ev.wait()
+            last_trigger_game_time = game_time_fired
             logger.info(
                 "[PM_SESSION] Pipeline complete (trigger %d, session=%s)",
                 schedule_index, session_id,

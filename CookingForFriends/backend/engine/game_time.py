@@ -14,6 +14,17 @@ Participant fields managed here (see models/experiment.py):
 import time
 
 
+def start_game_time(participant) -> None:
+    """Start the game-time clock if it has not started yet.
+
+    This is intentionally separate from token login.  Game time should begin
+    when the frontend enters the playing phase and sends start_game, not while
+    the participant is still on welcome/consent/introduction screens.
+    """
+    if participant.frozen_since is None and participant.last_unfreeze_at is None:
+        participant.last_unfreeze_at = time.time()
+
+
 def freeze_game_time(participant) -> None:
     """Snapshot accumulated game time and mark session as frozen.
 
