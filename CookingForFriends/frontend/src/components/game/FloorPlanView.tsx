@@ -27,7 +27,7 @@ import KitchenFurniture from './rooms/KitchenFurniture'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type FloorRoom = 'kitchen' | 'dining_hall' | 'bedroom' | 'bathroom' | 'living_room'
+type FloorRoom = 'kitchen' | 'dining_hall' | 'bedroom' | 'living_room'
 
 interface RoomDef {
   id: FloorRoom
@@ -56,7 +56,7 @@ interface NavLink {
 const ROOM_DEFS: Record<FloorRoom, RoomDef> = {
   kitchen: {
     id: 'kitchen', label: 'Kitchen', emoji: '🍳',
-    cx: 21, cy: 20,
+    cx: 21, cy: 18,
     x: 0, y: 0, w: 44, h: 41,
   },
   dining_hall: {
@@ -65,14 +65,9 @@ const ROOM_DEFS: Record<FloorRoom, RoomDef> = {
     x: 56, y: 0, w: 44, h: 33,
   },
   bedroom: {
-    id: 'bedroom', label: 'Bedroom', emoji: '🛏️',
-    cx: 16, cy: 76,
-    x: 0, y: 52, w: 33, h: 48,
-  },
-  bathroom: {
-    id: 'bathroom', label: 'Bathroom', emoji: '🚿',
-    cx: 45, cy: 78,
-    x: 33, y: 56, w: 25, h: 44,
+    id: 'bedroom', label: 'Bedroom / Bathroom', emoji: '🛏️',
+    cx: 29, cy: 76,
+    x: 0, y: 52, w: 58, h: 48,  // covers both bedroom + bathroom area
   },
   living_room: {
     id: 'living_room', label: 'Living Room', emoji: '🛋️',
@@ -81,14 +76,14 @@ const ROOM_DEFS: Record<FloorRoom, RoomDef> = {
   },
 }
 
-const ALL_ROOMS: FloorRoom[] = ['kitchen', 'dining_hall', 'bedroom', 'bathroom', 'living_room']
+const ALL_ROOMS: FloorRoom[] = ['kitchen', 'dining_hall', 'bedroom', 'living_room']
 
 // ── Adjacency map — buttons reflect the relative position of neighboring rooms ──
 
 const ADJACENCY: Record<FloorRoom, NavLink[]> = {
   kitchen: [
     { direction: 'right', target: 'dining_hall', label: 'Dining Hall' },
-    { direction: 'bottom', target: 'bedroom', label: 'Bedroom' },
+    { direction: 'bottom', target: 'bedroom', label: 'Bedroom / Bathroom' },
     { direction: 'bottom-right', target: 'living_room', label: 'Living Room' },
   ],
   dining_hall: [
@@ -97,16 +92,11 @@ const ADJACENCY: Record<FloorRoom, NavLink[]> = {
   ],
   bedroom: [
     { direction: 'top', target: 'kitchen', label: 'Kitchen' },
-    { direction: 'right', target: 'bathroom', label: 'Bathroom' },
-  ],
-  bathroom: [
-    { direction: 'left', target: 'bedroom', label: 'Bedroom' },
     { direction: 'right', target: 'living_room', label: 'Living Room' },
-    { direction: 'top', target: 'kitchen', label: 'Kitchen' },
   ],
   living_room: [
     { direction: 'top', target: 'dining_hall', label: 'Dining Hall' },
-    { direction: 'left', target: 'bathroom', label: 'Bathroom' },
+    { direction: 'left', target: 'bedroom', label: 'Bedroom / Bathroom' },
     { direction: 'top-left', target: 'kitchen', label: 'Kitchen' },
   ],
 }
@@ -127,7 +117,7 @@ function edgeStyle(dir: NavDirection): React.CSSProperties {
     case 'bottom':       return { ...base, bottom: 18, left: '50%', transform: 'translateX(-50%)' }
     case 'left':         return { ...base, left: 18, top: '50%', transform: 'translateY(-50%)' }
     case 'right':        return { ...base, right: 18, top: '50%', transform: 'translateY(-50%)' }
-    case 'top-left':     return { ...base, top: 18, left: 18 }
+    case 'top-left':     return { ...base, top: 76, left: 18 }
     case 'top-right':    return { ...base, top: 18, right: 18 }
     case 'bottom-left':  return { ...base, bottom: 18, left: 18 }
     case 'bottom-right': return { ...base, bottom: 18, right: 18 }
@@ -137,6 +127,11 @@ function edgeStyle(dir: NavDirection): React.CSSProperties {
 // ── Zoom constants ────────────────────────────────────────────────────────────
 
 const ZOOM_SCALE = 1.6
+const ZOOM_SCALE_KITCHEN = 1.7
+// Max positive translate (%) allowed for kitchen — creates a small controlled gap
+// so kitchen content isn't pinned to top-left corner of the view.
+const KITCHEN_MAX_OFFSET_X = 10
+const KITCHEN_MAX_OFFSET_Y = 25
 const TRANSIT_DELAY_MS = 1500
 const ROBOT_FOLLOW_DELAY_MS = 2200
 
@@ -212,12 +207,15 @@ export default function FloorPlanView() {
   const floorTransform = useMemo(() => {
     if (!isZoomed) return 'translate(0%, 0%) scale(1)'
     const room = ROOM_DEFS[currentRoom!]
-    const S = ZOOM_SCALE
-    const minT = (1 - S) * 100   // e.g. −60% for S=1.6
+    const isKitchen = currentRoom === 'kitchen'
+    const S = isKitchen ? ZOOM_SCALE_KITCHEN : ZOOM_SCALE
+    const minT = (1 - S) * 100
     const rawTx = (0.5 - S * room.cx / 100) * 100
     const rawTy = (0.5 - S * room.cy / 100) * 100
-    const tx = Math.min(0, Math.max(minT, rawTx))
-    const ty = Math.min(0, Math.max(minT, rawTy))
+    const maxTx = isKitchen ? KITCHEN_MAX_OFFSET_X : 0
+    const maxTy = isKitchen ? KITCHEN_MAX_OFFSET_Y : 0
+    const tx = Math.min(maxTx, Math.max(minT, rawTx))
+    const ty = Math.min(maxTy, Math.max(minT, rawTy))
     return `translate(${tx}%, ${ty}%) scale(${S})`
   }, [isZoomed, currentRoom])
 
@@ -246,7 +244,7 @@ export default function FloorPlanView() {
           alt="Floor plan"
           draggable={false}
           className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ objectFit: 'fill' }}
+          style={{ objectFit: 'fill', imageRendering: 'pixelated' }}
         />
 
         {/* ── Kitchen overlay — furniture sprites + interactive hotspots ── */}
@@ -437,7 +435,7 @@ export default function FloorPlanView() {
             className="absolute z-40 flex items-center gap-1.5 px-4 py-2.5
                        bg-slate-800/90 hover:bg-slate-700/95 backdrop-blur-sm
                        border border-slate-600/50 hover:border-amber-400/60
-                       rounded-xl shadow-lg
+                       rounded-xl shadow-lg whitespace-nowrap
                        text-slate-200 hover:text-amber-200
                        transition-all duration-200 hover:scale-105 active:scale-95
                        cursor-pointer"
@@ -453,10 +451,10 @@ export default function FloorPlanView() {
       {/* ── Overview / Zoom-out button ── */}
       {isZoomed && !isMoving && (
         <button
-          className="absolute bottom-5 right-5 z-40 flex items-center gap-2 px-4 py-2.5
+          className="absolute top-5 right-5 z-40 flex items-center gap-2 px-4 py-2.5
                      bg-slate-800/90 hover:bg-slate-700/95 backdrop-blur-sm
                      border border-slate-500/50 hover:border-slate-400/70
-                     rounded-xl shadow-lg text-slate-200 hover:text-white
+                     rounded-xl shadow-lg text-slate-200 hover:text-white whitespace-nowrap
                      transition-all duration-200 hover:scale-105 active:scale-95
                      cursor-pointer"
           onClick={exitToOverview}
@@ -468,7 +466,7 @@ export default function FloorPlanView() {
 
       {/* ── Room label badge (zoomed mode) ── */}
       {isZoomed && currentRoom && (
-        <div className="absolute top-5 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+        <div className="absolute top-5 left-5 z-40 pointer-events-none">
           <motion.div
             key={currentRoom}
             className="bg-slate-900/85 backdrop-blur-sm rounded-xl px-5 py-2 border border-amber-500/30 shadow-lg"
