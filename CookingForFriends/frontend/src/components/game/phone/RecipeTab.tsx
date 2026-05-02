@@ -8,7 +8,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
-import type { DishId, DishState, CookingStepResult } from '../../../types'
+import type { DishId, DishState, CookingStepResult, ActiveCookingStep, CookingWaitStep } from '../../../types'
 
 const DISH_ORDER: DishId[] = ['spaghetti', 'steak', 'tomato_soup', 'roasted_vegetables']
 
@@ -16,6 +16,8 @@ export default function RecipeTab() {
   const [isHolding, setIsHolding] = useState(false)
   const holdStartRef = useRef<number>(0)
   const dishes = useGameStore((s) => s.dishes)
+  const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
+  const cookingWaitSteps = useGameStore((s) => s.cookingWaitSteps)
   const wsSend = useGameStore((s) => s.wsSend)
 
   const handleHoldStart = useCallback(() => {
@@ -88,7 +90,12 @@ export default function RecipeTab() {
             {/* 2×2 grid, no scroll */}
             <div className="grid grid-cols-2 gap-2 flex-1 min-h-0">
               {DISH_ORDER.map(dishId => (
-                <DishRecipeCard key={dishId} dish={dishes[dishId]} />
+                <DishRecipeCard
+                  key={dishId}
+                  dish={dishes[dishId]}
+                  activeStep={activeCookingSteps.find(s => s.dishId === dishId)}
+                  waitStep={cookingWaitSteps.find(s => s.dishId === dishId)}
+                />
               ))}
             </div>
           </motion.div>
@@ -98,10 +105,28 @@ export default function RecipeTab() {
   )
 }
 
-/** Recipe card for a single dish showing all steps */
-function DishRecipeCard({ dish }: { dish: DishState }) {
+/** Recipe card for a single dish showing previous/current/next and current details. */
+function DishRecipeCard({
+  dish,
+  activeStep,
+  waitStep,
+}: {
+  dish: DishState
+  activeStep: ActiveCookingStep | undefined
+  waitStep: CookingWaitStep | undefined
+}) {
   const isActive = dish.phase !== 'idle' && dish.phase !== 'served'
   const isDone = dish.phase === 'served'
+  const currentIndex = activeStep?.stepIndex ?? waitStep?.stepIndex ?? dish.currentStepIndex
+  const previousStep = currentIndex > 0 ? dish.steps[currentIndex - 1] : undefined
+  const currentStep = activeStep
+    ? { label: activeStep.stepLabel, description: activeStep.stepDescription }
+    : waitStep
+      ? { label: waitStep.stepLabel, description: waitStep.stepDescription }
+      : dish.steps[currentIndex]
+        ? { label: dish.steps[currentIndex].label, description: dish.steps[currentIndex].description }
+        : undefined
+  const nextStep = currentIndex < dish.steps.length - 1 ? dish.steps[currentIndex + 1] : undefined
 
   return (
     <div className={`rounded-lg border p-2 flex flex-col min-h-0 overflow-hidden ${
@@ -119,24 +144,47 @@ function DishRecipeCard({ dish }: { dish: DishState }) {
         {dish.phase === 'idle' && <span className="text-[9px] text-slate-500 ml-auto shrink-0">…</span>}
       </div>
 
-      {/* Step list — scrollable if too many steps */}
-      <div className="flex flex-col gap-0.5 overflow-y-auto min-h-0 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-slate-600">
-        {dish.steps.map((step, idx) => {
-          const isCurrent = idx === dish.currentStepIndex && isActive
-          const isCompleted = idx < dish.currentStepIndex
-          const result = dish.stepResults.find(r => r.stepIndex === idx)
-
-          return (
+      {isDone ? (
+        <div className="flex-1 flex items-center justify-center text-green-300 text-xs font-semibold">
+          {dish.emoji} Complete
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1 min-h-0">
+          {previousStep && (
             <StepRow
-              key={step.id}
-              label={step.label}
-              isCurrent={isCurrent}
-              isCompleted={isCompleted}
-              result={result}
+              label={previousStep.label}
+              isCurrent={false}
+              isCompleted={true}
+              result={dish.stepResults.find(r => r.stepIndex === currentIndex - 1)}
             />
-          )
-        })}
-      </div>
+          )}
+          {currentStep && (
+            <>
+              <StepRow
+                label={currentStep.label}
+                isCurrent={isActive}
+                isCompleted={false}
+                result={dish.stepResults.find(r => r.stepIndex === currentIndex)}
+              />
+              {isActive && (
+                <div className="rounded-md bg-slate-950/70 border border-slate-700/60 px-2 py-1.5">
+                  <p className="text-[10px] leading-snug text-slate-200">
+                    {currentStep.description || 'Check this step carefully.'}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+          {nextStep && (
+            <StepRow
+              label={nextStep.label}
+              isCurrent={false}
+              isCompleted={false}
+              result={undefined}
+            />
+          )}
+        </div>
+      )}
     </div>
   )
 }
