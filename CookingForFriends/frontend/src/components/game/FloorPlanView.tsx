@@ -22,7 +22,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
-import KitchenRoom from './rooms/KitchenRoom'
+import KitchenRoom, { KitchenStationOverlay } from './rooms/KitchenRoom'
 import KitchenFurniture from './rooms/KitchenFurniture'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -149,6 +149,7 @@ export default function FloorPlanView() {
 
   // Robot speech from game store
   const robotState = useGameStore((s) => s.robot)
+  const setActiveStation = useGameStore((s) => s.setActiveStation)
 
   const isZoomed = currentRoom !== null
 
@@ -200,6 +201,11 @@ export default function FloorPlanView() {
 
   // Cleanup timers
   useEffect(() => () => { if (robotTimer.current) clearTimeout(robotTimer.current) }, [])
+
+  // Station popup belongs only to the kitchen view.
+  useEffect(() => {
+    if (currentRoom !== 'kitchen') setActiveStation(null)
+  }, [currentRoom, setActiveStation])
 
   // Compute clamped CSS transform: transform-origin 0 0, translate then scale.
   // Formula: tx = clamp((0.5 − S·cx/100)·100, (1−S)·100, 0)
@@ -377,6 +383,9 @@ export default function FloorPlanView() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Kitchen station popup is rendered at game-area level so it is centered in the whole play field. */}
+      {currentRoom === 'kitchen' && <KitchenStationOverlay />}
 
       {/* ── Robot speech bubble (viewport overlay so it's always readable) ── */}
       <AnimatePresence>

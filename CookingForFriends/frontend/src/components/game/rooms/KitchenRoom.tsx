@@ -9,7 +9,7 @@ import { useCallback, useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
 import PMTargetItems from '../PMTargetItems'
-import type { DishId, KitchenStationId, ActiveCookingStep, CookingStepOption } from '../../../types'
+import type { KitchenStationId, ActiveCookingStep, CookingStepOption } from '../../../types'
 
 /** Station labels and emoji for the popup header */
 const STATION_INFO: Record<KitchenStationId, { label: string; emoji: string }> = {
@@ -28,6 +28,11 @@ const STATION_INFO: Record<KitchenStationId, { label: string; emoji: string }> =
  * independent hotspots. burner2/3 are part of the same stove tile as burner1.
  */
 const HIDDEN_STATIONS = new Set<KitchenStationId>(['burner2', 'burner3'])
+
+function stationMatches(clicked: KitchenStationId, active: KitchenStationId) {
+  if (clicked === 'burner1') return active === 'burner1' || active === 'burner2' || active === 'burner3'
+  return clicked === active
+}
 
 /**
  * Station hotspot positions as % of the kitchen bounding box.
@@ -66,11 +71,10 @@ type FeedbackType = 'correct' | 'wrong' | 'missed' | null
 const DEBUG_COORDS = true
 
 export default function KitchenRoom({ isActive }: { isActive: boolean }) {
-  const dishes = useGameStore((s) => s.dishes)
   const activeStation = useGameStore((s) => s.activeStation)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
-  const wsSend = useGameStore((s) => s.wsSend)
+  const kitchenTimerQueue = useGameStore((s) => s.kitchenTimerQueue)
 
   const [feedback, setFeedback] = useState<{ station: KitchenStationId; type: FeedbackType }>({ station: 'fridge', type: null })
   const [debugPos, setDebugPos] = useState<{ x: number; y: number } | null>(null)
@@ -91,30 +95,10 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
 
   const handleStationClick = useCallback((station: KitchenStationId) => {
     if (!isActive) return
+    const hasActiveStep = activeCookingSteps.some(step => stationMatches(station, step.station))
+    if (!hasActiveStep) return
     setActiveStation(activeStation === station ? null : station)
-  }, [isActive, activeStation, setActiveStation])
-
-  const handleOptionClick = useCallback((step: ActiveCookingStep, option: CookingStepOption) => {
-    if (!wsSend) return
-    wsSend({
-      type: 'cooking_action',
-      data: {
-        dish: step.dishId,
-        step_index: step.stepIndex,
-        chosen_option_id: option.id,
-        chosen_option_text: option.text,
-        station: step.station,
-        timestamp: Date.now() / 1000,
-      },
-    })
-    setActiveStation(null)
-  }, [wsSend, setActiveStation])
-
-  // Get the active cooking step for the currently open station
-  const activeStepForStation = useMemo(() => {
-    if (!activeStation) return undefined
-    return activeCookingSteps.find(s => s.station === activeStation)
-  }, [activeStation, activeCookingSteps])
+  }, [isActive, activeStation, activeCookingSteps, setActiveStation])
 
   return (
     <div
@@ -133,13 +117,16 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
         ([stationId, pos]) => {
           if (HIDDEN_STATIONS.has(stationId)) return null
           const info = STATION_INFO[stationId]
-          const isOpen = activeStation === stationId
+          const isWarning = kitchenTimerQueue.some(
+            timer => timer.status === 'warning' && timer.station && stationMatches(stationId, timer.station)
+          )
           const showFeedback = feedback.station === stationId && feedback.type
 
           return (
             <motion.button
               key={stationId}
-              className={`absolute z-10 rounded-lg border-2 transition-all duration-200 bg-blue-500/30 border-blue-400
+              className={`absolute z-10 rounded-lg border-2 transition-all duration-200
+                ${isWarning ? 'bg-red-600/45 border-red-300 shadow-[0_0_20px_rgba(239,68,68,0.55)]' : 'bg-blue-500/30 border-blue-400'}
                 ${isActive ? 'cursor-pointer' : 'cursor-default pointer-events-none'}
               `}
               style={pos}
@@ -164,35 +151,67 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
                   </motion.div>
                 )}
               </AnimatePresence>
+              {isWarning && (
+                <motion.div
+                  className="absolute inset-0 flex items-center justify-center text-2xl pointer-events-none"
+                  animate={{ opacity: [0.45, 1, 0.45], y: [2, -3, 2] }}
+                  transition={{ repeat: Infinity, duration: 1.1 }}
+                >
+                  💨
+                </motion.div>
+              )}
             </motion.button>
           )
         }
       )}
-
-      {/* Station popup — shows distractor options */}
-      <AnimatePresence>
-        {activeStation && isActive && (
-          <StationPopup
-            station={activeStation}
-            activeStep={activeStepForStation}
-            onOptionClick={handleOptionClick}
-            onClose={() => setActiveStation(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Dish status indicators (bottom strip) */}
-      <div className="absolute bottom-1 left-2 right-2 z-10 flex gap-2 pointer-events-none">
-        {Object.values(dishes).map(dish => (
-          <DishIndicator key={dish.id} dish={dish} />
-        ))}
-      </div>
 
       {/* PM furniture button */}
       <div className="absolute z-10" style={{ left: '3%', bottom: '22%' }}>
         <PMTargetItems room="kitchen" />
       </div>
     </div>
+  )
+}
+
+/** Full-game overlay for station distractor options. Rendered by FloorPlanView, not inside the kitchen box. */
+export function KitchenStationOverlay() {
+  const activeStation = useGameStore((s) => s.activeStation)
+  const setActiveStation = useGameStore((s) => s.setActiveStation)
+  const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
+  const wsSend = useGameStore((s) => s.wsSend)
+
+  const handleOptionClick = useCallback((step: ActiveCookingStep, option: CookingStepOption) => {
+    if (!wsSend) return
+    wsSend({
+      type: 'cooking_action',
+      data: {
+        dish: step.dishId,
+        step_index: step.stepIndex,
+        chosen_option_id: option.id,
+        chosen_option_text: option.text,
+        station: step.station,
+        timestamp: Date.now() / 1000,
+      },
+    })
+    setActiveStation(null)
+  }, [wsSend, setActiveStation])
+
+  const activeStepForStation = useMemo(() => {
+    if (!activeStation) return undefined
+    return activeCookingSteps.find(s => stationMatches(activeStation, s.station))
+  }, [activeStation, activeCookingSteps])
+
+  return (
+    <AnimatePresence>
+      {activeStation && (
+        <StationPopup
+          station={activeStation}
+          activeStep={activeStepForStation}
+          onOptionClick={handleOptionClick}
+          onClose={() => setActiveStation(null)}
+        />
+      )}
+    </AnimatePresence>
   )
 }
 
@@ -212,7 +231,7 @@ function StationPopup({
 
   return (
     <motion.div
-      className="absolute inset-0 z-30 flex items-center justify-center"
+      className="absolute inset-0 z-[80] flex items-center justify-center p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -240,13 +259,7 @@ function StationPopup({
             {/* Step info */}
             <div className="mb-3">
               <p className="text-xs text-slate-300 font-medium">{activeStep.stepLabel}</p>
-              {activeStep.stepDescription && (
-                <p className="text-[10px] text-slate-400 mt-0.5">{activeStep.stepDescription}</p>
-              )}
             </div>
-
-            {/* Countdown timer */}
-            <CountdownBar activatedAt={activeStep.activatedAt} windowSeconds={activeStep.windowSeconds} />
 
             {/* Distractor options */}
             <div className="flex flex-col gap-2 mt-3">
@@ -275,60 +288,5 @@ function StationPopup({
         </button>
       </motion.div>
     </motion.div>
-  )
-}
-
-/** Animated countdown bar for step window */
-function CountdownBar({ activatedAt, windowSeconds }: { activatedAt: number; windowSeconds: number }) {
-  const [progress, setProgress] = useState(1)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const elapsed = (Date.now() - activatedAt) / 1000
-      const remaining = Math.max(0, 1 - elapsed / windowSeconds)
-      setProgress(remaining)
-      if (remaining <= 0) clearInterval(interval)
-    }, 200)
-    return () => clearInterval(interval)
-  }, [activatedAt, windowSeconds])
-
-  const color = progress > 0.5 ? 'bg-green-400' : progress > 0.2 ? 'bg-yellow-400' : 'bg-red-400'
-
-  return (
-    <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
-      <motion.div
-        className={`h-full rounded-full ${color}`}
-        style={{ width: `${progress * 100}%` }}
-        transition={{ duration: 0.2 }}
-      />
-    </div>
-  )
-}
-
-/** Small dish status indicator */
-function DishIndicator({ dish }: { dish: { id: DishId; emoji: string; phase: string; currentStepIndex: number; steps: { id: string }[] } }) {
-  if (dish.phase === 'idle') return null
-
-  const progress = dish.steps.length > 0
-    ? Math.round((dish.currentStepIndex / dish.steps.length) * 100)
-    : 0
-
-  const phaseColor: Record<string, string> = {
-    idle: 'bg-slate-600',
-    prep: 'bg-blue-500',
-    cooking: 'bg-orange-500',
-    waiting: 'bg-yellow-500',
-    ready: 'bg-green-500',
-    plated: 'bg-emerald-600',
-    served: 'bg-slate-400',
-  }
-
-  return (
-    <div className="flex items-center gap-1 bg-slate-900/70 rounded px-1.5 py-0.5">
-      <span className="text-[10px]">{dish.emoji}</span>
-      <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-500 ${phaseColor[dish.phase] || 'bg-slate-600'}`} style={{ width: `${progress}%` }} />
-      </div>
-    </div>
   )
 }
