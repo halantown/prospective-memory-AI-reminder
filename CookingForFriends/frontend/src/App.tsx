@@ -7,7 +7,6 @@ import type { Phase } from './types'
 import WelcomePage from './pages/game/WelcomePage'
 import ConsentPage from './pages/game/ConsentPage'
 import IntroductionPage from './pages/game/IntroductionPage'
-import CutsceneEncodingPage from './pages/game/CutsceneEncodingPage'
 import GamePage from './pages/game/GamePage'
 import PostQuestionnairePage from './pages/game/PostQuestionnairePage'
 import DebriefPage from './pages/game/DebriefPage'
@@ -57,7 +56,7 @@ function GameShell() {
 
   // Warn before tab close during active gameplay or early phases
   useEffect(() => {
-    const activePhases: Phase[] = ['playing', 'encoding', 'consent', 'introduction']
+    const activePhases: Phase[] = ['playing', 'consent', 'introduction']
     if (!activePhases.includes(phase)) return
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
@@ -82,8 +81,8 @@ function GameShell() {
         .then((status) => {
           // Map backend status/phase to frontend phase
           const phaseMap: Record<string, Phase> = {
-            pending: 'encoding',
-            encoding: 'encoding',
+            pending: 'playing',
+            encoding: 'playing',
             playing: 'playing',
             completed: 'debrief',
             consent: 'consent',
@@ -116,8 +115,6 @@ function GameShell() {
       return <ConsentPage />
     case 'introduction':
       return <IntroductionPage />
-    case 'encoding':
-      return <CutsceneEncodingPage />
     case 'playing':
       return <GamePage />
     case 'post_questionnaire':

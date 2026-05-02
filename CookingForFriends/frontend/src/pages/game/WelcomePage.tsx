@@ -46,10 +46,10 @@ export default function WelcomePage() {
         } else if (status.phase === 'playing') {
           setPhase('playing')
         } else {
-          setPhase('encoding')
+          setPhase('playing')
         }
       } catch {
-        setPhase('encoding')
+        setPhase('playing')
       }
     } catch (err: unknown) {
       console.error('[Welcome] Failed:', err)

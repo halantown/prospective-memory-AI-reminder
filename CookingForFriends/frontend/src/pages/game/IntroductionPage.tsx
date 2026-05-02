@@ -19,7 +19,7 @@ export default function IntroductionPage() {
       console.error('[Introduction] phase update failed', e)
     } finally {
       setLoading(false)
-      setPhase('encoding')
+      setPhase('playing')
     }
   }
 
