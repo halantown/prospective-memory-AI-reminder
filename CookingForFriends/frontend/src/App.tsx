@@ -68,7 +68,20 @@ function GameShell() {
   // Recover session from sessionStorage on mount
   useEffect(() => {
     if (sessionId) return
+    const urlToken = new URLSearchParams(window.location.search).get('token')?.trim().toUpperCase()
     const saved = sessionStorage.getItem('cff_session')
+    if (urlToken && saved) {
+      try {
+        const data = JSON.parse(saved)
+        if (data.token !== urlToken) {
+          sessionStorage.removeItem('cff_session')
+          return
+        }
+      } catch {
+        sessionStorage.removeItem('cff_session')
+        return
+      }
+    }
     if (!saved) return
 
     try {

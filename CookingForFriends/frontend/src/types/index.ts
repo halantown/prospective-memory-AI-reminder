@@ -56,6 +56,7 @@ export interface CutsceneSegment {
 export interface SessionData {
   session_id: string
   participant_id: string
+  token?: string
   condition: string
   task_order?: string
   is_test?: boolean
@@ -334,4 +335,3 @@ export interface QuizQuestion {
   options: string[]
   correctAnswer: string
 }
-

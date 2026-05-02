@@ -1,6 +1,6 @@
 /** Welcome page with token login — references SaturdayAtHome pattern. */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { startSession, getSessionStatus } from '../../services/api'
 
@@ -8,12 +8,13 @@ export default function WelcomePage() {
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const autoStartedRef = useRef(false)
 
   const setSession = useGameStore((s) => s.setSession)
   const setPhase = useGameStore((s) => s.setPhase)
 
-  const handleStart = async () => {
-    const t = token.trim().toUpperCase()
+  const handleStart = async (tokenOverride?: string) => {
+    const t = (tokenOverride ?? token).trim().toUpperCase()
     if (t.length !== 6) {
       setError('Please enter the 6-character session token')
       return
@@ -30,12 +31,19 @@ export default function WelcomePage() {
         session_id: data.session_id,
         participant_id: data.participant_id,
         condition: data.condition,
+        task_order: data.task_order,
+        is_test: data.is_test,
+        current_phase: data.current_phase,
       })
       // Persist session for page refresh recovery
       sessionStorage.setItem('cff_session', JSON.stringify({
         session_id: data.session_id,
         participant_id: data.participant_id,
+        token: t,
         condition: data.condition,
+        task_order: data.task_order,
+        is_test: data.is_test,
+        current_phase: data.current_phase,
       }))
 
       // Check session status to resume at correct phase for returning participants
@@ -58,6 +66,15 @@ export default function WelcomePage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (autoStartedRef.current) return
+    const urlToken = new URLSearchParams(window.location.search).get('token')?.trim().toUpperCase()
+    if (!urlToken) return
+    autoStartedRef.current = true
+    setToken(urlToken)
+    void handleStart(urlToken)
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cooking-50 to-orange-50 flex items-center justify-center p-4">
@@ -105,7 +122,7 @@ export default function WelcomePage() {
           )}
 
           <button
-            onClick={handleStart}
+            onClick={() => handleStart()}
             disabled={loading || token.trim().length !== 6}
             className="w-full py-3 bg-cooking-500 hover:bg-cooking-600
                        disabled:bg-cooking-200 text-white font-bold text-lg

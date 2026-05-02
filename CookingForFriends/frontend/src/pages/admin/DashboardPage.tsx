@@ -733,7 +733,7 @@ function TestModeTab() {
   }
 
   const handleOpen = () => {
-    if (result?.entry_url) window.open(result.entry_url, '_blank')
+    if (result?.entry_url) window.open(result.entry_url, '_blank', 'noopener,noreferrer')
   }
 
   return (
