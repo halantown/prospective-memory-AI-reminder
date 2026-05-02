@@ -63,7 +63,7 @@ const STATION_POSITIONS: Record<KitchenStationId, { left: string; top: string; w
 type FeedbackType = 'correct' | 'wrong' | 'missed' | null
 
 /** Set to true to show live mouse coordinates for hotspot calibration */
-const DEBUG_COORDS = false
+const DEBUG_COORDS = true
 
 export default function KitchenRoom({ isActive }: { isActive: boolean }) {
   const dishes = useGameStore((s) => s.dishes)

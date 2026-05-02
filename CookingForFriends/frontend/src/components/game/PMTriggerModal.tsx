@@ -442,6 +442,10 @@ export default function PMTriggerModal() {
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* DEBUG STRIP — remove before study */}
+        <div className="mb-3 px-2 py-1 bg-yellow-100 rounded text-xs text-yellow-800 font-mono">
+          step={step ?? 'null'} | taskId={taskId ?? 'NULL!'} | decoys={shuffledDecoys.length}
+        </div>
         {content ?? (
           <div className="flex items-center justify-center py-12">
             <div className="w-8 h-8 border-4 border-slate-300 border-t-transparent rounded-full animate-spin" />
