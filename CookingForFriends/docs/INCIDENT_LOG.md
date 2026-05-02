@@ -702,3 +702,134 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 
 ### Follow-up Actions
 > - [ ] Consider adding the same distinction to the LockScreen kitchen section (currently only shows active steps, not wait steps)
+
+---
+
+## INC-014 — Game clock advances past 18:00 (shows 18:02–18:30)
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-02 |
+| Severity     | P2 Medium |
+| Status       | Resolved |
+| Reported by  | Developer during frontend review |
+| Affected area| `backend/engine/timeline.py` — `time_tick` emission; `frontend/src/components/game/GameClock.tsx` |
+
+### Background
+
+The game simulates a one-hour cooking session from 17:00 to 18:00.
+The formula is: **10 real seconds = 1 game minute**, so 600 real seconds = 60 game minutes.
+The frontend displays the game clock to the participant as an ambient indicator of time pressure.
+Expected behaviour: clock starts at 17:00 on block_start, ticks up, and stops at 18:00.
+
+### Incident Description
+
+The game clock was observed showing **18:02, 18:04, ... up to ~18:30** during sessions.
+It did not stop at 18:00. This breaks the illusion of the one-hour game window and could
+influence participant stress perception in a study measuring time pressure.
+
+### Root Cause
+
+#### Part 1 — Unbounded tick_num formula
+
+In two places in `timeline.py`, the game clock was computed as:
+
+```python
+tick_num    = int(elapsed) // 10       # elapsed seconds → game minutes
+game_minutes = tick_num                 # ← no upper bound
+game_hour   = 17 + game_minutes // 60
+game_min    = game_minutes % 60
+game_clock  = f"{game_hour}:{game_min:02d}"
+```
+
+At `elapsed = 620 s`, `tick_num = 62`, so `game_clock = "18:02"`.
+At `elapsed = 900 s`, `tick_num = 90`, so `game_clock = "18:30"`.
+
+No maximum was enforced.  The fix is `game_minutes = min(tick_num, 60)`.
+
+#### Part 2 — `duration_seconds` mismatch (design issue, not a regression)
+
+`block_default.json` declares **`duration_seconds: 900`** but the game clock
+spans only 600 real seconds.  These two numbers serve *different* purposes
+that were never explicitly separated:
+
+| Field | Value | Meaning |
+|-------|-------|---------|
+| `duration_seconds` | 900 | How long the block runner keeps the session alive after the last event fires |
+| intended clock span | 600 | 60 game minutes × 10 s/min = 17:00 → 18:00 |
+
+The block needs to run for 900 s because steak-cooking `ongoing_task_event` entries
+are scheduled at t = 750, 800, 850, 880 s — well past the 18:00 game-clock boundary.
+These events still need to fire; the block runner must not exit at t = 600.
+
+Because `block_end` is the last scheduled event in the events list (t = 900),
+the tail-loop (`while remaining > 0`) never actually runs — `remaining ≈ 0`
+when all events are done.  `duration_seconds = 900` is therefore also redundant
+for this block, but it is **not wrong**.  The problem was purely the missing cap.
+
+#### Part 3 — Two separate emission sites
+
+`time_tick` is emitted from two independent code paths:
+
+1. **Main event loop** (`lines ~232–249`): the `while t - elapsed > 1.0` busy-wait
+   between consecutive scheduled events.  
+2. **Tail loop** (`lines ~387–407`): the `while remaining > 0` loop after the
+   last event in the list fires.
+
+Both paths had the unbounded formula; both were patched.
+
+### Timeline
+
+| Time (local) | Event |
+|--------------|-------|
+| 23:00 | Clock-past-18:00 noticed during frontend review session |
+| 23:05 | Traced to `tick_num` formula in `timeline.py` |
+| 23:10 | Identified two emission sites; confirmed `duration_seconds=900` vs clock span=600 |
+| 23:15 | Fix deployed: `min(tick_num, 60)` at both sites |
+| 23:20 | Build + smoke-test confirmed clock stops at 18:00 |
+
+### Fix
+
+**`CookingForFriends/backend/engine/timeline.py`**, two locations (lines ~237, ~394):
+
+```python
+# Before
+game_minutes = tick_num
+
+# After
+game_minutes = min(tick_num, 60)  # cap at 18:00 (60 game minutes)
+```
+
+No changes to data files.  The `duration_seconds: 900` in `block_default.json`
+is intentional and correct for event coverage.
+
+### Verification
+
+- Frontend build passes (no type errors).
+- Clock visually stops at 18:00 in browser; no 18:xx values observed after fix.
+- `ongoing_task_event` entries at t > 600 still fire correctly (block does not
+  terminate early).
+
+### Follow-up Actions / Refactor Notes
+
+The current design conflates two independent time spans inside a single field
+(`duration_seconds`) and one implicit constant (`10 s / game minute`).  Before
+any significant timeline refactor, consider:
+
+- [ ] **Introduce `clock_end_seconds` (or `game_duration_minutes`) in the JSON schema**
+  so the cap is data-driven rather than a magic `60` hardcoded in Python.
+  ```json
+  { "duration_seconds": 900, "clock_end_seconds": 600, ... }
+  ```
+  Python: `game_minutes = min(tick_num, timeline.get("clock_end_seconds", 600) // 10)`
+
+- [ ] **Name the conversion constant** — add `GAME_SECONDS_PER_MINUTE = 10` at the top
+  of `timeline.py` so the `// 10` divisor is self-documenting and easy to change.
+
+- [ ] **Consider whether `duration_seconds` should be removed** when `block_end` is
+  always present as the last event.  Currently it only controls the (unused) tail loop.
+  If every block guarantees a `block_end` event, `duration_seconds` is dead code.
+
+- [ ] Validate that `ongoing_task_event` handlers on the frontend are not affected
+  by the clock display capping (they are independent — cook timers run from
+  `activeCookingSteps` state, not from game_clock string).
