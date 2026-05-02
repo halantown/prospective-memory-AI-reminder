@@ -23,6 +23,7 @@ export default function LockScreen({
   const lockSystemNotifications = useGameStore((s) => s.lockSystemNotifications)
   const setActiveContactId = useGameStore((s) => s.setActiveContactId)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
+  const missedStepFlashes = useGameStore((s) => s.missedStepFlashes)
   const dishes = useGameStore((s) => s.dishes)
 
   const contactPreviews = useMemo(() => {
@@ -54,7 +55,7 @@ export default function LockScreen({
       .slice(0, 2),
     [activeCookingSteps],
   )
-  const hasKitchenTimers = visibleCookingSteps.length > 0
+  const hasKitchenTimers = visibleCookingSteps.length > 0 || missedStepFlashes.length > 0
 
   return (
     <div
@@ -102,6 +103,24 @@ export default function LockScreen({
                 </div>
               )
             })}
+            {missedStepFlashes.map((f) => (
+              <div
+                key={`missed-${f.dishId}-${f.stepIndex}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-2 rounded-xl px-2.5 py-2 border
+                           bg-slate-600/70 border-slate-500/40 text-slate-300"
+              >
+                <span className="text-base flex-shrink-0">{f.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-1">
+                    MISSED
+                  </div>
+                  <div className="text-[13px] font-semibold leading-tight truncate line-through opacity-70">
+                    {f.stepLabel}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -47,6 +47,8 @@ interface GameState {
   activeStation: KitchenStationId | null
   /** Active cooking steps sent by backend (awaiting participant action) */
   activeCookingSteps: ActiveCookingStep[]
+  /** Steps currently showing "missed" flash before disappearing */
+  missedStepFlashes: { dishId: string; stepIndex: number; stepLabel: string; emoji: string }[]
   /** Currently running wait steps (auto-progressing) */
   cookingWaitSteps: CookingWaitStep[]
   /** Accumulated results for scoring display */
@@ -264,6 +266,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   dishes: createInitialDishes(),
   activeStation: null,
   activeCookingSteps: [],
+  missedStepFlashes: [],
   cookingWaitSteps: [],
   cookingScore: { correct: 0, wrong: 0, missed: 0 },
 
@@ -367,6 +370,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     cookingDishOrder: definitions.dish_order,
     dishes: createInitialDishes(definitions),
     activeCookingSteps: [],
+    missedStepFlashes: [],
     cookingWaitSteps: [],
     cookingScore: { correct: 0, wrong: 0, missed: 0 },
     activeStation: null,
@@ -518,10 +522,37 @@ export const useGameStore = create<GameState>((set, get) => ({
       const alreadyRecorded = dish.stepResults.some(r => r.stepIndex === stepIndex)
       if (!alreadyRecorded) score.missed++
 
+      // Grab the step label & emoji before removing from activeCookingSteps
+      const timedOutStep = s.activeCookingSteps.find(
+        st => st.dishId === dishId && st.stepIndex === stepIndex
+      )
+      const flash = timedOutStep
+        ? {
+            dishId,
+            stepIndex,
+            stepLabel: timedOutStep.stepLabel,
+            emoji: s.dishes[dishId]?.emoji || '🍳',
+          }
+        : null
+
+      // Schedule removal of the flash after 1.5 s
+      if (flash) {
+        setTimeout(() => {
+          set((s2) => ({
+            missedStepFlashes: s2.missedStepFlashes.filter(
+              f => !(f.dishId === dishId && f.stepIndex === stepIndex)
+            ),
+          }))
+        }, 1500)
+      }
+
       return {
         activeCookingSteps: s.activeCookingSteps.filter(
           st => !(st.dishId === dishId && st.stepIndex === stepIndex)
         ),
+        missedStepFlashes: flash
+          ? [...s.missedStepFlashes, flash]
+          : s.missedStepFlashes,
         dishes: {
           ...s.dishes,
           [dishId]: {
@@ -812,6 +843,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     dishes: createInitialDishes(s.cookingDefinitions),
     activeStation: null,
     activeCookingSteps: [],
+    missedStepFlashes: [],
     cookingWaitSteps: [],
     cookingScore: { correct: 0, wrong: 0, missed: 0 },
     diningPhase: 'idle',
