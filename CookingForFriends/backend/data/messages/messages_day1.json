@@ -32,36 +32,26 @@
       "id": "q_003",
       "t": 130,
       "contact_id": "emma",
-      "text": "Should I bring red or white wine? What are you cooking? 🍷",
-      "correct_choice": "Red — I'm making steak",
-      "wrong_choice": "White goes better",
-      "feedback_correct": "Red it is! 🍷🥩",
-      "feedback_incorrect": "Hmm but steak pairs with red though! I'll bring red 🍷"
+      "text": "I'm buying drinks for tonight. 6 bottles of juice at €3 each — that's €18 total right? 🧃",
+      "correct_choice": "Yep, €18",
+      "wrong_choice": "No, that's €15",
+      "feedback_correct": "Cool, grabbing them now! 🧃",
+      "feedback_incorrect": "Wait, 6 × 3 = 18! Math checks out 🧃"
     },
     {
       "id": "q_004",
       "t": 200,
       "contact_id": "jake",
-      "text": "Can I park on your street or do I need a permit after 6? 🅿️",
-      "correct_choice": "Free parking after 6!",
-      "wrong_choice": "You need a permit all day",
-      "feedback_correct": "Nice, no hassle then! 🅿️",
-      "feedback_incorrect": "Oh wait, I think evenings are free actually! I'll check the sign 🅿️"
+      "text": "What's the chemical symbol for water? My niece is doing homework 😂",
+      "correct_choice": "H₂O",
+      "wrong_choice": "CO₂",
+      "feedback_correct": "Thanks! Passing it on 😂",
+      "feedback_incorrect": "Wait that's carbon dioxide! It's H₂O right? 😂"
     },
     {
       "id": "q_005",
       "t": 260,
       "contact_id": "sophie",
-      "text": "Hey! How many people tonight? I want to know how much salad to make 🥗",
-      "correct_choice": "6 people including you",
-      "wrong_choice": "Just 4 of us",
-      "feedback_correct": "Got it, making salad for 6! 🥗",
-      "feedback_incorrect": "Hmm I thought more people were coming? I'll make extra just in case 🥗"
-    },
-    {
-      "id": "q_006",
-      "t": 330,
-      "contact_id": "alice",
       "text": "I split the cake cost with Emma — €48 ÷ 2 = €24 each, right?",
       "correct_choice": "Yep, €24 each",
       "wrong_choice": "No that's €22 each",
@@ -69,64 +59,234 @@
       "feedback_incorrect": "Wait, 48 ÷ 2 is definitely 24! 💸"
     },
     {
-      "id": "q_007",
-      "t": 400,
-      "contact_id": "tom",
-      "text": "Just saw there's construction on the A4. Should I take the A44 instead? Is that faster from Leiden? 🛣️",
-      "correct_choice": "Stick with A4, construction is minor",
-      "wrong_choice": "A44 is usually quicker",
-      "feedback_correct": "Yeah you're right, A4 should be fine at this hour 🛣️",
-      "feedback_incorrect": "Actually the A4 is probably okay at this time, I'll risk it 🛣️"
-    },
-    {
-      "id": "q_008",
-      "t": 460,
-      "contact_id": "emma",
-      "text": "Is it true that the Netherlands has more bikes than people? 🚲 I got into an argument about it",
-      "correct_choice": "Yeah that's actually true",
-      "wrong_choice": "No way, that's a myth",
-      "feedback_correct": "Ha! I knew it! Sending this to my colleague right now 🚲",
-      "feedback_incorrect": "I just googled it — it IS true! About 23 million bikes for 17 million people 🚲"
-    },
-    {
-      "id": "q_009",
-      "t": 530,
-      "contact_id": "jake",
-      "text": "Quick math — if dinner's at 6 and it's 5:40 now, how many minutes do we have? ⏰",
+      "id": "q_006",
+      "t": 330,
+      "contact_id": "alice",
+      "text": "If dinner's at 6 and it's 5:40 now, how many minutes left? ⏰",
       "correct_choice": "20 minutes",
       "wrong_choice": "15 minutes",
       "feedback_correct": "Okay 20 min, we're fine! ⏰",
       "feedback_incorrect": "Wait, 6:00 minus 5:40 = 20 minutes right? ⏰"
     },
     {
+      "id": "q_007",
+      "t": 400,
+      "contact_id": "tom",
+      "text": "I'm bringing 3 bags of chips, each 200g. Is that 600g total?",
+      "correct_choice": "Yep, 600g",
+      "wrong_choice": "That's only 500g",
+      "feedback_correct": "Great, should be enough! 🥳",
+      "feedback_incorrect": "3 × 200 = 600 right? I'll bring them anyway!"
+    },
+    {
+      "id": "q_008",
+      "t": 460,
+      "contact_id": "emma",
+      "text": "What gas do we breathe out? CO₂ or O₂? 🫁",
+      "correct_choice": "CO₂",
+      "wrong_choice": "O₂",
+      "feedback_correct": "Right, carbon dioxide. Thanks! 🫁",
+      "feedback_incorrect": "We breathe IN O₂ and OUT CO₂! 🫁"
+    },
+    {
+      "id": "q_009",
+      "t": 530,
+      "contact_id": "jake",
+      "text": "If I'm going 60 km/h and it's 30 km away, that's 30 minutes right? 🚗",
+      "correct_choice": "Yep, 30 minutes",
+      "wrong_choice": "No, that's 20 minutes",
+      "feedback_correct": "Cool, right on schedule! 🚗",
+      "feedback_incorrect": "30 ÷ 60 = 0.5 hours = 30 min. I was right! 🚗"
+    },
+    {
       "id": "q_010",
-      "t": 600,
+      "t": 580,
       "contact_id": "sophie",
-      "text": "Do you have enough plates for everyone? I can bring some paper ones just in case 🍽️",
-      "correct_choice": "I've got plenty, don't worry",
-      "wrong_choice": "Actually yes please bring some!",
-      "feedback_correct": "Okay cool, one less thing to worry about! 🍽️",
-      "feedback_incorrect": "Alright I'll grab some on the way! 🍽️"
+      "text": "We ordered 2 pizzas for €9.50 each. Total is €19 right? 🍕",
+      "correct_choice": "Yep, €19",
+      "wrong_choice": "No, it's €18",
+      "feedback_correct": "Cool, splitting it now! 🍕",
+      "feedback_incorrect": "2 × 9.50 = 19! Math is hard 🍕"
     },
     {
       "id": "q_011",
-      "t": 700,
+      "t": 630,
       "contact_id": "alice",
-      "text": "Tom says Canberra is the capital of Australia but I keep thinking it's Sydney 😅",
-      "correct_choice": "Tom's right, it's Canberra",
-      "wrong_choice": "Nah it's Sydney",
-      "feedback_correct": "Ugh fine, Tom wins 😅🇦🇺",
-      "feedback_incorrect": "I just checked — it IS Canberra! Tom was right 😭"
+      "text": "What's the boiling point of water? I know it's basic but I'm blanking 😅",
+      "correct_choice": "100°C",
+      "wrong_choice": "90°C",
+      "feedback_correct": "Right right, thanks! 😅",
+      "feedback_incorrect": "It's 100! I knew that really 😅"
     },
     {
       "id": "q_012",
-      "t": 800,
+      "t": 680,
       "contact_id": "tom",
-      "text": "Almost there! Should I ring the doorbell or just come in? 🚪",
-      "correct_choice": "Ring the bell please",
-      "wrong_choice": "Just come in, door's open",
-      "feedback_correct": "Alright, I'll ring! 🚪",
-      "feedback_incorrect": "Okay I'll ring then, see you in a sec! 🚪"
+      "text": "If the recipe says 250ml and I double it, that's 500ml right? 🍲",
+      "correct_choice": "Yep, 500ml",
+      "wrong_choice": "No, 450ml",
+      "feedback_correct": "Perfect, doubling the batch! 🍲",
+      "feedback_incorrect": "250 × 2 = 500! Almost messed up 🍲"
+    },
+    {
+      "id": "q_013",
+      "t": 720,
+      "contact_id": "emma",
+      "text": "How many days in February? Not a leap year 📝",
+      "correct_choice": "28 days",
+      "wrong_choice": "30 days",
+      "feedback_correct": "Right, thanks! 📝",
+      "feedback_incorrect": "It's 28! Almost put wrong date 📝"
+    },
+    {
+      "id": "q_014",
+      "t": 760,
+      "contact_id": "jake",
+      "text": "I bought 5 candles, €2.50 each. That's €12.50 total? 🕯️",
+      "correct_choice": "Yep, €12.50",
+      "wrong_choice": "No, €11.50",
+      "feedback_correct": "Cool, worth it for the vibe 🕯️",
+      "feedback_incorrect": "5 × 2.50 = 12.50! 🕯️"
+    },
+    {
+      "id": "q_015",
+      "t": 800,
+      "contact_id": "sophie",
+      "text": "The recipe says bake 45 min. Started at 5:10, what time is it done? 🕐",
+      "correct_choice": "5:55",
+      "wrong_choice": "5:50",
+      "feedback_correct": "Setting my timer! 🕐",
+      "feedback_incorrect": "5:10 + 45 min = 5:55! 🕐"
+    },
+    {
+      "id": "q_016",
+      "t": 840,
+      "contact_id": "alice",
+      "text": "How many legs does a spider have? 🕷️",
+      "correct_choice": "8 legs",
+      "wrong_choice": "6 legs",
+      "feedback_correct": "That's what I thought! 🕷️",
+      "feedback_incorrect": "6 is insects! Spiders have 8 🕷️"
+    },
+    {
+      "id": "q_017",
+      "t": 880,
+      "contact_id": "tom",
+      "text": "If 1 euro = 1.10 dollar, then €20 is about $22 right? 💱",
+      "correct_choice": "Yep, about $22",
+      "wrong_choice": "No, about $20",
+      "feedback_correct": "Cool, just checking 💱",
+      "feedback_incorrect": "20 × 1.10 = 22! 💱"
+    },
+    {
+      "id": "q_018",
+      "t": 910,
+      "contact_id": "emma",
+      "text": "We need 8 napkins and I have 3. How many more? 🧻",
+      "correct_choice": "5 more",
+      "wrong_choice": "4 more",
+      "feedback_correct": "Grabbing 5, thanks! 🧻",
+      "feedback_incorrect": "8 minus 3 = 5! 🧻"
+    },
+    {
+      "id": "q_019",
+      "t": 945,
+      "contact_id": "jake",
+      "text": "If sunset is at 9:15 and it's 5:45 now, how long till sunset? 🌅",
+      "correct_choice": "3 hours 30 minutes",
+      "wrong_choice": "3 hours 15 minutes",
+      "feedback_correct": "Nice, plenty of light left! 🌅",
+      "feedback_incorrect": "9:15 minus 5:45 = 3:30! 🌅"
+    },
+    {
+      "id": "q_020",
+      "t": 980,
+      "contact_id": "sophie",
+      "text": "What's the freezing point of water? 0°C or -10°C? 🥶",
+      "correct_choice": "0°C",
+      "wrong_choice": "-10°C",
+      "feedback_correct": "Right, I knew that really 🥶",
+      "feedback_incorrect": "It's 0! 🥶"
+    },
+    {
+      "id": "q_021",
+      "t": 1020,
+      "contact_id": "alice",
+      "text": "If we split €60 among 5 people, that's €12 each right? 💰",
+      "correct_choice": "Yep, €12 each",
+      "wrong_choice": "No, €10 each",
+      "feedback_correct": "Tikkies incoming! 💰",
+      "feedback_incorrect": "60 ÷ 5 = 12! 💰"
+    },
+    {
+      "id": "q_022",
+      "t": 1060,
+      "contact_id": "tom",
+      "text": "How many hours in one day? Jake just said 12 😂",
+      "correct_choice": "24 hours",
+      "wrong_choice": "12 hours",
+      "feedback_correct": "That's what I told him 😂",
+      "feedback_incorrect": "It's 24! Jake... 😂"
+    },
+    {
+      "id": "q_023",
+      "t": 1100,
+      "contact_id": "emma",
+      "text": "I drove 15 km in 15 minutes. What's my speed in km/h? 🚗",
+      "correct_choice": "60 km/h",
+      "wrong_choice": "45 km/h",
+      "feedback_correct": "Okay not too fast then! 🚗",
+      "feedback_incorrect": "15 km in 15 min = 60 km/h! 🚗"
+    },
+    {
+      "id": "q_024",
+      "t": 1140,
+      "contact_id": "jake",
+      "text": "A triangle has how many sides? My kid's homework 📐",
+      "correct_choice": "3 sides",
+      "wrong_choice": "4 sides",
+      "feedback_correct": "Right, easy one 📐",
+      "feedback_incorrect": "4 is a square! Triangle = 3 📐"
+    },
+    {
+      "id": "q_025",
+      "t": 1180,
+      "contact_id": "sophie",
+      "text": "3 friends each bring 2 bottles of wine. How many bottles total? 🍷",
+      "correct_choice": "6 bottles",
+      "wrong_choice": "5 bottles",
+      "feedback_correct": "That's a lot of wine! 🍷",
+      "feedback_incorrect": "3 × 2 = 6! 🍷"
+    },
+    {
+      "id": "q_026",
+      "t": 1220,
+      "contact_id": "alice",
+      "text": "How many minutes in one hour? Sophie said 50 😅",
+      "correct_choice": "60 minutes",
+      "wrong_choice": "50 minutes",
+      "feedback_correct": "That's what I said! Sophie... 😅",
+      "feedback_incorrect": "It's 60! 😅"
+    },
+    {
+      "id": "q_027",
+      "t": 1260,
+      "contact_id": "tom",
+      "text": "If each person eats 300g of pasta and there are 4 people, I need 1200g right? 🍝",
+      "correct_choice": "Yep, 1200g",
+      "wrong_choice": "No, 900g",
+      "feedback_correct": "Boiling a big pot then! 🍝",
+      "feedback_incorrect": "4 × 300 = 1200! 🍝"
+    },
+    {
+      "id": "q_028",
+      "t": 1300,
+      "contact_id": "emma",
+      "text": "How many months have 31 days? I count 7 🗓️",
+      "correct_choice": "7 months",
+      "wrong_choice": "6 months",
+      "feedback_correct": "Okay I can still count! 🗓️",
+      "feedback_incorrect": "Jan, Mar, May, Jul, Aug, Oct, Dec — that's 7! 🗓️"
     }
   ],
   "notifications": [
