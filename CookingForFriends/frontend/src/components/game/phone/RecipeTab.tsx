@@ -19,11 +19,14 @@ export default function RecipeTab() {
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
   const cookingWaitSteps = useGameStore((s) => s.cookingWaitSteps)
   const wsSend = useGameStore((s) => s.wsSend)
+  const setActiveStation = useGameStore((s) => s.setActiveStation)
 
   const handleHoldStart = useCallback(() => {
+    // Close any open station popup so participants can't reference options while viewing recipe
+    setActiveStation(null)
     holdStartRef.current = Date.now()
     setIsHolding(true)
-  }, [])
+  }, [setActiveStation])
 
   const handleHoldEnd = useCallback(() => {
     if (!isHolding) return
