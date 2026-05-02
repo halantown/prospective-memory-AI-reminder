@@ -19,11 +19,29 @@ export interface WaypointNode {
   facing?: FacingDir
 }
 
+/** A room_meta exit/entry point can be a single waypoint ID, or a map from target-room → waypoint ID. */
+export type RoomPointSpec = string | Record<string, string> | null
+
 export interface WaypointData {
   waypoints: Record<string, WaypointNode>
   /** Undirected edges as pairs of waypoint IDs */
   edges: [string, string][]
-  room_meta?: Record<string, { exit: string | null; entry: string | null }>
+  room_meta?: Record<string, { exit?: RoomPointSpec; entry?: RoomPointSpec }>
+}
+
+/**
+ * Resolve a room_meta exit/entry field, optionally for a specific other room.
+ * Supports both legacy string values and per-destination maps.
+ */
+export function resolveRoomPoint(
+  field: RoomPointSpec | undefined,
+  otherRoom?: string
+): string | null {
+  if (!field) return null
+  if (typeof field === 'string') return field
+  if (otherRoom && field[otherRoom]) return field[otherRoom]
+  const vals = Object.values(field)
+  return vals[0] ?? null
 }
 
 // ── Graph construction ────────────────────────────────────────────────────────

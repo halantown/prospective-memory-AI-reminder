@@ -29,6 +29,7 @@ import PlayerAvatar from './PlayerAvatar'
 import { useCharacterStore } from '../../stores/characterStore'
 import waypointData from '../../data/waypoints.json'
 import type { WaypointData } from '../../utils/waypointGraph'
+import { resolveRoomPoint } from '../../utils/waypointGraph'
 
 const wpData = waypointData as unknown as WaypointData
 
@@ -185,8 +186,8 @@ export default function FloorPlanView() {
 
     const currentMeta = currentRoom ? wpData.room_meta?.[currentRoom] : null
     const targetMeta  = wpData.room_meta?.[target] ?? null
-    const exitId  = currentMeta?.exit ?? null
-    const entryId = targetMeta?.entry ?? null
+    const exitId  = resolveRoomPoint(currentMeta?.exit, target)
+    const entryId = resolveRoomPoint(targetMeta?.entry, currentRoom ?? undefined)
 
     const doTransition = () => {
       setIsMoving(true)

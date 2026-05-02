@@ -5,21 +5,72 @@
     "cutting_board":  { "x": 30.5, "y": 15.8, "room": "kitchen", "station": true,  "facing": "up" },
     "spice_rack":     { "x": 40.1, "y": 15.8, "room": "kitchen", "station": true,  "facing": "up" },
     "fridge":         { "x": 44.0, "y": 15.8, "room": "kitchen", "station": true,  "facing": "up" },
-    "kitchen_center": { "x": 26.0, "y": 19.8, "room": "kitchen", "station": false, "facing": "down" },
-    "plating_area":   { "x": 28.6, "y": 19.8, "room": "kitchen", "station": true,  "facing": "down" }
+    "kitchen_center": { "x": 26.0, "y": 19.8, "room": "kitchen" },
+    "kitchen_view_out_camera_switch": { "x": 51.4, "y": 15.5, "room": "kitchen" },
+
+    "dining_in_from_kitchen": { "x": 51.4, "y": 20.7, "room": "dining_hall" },
+    "dining_idle":            { "x": 63.0, "y": 20.7, "room": "dining_hall" },
+    "plating_area":           { "x": 76.4, "y": 20.7, "room": "dining_hall", "station": true, "facing": "down" },
+    "dining_out_down":        { "x": 63.0, "y": 50.5, "room": "dining_hall" },
+
+    "living_room_idle": { "x": 64.7, "y": 60.0, "room": "living_room" },
+    "front_door":       { "x": 64.7, "y": 82.0, "room": "living_room", "station": true, "facing": "right" },
+
+    "bed_bath_idle":    { "x": 53.6, "y": 50.5, "room": "bedroom" },
+    "beth_door":        { "x": 47.9, "y": 50.5, "room": "bedroom" },
+    "bed_door":         { "x": 21.0, "y": 50.5, "room": "bedroom" },
+    "bed_idle":         { "x": 21.0, "y": 67.7, "room": "bedroom", "station": true, "facing": "down" },
+    "bath_idle":        { "x": 47.9, "y": 66.0, "room": "bedroom", "station": true, "facing": "down" },
+    "bath_goto_wash_1": { "x": 51.9, "y": 66.0, "room": "bedroom" },
+    "bath_goto_wash_2": { "x": 51.9, "y": 86.2, "room": "bedroom" },
+    "bath_wash":        { "x": 41.9, "y": 86.0, "room": "bedroom", "station": true, "facing": "up" }
   },
   "edges": [
-    ["oven",          "kitchen_center"],
-    ["burner1",       "kitchen_center"],
-    ["cutting_board", "kitchen_center"],
-    ["spice_rack",    "kitchen_center"],
-    ["fridge",        "kitchen_center"],
-    ["plating_area",  "kitchen_center"]
+    ["oven",           "kitchen_center"],
+    ["burner1",        "kitchen_center"],
+    ["cutting_board",  "kitchen_center"],
+    ["spice_rack",     "kitchen_center"],
+    ["fridge",         "kitchen_center"],
+    ["kitchen_center", "kitchen_view_out_camera_switch"],
+
+    ["dining_in_from_kitchen", "dining_idle"],
+    ["dining_idle",    "plating_area"],
+    ["dining_idle",    "dining_out_down"],
+
+    ["living_room_idle", "front_door"],
+
+    ["bed_bath_idle",  "beth_door"],
+    ["beth_door",      "bed_door"],
+    ["bed_door",       "bed_idle"],
+    ["beth_door",      "bath_idle"],
+    ["bath_idle",      "bath_goto_wash_1"],
+    ["bath_goto_wash_1", "bath_goto_wash_2"],
+    ["bath_goto_wash_2", "bath_wash"]
   ],
   "room_meta": {
-    "kitchen":     { "exit": null, "entry": "kitchen_center" },
-    "dining_hall": { "exit": null, "entry": null },
-    "bedroom":     { "exit": null, "entry": null },
-    "living_room": { "exit": null, "entry": null }
+    "kitchen": {
+      "exit": "kitchen_view_out_camera_switch",
+      "entry": "kitchen_center"
+    },
+    "dining_hall": {
+      "exit": {
+        "kitchen":     "dining_in_from_kitchen",
+        "living_room": "dining_out_down",
+        "bedroom":     "dining_out_down"
+      },
+      "entry": {
+        "kitchen":     "dining_in_from_kitchen",
+        "living_room": "dining_out_down",
+        "bedroom":     "dining_out_down"
+      }
+    },
+    "living_room": {
+      "exit": "living_room_idle",
+      "entry": "living_room_idle"
+    },
+    "bedroom": {
+      "exit": "bed_bath_idle",
+      "entry": "bed_bath_idle"
+    }
   }
 }
