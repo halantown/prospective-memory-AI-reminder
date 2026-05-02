@@ -1,7 +1,7 @@
 """Logging models — InteractionLog, MouseTrack, OngoingTaskScore, GameStateSnapshot, PhoneMessageLog."""
 
 from datetime import datetime
-from sqlalchemy import Integer, String, DateTime, JSON, Float, ForeignKey, Boolean, Index, UniqueConstraint
+from sqlalchemy import Integer, String, DateTime, JSON, Float, ForeignKey, Boolean, Index, UniqueConstraint, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from models.base import Base
 
@@ -94,8 +94,8 @@ class PhoneMessageLog(Base):
     read_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # seen
     replied_at: Mapped[float | None] = mapped_column(Float, nullable=True)  # respondedAt
     response_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    user_choice: Mapped[int | None] = mapped_column(Integer, nullable=True)  # choice index (0 or 1)
-    correct_answer: Mapped[int | None] = mapped_column(Integer, nullable=True)  # correct choice index
+    user_choice: Mapped[str | None] = mapped_column(Text, nullable=True)   # selected reply text
+    correct_answer: Mapped[str | None] = mapped_column(Text, nullable=True)  # correct reply text
     reply_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     status: Mapped[str | None] = mapped_column(String(30), nullable=True)  # answered_correct | answered_incorrect | expired | seen
 
