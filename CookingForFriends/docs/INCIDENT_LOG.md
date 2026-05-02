@@ -635,3 +635,34 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > - [ ] Document the WS message field names in `docs/ARCHITECTURE.md` API contract section
 > - [ ] Consider adding a Pydantic model for WS inbound messages to catch field mismatches at parse time
 > - [x] All field names aligned and E2E verified
+
+---
+
+## INC-012 — `phone_message_logs.correct_answer` INTEGER receives reply text string
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-02 |
+| Severity     | P2 Medium |
+| Status       | Resolved |
+| Reported by  | Backend error log during live test with real token |
+| Affected area| `engine/timeline.py` → `_log_phone_message_sent` / `models/logging.py` |
+
+### Background
+> Every chat/phone message sent to the participant is logged in `phone_message_logs` including the correct reply. Normal operation: messages send, participant answers, results logged.
+
+### Incident Description
+> `asyncpg.exceptions.DataError: invalid input for query argument $8: "You'll make it!" ('str' object cannot be interpreted as an integer)` — timeline engine tried to insert the correct-choice reply text into an `INTEGER` column.
+
+### Root Cause
+> `correct_choice` in `messages_day1.json` is the **text** of the correct reply (e.g. `"You'll make it!"`), not a numeric index. The `PhoneMessageLog.correct_answer` column was typed `Integer`. Same issue existed for `user_choice` (text of the selected reply was already being stored by the WS handler).
+
+### Fix
+> `models/logging.py`: changed `correct_answer` and `user_choice` from `Integer` to `Text`.
+> `ALTER TABLE phone_message_logs ALTER COLUMN correct_answer TYPE TEXT USING correct_answer::TEXT, ALTER COLUMN user_choice TYPE TEXT USING user_choice::TEXT` applied to dev DB.
+
+### Verification
+> `information_schema.columns` confirms both columns are `text`. Timeline engine no longer errors on phone message logging.
+
+### Follow-up Actions
+> - [ ] Apply same ALTER TABLE in production migration when ready to deploy
