@@ -732,8 +732,18 @@ function TestModeTab() {
     setCreating(false)
   }
 
-  const handleOpen = () => {
-    if (result?.entry_url) window.open(result.entry_url, '_blank', 'noopener,noreferrer')
+  const [copied, setCopied] = useState(false)
+
+  const handleOpen = async () => {
+    if (!result) return
+    // Auto-copy token so participant can paste it on the entry page
+    try {
+      await navigator.clipboard.writeText(result.token)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 3000)
+    } catch (e) { console.error('Copy failed', e) }
+    // Open the root URL without token in the query string
+    window.open(window.location.origin, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -775,13 +785,17 @@ function TestModeTab() {
         {result && (
           <div className="mt-4 p-4 bg-slate-50 rounded-xl space-y-2">
             <p className="text-sm font-medium text-slate-800">Session created!</p>
-            <p className="text-xs text-slate-500">Token: <span className="font-mono font-bold text-slate-700">{result.token}</span></p>
-            <p className="text-xs font-mono text-slate-500 truncate">{result.entry_url}</p>
+            <p className="text-xs text-slate-500">
+              Token: <span className="font-mono font-bold text-slate-700">{result.token}</span>
+            </p>
             <button onClick={handleOpen}
               className="flex items-center gap-2 text-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
               <ExternalLink className="w-4 h-4" />
-              Open in New Tab
+              {copied ? '✅ Token copied — enter it on the page' : 'Copy Token & Open'}
             </button>
+            {copied && (
+              <p className="text-xs text-slate-500">Token copied to clipboard. Paste it on the participant entry page.</p>
+            )}
           </div>
         )}
       </div>
