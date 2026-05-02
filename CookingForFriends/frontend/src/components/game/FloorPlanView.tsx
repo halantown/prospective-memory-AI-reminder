@@ -30,7 +30,7 @@ import { useCharacterStore } from '../../stores/characterStore'
 import waypointData from '../../data/waypoints.json'
 import type { WaypointData } from '../../utils/waypointGraph'
 
-const wpData = waypointData as WaypointData
+const wpData = waypointData as unknown as WaypointData
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

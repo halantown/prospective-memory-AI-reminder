@@ -1,8 +1,23 @@
 {
-  "waypoints": {},
-  "edges": [],
+  "waypoints": {
+    "oven":           { "x": 9.5,  "y": 15.8, "room": "kitchen", "station": true,  "facing": "up" },
+    "burner1":        { "x": 17.0, "y": 15.8, "room": "kitchen", "station": true,  "facing": "up" },
+    "kitchen_center": { "x": 28.5, "y": 17.5, "room": "kitchen", "station": false, "facing": "down" },
+    "cutting_board":  { "x": 30.5, "y": 15.6, "room": "kitchen", "station": true,  "facing": "up" },
+    "spice_rack":     { "x": 40.1, "y": 15.7, "room": "kitchen", "station": true,  "facing": "up" },
+    "fridge":         { "x": 44.0, "y": 15.5, "room": "kitchen", "station": true,  "facing": "up" },
+    "plating_area":   { "x": 28.6, "y": 19.8, "room": "kitchen", "station": true,  "facing": "down" }
+  },
+  "edges": [
+    ["oven",           "burner1"],
+    ["burner1",        "kitchen_center"],
+    ["kitchen_center", "cutting_board"],
+    ["cutting_board",  "spice_rack"],
+    ["spice_rack",     "fridge"],
+    ["kitchen_center", "plating_area"]
+  ],
   "room_meta": {
-    "kitchen":     { "exit": null, "entry": null },
+    "kitchen":     { "exit": null, "entry": "kitchen_center" },
     "dining_hall": { "exit": null, "entry": null },
     "bedroom":     { "exit": null, "entry": null },
     "living_room": { "exit": null, "entry": null }

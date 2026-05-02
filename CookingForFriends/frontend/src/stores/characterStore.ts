@@ -45,7 +45,7 @@ interface CharacterState {
 
 // ── Waypoint graph (module-level, constructed once) ───────────────────────────
 
-const wpData = waypointData as WaypointData
+const wpData = waypointData as unknown as WaypointData
 const adjacency = buildAdjacency(wpData)
 
 function getWaypoint(id: string) {
@@ -55,11 +55,11 @@ function getWaypoint(id: string) {
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 export const useCharacterStore = create<CharacterState>((set, get) => ({
-  position: { x: 35, y: 35 }, // placeholder until waypoints are annotated
-  facing: 'down',
-  animation: 'idle',
+  position: { x: 28.5, y: 17.5 }, // kitchen_center
+  facing: 'down' as FacingDir,
+  animation: 'idle' as AnimationState,
   isMoving: false,
-  currentWaypointId: null,
+  currentWaypointId: 'kitchen_center',
   path: [],
   pendingInteraction: null,
   onArrival: null,
