@@ -864,3 +864,67 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > - [ ] Add frontend stale/rejected cooking-action feedback
 > - [ ] Add regression test for wrong/missed step display in Recipe tab
 > - [ ] Fix stale `test_cooking_engine.py` assertions to use real option IDs
+
+---
+
+## INC-017 — Cooking timer and recipe state still diverged after timeout/wait
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-02 |
+| Severity     | P1 High |
+| Status       | Resolved — runtime state unified; event-chain scheduling pending |
+| Reported by  | Manual test: timeout, Recipe tab, and lock-screen KITCHEN TIMER showed different state |
+| Affected area| CookingEngine wait/result events, frontend cooking store, Recipe tab, phone lock screen |
+
+### Background
+> Cooking state should have one runtime source: backend `CookingEngine` emits active/wait/result events; frontend renders recipe progress and timer cues from those events. A timed-out step should disappear from timer displays and appear as `missed` in Recipe. Wait steps should end before the next same-dish active step.
+
+### Incident Description
+> After the previous local guard, the system could still show inconsistent cooking state. `kitchenTimerQueue` remained a separate frontend queue from `activeCookingSteps`, so timeout/warning behavior could persist on lock screen or station highlights after the active step was gone. Recipe definitions were still copied into frontend code. Backend wait steps emitted `wait_start` but did not reliably emit `wait_end`, and backend never emitted `dish_complete`, even though the frontend had a handler for it.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 21:15 | Investigation started from user report that timeout/Recipe/KITCHEN TIMER remained out of sync |
+| 21:15 | Confirmed `kitchenTimerQueue` was an independent frontend state source |
+| 21:15 | Confirmed backend recipe definitions were still copied into frontend initialization |
+| 21:15 | Confirmed backend emitted `wait_start` without corresponding wait cleanup and did not emit `dish_complete` |
+| 21:15 | Refactor implemented and compile/test verification passed |
+
+### Root Cause
+> The cooking UI had three state paths: `activeCookingSteps`, `cookingWaitSteps` / `dishes.currentStepIndex`, and `kitchenTimerQueue`. Timeout and result events updated some but not all of those paths. Recipe definitions also still existed in frontend code, so frontend could diverge from backend recipe/timeline changes. Backend event semantics were incomplete because wait steps did not have a clear end event and dish completion was only an internal phase change.
+
+### Contributing Factors
+> - `kitchenTimerQueue` was not derived from backend active-step state
+> - Recipe definitions were not delivered as a session/bootstrap payload
+> - `wait_start` had no reliable frontend cleanup point if the next same-dish step arrived
+> - `dish_complete` existed as a frontend case but had no backend sender
+> - Cooking tests still used stale option IDs, masking current engine behavior in local verification
+
+### Fix
+> `backend/data/cooking_recipes.py`: added `serialize_cooking_definitions()` with recipe version, dish order, dish metadata, recipe-visible step definitions, and timeline entries. Correct answers remain backend-only.
+>
+> `backend/routers/session.py` and `backend/models/schemas.py`: session start now returns `cooking_definitions`; a dedicated `/api/session/{session_id}/cooking-definitions` endpoint restores definitions for refreshed sessions.
+>
+> `backend/engine/cooking_engine.py`: activating the next same-dish step now emits `wait_end` for the previous wait step. Completing all active steps now emits `dish_complete` once.
+>
+> It also marks an unanswered same-dish active step as `missed` before activating the next scheduled step. This prevents the timeout task and timeline activation race from overwriting the old active step without a result.
+>
+> `frontend/src/stores/gameStore.ts`: removed recipe content hardcode and initializes `dishes` from server definitions. Removed `kitchenTimerQueue`; timer displays are now derived from `activeCookingSteps`, while timeout/result writes only to `dish.stepResults`.
+>
+> `frontend/src/components/game/phone/RecipeTab.tsx`, `LockScreen.tsx`, `PhoneSidebar.tsx`, and `KitchenRoom.tsx`: UI now uses `activeCookingSteps`, `cookingWaitSteps`, and `dishes` as the shared runtime state. Legacy `kitchen_timer` WebSocket events are ignored to avoid reintroducing a second timer channel.
+>
+> `backend/tests/test_cooking_engine.py`: fixed stale option IDs and added regressions for `wait_start` → `wait_end` → `step_activate` and unanswered active-step supersession.
+
+### Verification
+> `cd CookingForFriends/backend && conda run -n thesis_server python -m py_compile data/cooking_recipes.py engine/cooking_engine.py routers/session.py models/schemas.py websocket/game_handler.py` passes.
+>
+> `cd CookingForFriends/frontend && npm run build` passes.
+>
+> `cd CookingForFriends/backend && conda run -n thesis_server pytest tests/test_cooking_engine.py -q` passes: 16 passed.
+
+### Follow-up Actions
+> - [ ] Add frontend store/unit tests for timeout/result/wait state rendering once frontend test tooling exists
+> - [ ] Add backend integration test for full cooking event order across one dish
+> - [ ] Refactor cooking scheduling so timeline controls only each dish's first step and later same-dish steps are activated by completion/timeout events

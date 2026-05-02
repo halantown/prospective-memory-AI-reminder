@@ -19,6 +19,7 @@ class SessionStartResponse(BaseModel):
     task_order: str
     is_test: bool
     current_phase: str
+    cooking_definitions: dict[str, Any]
 
 
 class StatusResponse(BaseModel):

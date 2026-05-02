@@ -85,7 +85,6 @@ export default function KitchenRoom({
   const activeStation = useGameStore((s) => s.activeStation)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
-  const kitchenTimerQueue = useGameStore((s) => s.kitchenTimerQueue)
 
   const [feedback, setFeedback] = useState<{ station: KitchenStationId; type: FeedbackType }>({ station: 'fridge', type: null })
   const [debugPos, setDebugPos] = useState<{ x: number; y: number } | null>(null)
@@ -133,8 +132,8 @@ export default function KitchenRoom({
         ([stationId, pos]) => {
           if (HIDDEN_STATIONS.has(stationId)) return null
           const info = STATION_INFO[stationId]
-          const isWarning = kitchenTimerQueue.some(
-            timer => timer.status === 'warning' && timer.station && stationMatches(stationId, timer.station)
+          const hasActiveStep = activeCookingSteps.some(
+            step => stationMatches(stationId, step.station)
           )
           const showFeedback = feedback.station === stationId && feedback.type
 
@@ -142,7 +141,7 @@ export default function KitchenRoom({
             <motion.button
               key={stationId}
               className={`absolute z-10 rounded-lg border-2 transition-all duration-200
-                ${isWarning ? 'bg-red-600/45 border-red-300 shadow-[0_0_20px_rgba(239,68,68,0.55)]' : 'bg-blue-500/30 border-blue-400'}
+                ${hasActiveStep ? 'bg-orange-500/35 border-orange-300 shadow-[0_0_18px_rgba(251,146,60,0.45)]' : 'bg-blue-500/30 border-blue-400'}
                 ${isActive ? 'cursor-pointer' : 'cursor-default pointer-events-none'}
               `}
               style={pos}
@@ -167,13 +166,13 @@ export default function KitchenRoom({
                   </motion.div>
                 )}
               </AnimatePresence>
-              {isWarning && (
+              {hasActiveStep && (
                 <motion.div
                   className="absolute inset-0 flex items-center justify-center text-2xl pointer-events-none"
                   animate={{ opacity: [0.45, 1, 0.45], y: [2, -3, 2] }}
                   transition={{ repeat: Infinity, duration: 1.1 }}
                 >
-                  💨
+                  ⏱️
                 </motion.div>
               )}
             </motion.button>

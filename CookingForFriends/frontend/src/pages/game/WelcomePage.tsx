@@ -34,6 +34,7 @@ export default function WelcomePage() {
         task_order: data.task_order,
         is_test: data.is_test,
         current_phase: data.current_phase,
+        cooking_definitions: data.cooking_definitions,
       })
       // Persist session for page refresh recovery
       sessionStorage.setItem('cff_session', JSON.stringify({
@@ -44,6 +45,7 @@ export default function WelcomePage() {
         task_order: data.task_order,
         is_test: data.is_test,
         current_phase: data.current_phase,
+        cooking_definitions: data.cooking_definitions,
       }))
 
       // Check session status to resume at correct phase for returning participants

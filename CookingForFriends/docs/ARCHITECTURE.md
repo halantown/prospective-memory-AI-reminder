@@ -152,7 +152,7 @@ Key state sections:
   - `activePhoneTab: 'chats' | 'recipe'`
   - `phoneLocked: boolean`, `phoneLastActivity: number`
   - `phoneBanner: PhoneMessage | null` — auto-dismissed notification or cross-contact chat alert
-  - `kitchenTimerQueue: KitchenTimerModal[]` — queued blocking modals
+  - Cooking timer UI is derived from `activeCookingSteps`; there is no separate timer queue
   - `lockSystemNotifications[]` — system notifications accumulated on lock screen (persist until session reset)
 - **PM**: activePMTrials, completedPMTrialIds
 - **Robot**: room, speaking, speechText

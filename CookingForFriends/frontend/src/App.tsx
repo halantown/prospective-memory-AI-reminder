@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useGameStore } from './stores/gameStore'
-import { getSessionStatus } from './services/api'
+import { getCookingDefinitions, getSessionStatus } from './services/api'
 import type { Phase } from './types'
 import WelcomePage from './pages/game/WelcomePage'
 import ConsentPage from './pages/game/ConsentPage'
@@ -42,6 +42,7 @@ function GameShell() {
   const sessionId = useGameStore((s) => s.sessionId)
   const setSession = useGameStore((s) => s.setSession)
   const setPhase = useGameStore((s) => s.setPhase)
+  const initializeCookingDefinitions = useGameStore((s) => s.initializeCookingDefinitions)
 
   // Prevent browser back-button during experiment
   useEffect(() => {
@@ -90,6 +91,13 @@ function GameShell() {
 
       // Restore session and fetch current status
       setSession(data)
+      if (!data.cooking_definitions) {
+        getCookingDefinitions(data.session_id)
+          .then(initializeCookingDefinitions)
+          .catch(() => {
+            console.warn('[App] Failed to restore cooking definitions')
+          })
+      }
       getSessionStatus(data.session_id)
         .then((status) => {
           // Map backend status/phase to frontend phase

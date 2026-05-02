@@ -3,14 +3,7 @@
 import { useMemo, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
-import type { PhoneMessage, Contact, ActiveCookingStep, DishId } from '../../../types'
-
-const DISH_DISPLAY: Record<DishId, { label: string; emoji: string }> = {
-  spaghetti: { label: 'Spaghetti', emoji: '🍝' },
-  steak: { label: 'Steak', emoji: '🥩' },
-  tomato_soup: { label: 'Tomato Soup', emoji: '🍅' },
-  roasted_vegetables: { label: 'Roast Veg', emoji: '🥕' },
-}
+import type { PhoneMessage, Contact, ActiveCookingStep } from '../../../types'
 
 function formatAction(step: ActiveCookingStep) {
   const label = step.stepLabel.trim()
@@ -30,6 +23,7 @@ export default function LockScreen({
   const lockSystemNotifications = useGameStore((s) => s.lockSystemNotifications)
   const setActiveContactId = useGameStore((s) => s.setActiveContactId)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
+  const dishes = useGameStore((s) => s.dishes)
 
   const contactPreviews = useMemo(() => {
     const grouped: Record<string, { contact: Contact | null; count: number; latest: PhoneMessage }> = {}
@@ -88,7 +82,7 @@ export default function LockScreen({
           </div>
           <div className="flex flex-col gap-1">
             {visibleCookingSteps.map((step) => {
-              const dish = DISH_DISPLAY[step.dishId] ?? { label: 'Dish', emoji: '🍽️' }
+              const dish = dishes[step.dishId] ?? { label: 'Dish', emoji: '🍽️' }
               return (
                 <div
                   key={`${step.dishId}-${step.stepIndex}`}

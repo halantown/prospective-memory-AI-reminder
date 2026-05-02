@@ -548,10 +548,10 @@ New structure:
 
 ```
 PhoneSidebar.tsx          (iPhone shell + Dynamic Island + status bar + lock screen logic)
-├── LockScreen.tsx         (three sections: Kitchen (orange, top) > Messages > System; Kitchen reads kitchenTimerQueue from store)
+├── LockScreen.tsx         (three sections: Kitchen (orange, top) > Messages > System; Kitchen derives timers from activeCookingSteps)
 ├── NotificationBanner.tsx (floating pill at top, 5s auto-dismiss, countdown bar)
-├── KitchenTimerBanner.tsx (shown below header bar when unlocked; inside LockScreen as first section when locked)
-├── KitchenTimerModal.tsx  (blocking modal overlay, must be dismissed manually)
+├── KitchenTimerBanner.tsx (legacy non-blocking helper; derives from activeCookingSteps if rendered)
+├── KitchenTimerModal.tsx  (legacy no-op; do not reintroduce blocking timer queue)
 ├── PhoneTabBar.tsx        (bottom tabs: Chats / Recipe)
 ├── ContactStrip.tsx       (left 48px vertical avatar list — hidden until contact sends first msg)
 ├── ChatView.tsx           (right panel: chat header + message scroll)

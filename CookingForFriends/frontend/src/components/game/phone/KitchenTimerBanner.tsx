@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
 
 export default function KitchenTimerBanner() {
-  const queue = useGameStore((s) => s.kitchenTimerQueue)
-  const visible = queue.slice(-2)
+  const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
+  const dishes = useGameStore((s) => s.dishes)
+  const visible = activeCookingSteps.slice(-2)
 
   return (
     <AnimatePresence initial={false}>
@@ -18,21 +19,18 @@ export default function KitchenTimerBanner() {
           transition={{ duration: 0.18 }}
           className="relative z-40 px-4 pb-2 flex flex-col gap-1.5"
         >
-          {visible.map((timer) => {
-            const warning = timer.status === 'warning'
+          {visible.map((step) => {
+            const dish = dishes[step.dishId]
             return (
               <motion.div
-                key={timer.id}
+                key={`${step.dishId}-${step.stepIndex}`}
                 layout
-                className={`flex items-center gap-2 rounded-full px-3 py-2 shadow-lg border ${
-                  warning
-                    ? 'bg-red-600/95 border-red-300/50 text-white shadow-red-950/40'
-                    : 'bg-orange-500/95 border-orange-200/50 text-white shadow-orange-950/30'
-                }`}
+                className="flex items-center gap-2 rounded-full px-3 py-2 shadow-lg border
+                           bg-orange-500/95 border-orange-200/50 text-white shadow-orange-950/30"
               >
-                <span className="text-base">{timer.icon || '🍳'}</span>
+                <span className="text-base">{dish?.emoji || '🍳'}</span>
                 <span className="text-[13px] font-semibold leading-tight truncate">
-                  {timer.message}
+                  {step.stepLabel}!
                 </span>
               </motion.div>
             )

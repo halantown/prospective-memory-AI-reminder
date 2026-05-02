@@ -10,12 +10,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
 import type { DishId, DishState, CookingStepResult, ActiveCookingStep, CookingWaitStep } from '../../../types'
 
-const DISH_ORDER: DishId[] = ['spaghetti', 'steak', 'tomato_soup', 'roasted_vegetables']
-
 export default function RecipeTab() {
   const [isHolding, setIsHolding] = useState(false)
   const holdStartRef = useRef<number>(0)
   const dishes = useGameStore((s) => s.dishes)
+  const dishOrder = useGameStore((s) => s.cookingDishOrder)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
   const cookingWaitSteps = useGameStore((s) => s.cookingWaitSteps)
   const wsSend = useGameStore((s) => s.wsSend)
@@ -44,11 +43,11 @@ export default function RecipeTab() {
           start_ts: start / 1000,
           end_ts: end / 1000,
           duration_ms: durationMs,
-          active_dishes: DISH_ORDER.filter(d => dishes[d].phase !== 'idle'),
+          active_dishes: dishOrder.filter(d => dishes[d]?.phase !== 'idle'),
         },
       })
     }
-  }, [isHolding, dishes, wsSend])
+  }, [isHolding, dishes, dishOrder, wsSend])
 
   return (
     /* All press/release handlers on the outermost div so that the overlay
@@ -92,7 +91,7 @@ export default function RecipeTab() {
             </div>
             {/* 2×2 grid, no scroll */}
             <div className="grid grid-cols-2 gap-2 flex-1 min-h-0">
-              {DISH_ORDER.map(dishId => (
+              {dishOrder.map(dishId => (
                 <DishRecipeCard
                   key={dishId}
                   dish={dishes[dishId]}
@@ -169,11 +168,11 @@ function DishRecipeCard({
             <>
               <StepRow
                 label={currentStep.label}
-                isCurrent={hasActiveAction}
+                isCurrent={hasLiveStep}
                 isCompleted={!hasLiveStep && Boolean(currentResult)}
                 result={currentResult}
               />
-              {hasActiveAction && (
+              {hasLiveStep && (
                 <div className="rounded-md bg-slate-950/70 border border-slate-700/60 px-2 py-1.5">
                   <p className="text-[10px] leading-snug text-slate-200">
                     {currentStep.description || 'Check this step carefully.'}

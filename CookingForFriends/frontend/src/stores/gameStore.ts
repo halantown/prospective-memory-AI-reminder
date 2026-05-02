@@ -6,24 +6,21 @@ import type {
   ActivePMTrial, PMTaskConfig, DiningPhase, SteakState, SeatState, UtensilType,
   DishId, DishState, KitchenStationId, Contact,
   ActiveCookingStep, CookingStepResult, CookingStepOption, CookingWaitStep,
-  TaskOrder, PMPipelineState, PMPipelineStep, KitchenTimerBannerItem,
+  TaskOrder, PMPipelineState, PMPipelineStep,
+  CookingDefinitions,
 } from '../types'
 
 const EMPTY_SEAT: SeatState = { plate: false, knife: false, fork: false, glass: false }
 
 /** Max visible phone messages — unused in chat mode but kept for backward compat. */
 const MAX_PHONE_MESSAGES = 50
-const COOKING_STATIONS = new Set<KitchenStationId>(['burner1', 'burner2', 'burner3', 'oven'])
+export const FALLBACK_DISH_ORDER: DishId[] = ['spaghetti', 'steak', 'tomato_soup', 'roasted_vegetables']
 
-function buildKitchenTimerMessage(stepLabel: string) {
-  const text = stepLabel.trim()
-  if (!text) return 'Check the kitchen!'
-  return `${text.charAt(0).toUpperCase()}${text.slice(1)}!`
-}
-
-function buildKitchenWarningMessage(dish: DishState | undefined) {
-  const label = dish?.label?.toLowerCase() || 'food'
-  return `The ${label} burned!`
+const FALLBACK_DISH_META: Record<DishId, { label: string; emoji: string }> = {
+  spaghetti: { label: 'Spaghetti', emoji: '🍝' },
+  steak: { label: 'Steak', emoji: '🥩' },
+  tomato_soup: { label: 'Tomato Soup', emoji: '🍅' },
+  roasted_vegetables: { label: 'Roasted Vegetables', emoji: '🥕' },
 }
 
 interface GameState {
@@ -43,6 +40,8 @@ interface GameState {
   kitchenScore: number
 
   // ── Cooking (new multi-dish system) ──
+  cookingDefinitions: CookingDefinitions | null
+  cookingDishOrder: DishId[]
   dishes: Record<DishId, DishState>
   /** Which station's popup is currently open */
   activeStation: KitchenStationId | null
@@ -72,7 +71,6 @@ interface GameState {
   contacts: Contact[]
   activeContactId: string | null
   activePhoneTab: 'chats' | 'recipe'
-  kitchenTimerQueue: KitchenTimerBannerItem[]
   recipeTabBounce: boolean
   lockSystemNotifications: Array<{ id: string; sender: string; text: string; timestamp: number }>
 
@@ -117,6 +115,7 @@ interface GameState {
   addKitchenScore: (points: number) => void
 
   // Cooking actions (new multi-dish)
+  initializeCookingDefinitions: (definitions: CookingDefinitions) => void
   setActiveStation: (station: KitchenStationId | null) => void
   advanceDishStep: (dishId: DishId) => void
   setDishStepReady: (dishId: DishId, ready: boolean) => void
@@ -153,10 +152,6 @@ interface GameState {
   setContacts: (contacts: Contact[]) => void
   setActiveContactId: (id: string | null) => void
   setActivePhoneTab: (tab: 'chats' | 'recipe') => void
-  pushKitchenTimer: (timer: Omit<KitchenTimerBannerItem, 'appearedAt'>) => void
-  dismissKitchenTimer: () => void
-  removeKitchenTimerForStep: (dishId: DishId, stepIndex: number) => void
-  markKitchenTimerWarning: (dishId: DishId, stepIndex: number, message: string) => void
   setRecipeTabBounce: (bounce: boolean) => void
   addLockSystemNotification: (notif: { id: string; sender: string; text: string; timestamp: number }) => void
 
@@ -210,77 +205,41 @@ const initialPans: Pan[] = [
   { id: 3, state: 'empty', timer: null, placedAt: null },
 ]
 
-/** Spaghetti recipe steps */
-const SPAGHETTI_STEPS: DishState['steps'] = [
-  { id: 'sp_pot_water', label: 'Prepare pot', station: 'burner1', description: 'Fill the large pot with water, add a pinch of salt.' },
-  { id: 'sp_wait_boil', label: 'Water heating', station: 'burner1', description: 'Waiting for water to boil.' },
-  { id: 'sp_add_pasta', label: 'Add pasta', station: 'burner1', description: 'Add spaghetti, cook for 9 minutes.' },
-  { id: 'sp_wait_cook', label: 'Pasta cooking', station: 'burner1', description: 'Pasta is cooking.' },
-  { id: 'sp_drain', label: 'Drain pasta', station: 'burner1', description: 'Drain and save a cup of pasta water.' },
-  { id: 'sp_add_sauce', label: 'Add sauce', station: 'spice_rack', description: 'Add pesto sauce.' },
-  { id: 'sp_toss', label: 'Toss pasta', station: 'burner1', description: 'Toss on low heat for 1 minute.' },
-  { id: 'sp_plate', label: 'Plate spaghetti', station: 'plating_area', description: 'Serve on the flat yellow plate.' },
-]
+function upsertStepResult(results: CookingStepResult[], next: CookingStepResult) {
+  return [
+    ...results.filter(r => r.stepIndex !== next.stepIndex),
+    next,
+  ].sort((a, b) => a.stepIndex - b.stepIndex)
+}
 
-/** Steak recipe steps */
-const STEAK_STEPS: DishState['steps'] = [
-  { id: 'st_select', label: 'Select steak', station: 'fridge', description: 'Get the ribeye steak.' },
-  { id: 'st_season', label: 'Season steak', station: 'cutting_board', description: 'Rub with salt, pepper, and olive oil.' },
-  { id: 'st_heat_pan', label: 'Heat pan', station: 'burner3', description: 'Heat the cast iron pan on high.' },
-  { id: 'st_place', label: 'Place steak', station: 'burner3', description: "Place steak and don't move it." },
-  { id: 'st_wait_side1', label: 'Cooking side 1', station: 'burner3', description: 'Searing first side.' },
-  { id: 'st_flip', label: 'Flip steak', station: 'burner3', description: 'Flip once, add a knob of butter.' },
-  { id: 'st_wait_side2', label: 'Cooking side 2', station: 'burner3', description: 'Searing second side.' },
-  { id: 'st_plate', label: 'Plate steak', station: 'plating_area', description: 'Rest on the warm black plate for 2 minutes.' },
-]
-
-/** Tomato soup recipe steps */
-const SOUP_STEPS: DishState['steps'] = [
-  { id: 'ts_select_ingredients', label: 'Select ingredients', station: 'fridge', description: 'Get tomatoes, onion, and garlic.' },
-  { id: 'ts_chop', label: 'Chop ingredients', station: 'cutting_board', description: 'Dice the onion, crush the garlic, quarter the tomatoes.' },
-  { id: 'ts_saute', label: 'Sauté base', station: 'burner2', description: 'Sauté onion and garlic on medium heat.' },
-  { id: 'ts_add_liquid', label: 'Add liquid', station: 'burner2', description: 'Add vegetable stock.' },
-  { id: 'ts_wait_simmer1', label: 'Simmering', station: 'burner2', description: 'Soup is simmering.' },
-  { id: 'ts_stir', label: 'Stir soup', station: 'burner2', description: 'Stir and reduce heat to low.' },
-  { id: 'ts_wait_simmer2', label: 'Continue simmering', station: 'burner2', description: 'Soup continues simmering.' },
-  { id: 'ts_season', label: 'Season soup', station: 'spice_rack', description: 'Add salt + basil.' },
-  { id: 'ts_plate', label: 'Serve soup', station: 'plating_area', description: 'Ladle into the deep red bowl.' },
-]
-
-/** Roasted vegetables recipe steps */
-const VEGGIE_STEPS: DishState['steps'] = [
-  { id: 'rv_select_veggies', label: 'Select vegetables', station: 'fridge', description: 'Get bell peppers, zucchini, and tomatoes.' },
-  { id: 'rv_chop', label: 'Chop vegetables', station: 'cutting_board', description: 'Slice into thin rounds.' },
-  { id: 'rv_season', label: 'Season vegetables', station: 'spice_rack', description: 'Add olive oil + dried herbs.' },
-  { id: 'rv_oven_place', label: 'Place tray in oven', station: 'oven', description: 'Set oven to 200°C.' },
-  { id: 'rv_wait_oven', label: 'Oven cooking', station: 'oven', description: 'Vegetables are roasting.' },
-  { id: 'rv_oven_remove', label: 'Remove from oven', station: 'oven', description: 'Take out the tray and turn off oven.' },
-  { id: 'rv_plate', label: 'Plate vegetables', station: 'plating_area', description: 'Arrange on the white oval plate.' },
-]
-
-function createInitialDishes(): Record<DishId, DishState> {
-  return {
-    spaghetti: {
-      id: 'spaghetti', label: 'Spaghetti', emoji: '🍝',
-      phase: 'idle', currentStepIndex: 0, steps: SPAGHETTI_STEPS,
-      stepReady: true, startedAt: null, completedAt: null, stepResults: [],
-    },
-    steak: {
-      id: 'steak', label: 'Steak', emoji: '🥩',
-      phase: 'idle', currentStepIndex: 0, steps: STEAK_STEPS,
-      stepReady: false, startedAt: null, completedAt: null, stepResults: [],
-    },
-    tomato_soup: {
-      id: 'tomato_soup', label: 'Tomato Soup', emoji: '🍅',
-      phase: 'idle', currentStepIndex: 0, steps: SOUP_STEPS,
-      stepReady: false, startedAt: null, completedAt: null, stepResults: [],
-    },
-    roasted_vegetables: {
-      id: 'roasted_vegetables', label: 'Roasted Vegetables', emoji: '🥕',
-      phase: 'idle', currentStepIndex: 0, steps: VEGGIE_STEPS,
-      stepReady: false, startedAt: null, completedAt: null, stepResults: [],
-    },
+function createInitialDishes(definitions?: CookingDefinitions | null): Record<DishId, DishState> {
+  const dishes = {} as Record<DishId, DishState>
+  for (const dishId of FALLBACK_DISH_ORDER) {
+    const definition = definitions?.dishes?.[dishId]
+    const meta = definition ?? FALLBACK_DISH_META[dishId]
+    dishes[dishId] = {
+      id: dishId,
+      label: meta.label,
+      emoji: meta.emoji,
+      phase: 'idle',
+      currentStepIndex: 0,
+      steps: definition
+        ? definition.steps.map(step => ({
+            id: step.id,
+            label: step.label,
+            station: step.station,
+            description: step.description,
+            stepType: step.step_type,
+            waitDurationS: step.wait_duration_s,
+          }))
+        : [],
+      stepReady: false,
+      startedAt: null,
+      completedAt: null,
+      stepResults: [],
+    }
   }
+  return dishes
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -300,6 +259,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   kitchenScore: 0,
 
   // ── Cooking (new multi-dish) ──
+  cookingDefinitions: null,
+  cookingDishOrder: FALLBACK_DISH_ORDER,
   dishes: createInitialDishes(),
   activeStation: null,
   activeCookingSteps: [],
@@ -325,7 +286,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   contacts: [],
   activeContactId: null,
   activePhoneTab: 'chats',
-  kitchenTimerQueue: [],
   recipeTabBounce: false,
   lockSystemNotifications: [],
 
@@ -359,14 +319,24 @@ export const useGameStore = create<GameState>((set, get) => ({
   wsSend: null,
 
   // ── Actions ──
-  setSession: (data) => set({
-    sessionId: data.session_id,
-    participantId: data.participant_id,
-    condition: data.condition,
-    taskOrder: (data.task_order as TaskOrder) || null,
-    isTest: data.is_test ?? false,
-    currentPhase: data.current_phase ?? 'welcome',
-  }),
+  setSession: (data) => {
+    const cookingState = data.cooking_definitions
+      ? {
+          cookingDefinitions: data.cooking_definitions,
+          cookingDishOrder: data.cooking_definitions.dish_order,
+          dishes: createInitialDishes(data.cooking_definitions),
+        }
+      : {}
+    set({
+      sessionId: data.session_id,
+      participantId: data.participant_id,
+      condition: data.condition,
+      taskOrder: (data.task_order as TaskOrder) || null,
+      isTest: data.is_test ?? false,
+      currentPhase: data.current_phase ?? 'welcome',
+      ...cookingState,
+    })
+  },
 
   setPhase: (phase) => set({ phase }),
 
@@ -392,6 +362,16 @@ export const useGameStore = create<GameState>((set, get) => ({
   addKitchenScore: (points) => set((s) => ({ kitchenScore: s.kitchenScore + points })),
 
   // Cooking (new multi-dish)
+  initializeCookingDefinitions: (definitions) => set({
+    cookingDefinitions: definitions,
+    cookingDishOrder: definitions.dish_order,
+    dishes: createInitialDishes(definitions),
+    activeCookingSteps: [],
+    cookingWaitSteps: [],
+    cookingScore: { correct: 0, wrong: 0, missed: 0 },
+    activeStation: null,
+  }),
+
   setActiveStation: (station) => set({ activeStation: station }),
 
   advanceDishStep: (dishId) => {
@@ -465,21 +445,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       activeCookingSteps: [...s.activeCookingSteps.filter(
         st => !(st.dishId === step.dishId && st.stepIndex === step.stepIndex)
       ), step],
-      kitchenTimerQueue: [
-        ...s.kitchenTimerQueue.filter(
-          t => !(t.dishId === step.dishId && t.stepIndex === step.stepIndex)
-        ),
-        {
-          id: `timer_${step.dishId}_${step.stepIndex}`,
-          icon: '🍳',
-          message: buildKitchenTimerMessage(step.stepLabel),
-          dishId: step.dishId,
-          stepIndex: step.stepIndex,
-          station: step.station,
-          status: 'active' as const,
-          appearedAt: Date.now(),
-        },
-      ].slice(-2),
+      cookingWaitSteps: s.cookingWaitSteps.filter(w => w.dishId !== step.dishId),
       dishes: {
         ...s.dishes,
         [step.dishId]: {
@@ -510,23 +476,24 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((s) => {
       const dish = s.dishes[dishId]
       const score = { ...s.cookingScore }
-      if (result === 'correct') score.correct++
-      else score.wrong++
+      const alreadyRecorded = dish.stepResults.some(r => r.stepIndex === stepIndex)
+      if (!alreadyRecorded) {
+        if (result === 'correct') score.correct++
+        else score.wrong++
+      }
 
       return {
         // Remove from active steps
         activeCookingSteps: s.activeCookingSteps.filter(
           st => !(st.dishId === dishId && st.stepIndex === stepIndex)
         ),
-        kitchenTimerQueue: s.kitchenTimerQueue.filter(
-          t => !(t.dishId === dishId && t.stepIndex === stepIndex)
-        ),
         // Add result to dish
         dishes: {
           ...s.dishes,
           [dishId]: {
             ...dish,
-            stepResults: [...dish.stepResults, stepResult],
+            phase: 'prep',
+            stepResults: upsertStepResult(dish.stepResults, stepResult),
             stepReady: false,
           },
         },
@@ -538,10 +505,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   handleCookingStepTimeout: (data) => {
     const dishId = data.dish as DishId
     const stepIndex = data.step_index as number
-    const timedOutStep = get().activeCookingSteps.find(
-      st => st.dishId === dishId && st.stepIndex === stepIndex
-    )
-    const isCookingStep = timedOutStep ? COOKING_STATIONS.has(timedOutStep.station) : false
 
     const stepResult: CookingStepResult = {
       dishId,
@@ -552,26 +515,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((s) => {
       const dish = s.dishes[dishId]
       const score = { ...s.cookingScore }
-      score.missed++
+      const alreadyRecorded = dish.stepResults.some(r => r.stepIndex === stepIndex)
+      if (!alreadyRecorded) score.missed++
 
       return {
         activeCookingSteps: s.activeCookingSteps.filter(
           st => !(st.dishId === dishId && st.stepIndex === stepIndex)
         ),
-        kitchenTimerQueue: isCookingStep
-          ? s.kitchenTimerQueue.map(t =>
-              t.dishId === dishId && t.stepIndex === stepIndex
-                ? { ...t, status: 'warning' as const, message: buildKitchenWarningMessage(dish) }
-                : t
-            )
-          : s.kitchenTimerQueue.filter(
-              t => !(t.dishId === dishId && t.stepIndex === stepIndex)
-            ),
         dishes: {
           ...s.dishes,
           [dishId]: {
             ...dish,
-            stepResults: [...dish.stepResults, stepResult],
+            phase: 'prep',
+            stepResults: upsertStepResult(dish.stepResults, stepResult),
             stepReady: false,
           },
         },
@@ -587,11 +543,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       stepLabel: data.label as string || '',
       stepDescription: data.description as string || '',
       station: data.station as KitchenStationId,
-      startedAt: Date.now(),
+      startedAt: data.started_at ? (data.started_at as number) * 1000 : Date.now(),
       durationS: data.wait_duration_s as number || 60,
     }
     set((s) => ({
-      cookingWaitSteps: [...s.cookingWaitSteps, waitStep],
+      activeCookingSteps: s.activeCookingSteps.filter(st => st.dishId !== waitStep.dishId),
+      cookingWaitSteps: [
+        ...s.cookingWaitSteps.filter(w => w.dishId !== waitStep.dishId),
+        waitStep,
+      ],
       dishes: {
         ...s.dishes,
         [waitStep.dishId]: {
@@ -610,6 +570,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       cookingWaitSteps: s.cookingWaitSteps.filter(
         w => !(w.dishId === dishId && w.stepIndex === stepIndex)
       ),
+      dishes: {
+        ...s.dishes,
+        [dishId]: {
+          ...s.dishes[dishId],
+          phase: s.dishes[dishId].phase === 'waiting' ? 'prep' : s.dishes[dishId].phase,
+        },
+      },
     }))
   },
 
@@ -698,27 +665,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   setContacts: (contacts) => set({ contacts }),
   setActiveContactId: (id) => set({ activeContactId: id }),
   setActivePhoneTab: (tab) => set({ activePhoneTab: tab }),
-  pushKitchenTimer: (timer) => set((s) => ({
-    kitchenTimerQueue: [
-      ...s.kitchenTimerQueue.filter(t => t.id !== timer.id),
-      { ...timer, appearedAt: Date.now(), status: timer.status ?? 'active' },
-    ].slice(-2),
-  })),
-  dismissKitchenTimer: () => set((s) => ({
-    kitchenTimerQueue: s.kitchenTimerQueue.slice(1),
-  })),
-  removeKitchenTimerForStep: (dishId, stepIndex) => set((s) => ({
-    kitchenTimerQueue: s.kitchenTimerQueue.filter(
-      t => !(t.dishId === dishId && t.stepIndex === stepIndex)
-    ),
-  })),
-  markKitchenTimerWarning: (dishId, stepIndex, message) => set((s) => ({
-    kitchenTimerQueue: s.kitchenTimerQueue.map(t =>
-      t.dishId === dishId && t.stepIndex === stepIndex
-        ? { ...t, status: 'warning', message }
-        : t
-    ),
-  })),
   setRecipeTabBounce: (bounce) => set({ recipeTabBounce: bounce }),
   addLockSystemNotification: (notif) => set((s) => ({
     lockSystemNotifications: [...s.lockSystemNotifications, notif].slice(-2),
@@ -829,6 +775,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         const dishId = data.dish as DishId | undefined
         if (dishId) {
           set((s) => ({
+            activeCookingSteps: s.activeCookingSteps.filter(st => st.dishId !== dishId),
+            cookingWaitSteps: s.cookingWaitSteps.filter(w => w.dishId !== dishId),
             dishes: {
               ...s.dishes,
               [dishId]: { ...s.dishes[dishId], phase: 'served', completedAt: Date.now() },
@@ -855,13 +803,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   totalScore: () => get().kitchenScore + get().diningScore,
 
   // Reset for new block
-  resetBlock: () => set({
+  resetBlock: () => set((s) => ({
     currentRoom: 'kitchen',
     previousRoom: null,
     avatarMoving: false,
     pans: [...initialPans],
     kitchenScore: 0,
-    dishes: createInitialDishes(),
+    dishes: createInitialDishes(s.cookingDefinitions),
     activeStation: null,
     activeCookingSteps: [],
     cookingWaitSteps: [],
@@ -879,7 +827,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     contacts: [],
     activeContactId: null,
     activePhoneTab: 'chats',
-    kitchenTimerQueue: [],
     recipeTabBounce: false,
     lockSystemNotifications: [],
     robot: { room: 'kitchen', speaking: false, text: '', visible: true },
@@ -890,5 +837,5 @@ export const useGameStore = create<GameState>((set, get) => ({
     activeTriggerEffects: [],
     gameClock: '17:00',
     elapsedSeconds: 0,
-  }),
+  })),
 }))

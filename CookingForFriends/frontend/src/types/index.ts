@@ -61,6 +61,7 @@ export interface SessionData {
   task_order?: string
   is_test?: boolean
   current_phase?: string
+  cooking_definitions?: CookingDefinitions
 }
 
 // ── Rooms ──
@@ -95,6 +96,8 @@ export interface CookingStep {
   label: string
   station: KitchenStationId
   description: string
+  stepType: 'active' | 'wait'
+  waitDurationS: number
 }
 
 export type DishPhase = 'idle' | 'prep' | 'cooking' | 'waiting' | 'ready' | 'plated' | 'served'
@@ -119,6 +122,36 @@ export interface DishState {
 export interface CookingStepOption {
   id: string
   text: string
+}
+
+export interface CookingDefinitionStep {
+  id: string
+  label: string
+  station: KitchenStationId
+  description: string
+  step_type: 'active' | 'wait'
+  wait_duration_s: number
+}
+
+export interface CookingDefinitionDish {
+  id: DishId
+  label: string
+  emoji: string
+  steps: CookingDefinitionStep[]
+}
+
+export interface CookingTimelineDefinitionEntry {
+  t: number
+  dish: DishId
+  step_index: number
+  step_type: 'active' | 'wait'
+}
+
+export interface CookingDefinitions {
+  recipe_version: string
+  dish_order: DishId[]
+  dishes: Record<DishId, CookingDefinitionDish>
+  timeline: CookingTimelineDefinitionEntry[]
 }
 
 export type CookingStepResultType = 'correct' | 'wrong' | 'missed'

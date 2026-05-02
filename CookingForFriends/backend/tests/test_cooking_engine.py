@@ -88,11 +88,12 @@ class TestHandleAction:
         assert data["step_index"] == 0
 
         # Submit correct answer
+        step_def = ALL_RECIPES["spaghetti"][0]
         result = await engine.handle_action(
             dish_id="spaghetti",
-            chosen_option_id="correct",
-            chosen_option_text="Correct text",
-            station=ALL_RECIPES["spaghetti"][0].station,
+            chosen_option_id=f"option_{step_def.correct_index}",
+            chosen_option_text=step_def.options[step_def.correct_index],
+            station=step_def.station,
             timestamp=0,
         )
 
@@ -190,8 +191,8 @@ class TestTimeout:
             # Answer immediately
             await engine.handle_action(
                 dish_id="spaghetti",
-                chosen_option_id="correct",
-                chosen_option_text="Answer",
+                chosen_option_id=f"option_{ALL_RECIPES['spaghetti'][0].correct_index}",
+                chosen_option_text=ALL_RECIPES["spaghetti"][0].options[ALL_RECIPES["spaghetti"][0].correct_index],
                 station=ALL_RECIPES["spaghetti"][0].station,
                 timestamp=0,
             )
@@ -206,13 +207,30 @@ class TestTimeout:
         missed = [r for r in dish.results if r.result == "missed"]
         assert len(missed) == 0
 
+    @pytest.mark.asyncio
+    async def test_next_step_marks_previous_unanswered_step_missed(self, engine, sender):
+        """A scheduled next step cannot overwrite an unanswered active step."""
+        from data.cooking_timeline import TimelineEntry
+
+        await engine._activate_entry(TimelineEntry(t=0, dish_id="tomato_soup", step_index=0, step_type="active"))
+        await engine._activate_entry(TimelineEntry(t=30, dish_id="tomato_soup", step_index=1, step_type="active"))
+
+        dish = engine.dishes["tomato_soup"]
+        assert len(dish.results) == 1
+        assert dish.results[0].step_index == 0
+        assert dish.results[0].result == "missed"
+
+        events = [data["event"] for _, data in sender.messages]
+        assert events == ["step_activate", "step_timeout", "step_activate"]
+        assert engine.get_state()["tomato_soup"]["active_step"] == 1
+
 
 class TestWaitStep:
     @pytest.mark.asyncio
     async def test_wait_step_sets_waiting_phase(self, engine, sender):
         """Wait steps set dish phase to 'waiting' and send wait_start event."""
         from data.cooking_timeline import TimelineEntry
-        entry = TimelineEntry(t=0, dish_id="spaghetti", step_index=2, step_type="wait")
+        entry = TimelineEntry(t=0, dish_id="spaghetti", step_index=1, step_type="wait")
         await engine._activate_entry(entry)
 
         dish = engine.dishes["spaghetti"]
@@ -223,6 +241,18 @@ class TestWaitStep:
         _, data = sender.messages[0]
         assert data["event"] == "wait_start"
         assert data["dish"] == "spaghetti"
+
+    @pytest.mark.asyncio
+    async def test_next_active_step_clears_previous_wait(self, engine, sender):
+        """Activating the next same-dish step emits wait_end before step_activate."""
+        from data.cooking_timeline import TimelineEntry
+
+        await engine._activate_entry(TimelineEntry(t=0, dish_id="spaghetti", step_index=1, step_type="wait"))
+        await engine._activate_entry(TimelineEntry(t=0, dish_id="spaghetti", step_index=2, step_type="active"))
+
+        events = [data["event"] for _, data in sender.messages]
+        assert events == ["wait_start", "wait_end", "step_activate"]
+        assert sender.messages[1][1]["step_index"] == 1
 
 
 class TestDishCompletion:
@@ -243,8 +273,8 @@ class TestDishCompletion:
             await engine._activate_entry(entry)
             await engine.handle_action(
                 dish_id=dish_id,
-                chosen_option_id="correct",
-                chosen_option_text="Answer",
+                chosen_option_id=f"option_{step_def.correct_index}",
+                chosen_option_text=step_def.options[step_def.correct_index],
                 station=step_def.station,
                 timestamp=0,
             )
@@ -265,11 +295,17 @@ class TestScoring:
 
         entry0 = TimelineEntry(t=0, dish_id=dish_id, step_index=0, step_type="active")
         await engine._activate_entry(entry0)
-        await engine.handle_action(dish_id, "correct", "A", steps[0].station, 0)
+        await engine.handle_action(
+            dish_id,
+            f"option_{steps[0].correct_index}",
+            steps[0].options[steps[0].correct_index],
+            steps[0].station,
+            0,
+        )
 
-        entry1 = TimelineEntry(t=0, dish_id=dish_id, step_index=1, step_type="active")
+        entry1 = TimelineEntry(t=0, dish_id=dish_id, step_index=2, step_type="active")
         await engine._activate_entry(entry1)
-        await engine.handle_action(dish_id, "distractor_0", "B", steps[1].station, 0)
+        await engine.handle_action(dish_id, "option_0", "B", steps[2].station, 0)
 
         scores = engine.get_scores()
         assert scores[dish_id]["correct"] == 1

@@ -1,6 +1,6 @@
 /** API service — all HTTP calls to backend. */
 
-import type { BlockEncoding } from '../types'
+import type { BlockEncoding, CookingDefinitions } from '../types'
 
 const API_BASE = '/api'
 
@@ -26,10 +26,15 @@ export async function startSession(token: string) {
     task_order?: string
     is_test?: boolean
     current_phase?: string
+    cooking_definitions?: CookingDefinitions
   }>('/session/start', {
     method: 'POST',
     body: JSON.stringify({ token }),
   })
+}
+
+export async function getCookingDefinitions(sessionId: string) {
+  return request<CookingDefinitions>(`/session/${sessionId}/cooking-definitions`)
 }
 
 export async function getSessionStatus(sessionId: string) {

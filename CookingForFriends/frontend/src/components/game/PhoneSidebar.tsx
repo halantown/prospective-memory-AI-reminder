@@ -22,16 +22,9 @@ import PhoneTabBar from './phone/PhoneTabBar'
 import RecipeTab from './phone/RecipeTab'
 import NotificationBanner from './phone/NotificationBanner'
 import LockScreen from './phone/LockScreen'
-import type { ActiveCookingStep, DishId } from '../../types'
+import type { ActiveCookingStep } from '../../types'
 
 const LOCK_TIMEOUT = 15_000
-
-const DISH_ICONS: Record<DishId, string> = {
-  spaghetti: '🍝',
-  steak: '🥩',
-  tomato_soup: '🍅',
-  roasted_vegetables: '🥕',
-}
 
 function buildHeaderTimerText(step: ActiveCookingStep) {
   const label = step.stepLabel.trim()
@@ -41,11 +34,14 @@ function buildHeaderTimerText(step: ActiveCookingStep) {
 
 function HeaderKitchenTimer() {
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
+  const dishes = useGameStore((s) => s.dishes)
   const step = activeCookingSteps[0]
 
   if (!step) {
     return <div className="min-w-0 flex-1" aria-hidden="true" />
   }
+
+  const dish = dishes[step.dishId]
 
   return (
     <div className="min-w-0 flex-1 flex justify-center px-2">
@@ -55,7 +51,7 @@ function HeaderKitchenTimer() {
                    text-orange-200"
       >
         <span className="text-[13px] leading-none flex-shrink-0">
-          {DISH_ICONS[step.dishId] ?? '🍳'}
+          {dish?.emoji ?? '🍳'}
         </span>
         <span className="text-[11px] font-semibold leading-none truncate">
           {buildHeaderTimerText(step)}

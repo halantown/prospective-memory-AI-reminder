@@ -24,6 +24,7 @@ from models.schemas import (
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
 from engine.game_time import unfreeze_game_time, get_current_game_time
+from data.cooking_recipes import serialize_cooking_definitions
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -82,7 +83,18 @@ async def start_session(req: TokenStartRequest, request: Request, db: AsyncSessi
         task_order=participant.task_order,
         is_test=participant.is_test,
         current_phase=participant.current_phase or "welcome",
+        cooking_definitions=serialize_cooking_definitions(),
     )
+
+
+@router.get("/session/{session_id}/cooking-definitions")
+async def get_cooking_definitions(session_id: str, db: AsyncSession = Depends(get_db)):
+    """Return server-authoritative cooking definitions for session bootstrap."""
+    result = await db.execute(select(Participant).where(Participant.id == session_id))
+    participant = result.scalar_one_or_none()
+    if not participant:
+        raise HTTPException(404, "Session not found")
+    return serialize_cooking_definitions()
 
 
 @router.get("/session/{session_id}/status", response_model=StatusResponse)

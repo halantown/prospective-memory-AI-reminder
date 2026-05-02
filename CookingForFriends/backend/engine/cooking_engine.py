@@ -81,6 +81,7 @@ class CookingEngine:
 
         # Active step tracking
         self._active_step: dict[str, TimelineEntry | None] = {d: None for d in COOKING_DISHES}
+        self._active_wait: dict[str, TimelineEntry | None] = {d: None for d in COOKING_DISHES}
         self._timeout_tasks: dict[str, asyncio.Task] = {}
         self._timeout_remaining_s: dict[str, float] = {}
         self._step_activated_at: dict[str, float] = {}
@@ -111,6 +112,8 @@ class CookingEngine:
             task.cancel()
         self._timeout_tasks.clear()
         self._timeout_remaining_s.clear()
+        for dish_id in self._active_wait:
+            self._active_wait[dish_id] = None
         if self._timeline_task and not self._timeline_task.done():
             self._timeline_task.cancel()
         self._timeline_task = None
@@ -199,6 +202,30 @@ class CookingEngine:
         dish = self.dishes[entry.dish_id]
         step_def = dish.steps[entry.step_index]
 
+        previous_active = self._active_step.get(entry.dish_id)
+        if previous_active and previous_active.step_index != entry.step_index:
+            timeout_task = self._timeout_tasks.pop(entry.dish_id, None)
+            if timeout_task:
+                timeout_task.cancel()
+            await self._mark_step_missed(
+                entry.dish_id,
+                previous_active.step_index,
+                self._step_activated_at.get(entry.dish_id, time.time()),
+                reason="superseded",
+            )
+
+        previous_wait = self._active_wait.get(entry.dish_id)
+        if previous_wait and previous_wait.step_index != entry.step_index:
+            previous_step = dish.steps[previous_wait.step_index]
+            await self._send("ongoing_task_event", {
+                "task": "cooking",
+                "event": "wait_end",
+                "dish": entry.dish_id,
+                "step_index": previous_wait.step_index,
+                "step_id": previous_step.id,
+            })
+            self._active_wait[entry.dish_id] = None
+
         # Update dish phase
         if dish.phase == "idle":
             dish.phase = "active"
@@ -209,15 +236,18 @@ class CookingEngine:
         if entry.step_type == "wait":
             # Wait steps: notify frontend, auto-progress after duration
             dish.phase = "waiting"
+            self._active_wait[entry.dish_id] = entry
             await self._send("ongoing_task_event", {
                 "task": "cooking",
                 "event": "wait_start",
                 "dish": entry.dish_id,
                 "step_index": entry.step_index,
+                "step_id": step_def.id,
                 "label": step_def.label,
                 "description": step_def.description,
                 "station": step_def.station,
                 "wait_duration_s": step_def.wait_duration_s,
+                "started_at": time.time(),
             })
         else:
             # Active steps: notify frontend with options, start timeout
@@ -274,6 +304,20 @@ class CookingEngine:
         if entry.step_index != step_index:
             return
 
+        await self._mark_step_missed(dish_id, step_index, activated_at, reason="timeout")
+
+    async def _mark_step_missed(
+        self,
+        dish_id: str,
+        step_index: int,
+        activated_at: float,
+        reason: str,
+    ) -> None:
+        """Record and emit a missed step for timeout or superseded activation."""
+        entry = self._active_step.get(dish_id)
+        if entry is None or entry.step_index != step_index:
+            return
+
         # Mark as missed
         now = time.time()
         dish = self.dishes[dish_id]
@@ -295,7 +339,7 @@ class CookingEngine:
         self._active_step[dish_id] = None
 
         # Check if dish is complete
-        self._check_dish_complete(dish_id)
+        dish_completed = self._check_dish_complete(dish_id)
 
         # Notify frontend
         await self._send("ongoing_task_event", {
@@ -305,13 +349,21 @@ class CookingEngine:
             "step_index": step_index,
             "step_id": step_def.id,
         })
+        if dish_completed:
+            await self._send("ongoing_task_event", {
+                "task": "cooking",
+                "event": "dish_complete",
+                "dish": dish_id,
+                "dish_label": DISH_LABELS[dish_id],
+                "dish_emoji": DISH_EMOJIS[dish_id],
+            })
 
         # Record to DB
         await self._record_step(result)
 
         logger.info(
-            "Cooking step timeout: %s step %d (%s) for participant %s",
-            dish_id, step_index, step_def.id, self.participant_id,
+            "Cooking step missed (%s): %s step %d (%s) for participant %s",
+            reason, dish_id, step_index, step_def.id, self.participant_id,
         )
 
     # ── Action Handler ────────────────────────────────────────────────────────
@@ -385,7 +437,7 @@ class CookingEngine:
         self._active_step[dish_id] = None
 
         # Check if dish is complete
-        self._check_dish_complete(dish_id)
+        dish_completed = self._check_dish_complete(dish_id)
 
         # Notify frontend
         event_data = {
@@ -400,6 +452,14 @@ class CookingEngine:
             "response_time_ms": response_time_ms,
         }
         await self._send("ongoing_task_event", event_data)
+        if dish_completed:
+            await self._send("ongoing_task_event", {
+                "task": "cooking",
+                "event": "dish_complete",
+                "dish": dish_id,
+                "dish_label": DISH_LABELS[dish_id],
+                "dish_emoji": DISH_EMOJIS[dish_id],
+            })
 
         # Record to DB
         await self._record_step(result)
@@ -426,14 +486,16 @@ class CookingEngine:
 
     # ── Dish Completion ───────────────────────────────────────────────────────
 
-    def _check_dish_complete(self, dish_id: str):
+    def _check_dish_complete(self, dish_id: str) -> bool:
         """Mark dish as done if all active steps have been processed."""
         dish = self.dishes[dish_id]
         total_active = sum(1 for s in dish.steps if s.step_type == "active")
         completed = sum(1 for r in dish.results)
-        if completed >= total_active:
+        if completed >= total_active and dish.phase != "done":
             dish.phase = "done"
             dish.completed_at = time.time()
+            return True
+        return False
 
     # ── State Snapshot ────────────────────────────────────────────────────────
 
@@ -447,6 +509,7 @@ class CookingEngine:
                 "current_step_index": dish.current_step_index,
                 "total_steps": len(dish.steps),
                 "active_step": active_entry.step_index if active_entry else None,
+                "wait_step": self._active_wait[dish_id].step_index if self._active_wait[dish_id] else None,
                 "results": [
                     {"step_index": r.step_index, "result": r.result}
                     for r in dish.results

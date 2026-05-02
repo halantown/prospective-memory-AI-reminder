@@ -465,6 +465,15 @@ ALL_RECIPES: dict[str, list[CookingStepDef]] = {
     "steak": STEAK_STEPS,
 }
 
+COOKING_RECIPE_VERSION = "cooking_v1_2026-05-02"
+
+DISH_DISPLAY_ORDER: list[str] = [
+    "spaghetti",
+    "steak",
+    "tomato_soup",
+    "roasted_vegetables",
+]
+
 DISH_LABELS: dict[str, str] = {
     "roasted_vegetables": "Roasted Vegetables",
     "tomato_soup": "Tomato Soup",
@@ -478,3 +487,45 @@ DISH_EMOJIS: dict[str, str] = {
     "spaghetti": "🍝",
     "steak": "🥩",
 }
+
+
+def serialize_cooking_definitions() -> dict:
+    """Return the frontend bootstrap payload for cooking definitions.
+
+    Backend data files are the source of truth. The frontend should render this
+    payload and only use WebSocket events for runtime state changes.
+    """
+    from data.cooking_timeline import COOKING_TIMELINE
+
+    return {
+        "recipe_version": COOKING_RECIPE_VERSION,
+        "dish_order": DISH_DISPLAY_ORDER,
+        "dishes": {
+            dish_id: {
+                "id": dish_id,
+                "label": DISH_LABELS[dish_id],
+                "emoji": DISH_EMOJIS[dish_id],
+                "steps": [
+                    {
+                        "id": step.id,
+                        "label": step.label,
+                        "station": step.station,
+                        "description": step.description,
+                        "step_type": step.step_type,
+                        "wait_duration_s": step.wait_duration_s,
+                    }
+                    for step in ALL_RECIPES[dish_id]
+                ],
+            }
+            for dish_id in DISH_DISPLAY_ORDER
+        },
+        "timeline": [
+            {
+                "t": entry.t,
+                "dish": entry.dish_id,
+                "step_index": entry.step_index,
+                "step_type": entry.step_type,
+            }
+            for entry in COOKING_TIMELINE
+        ],
+    }
