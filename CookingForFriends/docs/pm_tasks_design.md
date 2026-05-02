@@ -191,6 +191,39 @@ Anna刚从旅行回来，在学校咖啡厅见面，从礼品袋里拿出给你�
 | Tom | Navigate to kitchen → open fridge → take 苹果汁 out |
 | Task 4 | Reply to 送货员 in phone chat |
 
+### PM Prop Asset Prep Notes
+
+For the redesign pass, PM target props should be prepared as **small standalone transparent PNGs** and not embedded irreversibly into the room background.
+
+Reason:
+
+- the PM popup and selection logic already treats these as room-local interactive objects
+- target/distractor variants need precise visual comparison
+- the asset set will likely change during pilot iteration
+
+Recommended prep rule:
+
+- keep the supporting furniture in the background art
+- export the PM objects themselves as separate overlays when possible
+
+Minimum prop set to prepare for the currently documented narrative version:
+
+- 烘焙书
+- 巧克力
+- 苹果汁
+- 垃圾袋
+- plus episode-internal distractor props for cutscenes and decoys:
+  - 游戏手柄
+  - 蛋糕盒子
+  - 礼品袋
+  - 明信片
+  - 蓝牙音箱
+  - 烧烤架
+  - 旧电池
+  - 纸箱
+
+If a prop from the purchased pack is visually close enough, it can be recolored or lightly edited instead of redrawn from scratch. Books, bags, bottles, speakers, boxes, tables, shelving, and kitchen containers from the pack are likely reusable bases; the most likely custom draw items are narrative-specific labels and target/distractor micro-differences.
+
 ### Fake Triggers
 - 保留，防止meta-strategy（被试一看到trigger就知道是PM task）
 - 与real trigger同类型混合（doorbell / phone call）

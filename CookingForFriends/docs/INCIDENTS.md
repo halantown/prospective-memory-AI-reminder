@@ -583,3 +583,169 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 ### Follow-up Actions
 > - [x] Added verification import test to Phase 2+3 completion checklist
 > - [ ] Add `pytest` import smoke-test covering all routers to CI
+
+---
+
+## INC-012 — `phone_message_logs.correct_answer` type mismatch: string rejected as integer
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-02 |
+| Severity     | P2 Medium |
+| Status       | Open — production migration pending |
+| Reported by  | Error surfaced during test session with old token |
+| Affected area| `phone_message_logs` table / timeline engine phone message logging |
+
+### Background
+> The timeline engine logs each phone message to `phone_message_logs` with a `correct_answer` column intended to store the expected answer for quiz-type chat messages. Normal chat messages (non-quiz) were being logged with `correct_answer = "You'll make it!"` (a motivational string), which is valid data but the column was typed as `INTEGER` in the SQLAlchemy model and PostgreSQL schema.
+
+### Incident Description
+> During a test session, the timeline engine raised:
+> ```
+> (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.DataError'>:
+> invalid input for query argument $8: "You'll make it!" ('str' object cannot be interpreted as an integer)
+> ```
+> The INSERT into `phone_message_logs` failed, causing the message log to be silently dropped. The game continued but no log record was created for that message.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 13:34 | Error first observed in backend logs during test session |
+| 13:34 | Identified as type mismatch in `phone_message_logs.correct_answer` |
+
+### Root Cause
+> The `correct_answer` column was created as `INTEGER` when the schema was first designed (expecting quiz answer indices). Non-quiz phone messages pass a plain string (the message body or a motivational phrase) as `correct_answer`, causing a type rejection at the asyncpg layer.
+
+### Contributing Factors
+> - No constraint or validation at the application layer before the DB call
+> - Column type assumed all phone messages would be quiz-type (integer answer index)
+> - Old token used for testing may have had stale routing assumptions
+
+### Fix
+> **Pending**: Alter `phone_message_logs.correct_answer` column type from `INTEGER` to `TEXT` in both the SQLAlchemy model and a production migration script. Local dev database can be fixed with:
+> ```sql
+> ALTER TABLE phone_message_logs ALTER COLUMN correct_answer TYPE TEXT USING correct_answer::TEXT;
+> ```
+
+### Verification
+> Re-run timeline engine with a phone message containing a string `correct_answer` and confirm no DataError is raised.
+
+### Follow-up Actions
+> - [ ] Apply `ALTER TABLE` migration to local dev DB
+> - [ ] Apply to production DB in a dedicated migration step after E2E test passes
+> - [ ] Update SQLAlchemy model `PhoneMessageLog.correct_answer` column type to `String`
+> - [ ] Add validation / type coercion before INSERT to prevent future type mismatches
+
+---
+
+## INC-013 — PM modal freeze: screen unresponsive after clicking "I know" on reminder
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-02 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | Manual testing of PM trigger pipeline |
+| Affected area| `PMTriggerModal.tsx` / PM task pipeline UX |
+
+### Background
+> The PM trigger modal is the full-screen overlay that drives participants through the PM task pipeline: trigger affordance → greeting → robot reminder → decoy selection → confidence rating → avatar auto-action. While the modal is visible, the game applies `pointer-events-none` to all game divs to prevent background interaction. When the modal closes normally, `pmPipelineState` is set to `null`, removing the `pointer-events-none` and restoring full interactivity.
+
+### Incident Description
+> After clicking the doorbell trigger, progressing through greeting, and seeing the robot reminder, clicking "I know" (reminder acknowledgement) caused the screen to become completely unresponsive. No UI elements could be clicked. The modal disappeared but the game was still frozen.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| ~14:00 | Freeze first reported at affordance→greeting→reminder stage |
+| 14:00 | Investigation: suspected z-index / overlay conflict |
+| 14:05 | Ruled out: TriggerEffects, KitchenTimerModal, PMTargetItems, DetailCheckModal, useMouseTracker |
+| 14:10 | Root cause found: `if (!content) return null` in PMTriggerModal causing modal DOM to vanish while `pmPipelineState` still non-null |
+| 14:15 | Two additional bugs identified: `case 'completed': close()` during render + unstable `handleAvatarActionSent` ref |
+| 14:20 | All three fixes applied; `npm run build` passes; backend restarted |
+
+### Root Cause
+> **Primary**: `renderStep()` returned `null` for the `decoy` step when `taskId` was null or `shuffledDecoys` was still empty (first render before the shuffle `useEffect` fired). The component's bottom-level guard `if (!content) return null` then unmounted the entire modal DOM. However, `pmPipelineState` in the Zustand store was still non-null — so `GamePage` continued to apply `pointer-events-none` to all game divs. The result: no modal + no game interaction = fully frozen screen.
+>
+> **Secondary**: `case 'completed': close(); return null` in `renderStep()` called `setPMPipelineState(null)` during React's render phase — a React 18 anti-pattern that can produce undefined behaviour or silent failures.
+>
+> **Tertiary**: `handleAvatarActionSent` was not wrapped in `useCallback`, causing a new function reference on every parent re-render. `AvatarActionStep`'s fallback 5-second timer used this as a `useCallback` dependency; every parent re-render recreated the callback, cleared the timer, and started a fresh 5s window — meaning the timer could never fire if re-renders occurred more frequently than every 5 seconds.
+
+### Contributing Factors
+> - `pointer-events-none` on game divs is CSS-inherited (affects all descendants including `fixed` children), so any modal DOM removal while the store flag is set is catastrophic
+> - No visible error — the modal simply vanished without any console warning
+> - The `decoy` step's `shuffledDecoys` populates asynchronously in a `useEffect`, creating a one-render window where the step has no content to render
+> - React 18 silently tolerates (but mis-handles) `setState` calls during render in some cases, making the `case 'completed'` bug hard to spot
+
+### Fix
+> All changes in `frontend/src/components/game/PMTriggerModal.tsx`:
+>
+> 1. **Removed `if (!content) return null`**: modal wrapper now always renders when `pmPipelineState !== null`; content area shows a spinner `<div>` as fallback instead of unmounting.
+> 2. **Replaced `case 'completed': close()` with a `useEffect`**: `useEffect(() => { if (step === 'completed') close(); }, [step, close])` — moves the state update out of render phase.
+> 3. **Wrapped `handleAvatarActionSent` in `useCallback`**: added a `taskIdRef` (updated on every render) so the callback has a stable reference while still accessing the current `taskId`; dependency array is `[close]` only.
+> 4. **`decoy` step spinner**: when `shuffledDecoys.length === 0` (first render), returns a centered spinner instead of `null`.
+> 5. **Defensive z-index / pointer-events**: changed modal outer div from `z-50` to `z-[200]`; added explicit `style={{ pointerEvents: 'auto' }}` to ensure no parent CSS can block the modal.
+
+### Verification
+> `npm run build` passes (TypeScript + Vite, no errors). Backend restarted to serve new static files. User requested hard-refresh before re-testing.
+
+### Follow-up Actions
+> - [ ] Retest full PM pipeline in test mode: affordance → greeting → reminder → "I know" → decoy → confidence → avatar action → close
+> - [ ] Verify game time unfreezes correctly after pipeline completes
+> - [ ] Add unit test for `PMTriggerModal` covering the "content is null mid-pipeline" scenario
+
+---
+
+## INC-014 — Legacy timeline PM trigger overwrote real PM task state
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-02 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | Manual testing; debug strip showed `step=decoy | taskId=NULL! | decoys=0` |
+| Affected area| `backend/engine/timeline.py`, `frontend/src/hooks/useWebSocket.ts`, PM trigger pipeline |
+
+### Background
+> EC+/EC- sessions use the new event-driven PM scheduler in `engine/pm_session.py`. That scheduler sends `pm_trigger` WebSocket events with `task_id`, `trigger_type`, `position`, and fake/real metadata. The frontend uses `task_id` to load decoy options for the "What will you bring?" step.
+
+### Incident Description
+> During a PM trigger, the modal advanced through door/call affordance, greeting, and robot reminder, then reached the decoy step with no options. The debug strip showed `taskId=NULL!` and `decoys=0`. If the overlay DOM was removed via browser devtools, `pmPipelineState` remained non-null, so `GamePage` kept `pointer-events-none` on the game and phone areas and the UI stayed unclickable.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 15:08 | Investigation started from user report |
+| 15:08 | Found legacy `pm_trigger` entries in `backend/data/timelines/block_default.json` without `task_id` |
+| 15:08 | Confirmed frontend accepted malformed real `pm_trigger` as `isFake=false`, `taskId=null` |
+| 15:08 | Fix applied in backend timeline and frontend WebSocket guard |
+
+### Root Cause
+> The legacy block timeline still forwarded static JSON `pm_trigger` events for EC+/EC- sessions. Those events predate the new PM module and only contain fields like `trigger_id` and `trigger_event`; they do not include the `task_id` required by `PMTriggerModal`. The frontend treated missing `is_fake` as `false`, so malformed legacy events were interpreted as real PM tasks and replaced the valid pipeline state with `taskId=null`.
+
+### Contributing Factors
+> - Two PM schedulers were active for the same session: legacy `engine/timeline.py` entries and new `engine/pm_session.py`
+> - Frontend WebSocket handling did not validate that real `pm_trigger` events include `task_id`
+> - The modal intentionally blocks background interaction while `pmPipelineState` is non-null, making malformed PM state user-blocking
+
+### Fix
+> `backend/engine/timeline.py`: EC+/EC- sessions now skip legacy static `pm_trigger` events because `engine.pm_session` is authoritative for the new PM pipeline.
+>
+> `frontend/src/hooks/useWebSocket.ts`: malformed real `pm_trigger` events without `task_id` are ignored and logged with `console.warn`, preventing the modal from entering an empty decoy state.
+>
+> Follow-up fix: `backend/websocket/game_handler.py` now ensures the PM scheduler is running when a client reconnects to an already-`PLAYING` block. `backend/engine/pm_session.py` now resumes from persisted PM/fake trigger rows and computes the remaining wait from current game time, so disabling legacy timeline triggers does not leave existing playing sessions without PM triggers.
+>
+> Follow-up fix: `backend/engine/game_time.py` now has an explicit `start_game_time()` helper, and `backend/websocket/game_handler.py` calls it when the block enters or resumes `PLAYING`. Previously fresh sessions never set `last_unfreeze_at`, so `get_current_game_time()` stayed at `0` forever and the first 180-second PM wait never completed.
+
+### Verification
+> `cd CookingForFriends/frontend && npm run build` passes before and after the reconnect-resume fix.
+>
+> `cd CookingForFriends/backend && conda run -n thesis_server python -m py_compile engine/game_time.py engine/pm_session.py websocket/game_handler.py engine/timeline.py` passes.
+>
+> `cd CookingForFriends/backend && conda run -n thesis_server pytest tests -v` runs, but 3 existing `CookingEngine` tests fail because the tests submit `chosen_option_id="correct"` and the current cooking engine treats it as a wrong option. Those failures are unrelated to PM trigger WebSocket handling.
+
+### Follow-up Actions
+> - [ ] Remove or migrate legacy `pm_trigger` entries from static timeline JSON once no legacy experiment flow depends on them
+> - [ ] Add a frontend regression test for malformed `pm_trigger` payloads
+> - [ ] Add backend integration test proving EC+/EC- timeline does not emit legacy PM triggers
+> - [ ] Add backend integration test proving PM scheduler resumes when reconnecting to an already-`PLAYING` block

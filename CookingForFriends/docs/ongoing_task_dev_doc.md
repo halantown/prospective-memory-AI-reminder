@@ -79,6 +79,185 @@ The experiment simulates **one hour (17:00–18:00) before a dinner party**. The
 - Room interaction: click room to navigate there, then click objects within active room
 - Inactive rooms are slightly dimmed but content remains visible (monitor stove from other rooms)
 
+### Asset Audit And Preparation Plan
+
+Current frontend implementation no longer depends on the old per-room SVG furniture as the main world representation. The active path is:
+
+- `frontend/src/components/game/FloorPlanView.tsx`: renders a single `/assets/floorplan.png` as the base map
+- `frontend/src/components/game/rooms/KitchenFurniture.tsx`: supports per-object PNG furniture overlays for the kitchen
+- `frontend/src/components/game/rooms/KitchenRoom.tsx`: all cooking interaction is already separated into clickable hotspots
+- Other rooms currently rely mostly on background art + lightweight HTML overlays for PM task buttons, visitors, and dining interactions
+
+This means the art task should be treated as a **front-end asset replacement task**, not a gameplay-system rewrite.
+
+#### FloorPlanView Zoom Design
+
+The floorplan image is rendered with `objectFit: fill` and `imageRendering: pixelated`. All room positions (`ROOM_DEFS`) are stored as **percentages** of the image dimensions, so changing the image resolution never breaks hotspot alignment.
+
+**Zoom behaviour:**
+- All rooms zoom at `ZOOM_SCALE = 1.6×` using a CSS `scale()` + `translate()` transform anchored at the image top-left (`transform-origin: 0 0`).
+- Translations are clamped so the image always fills the container with no empty borders (`tx ∈ [(1−S)×100%, 0%]`).
+
+**Kitchen special case — top-left corner problem:**
+The kitchen occupies the top-left corner of the floorplan. At 1.6–1.7× zoom the standard clamp forces `translate(0%, 0%)`, pinning the kitchen to the top-left of the view with no room to centre it. Solution:
+- `ZOOM_SCALE_KITCHEN = 1.7` (slightly higher than global scale).
+- `KITCHEN_MAX_OFFSET = 8` — the upper clamp for kitchen is relaxed from `0%` to `+8%`, allowing the image to shift up to 8% right/down. This creates a small controlled gap (~118 px at 1480 px game width) against the `bg-slate-900` container, which reads as a thin dark border rather than a broken layout.
+- `ROOM_DEFS.kitchen.cy = 18` is kept low so `rawTy` naturally exceeds 8% and is clamped to the limit, producing a consistent 8% gap on both axes.
+
+#### Target Style Decision
+
+- Base tile size: **48×48**
+- Rendering goal: keep the readability of tiled assets, but avoid a harsh retro pixel-game feeling
+- Preferred treatment:
+  - build the layout from 48×48 pieces
+  - export the final room/background compositions at a larger display resolution
+  - keep object silhouettes clean and slightly roomy instead of over-dense tile packing
+  - avoid mixing too many different shadow systems in one room
+
+#### Purchased Pack: What Is Usable
+
+Asset pack inspected: `~/Downloads/moderninteriors-win/`
+
+Most useful folders:
+
+- `1_Interiors/48x48/Room_Builder_48x48.png`
+  - Best source for walls, borders, floors, baseboards, entryways, and room connectors
+  - This should be the primary source for rebuilding the apartment background
+- `1_Interiors/48x48/Room_Builder_subfiles_48x48/`
+  - Useful when you want floors, walls, shadows, or connectors separated instead of packed in one sheet
+- `1_Interiors/48x48/Theme_Sorter_48x48/`
+  - Good overview sheets for browsing categories quickly
+- `1_Interiors/48x48/Theme_Sorter_Singles_48x48/`
+  - Best source for extracting individual furniture pieces as standalone PNG files
+- `1_Interiors/48x48/Theme_Sorter_Shadowless_Singles_48x48/`
+  - Best source when you want to place furniture onto a custom-composed room without inheriting baked black shadows
+- `3_Animated_objects/48x48/spritesheets/`
+  - Selectively useful for lightweight environmental animation
+
+Most relevant categories for this project:
+
+- `12_Kitchen`
+- `2_Living_Room`
+- `3_Bathroom`
+- `4_Bedroom`
+- `5_Classroom_and_Library`
+- `26_Condominium`
+- `1_Generic`
+
+Useful animated objects already present in the pack:
+
+- `animated_kitchen_oven_48x48.png`
+- `animated_kitchen_oven_1cooker_48x48.png`
+- `animated_kitchen_oven_2cookers_48x48.png`
+- `animated_kitchen_oven_3cookers_48x48.png`
+- `animated_kitchen_oven_4cookers_48x48.png`
+- `animated_fridge_white_48x48.png`
+- `animated_fridge_grey_48x48.png`
+- `animated_sink_48x48.png`
+- `animated_kitchen_sink_1_48x48.png`
+- `animated_cat_48x48.png`
+- several `animated_door_*_48x48.png`
+
+#### What Should Be Reused Directly
+
+The following can likely be used with minimal or no repainting:
+
+- floor materials for kitchen, dining, hallway, bathroom
+- wall modules and room borders
+- kitchen counters and cabinet runs
+- stove / oven / fridge / sink
+- dining table and chairs
+- sofa, TV stand, coffee table
+- bookshelf / storage cabinet / sideboards
+- bed, desk, office chair
+- bathroom sink, cabinet, toilet, washer-like utility props
+- doors and archways
+
+#### What Should Be Custom-Composed Or Redrawn
+
+The following areas should not simply be copy-pasted from random theme sheets:
+
+- the **full apartment floor plan**
+  - build from room-builder pieces so the layout matches the experiment exactly
+- the **kitchen work triangle**
+  - fridge, board, spice area, burners, oven, plating area must visually match hotspot positions
+- any furniture used as a **PM target anchor**
+  - bookshelf, cabinet, shelf, supply shelf should have a stable silhouette and empty visual space around the hotspot/button
+- the **dining table interaction area**
+  - leave enough clean surface space for table-setting overlays
+- any object needing multiple visible states
+  - burners off/on
+  - oven idle/active
+  - food prep / cooked / plated states if shown on top of counters
+
+#### Recommended Shadow Rule
+
+Use **shadowless singles** as the default source for furniture composition, then add room-level shadows manually in the final background or via CSS overlays.
+
+Reason:
+
+- easier to keep the whole house lighting consistent
+- avoids mismatched baked shadows from different sheets
+- easier to place interactive UI highlights over furniture cleanly
+
+Use the regular shadowed singles only if a piece looks significantly better and is visually isolated enough not to clash.
+
+#### Required Deliverables Before Frontend Integration
+
+Prepare the following asset outputs first:
+
+1. One final full-apartment background export
+   - suggested output: `frontend/public/assets/floorplan_v2.png`
+2. One room layout source file
+   - layered PSD/Aseprite/Krita file for future edits
+3. Individual transparent furniture PNGs for the kitchen interaction layer
+   - fridge
+   - cutting board area
+   - spice rack / shelf
+   - stove burners
+   - oven
+   - plating counter
+4. Optional transparent furniture PNGs for other rooms if separate overlays are preferred
+   - dining table set
+   - living room furniture cluster
+   - study shelf/desk cluster
+   - bathroom shelf/washer cluster
+5. Optional small animated spritesheets
+   - oven light or cooker glow
+   - fridge door blink/open cue
+   - cat idle tail flick
+   - door open cue
+
+#### Room-By-Room Art Checklist
+
+- Kitchen
+  - Must-have: stove/oven, fridge, cutting board, spice shelf, sink, long lower counter, plating area
+  - Nice-to-have: jars, bottles, trays, wall shelf details
+- Dining room
+  - Must-have: dining table, 6 chairs, cabinet or sideboard
+  - Nice-to-have: rug, centerpiece, serving cart
+- Living room
+  - Must-have: sofa, coffee table, TV/media unit, shelf
+  - Nice-to-have: cat bed, lamp, side table
+- Study / bedroom area
+  - Must-have: desk, chair, shelf/bookcase, bed
+  - Nice-to-have: monitor, speakers, drawer unit
+- Bathroom / utility area
+  - Must-have: sink, toilet, storage shelf, washer/utility object
+  - Nice-to-have: basket, towels, mirror
+- Hallway / entrance
+  - Must-have: front door, transitional flooring, visual connectors between rooms
+  - Nice-to-have: shoe rack, coat storage, mat
+
+#### Technical Constraints For Art Export
+
+- Keep the final game background as a single flat image if schedule is tight
+- Keep interactive objects aligned to current hotspot percentages unless the hotspot map is intentionally recalibrated
+- Preserve enough negative space around hotspot regions for hover/selection states
+- Export transparent PNGs only; avoid SVG for the room furniture replacement path
+- If upscaling is needed, use integer scaling during composition first, then do final smoothing/export intentionally
+- Do not rely on runtime tilemap frameworks for this build; all placement can remain hard-coded in React/CSS
+
 ---
 
 ## 3. Ongoing Task Line 1: Cooking (Primary)
