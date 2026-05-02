@@ -6,13 +6,25 @@ import type {
   ActivePMTrial, PMTaskConfig, DiningPhase, SteakState, SeatState, UtensilType,
   DishId, DishState, KitchenStationId, Contact,
   ActiveCookingStep, CookingStepResult, CookingStepOption, CookingWaitStep,
-  TaskOrder, PMPipelineState, PMPipelineStep,
+  TaskOrder, PMPipelineState, PMPipelineStep, KitchenTimerBannerItem,
 } from '../types'
 
 const EMPTY_SEAT: SeatState = { plate: false, knife: false, fork: false, glass: false }
 
 /** Max visible phone messages — unused in chat mode but kept for backward compat. */
 const MAX_PHONE_MESSAGES = 50
+const COOKING_STATIONS = new Set<KitchenStationId>(['burner1', 'burner2', 'burner3', 'oven'])
+
+function buildKitchenTimerMessage(stepLabel: string) {
+  const text = stepLabel.trim()
+  if (!text) return 'Check the kitchen!'
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}!`
+}
+
+function buildKitchenWarningMessage(dish: DishState | undefined) {
+  const label = dish?.label?.toLowerCase() || 'food'
+  return `The ${label} burned!`
+}
 
 interface GameState {
   // ── Session ──
@@ -60,7 +72,7 @@ interface GameState {
   contacts: Contact[]
   activeContactId: string | null
   activePhoneTab: 'chats' | 'recipe'
-  kitchenTimerQueue: Array<{ id: string; icon: string; message: string; appearedAt: number }>
+  kitchenTimerQueue: KitchenTimerBannerItem[]
   recipeTabBounce: boolean
   lockSystemNotifications: Array<{ id: string; sender: string; text: string; timestamp: number }>
 
@@ -141,8 +153,10 @@ interface GameState {
   setContacts: (contacts: Contact[]) => void
   setActiveContactId: (id: string | null) => void
   setActivePhoneTab: (tab: 'chats' | 'recipe') => void
-  pushKitchenTimer: (timer: { id: string; icon: string; message: string }) => void
+  pushKitchenTimer: (timer: Omit<KitchenTimerBannerItem, 'appearedAt'>) => void
   dismissKitchenTimer: () => void
+  removeKitchenTimerForStep: (dishId: DishId, stepIndex: number) => void
+  markKitchenTimerWarning: (dishId: DishId, stepIndex: number, message: string) => void
   setRecipeTabBounce: (bounce: boolean) => void
   addLockSystemNotification: (notif: { id: string; sender: string; text: string; timestamp: number }) => void
 
@@ -443,7 +457,24 @@ export const useGameStore = create<GameState>((set, get) => ({
       waitDurationS: data.wait_duration_s as number | undefined,
     }
     set((s) => ({
-      activeCookingSteps: [...s.activeCookingSteps, step],
+      activeCookingSteps: [...s.activeCookingSteps.filter(
+        st => !(st.dishId === step.dishId && st.stepIndex === step.stepIndex)
+      ), step],
+      kitchenTimerQueue: [
+        ...s.kitchenTimerQueue.filter(
+          t => !(t.dishId === step.dishId && t.stepIndex === step.stepIndex)
+        ),
+        {
+          id: `timer_${step.dishId}_${step.stepIndex}`,
+          icon: '🍳',
+          message: buildKitchenTimerMessage(step.stepLabel),
+          dishId: step.dishId,
+          stepIndex: step.stepIndex,
+          station: step.station,
+          status: 'active' as const,
+          appearedAt: Date.now(),
+        },
+      ].slice(-2),
       dishes: {
         ...s.dishes,
         [step.dishId]: {
@@ -482,6 +513,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         activeCookingSteps: s.activeCookingSteps.filter(
           st => !(st.dishId === dishId && st.stepIndex === stepIndex)
         ),
+        kitchenTimerQueue: s.kitchenTimerQueue.filter(
+          t => !(t.dishId === dishId && t.stepIndex === stepIndex)
+        ),
         // Add result to dish
         dishes: {
           ...s.dishes,
@@ -499,6 +533,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   handleCookingStepTimeout: (data) => {
     const dishId = data.dish as DishId
     const stepIndex = data.step_index as number
+    const timedOutStep = get().activeCookingSteps.find(
+      st => st.dishId === dishId && st.stepIndex === stepIndex
+    )
+    const isCookingStep = timedOutStep ? COOKING_STATIONS.has(timedOutStep.station) : false
 
     const stepResult: CookingStepResult = {
       dishId,
@@ -515,6 +553,15 @@ export const useGameStore = create<GameState>((set, get) => ({
         activeCookingSteps: s.activeCookingSteps.filter(
           st => !(st.dishId === dishId && st.stepIndex === stepIndex)
         ),
+        kitchenTimerQueue: isCookingStep
+          ? s.kitchenTimerQueue.map(t =>
+              t.dishId === dishId && t.stepIndex === stepIndex
+                ? { ...t, status: 'warning' as const, message: buildKitchenWarningMessage(dish) }
+                : t
+            )
+          : s.kitchenTimerQueue.filter(
+              t => !(t.dishId === dishId && t.stepIndex === stepIndex)
+            ),
         dishes: {
           ...s.dishes,
           [dishId]: {
@@ -533,12 +580,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       dishId: data.dish as DishId,
       stepIndex: data.step_index as number,
       stepLabel: data.label as string || '',
+      stepDescription: data.description as string || '',
       station: data.station as KitchenStationId,
       startedAt: Date.now(),
       durationS: data.wait_duration_s as number || 60,
     }
     set((s) => ({
       cookingWaitSteps: [...s.cookingWaitSteps, waitStep],
+      dishes: {
+        ...s.dishes,
+        [waitStep.dishId]: {
+          ...s.dishes[waitStep.dishId],
+          phase: 'waiting',
+          currentStepIndex: waitStep.stepIndex,
+        },
+      },
     }))
   },
 
@@ -638,10 +694,25 @@ export const useGameStore = create<GameState>((set, get) => ({
   setActiveContactId: (id) => set({ activeContactId: id }),
   setActivePhoneTab: (tab) => set({ activePhoneTab: tab }),
   pushKitchenTimer: (timer) => set((s) => ({
-    kitchenTimerQueue: [...s.kitchenTimerQueue, { ...timer, appearedAt: Date.now() }],
+    kitchenTimerQueue: [
+      ...s.kitchenTimerQueue.filter(t => t.id !== timer.id),
+      { ...timer, appearedAt: Date.now(), status: timer.status ?? 'active' },
+    ].slice(-2),
   })),
   dismissKitchenTimer: () => set((s) => ({
     kitchenTimerQueue: s.kitchenTimerQueue.slice(1),
+  })),
+  removeKitchenTimerForStep: (dishId, stepIndex) => set((s) => ({
+    kitchenTimerQueue: s.kitchenTimerQueue.filter(
+      t => !(t.dishId === dishId && t.stepIndex === stepIndex)
+    ),
+  })),
+  markKitchenTimerWarning: (dishId, stepIndex, message) => set((s) => ({
+    kitchenTimerQueue: s.kitchenTimerQueue.map(t =>
+      t.dishId === dishId && t.stepIndex === stepIndex
+        ? { ...t, status: 'warning', message }
+        : t
+    ),
   })),
   setRecipeTabBounce: (bounce) => set({ recipeTabBounce: bounce }),
   addLockSystemNotification: (notif) => set((s) => ({

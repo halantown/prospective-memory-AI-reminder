@@ -8,7 +8,7 @@
  *    - ContactStrip (left avatar list)
  *    - ChatView (right chat thread)
  *    - PhoneTabBar (Chats / Recipe tabs)
- *    - KitchenTimerModal (blocking overlay, manual dismiss)
+ *    - KitchenTimerBanner (persistent cooking cue)
  *    - NotificationBanner (non-blocking, auto-dismiss)
  *    - RecipeTab (press-and-hold recipe viewer)
  */
@@ -20,7 +20,7 @@ import ContactStrip from './phone/ContactStrip'
 import ChatView from './phone/ChatView'
 import PhoneTabBar from './phone/PhoneTabBar'
 import RecipeTab from './phone/RecipeTab'
-import KitchenTimerModal from './phone/KitchenTimerModal'
+import KitchenTimerBanner from './phone/KitchenTimerBanner'
 import NotificationBanner from './phone/NotificationBanner'
 import LockScreen from './phone/LockScreen'
 
@@ -100,9 +100,6 @@ export default function PhoneSidebar() {
                       border-slate-600`}
           onPointerDownCapture={handleInteraction}
         >
-          {/* Kitchen Timer Modal (z-50, blocks all interaction) */}
-          <KitchenTimerModal />
-
           {/* Notification Banner (z-30, on top of everything including lock screen) */}
           <NotificationBanner />
 
@@ -127,6 +124,8 @@ export default function PhoneSidebar() {
               <span className="text-white/60">🔋</span>
             </div>
           </div>
+
+          <KitchenTimerBanner />
 
           {/* Screen content */}
           {locked ? (

@@ -147,9 +147,21 @@ export interface CookingWaitStep {
   dishId: DishId
   stepIndex: number
   stepLabel: string
+  stepDescription: string
   station: KitchenStationId
   startedAt: number
   durationS: number
+}
+
+export interface KitchenTimerBannerItem {
+  id: string
+  icon: string
+  message: string
+  appearedAt: number
+  dishId?: DishId
+  stepIndex?: number
+  station?: KitchenStationId
+  status?: 'active' | 'warning'
 }
 
 // ── PM Tasks ──

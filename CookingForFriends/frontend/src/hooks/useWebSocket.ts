@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import { getSessionState } from '../services/api'
-import type { ActivePMTrial, PMTaskConfig, RoomId } from '../types'
+import type { ActivePMTrial, PMTaskConfig, RoomId, DishId, KitchenStationId } from '../types'
 
 const HEARTBEAT_INTERVAL = 30_000
 const RECONNECT_BASE_MS = 500
@@ -170,6 +170,10 @@ export function useWebSocket(sessionId: string | null) {
           id: data.id as string,
           icon: (data.icon as string) || '🍳',
           message: data.message as string,
+          dishId: data.dish as DishId | undefined,
+          stepIndex: data.step_index as number | undefined,
+          station: data.station as KitchenStationId | undefined,
+          status: data.status === 'warning' ? 'warning' : 'active',
         })
         break
       }
