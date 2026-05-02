@@ -138,11 +138,14 @@ ws://host/ws/game/{session_id}/{block_number}?auto_start={bool}
 
 ## 5. State Management (Frontend)
 
-**Store**: Zustand (`gameStore.ts`) — single flat store, no nested slices.
+**Stores**: Zustand.
+- `gameStore.ts` — main flat store (see below)
+- `characterStore.ts` — avatar movement state (separate to avoid coupling cooking logic with movement)
 
-Key state sections:
+`gameStore.ts` key state sections:
 - **Session**: sessionId, participantId, group, conditionOrder, blockNumber, phase
 - **Room**: currentRoom, previousRoom, avatarMoving
+- **Character** (in `characterStore`): position {x,y}, currentWaypointId, isMoving, facing, animation, idleBubble
 - **Kitchen**: activeCookingSteps, cookingWaitSteps, completedDishes (cooking engine state)
 - **Dining**: diningPhase, seats (6), utensils, round, score
 - **Phone**:
@@ -270,6 +273,97 @@ PhoneSidebar
 ```
 
 Lock timeout: **15 seconds** of inactivity.
+
+### Character Movement System
+
+Avatar is a sprite-animated character that walks between kitchen stations and navigates cross-room via camera cuts.
+
+#### Component hierarchy
+
+```
+FloorPlanView → zoom div (absolute)
+  ├── <img floorplan.png>
+  ├── PlayerAvatar         — absolute, coordinates = % of full floorplan
+  │     └── AvatarSprite   — CSS spritesheet animation (48×96px frames)
+  └── WaypointEditor       — dev-only SVG overlay (DEV mode toggle)
+```
+
+#### Files
+
+| File | Purpose |
+|------|---------|
+| `src/stores/characterStore.ts` | Zustand store: rAF movement loop, BFS pathfinding, station callback, idle bubble |
+| `src/utils/waypointGraph.ts` | BFS (`bfsPath`), types (`WaypointData`, `RoomPointSpec`), `resolveRoomPoint()` |
+| `src/data/waypoints.json` | Waypoint coordinates, edges, `room_meta` exit/entry per room |
+| `src/components/game/AvatarSprite.tsx` | CSS spritesheet animation (8 fps, direction-aware frame selection) |
+| `src/components/game/PlayerAvatar.tsx` | Absolute-positioned avatar + "Nothing to do here" idle bubble |
+| `src/components/game/debug/WaypointEditor.tsx` | Dev annotation overlay — click to add node, drag to connect, JSON export |
+
+#### Sprite sheet spec
+
+- **Three sheets**: `idle.png`, `walk.png`, `sit.png` in `public/assets/characters/avatar1/`
+- **Frame size**: 48×96 px (width × height)
+- **Render size**: 48×96 px (1× scale)
+- **Frame rate**: 8 fps
+- **idle / walk** — 24 frames: right 0–5 | up 6–11 | left 12–17 | down 18–23
+- **sit** — 12 frames: right 0–5 | left 6–10 (no up/down; falls back to right)
+
+#### Waypoint coordinate system
+
+All coordinates are **% of the full 1536×1024 floorplan image**.
+Avatar foot anchors to `(x%, y%)` via `transform: translate(-50%, -100%)`.
+
+```jsonc
+// waypoints.json shape
+{
+  "waypoints": {
+    "kitchen_center": { "x": 26.0, "y": 19.8, "room": "kitchen" },
+    "fridge": { "x": 44.0, "y": 15.8, "room": "kitchen", "station": true, "facing": "up" }
+    // ...
+  },
+  "edges": [["fridge", "kitchen_center"], /* ... */],
+  "room_meta": {
+    "kitchen":  { "exit": "kitchen_view_out_camera_switch", "entry": "kitchen_center" },
+    "dining_hall": {
+      // per-destination exits (RoomPointSpec = string | Record<targetRoom, waypointId>)
+      "exit":  { "kitchen": "dining_in_from_kitchen", "living_room": "dining_out_down", "bedroom": "dining_out_down" },
+      "entry": { "kitchen": "dining_in_from_kitchen", "living_room": "dining_out_down", "bedroom": "dining_out_down" }
+    }
+  }
+}
+```
+
+**Important**: there are **no cross-room edges** in the `edges` list. Rooms are disconnected graphs. Cross-room transition is handled by `navigateToRoom`, not BFS.
+
+#### Movement flow
+
+**Station interaction (same room)**
+1. Player clicks hotspot → `setActiveStation(null)` closes current popup
+2. `characterStore.moveToStation(stationId, onArrival)` — BFS from `currentWaypointId` to station
+3. `rAF` loop advances position each frame at `WALK_SPEED = 12 %/s`
+4. On arrival: `onArrival()` → `setActiveStation(station)` opens popup; or idle bubble if no active step
+5. Hotspot `pointer-events: none` while `isCharMoving` (prevents mid-walk clicks)
+
+**Cross-room navigation**
+1. Player clicks room nav button → `navigateToRoom(target)`
+2. Resolve `exitId = resolveRoomPoint(currentMeta.exit, target)` (per-destination)
+3. Walk to exit waypoint (BFS within current room)
+4. On arrival: set `currentRoom = target`, after `TRANSIT_DELAY_MS = 1500 ms` teleport to `entryId`
+5. Gracefully degrades — if exit/entry not annotated, camera cuts immediately
+
+**Doorbell PM trigger**
+- Living Room nav button pulses amber + 🔔 when `gameStore.activePMTrials` contains a trial with `triggerEvent ∈ ['doorbell','knock','doorbell_ring']`
+
+#### WaypointEditor (dev only)
+
+Mounted inside zoom div; visible only when `showWaypointEditor = true` (toggle button outside zoom div, hidden in production via `import.meta.env.DEV`).
+
+- Click empty space → create numbered node (prompt for name)
+- Click node A then node B → add undirected edge
+- Double-click node → rename
+- Right-click → delete node/edge
+- JSON panel (portal to `document.body`) → one-click copy of current graph
+- Works in both overview and zoomed-room modes; coordinates are % of container = % of floorplan
 
 ### WorldView (Not Used)
 
