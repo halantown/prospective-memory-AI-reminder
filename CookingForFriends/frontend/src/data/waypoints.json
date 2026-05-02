@@ -1,0 +1,10 @@
+{
+  "waypoints": {},
+  "edges": [],
+  "room_meta": {
+    "kitchen":     { "exit": null, "entry": null },
+    "dining_hall": { "exit": null, "entry": null },
+    "bedroom":     { "exit": null, "entry": null },
+    "living_room": { "exit": null, "entry": null }
+  }
+}

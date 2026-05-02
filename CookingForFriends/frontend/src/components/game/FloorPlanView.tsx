@@ -24,6 +24,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
 import KitchenRoom, { KitchenStationOverlay } from './rooms/KitchenRoom'
 import KitchenFurniture from './rooms/KitchenFurniture'
+import WaypointEditor from './debug/WaypointEditor'
+import PlayerAvatar from './PlayerAvatar'
+import { useCharacterStore } from '../../stores/characterStore'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -144,6 +147,9 @@ export default function FloorPlanView() {
   const [isMoving, setIsMoving] = useState(false)
   const [stationPopupAnchor, setStationPopupAnchor] = useState<{ x: number; y: number } | null>(null)
 
+  // DEV-only: waypoint annotation tool
+  const [showWaypointEditor, setShowWaypointEditor] = useState(false)
+
   // Robot state: follows user with a delay
   const [robotRoom, setRobotRoom] = useState<FloorRoom>('living_room')
   const [isRobotMoving, setIsRobotMoving] = useState(false)
@@ -153,6 +159,9 @@ export default function FloorPlanView() {
   const robotState = useGameStore((s) => s.robot)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeStation = useGameStore((s) => s.activeStation)
+
+  // Character position for minimap dot
+  const avatarPosition = useCharacterStore((s) => s.position)
 
   const isZoomed = currentRoom !== null
 
@@ -321,50 +330,8 @@ export default function FloorPlanView() {
           )
         })}
 
-        {/* ── Virtual Character ── */}
-        <AnimatePresence mode="wait">
-          {!isMoving && (
-            <motion.div
-              key={charRoom}
-              className="absolute z-30 pointer-events-none"
-              style={{
-                left: `${charDef.cx}%`,
-                top: `${charDef.cy}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-              initial={{ opacity: 0, scale: 0.3 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.3 }}
-              transition={{ duration: 0.3 }}
-            >
-              <CharacterSprite />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Walking indicator while moving */}
-        <AnimatePresence>
-          {isMoving && (
-            <motion.div
-              className="absolute z-30 pointer-events-none"
-              style={{
-                left: `${charDef.cx}%`,
-                top: `${charDef.cy}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <motion.div
-                className="text-3xl drop-shadow-lg"
-                animate={{ y: [0, -6, 0] }}
-                transition={{ repeat: Infinity, duration: 0.5 }}
-              >
-                🚶
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* ── Player Avatar (sprite-based, movement-driven) ── */}
+        <PlayerAvatar />
 
         {/* ── Robot (Pepper) — follows user with delay ── */}
         <AnimatePresence mode="wait">
@@ -410,6 +377,11 @@ export default function FloorPlanView() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* ── Waypoint Editor overlay (DEV only, inside zoom div) ── */}
+        {import.meta.env.DEV && (
+          <WaypointEditor currentRoom={currentRoom} isActive={showWaypointEditor} />
+        )}
       </div>
 
       {/* Kitchen station popup is rendered at game-area level so it can follow the hotspot click position. */}
@@ -545,8 +517,8 @@ export default function FloorPlanView() {
             <div
               className="absolute w-2.5 h-2.5 bg-green-400 rounded-full border border-white shadow-sm"
               style={{
-                left: `${charDef.cx}%`,
-                top: `${charDef.cy}%`,
+                left: `${avatarPosition.x}%`,
+                top: `${avatarPosition.y}%`,
                 transform: 'translate(-50%, -50%)',
               }}
             />
@@ -561,6 +533,20 @@ export default function FloorPlanView() {
             />
           </div>
         </div>
+      )}
+
+      {/* ── DEV: Waypoint editor toggle ── */}
+      {import.meta.env.DEV && (
+        <button
+          className={`absolute bottom-5 right-5 z-40 text-xs px-3 py-1.5 rounded-lg border font-mono shadow-lg transition-colors
+            ${showWaypointEditor
+              ? 'bg-amber-500/30 border-amber-400/80 text-amber-200 hover:bg-amber-500/50'
+              : 'bg-slate-800/80 border-slate-600/50 text-slate-400 hover:bg-slate-700/80 hover:text-slate-200'
+            }`}
+          onClick={() => setShowWaypointEditor(v => !v)}
+        >
+          {showWaypointEditor ? '⚙ WP Editor ON' : '⚙ WP Editor'}
+        </button>
       )}
     </div>
   )

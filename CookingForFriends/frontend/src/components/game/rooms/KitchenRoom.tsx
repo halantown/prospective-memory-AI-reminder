@@ -8,6 +8,7 @@
 import { useCallback, useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
+import { useCharacterStore } from '../../../stores/characterStore'
 import PMTargetItems from '../PMTargetItems'
 import type { KitchenStationId, ActiveCookingStep, CookingStepOption } from '../../../types'
 
@@ -86,6 +87,9 @@ export default function KitchenRoom({
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
 
+  const isCharMoving    = useCharacterStore((s) => s.isMoving)
+  const moveToStation   = useCharacterStore((s) => s.moveToStation)
+
   const [feedback, setFeedback] = useState<{ station: KitchenStationId; type: FeedbackType }>({ station: 'fridge', type: null })
   const [debugPos, setDebugPos] = useState<{ x: number; y: number } | null>(null)
 
@@ -104,16 +108,25 @@ export default function KitchenRoom({
   }, [feedback.type])
 
   const handleStationClick = useCallback((station: KitchenStationId, event: React.MouseEvent<HTMLElement>) => {
-    if (!isActive) return
-    const hasActiveStep = activeCookingSteps.some(step => stationMatches(station, step.station))
-    if (!hasActiveStep) return
+    if (!isActive || isCharMoving) return
+    // Toggle off if already active
     if (activeStation === station) {
       setActiveStation(null)
       return
     }
-    onStationOpen?.(event)
-    setActiveStation(station)
-  }, [isActive, activeStation, activeCookingSteps, onStationOpen, setActiveStation])
+    // Move avatar to station; on arrival check for active step
+    const clickEvent = event
+    moveToStation(station, () => {
+      const hasActiveStep = useGameStore.getState().activeCookingSteps.some(
+        step => stationMatches(station, step.station)
+      )
+      if (hasActiveStep) {
+        onStationOpen?.(clickEvent)
+        setActiveStation(station)
+      }
+      // else: characterStore shows idle bubble automatically
+    })
+  }, [isActive, isCharMoving, activeStation, onStationOpen, setActiveStation, moveToStation])
 
   return (
     <div
@@ -142,7 +155,7 @@ export default function KitchenRoom({
               key={stationId}
               className={`absolute z-10 rounded-lg border-2 transition-all duration-200
                 ${hasActiveStep ? 'bg-orange-500/35 border-orange-300 shadow-[0_0_18px_rgba(251,146,60,0.45)]' : 'bg-blue-500/30 border-blue-400'}
-                ${isActive ? 'cursor-pointer' : 'cursor-default pointer-events-none'}
+                ${isActive && !isCharMoving ? 'cursor-pointer' : 'cursor-default pointer-events-none'}
               `}
               style={pos}
               onClick={(event) => handleStationClick(stationId, event)}
