@@ -98,12 +98,8 @@ function StationSprite({ station }: { station: StationDef }) {
           draggable={false}
         />
       ) : (
-        /* Placeholder — dashed outline only, won't obscure floorplan */
-        <div
-          className="w-full h-full rounded flex flex-col items-center justify-center gap-0.5 border border-dashed border-white/20"
-        >
-          <span className="text-[10px] leading-none opacity-50">{station.emoji}</span>
-        </div>
+        /* No sprite yet — render nothing so floorplan shows through */
+        null
       )}
     </div>
   )

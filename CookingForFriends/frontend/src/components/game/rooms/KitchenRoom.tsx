@@ -16,47 +16,54 @@ const STATION_INFO: Record<KitchenStationId, { label: string; emoji: string }> =
   fridge:       { label: 'Fridge',        emoji: '🧊' },
   cutting_board:{ label: 'Cutting Board', emoji: '🔪' },
   spice_rack:   { label: 'Spice Rack',   emoji: '🧂' },
-  burner1:      { label: 'Burner 1',     emoji: '🔥' },
-  burner2:      { label: 'Burner 2',     emoji: '🔥' },
-  burner3:      { label: 'Burner 3',     emoji: '🔥' },
+  burner1:      { label: 'Stove',        emoji: '🍳' },  // visual stove block (all 4 burners)
+  burner2:      { label: 'Burner 2',     emoji: '🔥' },  // hidden — same tile as burner1
+  burner3:      { label: 'Burner 3',     emoji: '🔥' },  // hidden — same tile as burner1
   oven:         { label: 'Oven',         emoji: '♨️' },
   plating_area: { label: 'Plating Area', emoji: '🍽️' },
 }
 
 /**
+ * Stations that are visually merged into another and should not be rendered as
+ * independent hotspots. burner2/3 are part of the same stove tile as burner1.
+ */
+const HIDDEN_STATIONS = new Set<KitchenStationId>(['burner2', 'burner3'])
+
+/**
  * Station hotspot positions as % of the kitchen bounding box.
- * Kitchen box = ROOM_DEFS.kitchen: x:0, y:0, w:44%, h:41% of the 1536×1024 floorplan.
- * Positions calibrated to the pixel-art furniture visible in the image.
+ * Kitchen box = ROOM_DEFS.kitchen: x:0, y:0, w:44%, h:41% of floorplan.png (1248×912px).
+ * Formula: left% = img_x / (0.44×1248=549), top% = img_y / (0.41×912=374)
  *
- *  Floorplan furniture layout (top-down, top-left = kitchen):
- *   ┌ burners 1+2 ┬ fridge ─────────── ┬ cutting board ─ ┬ spice shelf ┐
- *   ├ burner 3    │                     │                 │             │
- *   ├ oven ───────┤         (floor)     │                 │             │
- *   │             │                     │                 │             │
- *   ├ sink(no btn)├──────── lower counter / plating area ─┴─────────────┤
- *   └─────────────┴─────────────────────────────────────────────────────┘
+ *  Floorplan furniture layout (top-down):
+ *   ┌ stove+hood ┬──── prep/cutting zone ────┬ spice ┬ fridge ┐  ← top counter
+ *   ├ oven ──────┤        (open floor)        │                │
+ *   │ storage    │                            │                │
+ *   │            │    [island/plating table]  │                │
+ *   └────────────┴────────────────────────────┴────────────────┘
  */
 const STATION_POSITIONS: Record<KitchenStationId, { left: string; top: string; width: string; height: string }> = {
-  // Two-door fridge — top row, left-center
-  fridge:        { left: '37%', top: '1%',  width: '17%', height: '31%' },
-  // Wooden cutting board + knife — top row, right-center
-  cutting_board: { left: '63%', top: '1%',  width: '22%', height: '31%' },
-  // Jar shelf (spice rack) — top-right corner
-  spice_rack:    { left: '85%', top: '1%',  width: '14%', height: '23%' },
-  // Burner 1 (circle "1", top-left of stove 2×2 grid)
-  burner1:       { left: '13%', top: '1%',  width: '12%', height: '15%' },
-  // Burner 2 (circle "2", top-right of 2×2 grid)
-  burner2:       { left: '25%', top: '1%',  width: '12%', height: '15%' },
-  // Burner 3 (circle "3", bottom-left of 2×2 grid)
-  burner3:       { left: '13%', top: '16%', width: '12%', height: '14%' },
-  // Oven — below the burner cluster
-  oven:          { left: '15%', top: '23%', width: '23%', height: '19%' },
-  // Plating area — lower counter, center-right
-  plating_area:  { left: '48%', top: '68%', width: '30%', height: '18%' },
+  // Stove with range hood (all 4 burners) — measured: TL(35.1,14.6) BR(43.7,25.6), clickable area ×1.5
+  burner1:       { left: '32.75%', top: '12.25%', width: '13.5%', height: '16.5%' },
+  // burner2/3 hidden — same tile as burner1
+  burner2:       { left: '35%', top: '15%', width: '0%',  height: '0%'  },
+  burner3:       { left: '35%', top: '15%', width: '0%',  height: '0%'  },
+  // Prep zone: knife rack + rolling pin — measured: TL(61.2,17.3) BR(78.4,22.6), height ×1.5 centered
+  cutting_board: { left: '61%', top: '15.5%', width: '17%', height: '9%'  },
+  // Spice shelf — measured: TL(87.4,12.9) BR(96.0,24.8)
+  spice_rack:    { left: '87%', top: '13%', width: '9%',  height: '12%' },
+  // Fridge — TL(96.2,6.0), right edge extends beyond kitchen div (estimate)
+  fridge:        { left: '95%', top: '5%',  width: '5%',  height: '28%' },
+  // Oven — measured: TL(17.2,25.6) BR(25.9,33.1), clickable area ×1.5
+  oven:          { left: '14.75%', top: '24%', width: '13.5%', height: '12%' },
+  // Kitchen island / plating table — measured: TL(57.5,51.2) BR(73.6,70.3)
+  plating_area:  { left: '58%', top: '51%', width: '16%', height: '19%' },
 }
 
 /** Feedback flash types */
 type FeedbackType = 'correct' | 'wrong' | 'missed' | null
+
+/** Set to true to show live mouse coordinates for hotspot calibration */
+const DEBUG_COORDS = false
 
 export default function KitchenRoom({ isActive }: { isActive: boolean }) {
   const dishes = useGameStore((s) => s.dishes)
@@ -66,6 +73,14 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
   const wsSend = useGameStore((s) => s.wsSend)
 
   const [feedback, setFeedback] = useState<{ station: KitchenStationId; type: FeedbackType }>({ station: 'fridge', type: null })
+  const [debugPos, setDebugPos] = useState<{ x: number; y: number } | null>(null)
+
+  const handleDebugMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 100
+    const y = ((e.clientY - rect.top) / rect.height) * 100
+    setDebugPos({ x, y })
+  }, [])
 
   // Clear feedback after short delay
   useEffect(() => {
@@ -102,10 +117,21 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
   }, [activeStation, activeCookingSteps])
 
   return (
-    <div className="absolute inset-0">
+    <div
+      className="absolute inset-0"
+      onMouseMove={DEBUG_COORDS ? handleDebugMouseMove : undefined}
+      onMouseLeave={DEBUG_COORDS ? () => setDebugPos(null) : undefined}
+    >
+      {/* Debug coordinate display */}
+      {DEBUG_COORDS && debugPos && (
+        <div className="absolute top-1 right-1 z-50 bg-black/80 text-green-400 font-mono text-[11px] px-2 py-1 rounded pointer-events-none select-none">
+          left: {debugPos.x.toFixed(1)}% &nbsp; top: {debugPos.y.toFixed(1)}%
+        </div>
+      )}
       {/* Clickable station hotspots */}
       {(Object.entries(STATION_POSITIONS) as [KitchenStationId, typeof STATION_POSITIONS[KitchenStationId]][]).map(
         ([stationId, pos]) => {
+          if (HIDDEN_STATIONS.has(stationId)) return null
           const info = STATION_INFO[stationId]
           const isOpen = activeStation === stationId
           const showFeedback = feedback.station === stationId && feedback.type
@@ -113,20 +139,13 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
           return (
             <motion.button
               key={stationId}
-              className={`absolute z-10 rounded-lg border-2 transition-all duration-200
+              className={`absolute z-10 rounded-lg border-2 transition-all duration-200 bg-blue-500/30 border-blue-400
                 ${isActive ? 'cursor-pointer' : 'cursor-default pointer-events-none'}
-                ${isOpen
-                  ? 'border-cooking-400 bg-cooking-900/30'
-                  : 'border-transparent hover:border-slate-500/20 bg-transparent hover:bg-slate-800/20'
-                }
-                ${showFeedback === 'correct' ? '!border-green-400 !bg-green-500/30' : ''}
-                ${showFeedback === 'wrong' ? '!border-red-400 !bg-red-500/30' : ''}
-                ${showFeedback === 'missed' ? '!border-slate-400 !bg-slate-500/20' : ''}
               `}
               style={pos}
               onClick={() => handleStationClick(stationId)}
             >
-              <div className="absolute bottom-0.5 left-1 text-[8px] text-slate-400/70 font-medium whitespace-nowrap">
+              <div className="absolute bottom-0.5 left-1 text-[9px] text-white font-bold whitespace-nowrap drop-shadow">
                 {info.emoji} {info.label}
               </div>
               {/* Feedback flash icon */}
