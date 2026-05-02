@@ -101,8 +101,9 @@ The floorplan image is rendered with `objectFit: fill` and `imageRendering: pixe
 **Kitchen special case — top-left corner problem:**
 The kitchen occupies the top-left corner of the floorplan. At 1.6–1.7× zoom the standard clamp forces `translate(0%, 0%)`, pinning the kitchen to the top-left of the view with no room to centre it. Solution:
 - `ZOOM_SCALE_KITCHEN = 1.7` (slightly higher than global scale).
-- `KITCHEN_MAX_OFFSET = 8` — the upper clamp for kitchen is relaxed from `0%` to `+8%`, allowing the image to shift up to 8% right/down. This creates a small controlled gap (~118 px at 1480 px game width) against the `bg-slate-900` container, which reads as a thin dark border rather than a broken layout.
-- `ROOM_DEFS.kitchen.cy = 18` is kept low so `rawTy` naturally exceeds 8% and is clamped to the limit, producing a consistent 8% gap on both axes.
+- `KITCHEN_MAX_OFFSET_X = 10`, `KITCHEN_MAX_OFFSET_Y = 15` — separate X/Y offsets applied after the initial X=8%,Y=8% baseline, allowing the image to shift right/down to show more of the room. These produce a visible dark gap on each axis so the kitchen does not feel flush against the phone/game edge.
+- `ROOM_DEFS.kitchen.cy = 18` is kept low so `rawTy` naturally exceeds the Y clamp.
+- `ROOM_DEFS.kitchen.w = 49.5` — extended from 44 to include the fridge (right edge was clipping at w=44). All STATION_POSITIONS left/width values are scaled by factor 44/49.5 (≈ 8/9) to preserve absolute pixel alignment.
 
 #### Target Style Decision
 
@@ -547,8 +548,9 @@ New structure:
 
 ```
 PhoneSidebar.tsx          (iPhone shell + Dynamic Island + status bar + lock screen logic)
-├── LockScreen.tsx         (two sections: Messages above System, fixed layout, no overflow)
+├── LockScreen.tsx         (three sections: Kitchen (orange, top) > Messages > System; Kitchen reads kitchenTimerQueue from store)
 ├── NotificationBanner.tsx (floating pill at top, 5s auto-dismiss, countdown bar)
+├── KitchenTimerBanner.tsx (shown below header bar when unlocked; inside LockScreen as first section when locked)
 ├── KitchenTimerModal.tsx  (blocking modal overlay, must be dismissed manually)
 ├── PhoneTabBar.tsx        (bottom tabs: Chats / Recipe)
 ├── ContactStrip.tsx       (left 48px vertical avatar list — hidden until contact sends first msg)

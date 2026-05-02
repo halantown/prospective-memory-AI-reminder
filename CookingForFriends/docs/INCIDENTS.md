@@ -749,3 +749,118 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > - [ ] Add a frontend regression test for malformed `pm_trigger` payloads
 > - [ ] Add backend integration test proving EC+/EC- timeline does not emit legacy PM triggers
 > - [ ] Add backend integration test proving PM scheduler resumes when reconnecting to an already-`PLAYING` block
+
+---
+
+## INC-015 — PM pipeline froze DB game time but not backend gameplay timers
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-02 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | Code review after PM trigger debugging |
+| Affected area| PM scheduler, block timeline, cooking engine |
+
+### Background
+> PM triggers are modal interruptions. While the participant is in the PM/fake-trigger pipeline, the main cooking task and block timeline should not advance, because the frontend intentionally blocks background interaction.
+
+### Incident Description
+> `engine.pm_session` froze only the DB-backed game-time accumulator. The block timeline still used wall-clock elapsed time for HUD ticks, phone messages, and block-end timing. `CookingEngine` had `pause()` / `resume()` methods, but PM trigger start never called `pause()`, and the existing implementation did not safely restore active cooking-step timeouts after a pause.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 20:12 | Implementation started from review item 2 |
+| 20:12 | Found timeline was wall-clock driven despite DB game-time freeze |
+| 20:12 | Found cooking pause/resume did not preserve active timeout remaining time |
+| 20:12 | Added PM pipeline gameplay pause/resume integration |
+| 20:12 | Static compile verification passed |
+
+### Root Cause
+> PM pipeline state was split across three independent clocks: DB game time in `engine/game_time.py`, wall-clock scheduling in `engine/timeline.py`, and wall-clock cooking step timers in `engine/cooking_engine.py`. Freezing only DB game time stopped the PM scheduler from advancing but left non-PM backend tasks free to keep emitting events and timeouts while the participant could not interact with the game UI.
+
+### Contributing Factors
+> - `CookingEngine.pause()` existed but was not called when PM triggers fired
+> - Timeline scheduling had no pause/resume control and computed elapsed directly from `time.time() - start_time`
+> - The frontend modal correctly blocks background clicks, making backend timer drift invisible until cooking steps/time ticks/messages are inspected
+> - No integration test asserts that PM overlays pause cooking and timeline progression
+
+### Fix
+> `backend/engine/pm_session.py`: added an `on_pipeline_start` callback that runs immediately after `freeze_game_time()` and before `pm_trigger` is sent.
+>
+> `backend/websocket/game_handler.py`: passes a PM pipeline callback that pauses the block timeline and active `CookingEngine`; PM completion and fake-trigger acknowledgement now resume both systems after `unfreeze_game_time()`.
+>
+> `backend/engine/timeline.py`: added per-timeline pause/resume control. Timeline elapsed seconds and sleeps now exclude explicit pause intervals, so HUD ticks, phone messages, and block-end timing stop during PM overlays.
+>
+> `backend/engine/cooking_engine.py`: made pause/resume idempotent and safe for active steps. Pausing now cancels the cooking timeline task, preserves remaining active-step timeout, and adjusts activation timestamps on resume so response time does not include the PM interruption.
+
+### Verification
+> `cd CookingForFriends/backend && conda run -n thesis_server python -m py_compile engine/cooking_engine.py engine/timeline.py engine/pm_session.py websocket/game_handler.py` passes.
+>
+> `cd CookingForFriends/frontend && npm run build` passes.
+>
+> `cd CookingForFriends/backend && conda run -n thesis_server pytest tests/test_cooking_engine.py -q` runs with the same 3 existing failures caused by stale test inputs using `chosen_option_id="correct"` instead of `option_{correct_index}`; 11 tests pass.
+
+### Follow-up Actions
+> - [ ] Add backend unit test for `CookingEngine.pause()` preserving active-step timeout remaining time
+> - [ ] Add backend integration test proving PM pipeline pauses timeline `time_tick` and phone-message scheduling
+> - [ ] Consider making DB game time the single source of truth for all backend gameplay timers after the flow is stable
+
+---
+
+## INC-016 — Cooking recipe UI diverged from backend active-step state
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-02 |
+| Severity     | P1 High |
+| Status       | Resolved — local guard applied; data-source unification pending |
+| Reported by  | Manual test screenshot + WebSocket log |
+| Affected area| CookingEngine actions, Recipe tab, Kitchen station popup |
+
+### Background
+> The cooking task is backend-driven: `CookingEngine` sends `step_activate`, `step_result`, `step_timeout`, and `wait_start` events. The frontend should render the current recipe state from those events and should submit one action for the currently active backend step.
+
+### Incident Description
+> During a test run, the phone timer showed `Sauté base!`, but the Recipe tab for Tomato Soup still showed `Select ingredients`. The WebSocket log also showed multiple `cooking_action` submissions for the same `tomato_soup step_index=2` with different options. This means the frontend recipe display, timer queue, active step popup, and backend active step were not reliably synchronized.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 20:36 | User reported Recipe tab mismatch with screenshot and WS log |
+| 20:42 | Investigation found frontend recipe hardcodes diverged from backend recipes |
+| 20:42 | Found station popup could submit the same active step repeatedly |
+| 20:42 | Added frontend pending guard and backend stale step validation |
+| 20:42 | Build and compile verification completed |
+
+### Root Cause
+> The frontend kept a second hardcoded copy of cooking recipe steps in `frontend/src/stores/gameStore.ts`, separate from `backend/data/cooking_recipes.py`. The two copies had different step counts and missing wait steps. Recipe rendering also treated `dish.phase !== idle` as enough to mark a step as live, even when the active step had already been answered, missed, or removed. Finally, the station popup did not disable a step while its result was pending, and the backend ignored the client-provided `step_index`.
+
+### Contributing Factors
+> - No single source of truth for cooking recipe definitions
+> - `kitchenTimerQueue`, `activeCookingSteps`, and `dishes.currentStepIndex` are separate frontend state paths
+> - No backend stale-action guard for `step_index`
+> - No frontend test covering wrong/missed cooking steps and recipe display
+
+### Fix
+> `frontend/src/stores/gameStore.ts`: aligned frontend recipe step arrays with backend `cooking_recipes.py`, including wait steps and current labels/descriptions.
+>
+> `frontend/src/components/game/phone/RecipeTab.tsx`: only highlights a recipe row as live when an active or wait step actually exists; wrong/missed/completed current steps no longer appear as active.
+>
+> `frontend/src/components/game/rooms/KitchenRoom.tsx`: added a per-step pending guard so one active cooking step can only submit one `cooking_action` while waiting for backend result.
+>
+> `backend/engine/cooking_engine.py` and `backend/websocket/game_handler.py`: backend now validates the client `step_index` against the active backend step and rejects stale cooking actions with a warning instead of scoring them against a different step.
+
+### Verification
+> `cd CookingForFriends/backend && conda run -n thesis_server python -m py_compile engine/cooking_engine.py websocket/game_handler.py` passes.
+>
+> `cd CookingForFriends/frontend && npm run build` passes.
+>
+> `cd CookingForFriends/backend && conda run -n thesis_server pytest tests/test_cooking_engine.py -q` still has the same 3 existing stale-test failures caused by `chosen_option_id="correct"` instead of `option_{correct_index}`; 11 tests pass.
+
+### Follow-up Actions
+> - [ ] Move cooking recipe definitions to a server-provided payload so frontend does not hardcode a copy
+> - [ ] Add frontend stale/rejected cooking-action feedback
+> - [ ] Add regression test for wrong/missed step display in Recipe tab
+> - [ ] Fix stale `test_cooking_engine.py` assertions to use real option IDs
