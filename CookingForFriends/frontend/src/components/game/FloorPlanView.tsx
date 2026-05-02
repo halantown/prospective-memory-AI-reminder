@@ -27,6 +27,10 @@ import KitchenFurniture from './rooms/KitchenFurniture'
 import WaypointEditor from './debug/WaypointEditor'
 import PlayerAvatar from './PlayerAvatar'
 import { useCharacterStore } from '../../stores/characterStore'
+import waypointData from '../../data/waypoints.json'
+import type { WaypointData } from '../../utils/waypointGraph'
+
+const wpData = waypointData as WaypointData
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -160,35 +164,62 @@ export default function FloorPlanView() {
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeStation = useGameStore((s) => s.activeStation)
 
+  // Doorbell / PM trigger → highlight living room nav button
+  const activePMTrials = useGameStore((s) => s.activePMTrials)
+  const doorbellActive = activePMTrials.some(
+    t => ['doorbell', 'knock', 'doorbell_ring'].includes(t.triggerEvent ?? '')
+  )
+
   // Character position for minimap dot
   const avatarPosition = useCharacterStore((s) => s.position)
+  const moveToWaypoint  = useCharacterStore((s) => s.moveToWaypoint)
+  const teleportTo      = useCharacterStore((s) => s.teleportTo)
+  const isCharMoving    = useCharacterStore((s) => s.isMoving)
 
   const isZoomed = currentRoom !== null
 
-  // Navigate to a room — with delay for character "teleport"
+  // Navigate to a room: walk avatar to exit waypoint → camera cut → teleport to entry
   const navigateToRoom = useCallback((target: FloorRoom) => {
     if (isMoving) return
     if (target === currentRoom) return
 
-    setIsMoving(true)
-    setCurrentRoom(target)
+    const currentMeta = currentRoom ? wpData.room_meta?.[currentRoom] : null
+    const targetMeta  = wpData.room_meta?.[target] ?? null
+    const exitId  = currentMeta?.exit ?? null
+    const entryId = targetMeta?.entry ?? null
 
-    setTimeout(() => {
-      setCharRoom(target)
-      setIsMoving(false)
-    }, TRANSIT_DELAY_MS)
+    const doTransition = () => {
+      setIsMoving(true)
+      setCurrentRoom(target)
 
-    // Robot starts moving after user arrives
-    if (robotTimer.current) clearTimeout(robotTimer.current)
-    setIsRobotMoving(false)
-    robotTimer.current = setTimeout(() => {
-      setIsRobotMoving(true)
+      // Teleport avatar to entry after camera transition
       setTimeout(() => {
-        setRobotRoom(target)
-        setIsRobotMoving(false)
-      }, 800)
-    }, TRANSIT_DELAY_MS + 600)
-  }, [currentRoom, isMoving])
+        if (entryId) {
+          teleportTo(entryId)
+        }
+        setCharRoom(target)
+        setIsMoving(false)
+      }, TRANSIT_DELAY_MS)
+
+      // Robot follows with delay
+      if (robotTimer.current) clearTimeout(robotTimer.current)
+      setIsRobotMoving(false)
+      robotTimer.current = setTimeout(() => {
+        setIsRobotMoving(true)
+        setTimeout(() => {
+          setRobotRoom(target)
+          setIsRobotMoving(false)
+        }, 800)
+      }, TRANSIT_DELAY_MS + 600)
+    }
+
+    if (exitId && !isCharMoving) {
+      // Walk to exit first, then do transition
+      moveToWaypoint(exitId, doTransition)
+    } else {
+      doTransition()
+    }
+  }, [currentRoom, isMoving, isCharMoving, moveToWaypoint, teleportTo])
 
   // Enter a room from overview — robot follows immediately with delay
   const enterRoom = useCallback((room: FloorRoom) => {
@@ -438,23 +469,29 @@ export default function FloorPlanView() {
 
       {/* ── Navigation edge buttons (zoomed mode) ── */}
       {isZoomed && !isMoving && currentRoom && (
-        ADJACENCY[currentRoom].map((nav) => (
-          <button
-            key={nav.target}
-            className="absolute z-40 flex items-center gap-1.5 px-4 py-2.5
-                       bg-slate-800/90 hover:bg-slate-700/95 backdrop-blur-sm
-                       border border-slate-600/50 hover:border-amber-400/60
-                       rounded-xl shadow-lg whitespace-nowrap
-                       text-slate-200 hover:text-amber-200
-                       transition-all duration-200 hover:scale-105 active:scale-95
-                       cursor-pointer"
-            style={edgeStyle(nav.direction)}
-            onClick={() => navigateToRoom(nav.target)}
-          >
-            <span className="text-base font-bold">{ARROWS[nav.direction]}</span>
-            <span className="text-sm font-medium">{nav.label}</span>
-          </button>
-        ))
+        ADJACENCY[currentRoom].map((nav) => {
+          const isDoorbellTarget = doorbellActive && nav.target === 'living_room'
+          return (
+            <button
+              key={nav.target}
+              className={`absolute z-40 flex items-center gap-1.5 px-4 py-2.5
+                         bg-slate-800/90 hover:bg-slate-700/95 backdrop-blur-sm
+                         rounded-xl shadow-lg whitespace-nowrap
+                         transition-all duration-200 hover:scale-105 active:scale-95
+                         cursor-pointer
+                         ${isDoorbellTarget
+                           ? 'border-2 border-amber-400 text-amber-200 hover:text-amber-100 animate-pulse ring-2 ring-amber-400/50'
+                           : 'border border-slate-600/50 hover:border-amber-400/60 text-slate-200 hover:text-amber-200'
+                         }`}
+              style={edgeStyle(nav.direction)}
+              onClick={() => navigateToRoom(nav.target)}
+            >
+              <span className="text-base font-bold">{ARROWS[nav.direction]}</span>
+              <span className="text-sm font-medium">{nav.label}</span>
+              {isDoorbellTarget && <span className="text-base">🔔</span>}
+            </button>
+          )
+        })
       )}
 
       {/* ── Overview / Zoom-out button ── */}
