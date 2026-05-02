@@ -234,7 +234,7 @@ async def run_timeline(
                     tick_num = int(elapsed) // 10
                     if tick_num != last_tick_num:
                         last_tick_num = tick_num
-                        game_minutes = tick_num
+                        game_minutes = min(tick_num, 60)  # cap at 18:00
                         game_hour = 17 + game_minutes // 60
                         game_min = game_minutes % 60
                         game_clock = f"{game_hour}:{game_min:02d}"
@@ -391,7 +391,7 @@ async def run_timeline(
                 tick_num = int(elapsed) // 10
                 if tick_num != last_tick_num:
                     last_tick_num = tick_num
-                    game_minutes = tick_num
+                    game_minutes = min(tick_num, 60)  # cap at 18:00
                     game_hour = 17 + game_minutes // 60
                     game_min = game_minutes % 60
                     game_clock = f"{game_hour}:{game_min:02d}"
