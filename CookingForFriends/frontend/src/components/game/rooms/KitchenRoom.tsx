@@ -114,7 +114,8 @@ export default function KitchenRoom({
       setActiveStation(null)
       return
     }
-    // Move avatar to station; on arrival check for active step
+    // Close any open popup immediately, then walk to new station
+    setActiveStation(null)
     const clickEvent = event
     moveToStation(station, () => {
       const hasActiveStep = useGameStore.getState().activeCookingSteps.some(
