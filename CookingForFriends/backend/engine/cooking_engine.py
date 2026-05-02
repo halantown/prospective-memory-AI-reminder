@@ -82,6 +82,7 @@ class CookingEngine:
         # Active step tracking
         self._active_step: dict[str, TimelineEntry | None] = {d: None for d in COOKING_DISHES}
         self._timeout_tasks: dict[str, asyncio.Task] = {}
+        self._timeout_remaining_s: dict[str, float] = {}
         self._step_activated_at: dict[str, float] = {}
 
         # Timeline scheduling
@@ -89,6 +90,7 @@ class CookingEngine:
         self._running = False
         self._block_start_time: float = 0.0
         self._paused_at: float | None = None
+        self._next_timeline_index: int = 0
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -96,27 +98,44 @@ class CookingEngine:
         """Start the cooking timeline. Returns the background task."""
         self._block_start_time = block_start_time or time.time()
         self._running = True
+        self._paused_at = None
+        self._next_timeline_index = 0
         self._timeline_task = asyncio.create_task(self._run_timeline())
         return self._timeline_task
 
     async def stop(self):
         """Stop the cooking engine and cancel pending timers."""
         self._running = False
+        self._paused_at = None
         for task in self._timeout_tasks.values():
             task.cancel()
         self._timeout_tasks.clear()
+        self._timeout_remaining_s.clear()
         if self._timeline_task and not self._timeline_task.done():
             self._timeline_task.cancel()
+        self._timeline_task = None
 
     def pause(self):
         """Pause all cooking timers (called during PM pipeline freeze)."""
         if self._paused_at is not None:
             return  # already paused
-        self._paused_at = time.time()
+        now = time.time()
+        self._paused_at = now
         self._running = False
-        for task in self._timeout_tasks.values():
+
+        for dish_id, task in self._timeout_tasks.items():
+            activated_at = self._step_activated_at.get(dish_id)
+            if activated_at is not None:
+                self._timeout_remaining_s[dish_id] = max(
+                    0.0,
+                    COOKING_STEP_WINDOW_S - (now - activated_at),
+                )
             task.cancel()
         self._timeout_tasks.clear()
+
+        if self._timeline_task and not self._timeline_task.done():
+            self._timeline_task.cancel()
+        self._timeline_task = None
 
     def resume(self):
         """Resume cooking timers (called when game time unfreezes)."""
@@ -126,7 +145,25 @@ class CookingEngine:
         self._block_start_time += offset
         self._paused_at = None
         self._running = True
-        if self._timeline_task and self._timeline_task.done():
+
+        for dish_id, remaining_s in list(self._timeout_remaining_s.items()):
+            entry = self._active_step.get(dish_id)
+            if entry is None:
+                continue
+            activated_at = self._step_activated_at.get(dish_id, time.time())
+            adjusted_activated_at = activated_at + offset
+            self._step_activated_at[dish_id] = adjusted_activated_at
+            self._timeout_tasks[dish_id] = asyncio.create_task(
+                self._step_timeout(
+                    dish_id,
+                    entry.step_index,
+                    adjusted_activated_at,
+                    remaining_s,
+                )
+            )
+        self._timeout_remaining_s.clear()
+
+        if self._timeline_task is None or self._timeline_task.done():
             self._timeline_task = asyncio.create_task(self._run_timeline())
 
     # ── Timeline Runner ───────────────────────────────────────────────────────
@@ -134,9 +171,10 @@ class CookingEngine:
     async def _run_timeline(self):
         """Fire timeline events at their scheduled times."""
         try:
-            for entry in COOKING_TIMELINE:
+            while self._next_timeline_index < len(COOKING_TIMELINE):
                 if not self._running:
                     break
+                entry = COOKING_TIMELINE[self._next_timeline_index]
 
                 # Wait until the scheduled time
                 now = time.time()
@@ -149,6 +187,7 @@ class CookingEngine:
                     break
 
                 await self._activate_entry(entry)
+                self._next_timeline_index += 1
 
         except asyncio.CancelledError:
             logger.debug("CookingEngine timeline cancelled for block %d", self.block_id)
@@ -213,12 +252,20 @@ class CookingEngine:
 
     # ── Timeout Handler ───────────────────────────────────────────────────────
 
-    async def _step_timeout(self, dish_id: str, step_index: int, activated_at: float):
+    async def _step_timeout(
+        self,
+        dish_id: str,
+        step_index: int,
+        activated_at: float,
+        delay_s: float | None = None,
+    ):
         """Called after COOKING_STEP_WINDOW_S if participant hasn't acted."""
         try:
-            await asyncio.sleep(COOKING_STEP_WINDOW_S)
+            await asyncio.sleep(COOKING_STEP_WINDOW_S if delay_s is None else delay_s)
         except asyncio.CancelledError:
             return
+        finally:
+            self._timeout_tasks.pop(dish_id, None)
 
         # Check step is still active (not already handled)
         if self._active_step.get(dish_id) is None:
@@ -276,6 +323,7 @@ class CookingEngine:
         chosen_option_text: str,
         station: str,
         timestamp: float,
+        client_step_index: int | None = None,
     ) -> dict[str, Any]:
         """Process a participant's cooking action.
 
@@ -288,6 +336,21 @@ class CookingEngine:
 
         dish = self.dishes[dish_id]
         step_def = dish.steps[entry.step_index]
+
+        if client_step_index is not None and client_step_index != entry.step_index:
+            logger.warning(
+                "Rejected stale cooking action: %s client_step=%s active_step=%s participant=%s",
+                dish_id,
+                client_step_index,
+                entry.step_index,
+                self.participant_id,
+            )
+            return {
+                "result": "stale_step",
+                "dish": dish_id,
+                "received_step_index": client_step_index,
+                "expected_step_index": entry.step_index,
+            }
 
         # Validate station matches
         if station != step_def.station:
@@ -332,6 +395,7 @@ class CookingEngine:
             "step_index": entry.step_index,
             "step_id": step_def.id,
             "result": result_str,
+            "chosen_option_id": chosen_option_id,
             "correct_option": correct_option_text,
             "response_time_ms": response_time_ms,
         }

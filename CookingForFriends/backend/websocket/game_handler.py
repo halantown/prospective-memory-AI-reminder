@@ -6,7 +6,7 @@ import logging
 import time
 from fastapi import WebSocket, WebSocketDisconnect
 from websocket.connection_manager import manager, ws_pump
-from engine.timeline import run_timeline, cancel_timeline
+from engine.timeline import run_timeline, cancel_timeline, pause_timeline, resume_timeline
 from engine.cooking_engine import CookingEngine
 from engine.game_time import start_game_time, unfreeze_game_time, get_current_game_time
 from engine.pm_session import run_pm_session, signal_pipeline_complete
@@ -21,7 +21,35 @@ _cooking_engines: dict[str, CookingEngine] = {}
 _pm_session_tasks: dict[str, asyncio.Task] = {}
 
 
-def _ensure_pm_session_task(participant_id: str, task_order: str, send_fn, db_factory) -> None:
+def _pause_gameplay_for_pm(participant_id: str, block_number: int) -> None:
+    """Pause non-PM gameplay while a PM/fake trigger modal owns the UI."""
+    timeline_paused = pause_timeline(participant_id, block_number)
+    cooking = _cooking_engines.get(participant_id)
+    if cooking:
+        cooking.pause()
+    logger.info(
+        "[GAME_HANDLER] Gameplay paused for PM pipeline: participant=%s timeline=%s cooking=%s",
+        participant_id,
+        timeline_paused,
+        cooking is not None,
+    )
+
+
+def _resume_gameplay_after_pm(participant_id: str, block_number: int) -> None:
+    """Resume non-PM gameplay after the PM/fake trigger pipeline completes."""
+    cooking = _cooking_engines.get(participant_id)
+    if cooking:
+        cooking.resume()
+    timeline_resumed = resume_timeline(participant_id, block_number)
+    logger.info(
+        "[GAME_HANDLER] Gameplay resumed after PM pipeline: participant=%s timeline=%s cooking=%s",
+        participant_id,
+        timeline_resumed,
+        cooking is not None,
+    )
+
+
+def _ensure_pm_session_task(participant_id: str, task_order: str, block_number: int, send_fn, db_factory) -> None:
     """Start or resume the PM scheduler if this process is not already running one."""
     existing = _pm_session_tasks.get(participant_id)
     if existing and not existing.done():
@@ -29,7 +57,13 @@ def _ensure_pm_session_task(participant_id: str, task_order: str, send_fn, db_fa
         return
 
     pm_task = asyncio.create_task(
-        run_pm_session(participant_id, task_order, send_fn, db_factory)
+        run_pm_session(
+            participant_id,
+            task_order,
+            send_fn,
+            db_factory,
+            on_pipeline_start=lambda: _pause_gameplay_for_pm(participant_id, block_number),
+        )
     )
     _pm_session_tasks[participant_id] = pm_task
     logger.info(f"[GAME_HANDLER] PM session task ensured for {participant_id} (order={task_order})")
@@ -138,7 +172,7 @@ async def handle_game_ws(
                     logger.info(f"[GAME_HANDLER] CookingEngine already running for {participant_id}, skipping restart")
 
                 try:
-                    _ensure_pm_session_task(participant_id, task_order, send_event, db_factory)
+                    _ensure_pm_session_task(participant_id, task_order, block_number, send_event, db_factory)
                 except Exception as pe:
                     logger.error(f"[GAME_HANDLER] PM session resume failed on reconnect: {pe}")
             else:
@@ -232,9 +266,9 @@ async def _ws_receiver(
                 elif msg_type == "pm_confidence_rated":
                     await _handle_pm_confidence_rated(participant_id, data, db_factory)
                 elif msg_type == "pm_action_complete":
-                    await _handle_pm_action_complete(participant_id, data, db_factory)
+                    await _handle_pm_action_complete(participant_id, block_number, data, db_factory)
                 elif msg_type == "fake_trigger_ack":
-                    await _handle_fake_trigger_ack(participant_id, data, db_factory)
+                    await _handle_fake_trigger_ack(participant_id, block_number, data, db_factory)
                 elif msg_type == "phone_unlock":
                     await _handle_interaction(participant_id, block_number, "phone_unlock", data, db_factory)
                 elif msg_type == "phone_action":
@@ -380,7 +414,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
 
     # Start the PM session task
     try:
-        _ensure_pm_session_task(participant_id, task_order, send_fn, db_factory)
+        _ensure_pm_session_task(participant_id, task_order, block_number, send_fn, db_factory)
     except Exception as e:
         logger.error(f"[GAME_HANDLER] PM session start failed: {e}")
 
@@ -424,15 +458,28 @@ async def _handle_cooking_action(participant_id, block_number, data, db_factory)
     chosen_option_id = data.get("chosen_option_id", "")
     chosen_option_text = data.get("chosen_option_text", "")
     station = data.get("station", "")
+    client_step_index = data.get("step_index")
+    if not isinstance(client_step_index, int):
+        client_step_index = None
     ts = data.get("timestamp", time.time())
 
-    await cooking.handle_action(
+    result = await cooking.handle_action(
         dish_id=dish_id,
         chosen_option_id=chosen_option_id,
         chosen_option_text=chosen_option_text,
         station=station,
         timestamp=ts,
+        client_step_index=client_step_index,
     )
+    if result.get("result") in {"no_active_step", "wrong_station", "stale_step"}:
+        logger.warning(
+            "[GAME_HANDLER] rejected cooking_action participant=%s dish=%s client_step=%s station=%s result=%s",
+            participant_id,
+            dish_id,
+            client_step_index,
+            station,
+            result,
+        )
 
     # Also log as interaction for general event tracking
     await _handle_interaction(participant_id, block_number, "cooking_action", data, db_factory)
@@ -546,7 +593,7 @@ async def _handle_pm_confidence_rated(participant_id: str, data: dict, db_factor
     })
 
 
-async def _handle_pm_action_complete(participant_id: str, data: dict, db_factory):
+async def _handle_pm_action_complete(participant_id: str, block_number: int, data: dict, db_factory):
     """Record action animation completion; resume cooking and signal PM pipeline."""
     task_id = data.get("task_id")
     if not task_id:
@@ -576,16 +623,13 @@ async def _handle_pm_action_complete(participant_id: str, data: dict, db_factory
             unfreeze_game_time(p)
             await db.commit()
 
-    # Resume cooking engine
-    cooking = _cooking_engines.get(participant_id)
-    if cooking:
-        cooking.resume()
+    _resume_gameplay_after_pm(participant_id, block_number)
 
     # Advance PM session to next trigger
     signal_pipeline_complete(participant_id)
 
 
-async def _handle_fake_trigger_ack(participant_id: str, data: dict, db_factory):
+async def _handle_fake_trigger_ack(participant_id: str, block_number: int, data: dict, db_factory):
     """Acknowledge a fake trigger and resume the game."""
     trigger_type = data.get("trigger_type", "")
     async with db_factory() as db:
@@ -613,9 +657,7 @@ async def _handle_fake_trigger_ack(participant_id: str, data: dict, db_factory):
             unfreeze_game_time(p)
             await db.commit()
 
-    cooking = _cooking_engines.get(participant_id)
-    if cooking:
-        cooking.resume()
+    _resume_gameplay_after_pm(participant_id, block_number)
 
     signal_pipeline_complete(participant_id)
 

@@ -97,14 +97,21 @@ async def _get_resume_state(session_id: str, db_factory) -> tuple[int, float | N
     return len(trigger_times), max(trigger_times) if trigger_times else None
 
 
-async def run_pm_session(session_id: str, task_order: str, send_fn, db_factory):
+async def run_pm_session(
+    session_id: str,
+    task_order: str,
+    send_fn,
+    db_factory,
+    on_pipeline_start=None,
+):
     """Drive the PM trigger schedule for one session as a background task.
 
     For each TRIGGER_SCHEDULE entry:
       1. Wait delay_after_previous_s of game time (frozen time excluded)
       2. Freeze game time
-      3. Fire pm_trigger WS event (real or fake)
-      4. Wait for pipeline-complete signal (set by signal_pipeline_complete)
+      3. Pause non-PM gameplay via on_pipeline_start, if provided
+      4. Fire pm_trigger WS event (real or fake)
+      5. Wait for pipeline-complete signal (set by signal_pipeline_complete)
 
     After all 6 entries: wait SESSION_END_DELAY game seconds, send session_end.
     """
@@ -157,6 +164,17 @@ async def run_pm_session(session_id: str, task_order: str, send_fn, db_factory):
                 freeze_game_time(participant)
                 game_time_fired = participant.game_time_elapsed_s
                 await db.commit()
+
+            if on_pipeline_start:
+                try:
+                    maybe_awaitable = on_pipeline_start()
+                    if asyncio.iscoroutine(maybe_awaitable):
+                        await maybe_awaitable
+                except Exception:
+                    logger.exception(
+                        "[PM_SESSION] on_pipeline_start failed (session=%s)",
+                        session_id,
+                    )
 
             ev.clear()
 

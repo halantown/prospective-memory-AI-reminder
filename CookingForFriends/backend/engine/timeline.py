@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from config import DATA_DIR, MESSAGE_COOLDOWN_S
 from engine.execution_window import start_window
@@ -13,6 +14,16 @@ logger = logging.getLogger(__name__)
 
 # Active timelines: key = "participant_id:block_number"
 _active_timelines: dict[str, asyncio.Task] = {}
+
+
+@dataclass
+class TimelineControl:
+    task: asyncio.Task | None = None
+    paused_at: float | None = None
+    total_paused_s: float = 0.0
+
+
+_timeline_controls: dict[str, TimelineControl] = {}
 
 # Per-participant unanswered chat tracking for nudge mechanism
 # key = participant_id, value = set of unanswered message_ids
@@ -36,6 +47,56 @@ def set_db_factory(factory):
 
 def _timeline_key(participant_id: str, block_number: int) -> str:
     return f"{participant_id}:{block_number}"
+
+
+def _timeline_elapsed(start_time: float, control: TimelineControl) -> float:
+    """Return timeline seconds with explicit pause intervals excluded."""
+    now = control.paused_at if control.paused_at is not None else time.time()
+    return max(0.0, now - start_time - control.total_paused_s)
+
+
+async def _sleep_timeline(seconds: float, control: TimelineControl) -> None:
+    """Sleep for unpaused timeline seconds."""
+    remaining = max(0.0, seconds)
+    last = time.time()
+
+    while remaining > 0:
+        if control.paused_at is not None:
+            await asyncio.sleep(0.2)
+            last = time.time()
+            continue
+
+        await asyncio.sleep(min(1.0, remaining))
+        now = time.time()
+        if control.paused_at is None:
+            remaining -= now - last
+        else:
+            remaining -= max(0.0, control.paused_at - last)
+        last = now
+
+
+def pause_timeline(participant_id: str, block_number: int) -> bool:
+    """Pause a running timeline so phone/HUD events stop during PM overlays."""
+    key = _timeline_key(participant_id, block_number)
+    control = _timeline_controls.get(key)
+    if not control or not control.task or control.task.done():
+        return False
+    if control.paused_at is None:
+        control.paused_at = time.time()
+        logger.info(f"[TIMELINE] Paused: {key}")
+    return True
+
+
+def resume_timeline(participant_id: str, block_number: int) -> bool:
+    """Resume a previously paused timeline."""
+    key = _timeline_key(participant_id, block_number)
+    control = _timeline_controls.get(key)
+    if not control or control.paused_at is None:
+        return False
+    control.total_paused_s += time.time() - control.paused_at
+    control.paused_at = None
+    logger.info(f"[TIMELINE] Resumed: {key}")
+    return True
 
 
 def load_timeline(block_number: int, condition: str, **kwargs) -> dict:
@@ -98,6 +159,7 @@ async def run_timeline(
     # Cancel any existing timeline for this slot
     if key in _active_timelines:
         old_task = _active_timelines.pop(key)
+        _timeline_controls.pop(key, None)
         old_task.cancel()
         try:
             await old_task
@@ -121,11 +183,13 @@ async def run_timeline(
     duration = timeline.get("duration_seconds", 600)
     logger.info(f"[TIMELINE] Loaded timeline for {key}: {len(events)} events, {duration}s duration")
 
+    control = TimelineControl()
+
     async def _run():
         try:
             start_time = block_start_time if block_start_time else time.time()
             # How far into the block are we already?  0 on first start, >0 on reconnect.
-            resume_offset = time.time() - start_time if block_start_time else 0.0
+            resume_offset = _timeline_elapsed(start_time, control) if block_start_time else 0.0
             logger.info(f"[TIMELINE] _run started: {key} ({len(events)} events, {duration}s, resume_offset={resume_offset:.1f}s)")
 
             # Send contacts list for phone chat UI
@@ -143,7 +207,7 @@ async def run_timeline(
             # Track last emitted game-clock tick
             last_tick_num = -1
 
-            # Track last phone message send time for runtime cooldown
+            # Track last phone message send time in timeline seconds for runtime cooldown
             last_msg_sent_at: float = 0.0
             # Initialize unanswered chat tracking for nudge mechanism
             _unanswered_chats[participant_id] = set()
@@ -156,7 +220,7 @@ async def run_timeline(
                     break
 
                 t = event.get("t", 0)
-                elapsed = time.time() - start_time
+                elapsed = _timeline_elapsed(start_time, control)
 
                 # On reconnect, skip events whose scheduled time has already passed.
                 # phone_message events in particular must not be re-delivered; other
@@ -165,7 +229,7 @@ async def run_timeline(
                     logger.debug(f"[TIMELINE] Skipping past event t={t}s (resume_offset={resume_offset:.1f}s): {event.get('type')}")
                     continue
 
-                # While waiting for next event, emit time_tick every 10 real seconds
+                # While waiting for next event, emit time_tick every 10 timeline seconds
                 while t - elapsed > 1.0:
                     tick_num = int(elapsed) // 10
                     if tick_num != last_tick_num:
@@ -181,12 +245,12 @@ async def run_timeline(
                             })
                         except Exception as e:
                             logger.error(f"[TIMELINE] Failed to send time_tick: {e}")
-                    await asyncio.sleep(1.0)
-                    elapsed = time.time() - start_time
+                    await _sleep_timeline(1.0, control)
+                    elapsed = _timeline_elapsed(start_time, control)
 
                 wait = t - elapsed
                 if wait > 0:
-                    await asyncio.sleep(wait)
+                    await _sleep_timeline(wait, control)
 
                 event_type = event.get("type", "unknown")
                 event_data = dict(event.get("data", {}))  # shallow copy to avoid mutating template
@@ -207,10 +271,12 @@ async def run_timeline(
                 if event_type == "phone_message":
                     # Runtime cooldown: wait if previous message was sent too recently
                     if MESSAGE_COOLDOWN_S > 0 and last_msg_sent_at > 0:
-                        cooldown_remaining = MESSAGE_COOLDOWN_S - (time.time() - last_msg_sent_at)
+                        cooldown_remaining = MESSAGE_COOLDOWN_S - (
+                            _timeline_elapsed(start_time, control) - last_msg_sent_at
+                        )
                         if cooldown_remaining > 0:
                             logger.debug(f"[TIMELINE] Message cooldown: waiting {cooldown_remaining:.1f}s")
-                            await asyncio.sleep(cooldown_remaining)
+                            await _sleep_timeline(cooldown_remaining, control)
 
                     message_id = event_data.get("message_id", "")
                     msg = get_message(block_number, message_id)
@@ -224,7 +290,7 @@ async def run_timeline(
                             )
                         try:
                             await send_fn("phone_message", ws_payload)
-                            last_msg_sent_at = time.time()
+                            last_msg_sent_at = _timeline_elapsed(start_time, control)
                             # Track unanswered chats for nudge
                             if msg.get("channel") == "chat":
                                 _unanswered_chats.setdefault(participant_id, set()).add(message_id)
@@ -319,9 +385,9 @@ async def run_timeline(
                     logger.error(f"[TIMELINE] Failed to send {event_type}: {e}")
 
             # Wait for remaining duration, continuing to emit time_ticks
-            remaining = duration - (time.time() - start_time)
+            remaining = duration - _timeline_elapsed(start_time, control)
             while remaining > 0:
-                elapsed = time.time() - start_time
+                elapsed = _timeline_elapsed(start_time, control)
                 tick_num = int(elapsed) // 10
                 if tick_num != last_tick_num:
                     last_tick_num = tick_num
@@ -336,8 +402,8 @@ async def run_timeline(
                         })
                     except Exception as e:
                         logger.error(f"[TIMELINE] Failed to send time_tick (tail): {e}")
-                await asyncio.sleep(1.0)
-                remaining = duration - (time.time() - start_time)
+                await _sleep_timeline(1.0, control)
+                remaining = duration - _timeline_elapsed(start_time, control)
 
             # Send block_end only if not already fired as part of timeline events
             if not any(e.get("type") == "block_end" for e in events):
@@ -355,6 +421,9 @@ async def run_timeline(
 
     def _on_task_done(t: asyncio.Task):
         """Log if the timeline task failed with an unhandled exception."""
+        if _active_timelines.get(key) is t:
+            _active_timelines.pop(key, None)
+            _timeline_controls.pop(key, None)
         if t.cancelled():
             return
         exc = t.exception()
@@ -362,8 +431,10 @@ async def run_timeline(
             logger.error(f"[TIMELINE] Task failed for {key}: {exc}", exc_info=exc)
 
     task = asyncio.create_task(_run())
+    control.task = task
     task.add_done_callback(_on_task_done)
     _active_timelines[key] = task
+    _timeline_controls[key] = control
     return task
 
 
@@ -493,6 +564,7 @@ def cancel_timeline(participant_id: str, block_number: int):
     key = _timeline_key(participant_id, block_number)
     if key in _active_timelines:
         task = _active_timelines.pop(key)
+        _timeline_controls.pop(key, None)
         task.cancel()
         logger.info(f"Timeline cancelled: {key}")
 
@@ -503,6 +575,7 @@ def cancel_all():
     for key, task in _active_timelines.items():
         task.cancel()
     _active_timelines.clear()
+    _timeline_controls.clear()
     cancel_all_windows()
     cancel_activity_watchers()
 
