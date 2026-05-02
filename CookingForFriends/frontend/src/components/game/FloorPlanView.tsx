@@ -57,7 +57,7 @@ const ROOM_DEFS: Record<FloorRoom, RoomDef> = {
   kitchen: {
     id: 'kitchen', label: 'Kitchen', emoji: '🍳',
     cx: 21, cy: 18,
-    x: 0, y: 0, w: 44, h: 41,
+    x: 0, y: 0, w: 49.5, h: 41,
   },
   dining_hall: {
     id: 'dining_hall', label: 'Dining Hall', emoji: '🍽️',
@@ -138,9 +138,11 @@ const ROBOT_FOLLOW_DELAY_MS = 2200
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function FloorPlanView() {
+  const viewRef = useRef<HTMLDivElement>(null)
   const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(null)
   const [charRoom, setCharRoom] = useState<FloorRoom>('living_room')
   const [isMoving, setIsMoving] = useState(false)
+  const [stationPopupAnchor, setStationPopupAnchor] = useState<{ x: number; y: number } | null>(null)
 
   // Robot state: follows user with a delay
   const [robotRoom, setRobotRoom] = useState<FloorRoom>('living_room')
@@ -150,6 +152,7 @@ export default function FloorPlanView() {
   // Robot speech from game store
   const robotState = useGameStore((s) => s.robot)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
+  const activeStation = useGameStore((s) => s.activeStation)
 
   const isZoomed = currentRoom !== null
 
@@ -204,8 +207,29 @@ export default function FloorPlanView() {
 
   // Station popup belongs only to the kitchen view.
   useEffect(() => {
-    if (currentRoom !== 'kitchen') setActiveStation(null)
+    if (currentRoom !== 'kitchen') {
+      setActiveStation(null)
+      setStationPopupAnchor(null)
+    }
   }, [currentRoom, setActiveStation])
+
+  useEffect(() => {
+    if (!activeStation) setStationPopupAnchor(null)
+  }, [activeStation])
+
+  const openStationPopup = useCallback((event: React.MouseEvent<HTMLElement>) => {
+    const rect = viewRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setStationPopupAnchor({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    })
+  }, [])
+
+  const handleGameAreaMouseLeave = useCallback(() => {
+    setActiveStation(null)
+    setStationPopupAnchor(null)
+  }, [setActiveStation])
 
   // Compute clamped CSS transform: transform-origin 0 0, translate then scale.
   // Formula: tx = clamp((0.5 − S·cx/100)·100, (1−S)·100, 0)
@@ -233,7 +257,11 @@ export default function FloorPlanView() {
   const robotDef = ROOM_DEFS[robotRoom]
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-slate-950 select-none">
+    <div
+      ref={viewRef}
+      className="absolute inset-0 overflow-hidden bg-slate-950 select-none"
+      onMouseLeave={handleGameAreaMouseLeave}
+    >
 
       {/* ── Floor plan layer (zoomable) ── */}
       <div
@@ -265,7 +293,7 @@ export default function FloorPlanView() {
               {/* Sprite layer — transparent placeholders until PNGs added */}
               <KitchenFurniture />
               {/* Interactive hotspot layer — only when zoomed into kitchen */}
-              {inKitchen && <KitchenRoom isActive={true} />}
+              {inKitchen && <KitchenRoom isActive={true} onStationOpen={openStationPopup} />}
             </div>
           )
         })()}
@@ -384,8 +412,8 @@ export default function FloorPlanView() {
         </AnimatePresence>
       </div>
 
-      {/* Kitchen station popup is rendered at game-area level so it is centered in the whole play field. */}
-      {currentRoom === 'kitchen' && <KitchenStationOverlay />}
+      {/* Kitchen station popup is rendered at game-area level so it can follow the hotspot click position. */}
+      {currentRoom === 'kitchen' && <KitchenStationOverlay anchor={stationPopupAnchor} />}
 
       {/* ── Robot speech bubble (viewport overlay so it's always readable) ── */}
       <AnimatePresence>

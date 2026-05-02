@@ -118,9 +118,12 @@ function DishRecipeCard({
   activeStep: ActiveCookingStep | undefined
   waitStep: CookingWaitStep | undefined
 }) {
-  const isActive = dish.phase !== 'idle' && dish.phase !== 'served'
+  const hasActiveAction = Boolean(activeStep)
+  const isStarted = dish.phase !== 'idle' && dish.phase !== 'served'
   const isDone = dish.phase === 'served'
+  const hasLiveStep = Boolean(activeStep || waitStep)
   const currentIndex = activeStep?.stepIndex ?? waitStep?.stepIndex ?? dish.currentStepIndex
+  const currentResult = dish.stepResults.find(r => r.stepIndex === currentIndex)
   const previousStep = currentIndex > 0 ? dish.steps[currentIndex - 1] : undefined
   const currentStep = activeStep
     ? { label: activeStep.stepLabel, description: activeStep.stepDescription }
@@ -133,14 +136,15 @@ function DishRecipeCard({
 
   return (
     <div className={`rounded-lg border p-2 flex flex-col min-h-0 overflow-hidden ${
-      isActive ? 'border-cooking-400/50 bg-slate-800/80' :
+      hasActiveAction ? 'border-cooking-400/50 bg-slate-800/80' :
+      isStarted ? 'border-slate-600/45 bg-slate-800/45' :
       isDone ? 'border-slate-600/30 bg-slate-800/40' :
       'border-slate-700/40 bg-slate-800/30'
     }`}>
       {/* Dish header */}
       <div className="flex items-center gap-1.5 mb-1.5 shrink-0">
         <span className="text-xs">{dish.emoji}</span>
-        <span className={`text-[11px] font-semibold truncate ${isActive ? 'text-slate-100' : 'text-slate-400'}`}>
+        <span className={`text-[11px] font-semibold truncate ${hasActiveAction ? 'text-slate-100' : 'text-slate-400'}`}>
           {dish.label}
         </span>
         {isDone && <span className="text-[9px] text-green-400 ml-auto shrink-0">✓</span>}
@@ -165,11 +169,11 @@ function DishRecipeCard({
             <>
               <StepRow
                 label={currentStep.label}
-                isCurrent={isActive}
-                isCompleted={false}
-                result={dish.stepResults.find(r => r.stepIndex === currentIndex)}
+                isCurrent={hasActiveAction}
+                isCompleted={!hasLiveStep && Boolean(currentResult)}
+                result={currentResult}
               />
-              {isActive && (
+              {hasActiveAction && (
                 <div className="rounded-md bg-slate-950/70 border border-slate-700/60 px-2 py-1.5">
                   <p className="text-[10px] leading-snug text-slate-200">
                     {currentStep.description || 'Check this step carefully.'}
@@ -219,7 +223,6 @@ function StepRow({
     }`}>
       {resultIcon && <span className="text-[11px]">{resultIcon}</span>}
       {isCurrent && !resultIcon && <span className="text-[11px]">▶</span>}
-      {!isCurrent && !isCompleted && !resultIcon && <span className="text-[11px] text-slate-600">○</span>}
       <span className="truncate">{label}</span>
     </div>
   )

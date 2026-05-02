@@ -20,7 +20,6 @@ export default function NotificationBanner() {
   const setActiveContactId = useGameStore((s) => s.setActiveContactId)
   const setActivePhoneTab = useGameStore((s) => s.setActivePhoneTab)
   const wsSend = useGameStore((s) => s.wsSend)
-  const hasKitchenTimer = useGameStore((s) => s.kitchenTimerQueue.length > 0)
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -62,9 +61,9 @@ export default function NotificationBanner() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-          className={`absolute ${hasKitchenTimer ? 'top-[104px]' : 'top-[52px]'} left-3 right-3 z-30
+          className="absolute top-[52px] left-3 right-3 z-30
                      rounded-2xl bg-white shadow-2xl shadow-black/60
-                     border border-white/20 cursor-pointer overflow-hidden`}
+                     border border-white/20 cursor-pointer overflow-hidden"
           onClick={handleClick}
         >
           {/* Countdown bar — shrinks from full width to 0 over BANNER_DURATION */}

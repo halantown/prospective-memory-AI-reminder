@@ -34,10 +34,15 @@ function stationMatches(clicked: KitchenStationId, active: KitchenStationId) {
   return clicked === active
 }
 
+function cookingStepKey(step: ActiveCookingStep) {
+  return `${step.dishId}:${step.stepIndex}`
+}
+
 /**
  * Station hotspot positions as % of the kitchen bounding box.
- * Kitchen box = ROOM_DEFS.kitchen: x:0, y:0, w:44%, h:41% of floorplan.png (1248×912px).
- * Formula: left% = img_x / (0.44×1248=549), top% = img_y / (0.41×912=374)
+ * Kitchen box = ROOM_DEFS.kitchen: x:0, y:0, w:49.5%, h:41% of floorplan.png (1248×912px).
+ * Formula: left% = img_x / (0.495×1248=617.76), top% = img_y / (0.41×912=374)
+ * Left/width values scaled from w=44 by factor 44/49.5 = 8/9 to include fridge.
  *
  *  Floorplan furniture layout (top-down):
  *   ┌ stove+hood ┬──── prep/cutting zone ────┬ spice ┬ fridge ┐  ← top counter
@@ -47,21 +52,21 @@ function stationMatches(clicked: KitchenStationId, active: KitchenStationId) {
  *   └────────────┴────────────────────────────┴────────────────┘
  */
 const STATION_POSITIONS: Record<KitchenStationId, { left: string; top: string; width: string; height: string }> = {
-  // Stove with range hood (all 4 burners) — measured: TL(35.1,14.6) BR(43.7,25.6), clickable area ×1.5
-  burner1:       { left: '32.75%', top: '12.25%', width: '13.5%', height: '16.5%' },
+  // Stove with range hood (all 4 burners) — measured TL(35.1,14.6) BR(43.7,25.6), ×1.5, scaled ×8/9
+  burner1:       { left: '29.1%', top: '12.25%', width: '12%',  height: '16.5%' },
   // burner2/3 hidden — same tile as burner1
-  burner2:       { left: '35%', top: '15%', width: '0%',  height: '0%'  },
-  burner3:       { left: '35%', top: '15%', width: '0%',  height: '0%'  },
-  // Prep zone: knife rack + rolling pin — measured: TL(61.2,17.3) BR(78.4,22.6), height ×1.5 centered
-  cutting_board: { left: '61%', top: '15.5%', width: '17%', height: '9%'  },
-  // Spice shelf — measured: TL(87.4,12.9) BR(96.0,24.8)
-  spice_rack:    { left: '87%', top: '13%', width: '9%',  height: '12%' },
-  // Fridge — TL(96.2,6.0), right edge extends beyond kitchen div (estimate)
-  fridge:        { left: '95%', top: '5%',  width: '5%',  height: '28%' },
-  // Oven — measured: TL(17.2,25.6) BR(25.9,33.1), clickable area ×1.5
-  oven:          { left: '14.75%', top: '24%', width: '13.5%', height: '12%' },
-  // Kitchen island / plating table — measured: TL(57.5,51.2) BR(73.6,70.3)
-  plating_area:  { left: '58%', top: '51%', width: '16%', height: '19%' },
+  burner2:       { left: '31%',   top: '15%',    width: '0%',   height: '0%'  },
+  burner3:       { left: '31%',   top: '15%',    width: '0%',   height: '0%'  },
+  // Prep zone — measured TL(61.2,17.3) BR(78.4,22.6), height ×1.5 centered, scaled ×8/9
+  cutting_board: { left: '54.2%', top: '15.5%',  width: '15.1%', height: '9%'  },
+  // Spice shelf — measured TL(87.4,12.9) BR(96.0,24.8), scaled ×8/9
+  spice_rack:    { left: '77.3%', top: '13%',    width: '8%',   height: '12%' },
+  // Fridge — measured TL(96.2,6.0), scaled ×8/9; right edge now fits in w=49.5
+  fridge:        { left: '84.4%', top: '5%',     width: '9%',   height: '28%' },
+  // Oven — measured TL(17.2,25.6) BR(25.9,33.1), ×1.5, scaled ×8/9
+  oven:          { left: '13.1%', top: '24%',    width: '12%',  height: '12%' },
+  // Kitchen island / plating table — measured TL(57.5,51.2) BR(73.6,70.3), scaled ×8/9
+  plating_area:  { left: '51.5%', top: '51%',    width: '14.2%', height: '19%' },
 }
 
 /** Feedback flash types */
@@ -70,7 +75,13 @@ type FeedbackType = 'correct' | 'wrong' | 'missed' | null
 /** Set to true to show live mouse coordinates for hotspot calibration */
 const DEBUG_COORDS = true
 
-export default function KitchenRoom({ isActive }: { isActive: boolean }) {
+export default function KitchenRoom({
+  isActive,
+  onStationOpen,
+}: {
+  isActive: boolean
+  onStationOpen?: (event: React.MouseEvent<HTMLElement>) => void
+}) {
   const activeStation = useGameStore((s) => s.activeStation)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
@@ -93,12 +104,17 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
     return () => clearTimeout(timer)
   }, [feedback.type])
 
-  const handleStationClick = useCallback((station: KitchenStationId) => {
+  const handleStationClick = useCallback((station: KitchenStationId, event: React.MouseEvent<HTMLElement>) => {
     if (!isActive) return
     const hasActiveStep = activeCookingSteps.some(step => stationMatches(station, step.station))
     if (!hasActiveStep) return
-    setActiveStation(activeStation === station ? null : station)
-  }, [isActive, activeStation, activeCookingSteps, setActiveStation])
+    if (activeStation === station) {
+      setActiveStation(null)
+      return
+    }
+    onStationOpen?.(event)
+    setActiveStation(station)
+  }, [isActive, activeStation, activeCookingSteps, onStationOpen, setActiveStation])
 
   return (
     <div
@@ -130,7 +146,7 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
                 ${isActive ? 'cursor-pointer' : 'cursor-default pointer-events-none'}
               `}
               style={pos}
-              onClick={() => handleStationClick(stationId)}
+              onClick={(event) => handleStationClick(stationId, event)}
             >
               <div className="absolute bottom-0.5 left-1 text-[9px] text-white font-bold whitespace-nowrap drop-shadow">
                 {info.emoji} {info.label}
@@ -174,14 +190,30 @@ export default function KitchenRoom({ isActive }: { isActive: boolean }) {
 }
 
 /** Full-game overlay for station distractor options. Rendered by FloorPlanView, not inside the kitchen box. */
-export function KitchenStationOverlay() {
+export function KitchenStationOverlay({
+  anchor,
+}: {
+  anchor: { x: number; y: number } | null
+}) {
   const activeStation = useGameStore((s) => s.activeStation)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
   const wsSend = useGameStore((s) => s.wsSend)
+  const [submittedStepKeys, setSubmittedStepKeys] = useState<Set<string>>(() => new Set())
+
+  useEffect(() => {
+    setSubmittedStepKeys((prev) => {
+      const activeKeys = new Set(activeCookingSteps.map(cookingStepKey))
+      const next = new Set([...prev].filter(key => activeKeys.has(key)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [activeCookingSteps])
 
   const handleOptionClick = useCallback((step: ActiveCookingStep, option: CookingStepOption) => {
     if (!wsSend) return
+    const key = cookingStepKey(step)
+    if (submittedStepKeys.has(key)) return
+    setSubmittedStepKeys(prev => new Set(prev).add(key))
     wsSend({
       type: 'cooking_action',
       data: {
@@ -194,18 +226,21 @@ export function KitchenStationOverlay() {
       },
     })
     setActiveStation(null)
-  }, [wsSend, setActiveStation])
+  }, [wsSend, submittedStepKeys, setActiveStation])
 
   const activeStepForStation = useMemo(() => {
     if (!activeStation) return undefined
-    return activeCookingSteps.find(s => stationMatches(activeStation, s.station))
-  }, [activeStation, activeCookingSteps])
+    return activeCookingSteps.find(s =>
+      stationMatches(activeStation, s.station) && !submittedStepKeys.has(cookingStepKey(s))
+    )
+  }, [activeStation, activeCookingSteps, submittedStepKeys])
 
   return (
     <AnimatePresence>
       {activeStation && (
         <StationPopup
           station={activeStation}
+          anchor={anchor}
           activeStep={activeStepForStation}
           onOptionClick={handleOptionClick}
           onClose={() => setActiveStation(null)}
@@ -218,34 +253,39 @@ export function KitchenStationOverlay() {
 /** Popup showing distractor options for active cooking step */
 function StationPopup({
   station,
+  anchor,
   activeStep,
   onOptionClick,
   onClose,
 }: {
   station: KitchenStationId
+  anchor: { x: number; y: number } | null
   activeStep: ActiveCookingStep | undefined
   onOptionClick: (step: ActiveCookingStep, option: CookingStepOption) => void
   onClose: () => void
 }) {
   const info = STATION_INFO[station]
+  const x = anchor?.x ?? 24
+  const y = anchor?.y ?? 24
 
   return (
     <motion.div
-      className="absolute inset-0 z-[80] flex items-center justify-center p-4"
+      className="absolute inset-0 z-[80] pointer-events-none"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-
       {/* Popup card */}
       <motion.div
-        className="relative bg-slate-800 border border-slate-600 rounded-xl shadow-2xl p-4 min-w-[220px] max-w-[300px]"
-        initial={{ scale: 0.9, y: 10 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.9, y: 10 }}
+        className="absolute pointer-events-auto bg-slate-800 border border-slate-600 rounded-xl shadow-2xl p-4 min-w-[220px] max-w-[300px]"
+        style={{
+          left: `clamp(12px, ${x + 14}px, calc(100% - 316px))`,
+          top: `clamp(12px, ${y - 24}px, calc(100% - 280px))`,
+        }}
+        initial={{ scale: 0.94, opacity: 0, y: 6 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.94, opacity: 0, y: 6 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
       >
         {/* Header */}

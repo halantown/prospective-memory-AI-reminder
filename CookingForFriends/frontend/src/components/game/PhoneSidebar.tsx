@@ -8,7 +8,7 @@
  *    - ContactStrip (left avatar list)
  *    - ChatView (right chat thread)
  *    - PhoneTabBar (Chats / Recipe tabs)
- *    - KitchenTimerBanner (persistent cooking cue)
+ *    - Header kitchen timer pill (persistent cooking cue)
  *    - NotificationBanner (non-blocking, auto-dismiss)
  *    - RecipeTab (press-and-hold recipe viewer)
  */
@@ -20,11 +20,50 @@ import ContactStrip from './phone/ContactStrip'
 import ChatView from './phone/ChatView'
 import PhoneTabBar from './phone/PhoneTabBar'
 import RecipeTab from './phone/RecipeTab'
-import KitchenTimerBanner from './phone/KitchenTimerBanner'
 import NotificationBanner from './phone/NotificationBanner'
 import LockScreen from './phone/LockScreen'
+import type { ActiveCookingStep, DishId } from '../../types'
 
 const LOCK_TIMEOUT = 15_000
+
+const DISH_ICONS: Record<DishId, string> = {
+  spaghetti: '🍝',
+  steak: '🥩',
+  tomato_soup: '🍅',
+  roasted_vegetables: '🥕',
+}
+
+function buildHeaderTimerText(step: ActiveCookingStep) {
+  const label = step.stepLabel.trim()
+  if (!label) return 'Check kitchen!'
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}!`
+}
+
+function HeaderKitchenTimer() {
+  const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
+  const step = activeCookingSteps[0]
+
+  if (!step) {
+    return <div className="min-w-0 flex-1" aria-hidden="true" />
+  }
+
+  return (
+    <div className="min-w-0 flex-1 flex justify-center px-2">
+      <div
+        className="max-w-full inline-flex items-center gap-1.5 rounded-full
+                   bg-orange-500/15 border border-orange-400/35 px-2.5 py-1
+                   text-orange-200"
+      >
+        <span className="text-[13px] leading-none flex-shrink-0">
+          {DISH_ICONS[step.dishId] ?? '🍳'}
+        </span>
+        <span className="text-[11px] font-semibold leading-none truncate">
+          {buildHeaderTimerText(step)}
+        </span>
+      </div>
+    </div>
+  )
+}
 
 export default function PhoneSidebar() {
   const locked = useGameStore((s) => s.phoneLocked)
@@ -125,21 +164,20 @@ export default function PhoneSidebar() {
             </div>
           </div>
 
-          <KitchenTimerBanner />
-
           {/* Screen content */}
           {locked ? (
             <LockScreen gameClock={gameClock ?? '--:--'} onUnlock={handleUnlock} />
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* App header */}
-              <div className="px-4 py-1.5 border-b border-slate-700/50 flex items-center justify-between shrink-0">
-                <h3 className="text-white text-sm font-semibold">
+              <div className="px-4 py-1.5 border-b border-slate-700/50 grid grid-cols-[minmax(76px,auto)_1fr_auto] items-center gap-2 shrink-0">
+                <h3 className="text-white text-sm font-semibold truncate">
                   {activePhoneTab === 'chats' ? '💬 Chats' : '📖 Recipe'}
                 </h3>
+                <HeaderKitchenTimer />
                 <button
                   onClick={() => setPhoneLocked(true)}
-                  className="text-[10px] text-slate-400 hover:text-white transition-colors px-2 py-1 rounded"
+                  className="text-[10px] text-slate-400 hover:text-white transition-colors px-2 py-1 rounded justify-self-end"
                 >
                   🔒 Lock
                 </button>

@@ -212,45 +212,50 @@ const initialPans: Pan[] = [
 
 /** Spaghetti recipe steps */
 const SPAGHETTI_STEPS: DishState['steps'] = [
-  { id: 'place_pot',    label: 'Place pot of water', station: 'burner1', description: 'Put a pot of water on the burner' },
-  { id: 'add_pasta',    label: 'Add pasta',          station: 'burner1', description: 'Add spaghetti to boiling water' },
-  { id: 'drain',        label: 'Drain pasta',        station: 'burner1', description: 'Drain the cooked pasta' },
-  { id: 'add_sauce',    label: 'Add sauce',          station: 'spice_rack', description: 'Add tomato sauce' },
-  { id: 'toss',         label: 'Toss pasta',         station: 'burner1', description: 'Toss pasta with sauce' },
-  { id: 'plate',        label: 'Plate spaghetti',    station: 'plating_area', description: 'Plate the finished spaghetti' },
+  { id: 'sp_pot_water', label: 'Prepare pot', station: 'burner1', description: 'Fill the large pot with water, add a pinch of salt.' },
+  { id: 'sp_wait_boil', label: 'Water heating', station: 'burner1', description: 'Waiting for water to boil.' },
+  { id: 'sp_add_pasta', label: 'Add pasta', station: 'burner1', description: 'Add spaghetti, cook for 9 minutes.' },
+  { id: 'sp_wait_cook', label: 'Pasta cooking', station: 'burner1', description: 'Pasta is cooking.' },
+  { id: 'sp_drain', label: 'Drain pasta', station: 'burner1', description: 'Drain and save a cup of pasta water.' },
+  { id: 'sp_add_sauce', label: 'Add sauce', station: 'spice_rack', description: 'Add pesto sauce.' },
+  { id: 'sp_toss', label: 'Toss pasta', station: 'burner1', description: 'Toss on low heat for 1 minute.' },
+  { id: 'sp_plate', label: 'Plate spaghetti', station: 'plating_area', description: 'Serve on the flat yellow plate.' },
 ]
 
 /** Steak recipe steps */
 const STEAK_STEPS: DishState['steps'] = [
-  { id: 'select_steak', label: 'Select steak',    station: 'fridge',        description: 'Get the steak from the fridge' },
-  { id: 'season',       label: 'Season steak',    station: 'cutting_board', description: 'Season and marinate the steak' },
-  { id: 'heat_pan',     label: 'Heat pan',        station: 'burner3',       description: 'Heat up the pan' },
-  { id: 'place_steak',  label: 'Place steak',     station: 'burner3',       description: 'Place steak in hot pan' },
-  { id: 'flip',         label: 'Flip steak',      station: 'burner3',       description: 'Flip to cook other side' },
-  { id: 'remove',       label: 'Remove steak',    station: 'burner3',       description: 'Remove from pan' },
-  { id: 'plate',        label: 'Plate steak',     station: 'plating_area',  description: 'Plate the finished steak' },
+  { id: 'st_select', label: 'Select steak', station: 'fridge', description: 'Get the ribeye steak.' },
+  { id: 'st_season', label: 'Season steak', station: 'cutting_board', description: 'Rub with salt, pepper, and olive oil.' },
+  { id: 'st_heat_pan', label: 'Heat pan', station: 'burner3', description: 'Heat the cast iron pan on high.' },
+  { id: 'st_place', label: 'Place steak', station: 'burner3', description: "Place steak and don't move it." },
+  { id: 'st_wait_side1', label: 'Cooking side 1', station: 'burner3', description: 'Searing first side.' },
+  { id: 'st_flip', label: 'Flip steak', station: 'burner3', description: 'Flip once, add a knob of butter.' },
+  { id: 'st_wait_side2', label: 'Cooking side 2', station: 'burner3', description: 'Searing second side.' },
+  { id: 'st_plate', label: 'Plate steak', station: 'plating_area', description: 'Rest on the warm black plate for 2 minutes.' },
 ]
 
 /** Tomato soup recipe steps */
 const SOUP_STEPS: DishState['steps'] = [
-  { id: 'select_ingr',  label: 'Select ingredients', station: 'fridge',        description: 'Get onion and tomatoes' },
-  { id: 'chop',         label: 'Chop vegetables',    station: 'cutting_board', description: 'Chop onion and tomato' },
-  { id: 'saute',        label: 'Sauté base',         station: 'burner2',       description: 'Sauté the chopped vegetables' },
-  { id: 'add_water',    label: 'Add water',           station: 'burner2',       description: 'Add water to the pot' },
-  { id: 'stir',         label: 'Stir soup',           station: 'burner2',       description: 'Give the soup a stir' },
-  { id: 'season',       label: 'Add seasoning',       station: 'spice_rack',    description: 'Season the soup' },
-  { id: 'ladle',        label: 'Ladle into bowl',     station: 'plating_area',  description: 'Ladle soup into serving bowl' },
+  { id: 'ts_select_ingredients', label: 'Select ingredients', station: 'fridge', description: 'Get tomatoes, onion, and garlic.' },
+  { id: 'ts_chop', label: 'Chop ingredients', station: 'cutting_board', description: 'Dice the onion, crush the garlic, quarter the tomatoes.' },
+  { id: 'ts_saute', label: 'Sauté base', station: 'burner2', description: 'Sauté onion and garlic on medium heat.' },
+  { id: 'ts_add_liquid', label: 'Add liquid', station: 'burner2', description: 'Add vegetable stock.' },
+  { id: 'ts_wait_simmer1', label: 'Simmering', station: 'burner2', description: 'Soup is simmering.' },
+  { id: 'ts_stir', label: 'Stir soup', station: 'burner2', description: 'Stir and reduce heat to low.' },
+  { id: 'ts_wait_simmer2', label: 'Continue simmering', station: 'burner2', description: 'Soup continues simmering.' },
+  { id: 'ts_season', label: 'Season soup', station: 'spice_rack', description: 'Add salt + basil.' },
+  { id: 'ts_plate', label: 'Serve soup', station: 'plating_area', description: 'Ladle into the deep red bowl.' },
 ]
 
 /** Roasted vegetables recipe steps */
 const VEGGIE_STEPS: DishState['steps'] = [
-  { id: 'select_veggies', label: 'Select vegetables',    station: 'fridge',        description: 'Get vegetables from the fridge' },
-  { id: 'chop',           label: 'Chop vegetables',      station: 'cutting_board', description: 'Chop the vegetables' },
-  { id: 'season',         label: 'Season vegetables',    station: 'spice_rack',    description: 'Add oil, salt, and herbs' },
-  { id: 'place_tray',     label: 'Place on baking tray', station: 'oven',          description: 'Arrange on baking tray' },
-  { id: 'set_oven',       label: 'Set oven temperature', station: 'oven',          description: 'Set oven to 200°C' },
-  { id: 'remove_tray',    label: 'Remove from oven',     station: 'oven',          description: 'Take the tray out of the oven' },
-  { id: 'plate',          label: 'Plate vegetables',     station: 'plating_area',  description: 'Plate the roasted vegetables' },
+  { id: 'rv_select_veggies', label: 'Select vegetables', station: 'fridge', description: 'Get bell peppers, zucchini, and tomatoes.' },
+  { id: 'rv_chop', label: 'Chop vegetables', station: 'cutting_board', description: 'Slice into thin rounds.' },
+  { id: 'rv_season', label: 'Season vegetables', station: 'spice_rack', description: 'Add olive oil + dried herbs.' },
+  { id: 'rv_oven_place', label: 'Place tray in oven', station: 'oven', description: 'Set oven to 200°C.' },
+  { id: 'rv_wait_oven', label: 'Oven cooking', station: 'oven', description: 'Vegetables are roasting.' },
+  { id: 'rv_oven_remove', label: 'Remove from oven', station: 'oven', description: 'Take out the tray and turn off oven.' },
+  { id: 'rv_plate', label: 'Plate vegetables', station: 'plating_area', description: 'Arrange on the white oval plate.' },
 ]
 
 function createInitialDishes(): Record<DishId, DishState> {

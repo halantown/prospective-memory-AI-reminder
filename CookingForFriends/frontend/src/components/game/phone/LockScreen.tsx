@@ -3,7 +3,20 @@
 import { useMemo, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
-import type { PhoneMessage, Contact } from '../../../types'
+import type { PhoneMessage, Contact, ActiveCookingStep, DishId } from '../../../types'
+
+const DISH_DISPLAY: Record<DishId, { label: string; emoji: string }> = {
+  spaghetti: { label: 'Spaghetti', emoji: '🍝' },
+  steak: { label: 'Steak', emoji: '🥩' },
+  tomato_soup: { label: 'Tomato Soup', emoji: '🍅' },
+  roasted_vegetables: { label: 'Roast Veg', emoji: '🥕' },
+}
+
+function formatAction(step: ActiveCookingStep) {
+  const label = step.stepLabel.trim()
+  if (!label) return 'Check kitchen!'
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}!`
+}
 
 export default function LockScreen({
   gameClock,
@@ -16,6 +29,7 @@ export default function LockScreen({
   const contacts = useGameStore((s) => s.contacts)
   const lockSystemNotifications = useGameStore((s) => s.lockSystemNotifications)
   const setActiveContactId = useGameStore((s) => s.setActiveContactId)
+  const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
 
   const contactPreviews = useMemo(() => {
     const grouped: Record<string, { contact: Contact | null; count: number; latest: PhoneMessage }> = {}
@@ -40,6 +54,13 @@ export default function LockScreen({
 
   const hasSysNotifs = lockSystemNotifications.length > 0
   const hasChatNotifs = contactPreviews.length > 0
+  const visibleCookingSteps = useMemo(
+    () => [...activeCookingSteps]
+      .sort((a, b) => b.activatedAt - a.activatedAt)
+      .slice(0, 2),
+    [activeCookingSteps],
+  )
+  const hasKitchenTimers = visibleCookingSteps.length > 0
 
   return (
     <div
@@ -55,7 +76,41 @@ export default function LockScreen({
       {/* Scrollable notifications area */}
       <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-0 scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
 
-      {/* Chat messages */}
+      {/* Kitchen timers — highest priority, shown first */}
+      {hasKitchenTimers && (
+        <div className="mb-2">
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex-1 h-px bg-orange-500/50" />
+            <span className="text-[13px] text-orange-300 font-medium uppercase tracking-widest whitespace-nowrap">
+              TIME SENSITIVE
+            </span>
+            <div className="flex-1 h-px bg-orange-500/50" />
+          </div>
+          <div className="flex flex-col gap-1">
+            {visibleCookingSteps.map((step) => {
+              const dish = DISH_DISPLAY[step.dishId] ?? { label: 'Dish', emoji: '🍽️' }
+              return (
+                <div
+                  key={`${step.dishId}-${step.stepIndex}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-2 rounded-xl px-2.5 py-2 border
+                             bg-orange-500/80 border-orange-300/50 text-white"
+                >
+                  <span className="text-base flex-shrink-0">{dish.emoji}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-orange-100/90 leading-none mb-1">
+                      KITCHEN TIMERS
+                    </div>
+                    <div className="text-[13px] font-semibold leading-tight truncate">
+                      {dish.label} — {formatAction(step)}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
       {hasChatNotifs && (
         <div className="mb-2">
           <div className="flex items-center gap-2 mb-1.5">
