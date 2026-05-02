@@ -666,3 +666,39 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 
 ### Follow-up Actions
 > - [ ] Apply same ALTER TABLE in production migration when ready to deploy
+
+---
+
+## INC-013 — Wait steps visually indistinguishable from actionable steps in Recipe tab
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-02 |
+| Severity     | P3 Low |
+| Status       | Resolved |
+| Reported by  | Observed during frontend testing (screenshot) |
+| Affected area| `frontend/src/components/game/phone/RecipeTab.tsx` — `DishRecipeCard` / `StepRow` |
+
+### Background
+> The Recipe tab shows each dish's step list with the current active step highlighted. Two types of "live" steps exist: **active steps** (require user interaction at a kitchen station) and **wait steps** (automatic background processes, e.g. oven cooking). Both were fed into `hasLiveStep = Boolean(activeStep || waitStep)`.
+
+### Incident Description
+> "Oven cooking" appeared highlighted in orange with a ▶ icon — identical to an actionable step — even though no user action was required (oven cooking is fully automatic). This confused the UI state: nothing was clickable in the kitchen, but the recipe card implied an action was pending.
+
+### Root Cause
+> `DishRecipeCard` computed `hasLiveStep = Boolean(activeStep || waitStep)` and passed `isCurrent={hasLiveStep}` to `StepRow`. `StepRow` applied the same orange `bg-cooking-900/40 border-cooking-400/40` style and `▶` icon regardless of whether the step was user-driven or automatic.
+
+### Contributing Factors
+> Wait steps and active steps were added at different times; both reused the same `isCurrent` styling path without a flag to distinguish them.
+
+### Fix
+> `RecipeTab.tsx`:
+> - Added `isWaiting = !activeStep && Boolean(waitStep)` flag in `DishRecipeCard`.
+> - Passed `isWaiting` prop to the current-step `StepRow`.
+> - `StepRow` now applies **indigo** background (`bg-indigo-900/40 border-indigo-400/40`) and **⏳** icon for wait steps, vs orange + ▶ for active steps.
+
+### Verification
+> TypeScript build clean (`npm run build`). Wait steps now display teal/indigo with ⏳; active steps retain orange with ▶.
+
+### Follow-up Actions
+> - [ ] Consider adding the same distinction to the LockScreen kitchen section (currently only shows active steps, not wait steps)
