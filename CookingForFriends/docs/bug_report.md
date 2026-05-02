@@ -141,3 +141,53 @@
   - [ ] 将 cooking timeline 从绝对时间触发改为 per-dish event chain，只用 timeline 控制每道菜第一步开始。
 
 5. 每道菜内部，前一步没完成（完成或timeout），下一步不激活。timeline只控制第一步的开始时间，后续步骤由完成事件触发。
+
+6. Game clock 超过 18:00 / 时间系统分层说明
+
+- 记录日期：2026-05-02
+- 状态：已修复（止血），架构层面仍需改进
+- 严重性：P2 中
+- 观察：游戏时钟在 elapsed=620s 时显示 18:02，block 运行期间可达 18:30。
+- 详见 `INCIDENT_LOG.md` INC-014。
+
+**三套时间系统（当前架构）**
+
+系统中现存三套完全独立的时间：
+
+| 套 | 位置 | 单位 | 用途 |
+|----|------|------|------|
+| 1. Event t 值 | `block_default.json` + `timeline.py` | 真实秒（0–900） | 控制何时触发剧情事件（phone message、steak、block_end） |
+| 2. Game Clock | `timeline.py` → `time_tick` → 前端 `GameClock` | 游戏分钟（17:00–18:00） | 纯 UI 显示，无逻辑依赖 |
+| 3. Cooking Countdown | 前端 `activeCookingSteps`，用 `Date.now()` 驱动 | 系统实时时钟 | 每道菜步骤的倒计时显示 |
+
+三套之间**没有数据依赖**。关系如下：
+
+```
+真实 elapsed（秒）
+    │
+    ├─ ÷10，min(60) ──→ game_clock "17:xx"     [系统2，纯显示，上限18:00]
+    │
+    └─ 直接比较 t 值  ──→ 触发 events           [系统1，逻辑，上限900s]
+
+系统3（cooking countdown）= Date.now() - step激活时间戳，完全独立
+```
+
+**为什么 `duration_seconds=900` 而时钟跨度是 600s？**
+
+- `duration_seconds=900`：block runner 需要运行 900 真实秒，因为 steak 的 `ongoing_task_event` 排到 t=880。
+- 游戏时钟跨度 600s：17:00→18:00 = 60 游戏分钟 × 10s/min。
+- 两者目的不同，但原来共用同一个 `tick_num` 推导，导致时钟越界。
+- 当前止血：`game_minutes = min(tick_num, 60)`。
+
+**根本问题**：`duration_seconds` 同时承担了两个语义——"block 运行多久"和"时钟走多久"——却没有被明确分离。
+
+**重构建议**：
+
+- [ ] 在 JSON schema 中加 `clock_end_seconds: 600` 字段，与 `duration_seconds` 解耦：
+  ```json
+  { "duration_seconds": 900, "clock_end_seconds": 600 }
+  ```
+  Python: `game_minutes = min(tick_num, timeline.get("clock_end_seconds", 600) // 10)`
+- [ ] 在 `timeline.py` 顶部加常量 `GAME_SECONDS_PER_MINUTE = 10`，让 `// 10` 有名字。
+- [ ] 考虑是否可以删除 `duration_seconds`：当 `block_end` 永远是最后一个事件时，tail loop 实际不执行，该字段是死代码。
+- [ ] 评估系统3（cooking countdown）是否应改为由 `time_tick` 驱动，以便 PM pause 时 cooking 倒计时也能暂停（目前 PM pause 期间 `Date.now()` 仍在走，步骤可能超时）。
