@@ -8,7 +8,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
-import type { DishId, DishState, CookingStepResult, ActiveCookingStep, CookingWaitStep } from '../../../types'
+import type { DishId, DishState, ActiveCookingStep, CookingWaitStep } from '../../../types'
 
 export default function RecipeTab() {
   const [isHolding, setIsHolding] = useState(false)
@@ -118,6 +118,7 @@ function DishRecipeCard({
   waitStep: CookingWaitStep | undefined
 }) {
   const hasActiveAction = Boolean(activeStep)
+  const isWaiting = !activeStep && Boolean(waitStep)
   const isStarted = dish.phase !== 'idle' && dish.phase !== 'served'
   const isDone = dish.phase === 'served'
   const hasLiveStep = Boolean(activeStep || waitStep)
@@ -161,7 +162,6 @@ function DishRecipeCard({
               label={previousStep.label}
               isCurrent={false}
               isCompleted={true}
-              result={dish.stepResults.find(r => r.stepIndex === currentIndex - 1)}
             />
           )}
           {currentStep && (
@@ -169,8 +169,8 @@ function DishRecipeCard({
               <StepRow
                 label={currentStep.label}
                 isCurrent={hasLiveStep}
+                isWaiting={isWaiting}
                 isCompleted={!hasLiveStep && Boolean(currentResult)}
-                result={currentResult}
               />
               {hasLiveStep && (
                 <div className="rounded-md bg-slate-950/70 border border-slate-700/60 px-2 py-1.5">
@@ -186,7 +186,6 @@ function DishRecipeCard({
               label={nextStep.label}
               isCurrent={false}
               isCompleted={false}
-              result={undefined}
             />
           )}
         </div>
@@ -198,30 +197,26 @@ function DishRecipeCard({
 function StepRow({
   label,
   isCurrent,
+  isWaiting = false,
   isCompleted,
-  result,
 }: {
   label: string
   isCurrent: boolean
+  isWaiting?: boolean
   isCompleted: boolean
-  result: CookingStepResult | undefined
 }) {
-  const resultIcon = result
-    ? result.result === 'correct' ? '✅'
-    : result.result === 'wrong' ? '❌'
-    : '⏭️'
-    : null
-
   return (
     <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${
-      isCurrent
-        ? 'bg-cooking-900/40 border border-cooking-400/40 text-slate-100 font-medium'
-        : isCompleted
-          ? 'text-slate-500 line-through'
-          : 'text-slate-400'
+      isCurrent && isWaiting
+        ? 'bg-indigo-900/40 border border-indigo-400/40 text-slate-200 font-medium'
+        : isCurrent
+          ? 'bg-cooking-900/40 border border-cooking-400/40 text-slate-100 font-medium'
+          : isCompleted
+            ? 'text-slate-500 line-through opacity-60'
+            : 'text-slate-400'
     }`}>
-      {resultIcon && <span className="text-[11px]">{resultIcon}</span>}
-      {isCurrent && !resultIcon && <span className="text-[11px]">▶</span>}
+      {isCompleted && <span className="text-[11px] opacity-70">—</span>}
+      {isCurrent && <span className="text-[11px]">{isWaiting ? '⏳' : '▶'}</span>}
       <span className="truncate">{label}</span>
     </div>
   )
