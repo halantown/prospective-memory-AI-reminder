@@ -18,7 +18,7 @@
  * On completed/fake ack: setPMPipelineState(null) + setGameTimeFrozen(false)
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { DECOY_OPTIONS } from '../../constants/pmTasks'
 import {
@@ -27,7 +27,7 @@ import {
   PLACEHOLDER_FAKE_REMINDER_POOL,
   PLACEHOLDER_CONFIDENCE_SCALE,
 } from '../../constants/placeholders'
-import type { DecoyOption } from '../../types'
+import type { DecoyOption, PMPipelineStep } from '../../types'
 
 // ── Helpers ──
 
@@ -241,20 +241,32 @@ function ConfidenceStep({
 function AvatarActionStep({ onActionSent }: { onActionSent: () => void }) {
   const [animating, setAnimating] = useState(false)
   const [done, setDone] = useState(false)
+  const firedRef = useRef(false)
 
-  // Listen for server avatar_action event dispatched as custom DOM event
-  useEffect(() => {
-    const handler = () => {
-      setAnimating(true)
-      setTimeout(() => {
-        setDone(true)
-        setAnimating(false)
-        onActionSent()
-      }, 3000)
-    }
-    window.addEventListener('pm:avatar_action', handler)
-    return () => window.removeEventListener('pm:avatar_action', handler)
+  const startAnimation = useCallback(() => {
+    if (firedRef.current) return
+    firedRef.current = true
+    setAnimating(true)
+    setTimeout(() => {
+      setDone(true)
+      setAnimating(false)
+      onActionSent()
+    }, 3000)
   }, [onActionSent])
+
+  useEffect(() => {
+    // Listen for server avatar_action event
+    const handler = () => startAnimation()
+    window.addEventListener('pm:avatar_action', handler)
+
+    // Fallback: if server event never arrives, auto-start after 5s
+    const fallbackTimer = setTimeout(() => startAnimation(), 5000)
+
+    return () => {
+      window.removeEventListener('pm:avatar_action', handler)
+      clearTimeout(fallbackTimer)
+    }
+  }, [startAnimation])
 
   return (
     <div className="space-y-6 text-center">
@@ -277,29 +289,52 @@ function AvatarActionStep({ onActionSent }: { onActionSent: () => void }) {
 export default function PMTriggerModal() {
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
   const condition = useGameStore((s) => s.condition)
-  const wsSend = useGameStore((s) => s.wsSend)
   const advancePMPipelineStep = useGameStore((s) => s.advancePMPipelineStep)
   const setPMPipelineState = useGameStore((s) => s.setPMPipelineState)
   const setGameTimeFrozen = useGameStore((s) => s.setGameTimeFrozen)
 
-  // Stable shuffled decoys for this trigger instance
-  const [shuffledDecoys, setShuffledDecoys] = useState<DecoyOption[]>([])
-
-  useEffect(() => {
-    if (pmPipelineState?.step === 'decoy' && pmPipelineState.taskId) {
-      const options = DECOY_OPTIONS[pmPipelineState.taskId] ?? []
-      setShuffledDecoys(shuffleArray(options))
-    }
-  }, [pmPipelineState?.step, pmPipelineState?.taskId])
+  // Shuffled decoys — computed synchronously via useMemo to avoid async effect gap.
+  // taskId changes per trigger, so shuffle is stable within one trigger instance.
+  const shuffledDecoys = useMemo(() => {
+    if (!pmPipelineState?.taskId) return []
+    return shuffleArray(DECOY_OPTIONS[pmPipelineState.taskId] ?? [])
+  }, [pmPipelineState?.taskId])
 
   const close = useCallback(() => {
     setPMPipelineState(null)
     setGameTimeFrozen(false)
   }, [setPMPipelineState, setGameTimeFrozen])
 
-  if (!pmPipelineState) return null
+  // Auto-close on 'completed' step (never call setState during render)
+  const step = pmPipelineState?.step as PMPipelineStep | undefined
+  useEffect(() => {
+    if (step === 'completed') close()
+  }, [step, close])
 
-  const { step, taskId, triggerType, isFake, firedAt } = pmPipelineState
+  // ── Stable action sent handler (useCallback so AvatarActionStep's dep stays stable) ──
+  const taskIdRef = useRef(pmPipelineState?.taskId ?? null)
+  taskIdRef.current = pmPipelineState?.taskId ?? null
+
+  const handleAvatarActionSent = useCallback(() => {
+    const send = useGameStore.getState().wsSend
+    const now = Date.now() / 1000
+    const tId = taskIdRef.current
+    if (send && tId) {
+      send({
+        type: 'pm_action_complete',
+        data: {
+          task_id: tId,
+          action_animation_start_time: now - 3,
+          action_animation_complete_time: now,
+        },
+      })
+    }
+    close()
+  }, [close])
+
+  if (!pmPipelineState || step === 'completed') return null
+
+  const { taskId, triggerType, isFake, firedAt } = pmPipelineState
 
   // ── Greeting text ──
   const getGreetingText = () => {
@@ -372,23 +407,7 @@ export default function PMTriggerModal() {
     advancePMPipelineStep('avatar_action')
   }
 
-  const handleAvatarActionSent = () => {
-    const send = useGameStore.getState().wsSend
-    const now = Date.now() / 1000
-    if (send && taskId) {
-      send({
-        type: 'pm_action_complete',
-        data: {
-          task_id: taskId,
-          action_animation_start_time: now - 3,
-          action_animation_complete_time: now,
-        },
-      })
-    }
-    close()
-  }
-
-  // ── Render ──
+  // ── Render step content ──
   const renderStep = () => {
     switch (step) {
       case 'trigger_affordance':
@@ -400,29 +419,34 @@ export default function PMTriggerModal() {
       case 'fake_reminder':
         return <FakeReminderStep reminderText={PLACEHOLDER_FAKE_REMINDER_POOL[0] ?? '[Fake reminder]'} onAck={handleFakeAck} />
       case 'decoy':
-        return taskId ? <DecoyStep taskId={taskId} shuffled={shuffledDecoys} onSelect={handleDecoySelect} /> : null
+        return <DecoyStep taskId={taskId ?? ''} shuffled={shuffledDecoys} onSelect={handleDecoySelect} />
       case 'confidence':
         return <ConfidenceStep onSubmit={handleConfidenceSubmit} />
       case 'avatar_action':
         return <AvatarActionStep onActionSent={handleAvatarActionSent} />
-      case 'completed':
-        close()
-        return null
       default:
         return null
     }
   }
 
   const content = renderStep()
-  if (!content) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    // z-[200] ensures this is always above all game elements (z-50, z-[60], etc.)
+    // pointer-events-auto is explicit: never inherit none from any ancestor
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4"
+      style={{ pointerEvents: 'auto' }}
+    >
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8"
         onClick={(e) => e.stopPropagation()}
       >
-        {content}
+        {content ?? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-8 h-8 border-4 border-slate-300 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
       </div>
     </div>
   )

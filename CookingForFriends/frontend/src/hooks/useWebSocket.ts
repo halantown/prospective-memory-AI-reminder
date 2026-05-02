@@ -69,6 +69,11 @@ export function useWebSocket(sessionId: string | null) {
         const taskPosition = data.position != null ? (data.position as number) : null
         const scheduleIndex = (data.schedule_index as number) || 0
 
+        if (!isFake && !taskId) {
+          console.warn('[WS] Ignoring malformed real pm_trigger without task_id:', data)
+          break
+        }
+
         store.setPMPipelineState({
           step: 'trigger_affordance',
           taskId: isFake ? null : taskId,
