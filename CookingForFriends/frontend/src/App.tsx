@@ -16,6 +16,7 @@ import TutorialFlowPage from './pages/game/TutorialFlowPage'
 import EveningTransitionPage from './pages/game/EveningTransitionPage'
 import GamePage from './pages/game/GamePage'
 import PostQuestionnairePage from './pages/game/PostQuestionnairePage'
+import PostTestFlowPage from './pages/game/PostTestFlowPage'
 import DebriefPage from './pages/game/DebriefPage'
 import AdminDashboard from './pages/admin/DashboardPage'
 import ConfigPage from './pages/admin/ConfigPage'
@@ -155,6 +156,8 @@ function GameShell() {
       return <IntroductionPage />
     case 'playing':
       return <GamePage />
+    case 'post_test':
+      return <PostTestFlowPage />
     case 'post_questionnaire':
       return <PostQuestionnairePage />
     case 'debrief':

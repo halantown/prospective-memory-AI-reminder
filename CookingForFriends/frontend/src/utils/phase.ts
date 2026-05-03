@@ -11,6 +11,7 @@ type RenderPhase =
   | 'evening_transition'
   | 'introduction'
   | 'playing'
+  | 'post_test'
   | 'post_questionnaire'
   | 'debrief'
   | 'complete'
@@ -40,11 +41,11 @@ const CANONICAL_TO_RENDER: Record<string, RenderPhase> = {
   TUTORIAL_TRIGGER: 'tutorial_flow',
   EVENING_TRANSITION: 'evening_transition',
   MAIN_EXPERIMENT: 'playing',
-  POST_MANIP_CHECK: 'post_questionnaire',
-  POST_SUBJECTIVE_DV: 'post_questionnaire',
-  POST_NASA_TLX: 'post_questionnaire',
-  POST_MSE: 'post_questionnaire',
-  POST_RETRO_CHECK: 'post_questionnaire',
+  POST_MANIP_CHECK: 'post_test',
+  POST_SUBJECTIVE_DV: 'post_test',
+  POST_NASA_TLX: 'post_test',
+  POST_MSE: 'post_test',
+  POST_RETRO_CHECK: 'post_test',
   DEBRIEF: 'debrief',
   COMPLETED: 'complete',
 }
