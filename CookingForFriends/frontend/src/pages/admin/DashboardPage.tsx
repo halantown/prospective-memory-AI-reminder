@@ -732,18 +732,11 @@ function TestModeTab() {
     setCreating(false)
   }
 
-  const [copied, setCopied] = useState(false)
-
-  const handleOpen = async () => {
+  const handleOpen = () => {
     if (!result) return
-    // Auto-copy token so participant can paste it on the entry page
-    try {
-      await navigator.clipboard.writeText(result.token)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 3000)
-    } catch (e) { console.error('Copy failed', e) }
-    // Open the root URL without token in the query string
-    window.open(window.location.origin, '_blank', 'noopener,noreferrer')
+    // Open with token in URL — WelcomePage auto-starts when ?token= is present,
+    // and since the backend already advanced the phase, it lands directly there.
+    window.open(`${window.location.origin}/?token=${result.token}`, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -791,11 +784,8 @@ function TestModeTab() {
             <button onClick={handleOpen}
               className="flex items-center gap-2 text-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
               <ExternalLink className="w-4 h-4" />
-              {copied ? '✅ Token copied — enter it on the page' : 'Copy Token & Open'}
+              Open Session
             </button>
-            {copied && (
-              <p className="text-xs text-slate-500">Token copied to clipboard. Paste it on the participant entry page.</p>
-            )}
           </div>
         )}
       </div>

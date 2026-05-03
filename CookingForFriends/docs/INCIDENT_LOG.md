@@ -833,3 +833,112 @@ any significant timeline refactor, consider:
 - [ ] Validate that `ongoing_task_event` handlers on the frontend are not affected
   by the clock display capping (they are independent — cook timers run from
   `activeCookingSteps` state, not from game_clock string).
+
+
+---
+
+## INC-015 — Four frontend UX bugs (Welcome flash, Consent iframe, Demographics, Encoding)
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-03 |
+| Severity     | P2 Medium |
+| Status       | Resolved |
+| Reported by  | Developer observation during experiment prep |
+| Affected area| WelcomePage, ConsentPage, DemographicsPage, CutsceneEncodingPage |
+
+### Background
+> The frontend experiment flow covers: Welcome → Consent → Demographics → Encoding → Game. Multiple UX issues were identified in these phases.
+
+### Incident Description
+> 1. **Welcome flash**: Fallback text "Welcome! You'll be preparing dinner…" briefly rendered before the WELCOME config loaded, then jumped to the actual cover story text.
+> 2. **Consent nested iframe**: Informed Consent page showed recursive layers of itself instead of the PDF; the PDF could not be viewed.
+> 3. **Demographics page**: Had 6 backend-driven fields; too wide; browser showed "Save identity card?" popup on submit.
+> 4. **Encoding phase blank**: CutsceneEncodingPage showed a plain white card on a blank background instead of the game world.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 22:51 | All four issues reported |
+| 22:52 | Root cause investigation started |
+| 23:00 | All root causes identified |
+| 23:10 | All fixes deployed |
+| 23:12 | TypeScript build passed, confirmed resolved |
+
+### Root Cause
+> 1. **Welcome flash**: `welcomeText` state started as `null`; the JSX used a `?? fallback` expression that rendered immediately before the async API call resolved.
+> 2. **Consent iframe**: Vite dev-server proxy only forwarded `/api` and `/ws` to FastAPI. `/documents` was unproxied, so Vite served its own `index.html` for `/documents/Informed_Consent_no_HREC.pdf`. The React app in the iframe detected the active session in `sessionStorage` and re-rendered `ConsentPage`, causing infinite nesting.
+> 3. **Demographics popup**: The form used `type="number"` inputs alongside personal-looking fields without `autocomplete="off"`, triggering Chrome's identity-card save heuristic. Additionally, 6 backend-driven fields exceeded UX requirements.
+> 4. **Encoding phase blank**: `CutsceneEncodingPage` used standalone full-page components (white card on gradient background) with no game world behind them.
+
+### Contributing Factors
+> - Vite proxy config was not kept in sync with FastAPI static-file mounts.
+> - Demographics page was purely data-driven (from backend questionnaire JSON) with no frontend field-type handling for `choice` / `select` inputs.
+> - CutsceneEncodingPage was designed before the galgame layout decision.
+
+### Fix
+> 1. **`WelcomePage.tsx`**: Added `configLoaded` boolean state; text paragraph only renders after the config fetch settles (success or failure via `.finally()`).
+> 2. **`vite.config.ts`**: Added `/documents` proxy entry pointing to `http://localhost:5000`.
+> 3. **`DemographicsPage.tsx`**: Complete rewrite — hardcoded 3 fields (Age number, Gender select+other, English proficiency select). `max-w-sm` container. `<form autoComplete="off">` + non-standard `name` attributes to prevent browser identity-card detection.
+> 4. **`CutsceneEncodingPage.tsx`**: Imports `FloorPlanView` and `PhoneSidebar`; all stage renders now use a `h-screen` game-layout background (pointer-events-none) with stage-specific overlays: cutscene → bottom galgame panel (dark glass), detail_check → existing `fixed inset-0` `DetailCheckModal`, intention_check → `absolute` overlay inside game area. **`IntentionCheckQuestion.tsx`**: Added optional `className` prop to override the outer wrapper.
+
+### Verification
+> `npm run build` (tsc + vite) passed with zero errors or warnings.
+
+### Follow-up Actions
+> - [ ] Keep Vite proxy in sync whenever FastAPI adds new static mounts.
+> - [ ] Consider a proxy config helper or comment documenting all backend-served paths.
+> - [ ] Add real cutscene video/image assets to replace the placeholder text in `CutscenePlayer` (the component is no longer used by `CutsceneEncodingPage` but still exists for reference).
+
+---
+
+## INC-016 — Admin Test Mode "Start Phase" selector had no effect
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-03 |
+| Severity     | P2 Medium |
+| Status       | Resolved |
+| Reported by  | Developer — noticed in manual testing |
+| Affected area| Admin dashboard → Test Mode tab; `/admin/test-session` endpoint |
+
+### Background
+> The admin Test Mode tab lets developers create throw-away test sessions with a specific condition, task order, and starting phase. The intent is to skip to any experiment phase directly from the admin UI without going through the full participant flow.
+
+### Incident Description
+> Selecting a non-default "Start Phase" in the admin Test Mode tab had no effect. Sessions always started at the WELCOME phase regardless of the dropdown value.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 23:06 | Developer reported start phase selector not working |
+| 23:10 | Root cause identified via code inspection |
+| 23:20 | Backend + frontend fixed and build verified |
+
+### Root Cause
+> Three compounding bugs:
+> 1. **Wrong request schema**: `POST /admin/test-session` used `AdminParticipantCreateRequest` (which has `condition` and `task_order` only) instead of the already-existing `TestSessionRequest` (which has `condition`, `order`, and `start_phase`). The `start_phase` field sent by the frontend was silently discarded by FastAPI's Pydantic parser.
+> 2. **Wrong field name**: Frontend sent `order` but `AdminParticipantCreateRequest` expected `task_order`, so the order selection was also ignored.
+> 3. **No phase advance**: Even if the request body had been parsed correctly, the endpoint never called `enter_phase()` — it only created the participant row and returned.
+
+### Contributing Factors
+> - `TestSessionRequest` schema existed in `models/schemas.py` but was never wired to the endpoint.
+> - The `AdminParticipantCreateRequest` and `TestSessionRequest` schemas have overlapping but distinct field names (`task_order` vs `order`), making the mismatch non-obvious.
+
+### Fix
+> **Backend** (`routers/admin.py`):
+> - Added `TestSessionRequest` to imports.
+> - Changed `create_test_session` to accept `Optional[TestSessionRequest]` instead of `Optional[AdminParticipantCreateRequest]`.
+> - Added a compatibility shim that maps `req.order → compat.task_order` for `_create_participant_row`.
+> - After creating the participant, calls `await enter_phase(db, participant, req.start_phase)` when `start_phase` is not `welcome`/empty.
+>
+> **Frontend** (`pages/admin/DashboardPage.tsx`):
+> - Replaced copy-token-and-open workflow with direct URL launch: `/?token=XXX`. WelcomePage already auto-starts when `?token=` is present in the URL, and since the backend pre-advanced the phase, the session lands directly on the target screen.
+> - Removed now-unused `copied`/`setCopied` state.
+
+### Verification
+> `npm run build` (tsc + vite) passed with zero errors. Backend import check passed (`python -c "from routers.admin import router"`).
+
+### Follow-up Actions
+> - [ ] Add an integration test for `POST /admin/test-session` verifying that `current_phase` equals `start_phase` after creation.
+> - [ ] Consider consolidating `AdminParticipantCreateRequest` and `TestSessionRequest` into a single schema.
