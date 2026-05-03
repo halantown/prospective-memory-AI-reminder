@@ -1,4 +1,38 @@
 1. 部分（未处理的）消息反复发送
+
+## Code review: 被试运行状态 / reconnect recovery 系统缺失
+
+- 记录日期：2026-05-03
+- 状态：Open
+- 严重性：P1 高
+- 结论：
+  - 当前核心问题可以概括为：被试（participant/user）运行状态系统没有真正开发完整。
+  - 这里的“状态系统”不是单个 frontend store，而是跨 backend runtime、database snapshot、WebSocket reconnect、PM pipeline、cooking progress 的统一 lifecycle/recovery contract。
+  - 现在系统主要依赖内存态 `BlockRuntime` 维持 timeline / cooking / PM scheduler；一旦 WS 断开或进程重启，就没有足够的持久化状态恢复当前实验。
+- 具体发现：
+  - WebSocket 断开会停止整局 runtime：`backend/websocket/game_handler.py` 在最新连接断开时 `pop` runtime 并 `runtime.stop(save_scores=True)`，会取消 timeline、CookingEngine 和 PM scheduler。短暂网络抖动会导致 cooking state 丢失、分数提前落库、PM scheduler 重新推断状态。
+  - PM reconnect state endpoint 前后端契约不一致：frontend `getSessionState(sessionId)` 调 `/api/session/{sessionId}/state`，但 backend `GET /api/session/{token}/state` 按 `Participant.token` 查询。断线重连时 pipeline restore 会 404 并被前端静默吞掉。
+  - PM scheduler resume 只按“已写入 trigger event 数量”跳过 schedule，不区分“已触发但 pipeline 未完成”的当前任务。断线发生在 PM modal 中时，重启后的 scheduler 可能直接进入下一 trigger，当前任务不再重新发给前端。
+  - CookingEngine reconnect 时没有跳过历史 cooking timeline event。普通 timeline 有 `resume_offset` skip 逻辑，但 cooking 每次 start 都从 `_next_timeline_index = 0` 开始；过去的 `sleep_until(entry.t)` 会立即返回，可能快速重放历史 cooking steps。
+  - Admin 手动创建 participant/test session 的 order 参数不生效：frontend 发送 `{ condition, order }`，backend schema 接收 `task_order`；真实 participant 创建路径仍总是自动 assignment。
+- 影响：
+  - 中途断线、刷新、浏览器关闭、Vite proxy reset、后端 reload 都可能让被试实验状态进入不可恢复或不可解释状态。
+  - PM trigger、cooking task、phone message、score logging 可能和用户看到的 UI 状态不一致。
+  - 实验数据分析时无法可靠判断某些 missed / wrong / incomplete 是用户行为还是 runtime lifecycle 造成。
+- 建议架构方向：
+  - 明确定义 participant session lifecycle：`registered -> encoding -> playing -> interrupted -> incomplete/completed`，不要把 reconnect 当作隐式重启。
+  - DB 持久化最小可恢复 snapshot：current phase、block status、game time snapshot、active PM pipeline、active cooking steps / waits、last emitted one-shot events。
+  - WebSocket reconnect 只重新绑定 transport，不应该默认 stop runtime；短断线应保持 runtime 或恢复 snapshot，长断线按策略标记 incomplete。
+  - PM scheduler 恢复时必须识别 active unfinished pipeline，并重新下发当前 trigger state，而不是只按 event count 跳到下一项。
+  - CookingEngine 需要 either 持久化 progress 后恢复，or 在不支持恢复时明确把 session 标记 invalid/incomplete；不能重放过去的绝对 timeline event。
+  - Admin/manual test session API 统一字段名：frontend 发送 `task_order`，backend 对真实 participant 是否允许 override 要有明确策略。
+- 推荐后续任务：
+  - [ ] 修复 `/api/session/{session_id}/state` contract，按 session id 查询；如仍需 token lookup，新增独立 endpoint，避免同一路由语义混淆。
+  - [ ] 为 WebSocket disconnect 制定策略：短断线保留 runtime，长断线标记 incomplete；不要在普通 disconnect 上保存最终 cooking scores。
+  - [ ] 为 active PM pipeline 增加可恢复 snapshot，并在 reconnect 时重新发送完整 modal 所需字段。
+  - [ ] 为 CookingEngine 增加 resume offset / persisted progress，或关闭 reconnect 恢复并明确 invalidation。
+  - [ ] 修复 admin 创建接口的 `order` / `task_order` 字段不一致，并添加 regression test。
+  - [ ] 增加集成测试：PM modal 中断线重连、active cooking step 中断线重连、admin 手动创建指定 order。
 2. Reconnect PM pipeline state endpoint 参数不一致
 
 - 观察：前端 `getSessionState(sessionId)` 调用 `/api/session/{sessionId}/state`，但后端 `GET /api/session/{token}/state` 按 participant token 查询。
