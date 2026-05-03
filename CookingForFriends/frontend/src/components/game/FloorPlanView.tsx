@@ -166,14 +166,13 @@ export default function FloorPlanView() {
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeStation = useGameStore((s) => s.activeStation)
 
-  // Doorbell / PM trigger → highlight living room nav button
-  const activePMTrials = useGameStore((s) => s.activePMTrials)
-  const doorbellActive = activePMTrials.some(
-    t => ['doorbell', 'knock', 'doorbell_ring'].includes(t.triggerEvent ?? '')
-  )
+  // Doorbell PM trigger → highlight living room navigation and front-door area.
+  const pmPipelineState = useGameStore((s) => s.pmPipelineState)
+  const doorbellActive = pmPipelineState?.step === 'trigger_event'
+    && pmPipelineState.triggerType === 'doorbell'
+  const visitorVisible = pmPipelineState?.triggerType === 'doorbell'
+    && (pmPipelineState.step === 'greeting' || pmPipelineState.step === 'fake_resolution')
 
-  // Character position for minimap dot
-  const avatarPosition = useCharacterStore((s) => s.position)
   const moveToWaypoint  = useCharacterStore((s) => s.moveToWaypoint)
   const teleportTo      = useCharacterStore((s) => s.teleportTo)
   const isCharMoving    = useCharacterStore((s) => s.isMoving)
@@ -201,6 +200,9 @@ export default function FloorPlanView() {
         }
         setCharRoom(target)
         setIsMoving(false)
+        if (doorbellActive && target === 'living_room') {
+          window.dispatchEvent(new CustomEvent('pm:doorbell_answered'))
+        }
       }, TRANSIT_DELAY_MS)
 
       // Robot follows with delay
@@ -221,12 +223,15 @@ export default function FloorPlanView() {
     } else {
       doTransition()
     }
-  }, [currentRoom, isMoving, isCharMoving, moveToWaypoint, teleportTo])
+  }, [currentRoom, doorbellActive, isMoving, isCharMoving, moveToWaypoint, teleportTo])
 
   // Enter a room from overview — robot follows immediately with delay
   const enterRoom = useCallback((room: FloorRoom) => {
     setCurrentRoom(room)
     setCharRoom(room)
+    if (doorbellActive && room === 'living_room') {
+      window.dispatchEvent(new CustomEvent('pm:doorbell_answered'))
+    }
 
     if (robotTimer.current) clearTimeout(robotTimer.current)
     robotTimer.current = setTimeout(() => {
@@ -236,7 +241,7 @@ export default function FloorPlanView() {
         setIsRobotMoving(false)
       }, 800)
     }, ROBOT_FOLLOW_DELAY_MS)
-  }, [])
+  }, [doorbellActive])
 
   // Back to overview
   const exitToOverview = useCallback(() => {
@@ -370,6 +375,39 @@ export default function FloorPlanView() {
             </div>
           )
         })}
+
+        {/* Doorbell trigger pulse near the living-room/front-door area. */}
+        <AnimatePresence>
+          {doorbellActive && (
+            <motion.div
+              className="absolute z-30 pointer-events-none"
+              style={{ left: '59%', top: '50%' }}
+              initial={{ opacity: 0, scale: 0.4 }}
+              animate={{ opacity: 1, scale: [1, 1.2, 1] }}
+              exit={{ opacity: 0, scale: 0.4 }}
+              transition={{ scale: { repeat: Infinity, duration: 0.9 }, opacity: { duration: 0.2 } }}
+            >
+              <div className="rounded-full bg-amber-300/30 p-3 text-4xl shadow-[0_0_30px_rgba(251,191,36,0.9)]">
+                🔔
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {visitorVisible && (
+            <motion.div
+              className="absolute z-[31] pointer-events-none"
+              style={{ left: '61%', top: '53%' }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="rounded-full bg-white/90 px-3 py-2 text-3xl shadow-xl">🧍</div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── Player Avatar (sprite-based, movement-driven) ── */}
         <PlayerAvatar />
@@ -533,15 +571,7 @@ export default function FloorPlanView() {
                 }}
               />
             )}
-            {/* Character dot on minimap */}
-            <div
-              className="absolute w-2.5 h-2.5 bg-green-400 rounded-full border border-white shadow-sm"
-              style={{
-                left: `${avatarPosition.x}%`,
-                top: `${avatarPosition.y}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-            />
+            <MinimapAvatarDot />
             {/* Robot dot on minimap */}
             <div
               className="absolute w-2 h-2 bg-cyan-400 rounded-full border border-white shadow-sm"
@@ -569,6 +599,54 @@ export default function FloorPlanView() {
         </button>
       )}
     </div>
+  )
+}
+
+function MinimapAvatarDot() {
+  const dotRef = useRef<HTMLDivElement>(null)
+
+  const updateDotTransform = useCallback((position: { x: number; y: number }) => {
+    const el = dotRef.current
+    const parent = el?.parentElement
+    if (!el || !parent) return
+
+    const xPx = (position.x / 100) * parent.clientWidth
+    const yPx = (position.y / 100) * parent.clientHeight
+    el.style.transform = `translate3d(${xPx}px, ${yPx}px, 0) translate(-50%, -50%)`
+  }, [])
+
+  useEffect(() => {
+    updateDotTransform(useCharacterStore.getState().position)
+
+    const unsubscribe = useCharacterStore.subscribe((state, prevState) => {
+      if (state.position !== prevState.position) {
+        updateDotTransform(state.position)
+      }
+    })
+
+    const parent = dotRef.current?.parentElement
+    const resizeObserver = parent && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => updateDotTransform(useCharacterStore.getState().position))
+      : null
+    if (parent && resizeObserver) resizeObserver.observe(parent)
+
+    return () => {
+      unsubscribe()
+      resizeObserver?.disconnect()
+    }
+  }, [updateDotTransform])
+
+  return (
+    <div
+      ref={dotRef}
+      className="absolute w-2.5 h-2.5 bg-green-400 rounded-full border border-white shadow-sm"
+      style={{
+        left: 0,
+        top: 0,
+        transform: 'translate3d(0, 0, 0) translate(-50%, -50%)',
+        willChange: 'transform',
+      }}
+    />
   )
 }
 

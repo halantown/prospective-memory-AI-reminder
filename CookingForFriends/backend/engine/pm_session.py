@@ -6,7 +6,7 @@ import time
 from config import TRIGGER_SCHEDULE, TASK_ORDERS, SESSION_END_DELAY_AFTER_LAST_TRIGGER_S
 from engine.game_time import freeze_game_time, get_current_game_time
 from engine.game_clock import GameClock
-from engine.pm_tasks import get_task
+from engine.pm_tasks import FAKE_TRIGGER_LINES, get_item_options, get_reminder_text, get_task
 
 logger = logging.getLogger(__name__)
 
@@ -225,9 +225,17 @@ async def run_pm_session(
                     "is_fake": False,
                     "task_id": task_id,
                     "trigger_type": task_def.trigger_type,
+                    "guest_name": task_def.guest_name,
                     "position": task_position,
                     "schedule_index": schedule_index,
+                    "condition": condition,
                     "game_time_fired": game_time_fired,
+                    "greeting_lines": list(task_def.greeting_lines),
+                    "reminder_text": get_reminder_text(task_id, condition),
+                    "item_options": [
+                        {"id": o.id, "label": o.label, "isTarget": o.is_target}
+                        for o in get_item_options(task_id)
+                    ],
                 })
                 logger.info(
                     "[PM_SESSION] Real trigger fired: task=%s pos=%d (session=%s)",
@@ -251,8 +259,10 @@ async def run_pm_session(
                 await send_fn("pm_trigger", {
                     "is_fake": True,
                     "trigger_type": trigger_type,
+                    "guest_name": "Visitor" if trigger_type == "doorbell" else "Caller",
                     "schedule_index": schedule_index,
                     "game_time_fired": game_time_fired,
+                    "fake_resolution_lines": list(FAKE_TRIGGER_LINES.get(trigger_type, ())),
                 })
                 logger.info(
                     "[PM_SESSION] Fake trigger fired: type=%s (session=%s)",

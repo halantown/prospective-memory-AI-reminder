@@ -1,193 +1,184 @@
-/** PMTriggerModal — full-screen overlay PM pipeline. Blocks all game interaction.
+/** Strict PM pipeline overlay.
  *
- * REAL trigger pipeline:
- *   trigger_affordance → greeting → reminder → decoy → confidence → avatar_action → completed
- *
- * FAKE trigger pipeline:
- *   trigger_affordance → greeting → fake_reminder → completed
- *
- * WS messages sent per step:
- *   - greeting complete → pm_greeting_complete
- *   - reminder ack → pm_reminder_ack
- *   - decoy selected → pm_decoy_selected
- *   - confidence rated → pm_confidence_rated
- *   - avatar action complete → pm_action_complete
- *   - fake ack → fake_trigger_ack
- *
- * gameTimeFrozen is true for the entire pipeline.
- * On completed/fake ack: setPMPipelineState(null) + setGameTimeFrozen(false)
+ * Real: trigger_event -> greeting -> reminder -> item_selection
+ *       -> confidence_rating -> auto_execute -> completed
+ * Fake: trigger_event -> greeting -> fake_resolution -> completed
  */
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
-import { DECOY_OPTIONS } from '../../constants/pmTasks'
-import {
-  GREETING_PLACEHOLDERS,
-  REMINDER_PLACEHOLDERS,
-  PLACEHOLDER_FAKE_REMINDER_POOL,
-  PLACEHOLDER_CONFIDENCE_SCALE,
-} from '../../constants/placeholders'
+import { FAKE_TRIGGER_LINES, ITEM_SELECTION_OPTIONS, PM_TASKS } from '../../constants/pmTasks'
+import { GREETING_PLACEHOLDERS, REMINDER_PLACEHOLDERS } from '../../constants/placeholders'
 import type { DecoyOption, PMPipelineStep } from '../../types'
+import type { ReactNode } from 'react'
 
-// ── Helpers ──
+const TRIGGER_NUDGE_MS = 30_000
+const TRIGGER_TIMEOUT_MS = 45_000
+const LINE_INTERVAL_MS = 1_500
+const AUTO_EXECUTE_MS = 3_000
 
 function shuffleArray<T>(arr: T[]): T[] {
   const out = [...arr]
   for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]]
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
   }
   return out
 }
 
-// ── Sub-components ──
+function nowSeconds() {
+  return Date.now() / 1000
+}
 
-function TriggerAffordance({
-  triggerType,
-  onOpen,
+function triggerLabel(triggerType: 'doorbell' | 'phone_call') {
+  return triggerType === 'doorbell' ? 'doorbell' : 'phone'
+}
+
+function PhoneCallScreen({
+  guestName,
+  onAnswer,
 }: {
-  triggerType: 'doorbell' | 'phone_call'
-  onOpen: () => void
+  guestName: string
+  onAnswer: () => void
 }) {
-  const isDoorbell = triggerType === 'doorbell'
   return (
-    <div className="text-center space-y-6">
-      <div className="text-8xl animate-bounce">
-        {isDoorbell ? '🔔' : '📱'}
+    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/95 p-4">
+      <div className="w-full max-w-sm rounded-[2rem] border border-slate-700 bg-slate-900 p-8 text-center shadow-2xl">
+        <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-400 text-5xl shadow-lg">
+          📞
+        </div>
+        <p className="text-sm uppercase tracking-[0.35em] text-emerald-200">Incoming Call</p>
+        <h2 className="mt-3 text-3xl font-bold text-white">{guestName}</h2>
+        <button
+          onClick={onAnswer}
+          className="mt-8 w-full rounded-full bg-emerald-500 px-8 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-emerald-400 active:scale-95"
+        >
+          Answer
+        </button>
       </div>
-      <h2 className="text-2xl font-bold text-slate-800">
-        {isDoorbell ? 'Someone is at the door!' : 'Incoming phone call!'}
-      </h2>
-      <p className="text-slate-500 text-sm">
-        {isDoorbell ? 'A visitor has arrived.' : 'Your phone is ringing.'}
-      </p>
-      <button
-        onClick={onOpen}
-        className="px-8 py-4 bg-green-500 hover:bg-green-600 text-white font-bold
-                   rounded-2xl text-lg shadow-lg transition-all active:scale-95"
-      >
-        {isDoorbell ? '🚪 Answer Door' : '📞 Answer Call'}
-      </button>
     </div>
   )
 }
 
-function GreetingStep({
-  greetingText,
-  onContinue,
-}: {
-  greetingText: string
-  onContinue: () => void
-}) {
+function DoorbellHint() {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="text-4xl">👋</div>
-        <h2 className="text-xl font-bold text-slate-800">Greeting</h2>
-      </div>
-      <div className="bg-slate-50 rounded-2xl p-6 text-slate-700 leading-relaxed min-h-[80px]">
-        {greetingText}
-      </div>
-      <button
-        onClick={onContinue}
-        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white
-                   font-semibold rounded-xl transition-colors"
-      >
-        Continue →
-      </button>
+    <div className="fixed left-1/2 top-5 z-[210] -translate-x-1/2 rounded-full border border-amber-300/60 bg-slate-950/80 px-5 py-3 text-sm font-semibold text-amber-100 shadow-xl backdrop-blur pointer-events-none">
+      🔔 Someone is at the door. Go to the Living Room to answer.
     </div>
+  )
+}
+
+function DialogueStep({
+  title,
+  speaker,
+  lines,
+  onComplete,
+}: {
+  title: string
+  speaker: string
+  lines: string[]
+  onComplete: () => void
+}) {
+  const [index, setIndex] = useState(0)
+  const completedRef = useRef(false)
+
+  useEffect(() => {
+    setIndex(0)
+    completedRef.current = false
+  }, [lines])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (index < lines.length - 1) {
+        setIndex(i => i + 1)
+        return
+      }
+      if (!completedRef.current) {
+        completedRef.current = true
+        onComplete()
+      }
+    }, LINE_INTERVAL_MS)
+    return () => clearTimeout(timer)
+  }, [index, lines.length, onComplete])
+
+  return (
+    <ModalShell>
+      <div className="space-y-5">
+        <p className="text-sm uppercase tracking-[0.25em] text-amber-600">{title}</p>
+        <div className="flex items-start gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-amber-100 text-3xl">
+            {title === 'Call' ? '📞' : '👋'}
+          </div>
+          <div className="min-h-[110px] flex-1 rounded-3xl bg-slate-100 px-5 py-4 text-slate-800 shadow-inner">
+            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{speaker}</div>
+            <div className="text-lg leading-relaxed">{lines[index] ?? ''}</div>
+          </div>
+        </div>
+        <div className="flex justify-center gap-2">
+          {lines.map((_, i) => (
+            <div key={i} className={`h-2 w-2 rounded-full ${i <= index ? 'bg-amber-500' : 'bg-slate-300'}`} />
+          ))}
+        </div>
+      </div>
+    </ModalShell>
   )
 }
 
 function ReminderStep({
-  reminderText,
+  text,
   onAck,
 }: {
-  reminderText: string
+  text: string
   onAck: () => void
 }) {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="text-4xl">🤖</div>
-        <h2 className="text-xl font-bold text-slate-800">Robot Reminder</h2>
+    <ModalShell>
+      <div className="space-y-5">
+        <div className="rounded-3xl bg-cyan-50 px-5 py-4 text-slate-800 shadow-inner">
+          <div className="mb-2 text-xs font-bold uppercase tracking-wide text-cyan-700">Pepper</div>
+          <p>Hey, I wanted to remind you...</p>
+        </div>
+        <div className="rounded-3xl border-2 border-cyan-200 bg-white p-6 shadow-lg">
+          <h2 className="mb-3 text-xl font-bold text-slate-900">Robot Reminder</h2>
+          <p className="text-lg leading-relaxed text-slate-700">{text}</p>
+        </div>
+        <button
+          onClick={onAck}
+          className="w-full rounded-2xl bg-cyan-600 py-4 text-lg font-bold text-white transition hover:bg-cyan-500 active:scale-95"
+        >
+          Got it
+        </button>
       </div>
-      <div className="relative bg-blue-50 border-2 border-blue-200 rounded-2xl p-6">
-        <div className="absolute -top-3 left-6 w-0 h-0
-                        border-l-[10px] border-l-transparent
-                        border-r-[10px] border-r-transparent
-                        border-b-[12px] border-b-blue-200" />
-        <p className="text-slate-700 leading-relaxed">{reminderText}</p>
-      </div>
-      <button
-        onClick={onAck}
-        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white
-                   font-semibold rounded-xl transition-colors"
-      >
-        I know
-      </button>
-    </div>
+    </ModalShell>
   )
 }
 
-function FakeReminderStep({
-  reminderText,
-  onAck,
-}: {
-  reminderText: string
-  onAck: () => void
-}) {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="text-4xl">🤖</div>
-        <h2 className="text-xl font-bold text-slate-800">Robot Message</h2>
-      </div>
-      <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-6">
-        <p className="text-slate-700 leading-relaxed">{reminderText}</p>
-      </div>
-      <button
-        onClick={onAck}
-        className="w-full py-3 bg-slate-600 hover:bg-slate-700 text-white
-                   font-semibold rounded-xl transition-colors"
-      >
-        I know
-      </button>
-    </div>
-  )
-}
-
-function DecoyStep({
-  taskId,
-  shuffled,
+function ItemSelectionStep({
+  options,
   onSelect,
 }: {
-  taskId: string
-  shuffled: DecoyOption[]
+  options: DecoyOption[]
   onSelect: (option: DecoyOption, responseTimeMs: number) => void
 }) {
   const startRef = useRef(Date.now())
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <div className="text-4xl">🎯</div>
-        <h2 className="text-xl font-bold text-slate-800">What will you bring?</h2>
+    <ModalShell>
+      <div className="space-y-5">
+        <h2 className="text-2xl font-bold text-slate-900">What did you promise?</h2>
+        <div className="grid gap-3">
+          {options.map((option) => (
+            <button
+              key={option.id}
+              onClick={() => onSelect(option, Date.now() - startRef.current)}
+              className="flex items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white px-5 py-4 text-left text-lg font-semibold text-slate-800 transition hover:border-amber-400 hover:bg-amber-50 active:scale-[0.99]"
+            >
+              <span className="text-2xl">{option.isTarget ? '🎯' : '📦'}</span>
+              <span>{option.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
-      <p className="text-slate-500 text-sm">Select the correct item for Task {taskId}.</p>
-      <div className="grid grid-cols-2 gap-3">
-        {shuffled.map((opt) => (
-          <button
-            key={opt.id}
-            onClick={() => onSelect(opt, Date.now() - startRef.current)}
-            className="px-4 py-4 bg-white border-2 border-slate-200 hover:border-amber-400
-                       hover:bg-amber-50 rounded-xl text-slate-800 font-medium text-sm
-                       transition-all active:scale-95 text-center"
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 
@@ -196,95 +187,69 @@ function ConfidenceStep({
 }: {
   onSubmit: (rating: number, responseTimeMs: number) => void
 }) {
-  const [selected, setSelected] = useState<number | null>(null)
   const startRef = useRef(Date.now())
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="text-4xl">💭</div>
-        <h2 className="text-xl font-bold text-slate-800">Confidence Rating</h2>
+    <ModalShell>
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">How confident are you in your choice?</h2>
+          <p className="mt-2 text-sm text-slate-500">1 = Not at all confident, 7 = Extremely confident</p>
+        </div>
+        <div className="grid grid-cols-7 gap-2">
+          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+            <button
+              key={n}
+              onClick={() => onSubmit(n, Date.now() - startRef.current)}
+              className="rounded-2xl border-2 border-slate-200 bg-white py-4 text-xl font-bold text-slate-700 transition hover:border-amber-500 hover:bg-amber-50 hover:text-amber-700 active:scale-95"
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-between text-xs text-slate-500">
+          <span>Not at all confident</span>
+          <span>Extremely confident</span>
+        </div>
       </div>
-      <p className="text-slate-600 text-sm leading-relaxed">
-        {PLACEHOLDER_CONFIDENCE_SCALE}
-      </p>
-      <div className="flex justify-between gap-2">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            onClick={() => setSelected(n)}
-            className={`flex-1 py-4 rounded-xl border-2 font-bold text-lg transition-all
-              ${selected === n
-                ? 'border-amber-500 bg-amber-50 text-amber-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-amber-300'}`}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-      <div className="flex justify-between text-xs text-slate-400 px-1">
-        <span>Not at all confident</span>
-        <span>Completely confident</span>
-      </div>
-      <button
-        onClick={() => selected !== null && onSubmit(selected, Date.now() - startRef.current)}
-        disabled={selected === null}
-        className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200
-                   disabled:text-slate-400 text-white font-semibold rounded-xl transition-colors"
-      >
-        Submit
-      </button>
-    </div>
+    </ModalShell>
   )
 }
 
-function AvatarActionStep({ onActionSent }: { onActionSent: () => void }) {
-  const [animating, setAnimating] = useState(false)
-  const [done, setDone] = useState(false)
-  const firedRef = useRef(false)
-
-  const startAnimation = useCallback(() => {
-    if (firedRef.current) return
-    firedRef.current = true
-    setAnimating(true)
-    setTimeout(() => {
-      setDone(true)
-      setAnimating(false)
-      onActionSent()
-    }, 3000)
-  }, [onActionSent])
+function AutoExecuteStep({ onDone }: { onDone: (startedAt: number, finishedAt: number) => void }) {
+  const onDoneRef = useRef(onDone)
 
   useEffect(() => {
-    // Listen for server avatar_action event
-    const handler = () => startAnimation()
-    window.addEventListener('pm:avatar_action', handler)
+    onDoneRef.current = onDone
+  }, [onDone])
 
-    // Fallback: if server event never arrives, auto-start after 5s
-    const fallbackTimer = setTimeout(() => startAnimation(), 5000)
-
-    return () => {
-      window.removeEventListener('pm:avatar_action', handler)
-      clearTimeout(fallbackTimer)
-    }
-  }, [startAnimation])
+  useEffect(() => {
+    const startedAt = nowSeconds()
+    const timer = setTimeout(() => onDoneRef.current(startedAt, nowSeconds()), AUTO_EXECUTE_MS)
+    return () => clearTimeout(timer)
+  }, [])
 
   return (
-    <div className="space-y-6 text-center">
-      <div className={`text-6xl ${animating ? 'animate-spin' : ''}`}>🤖</div>
-      <h2 className="text-xl font-bold text-slate-800">
-        {done ? 'Action complete!' : animating ? 'Robot is performing action…' : 'Waiting for robot…'}
-      </h2>
-      {!animating && !done && (
-        <p className="text-slate-500 text-sm">Please wait while the robot completes the task.</p>
-      )}
-      {done && (
-        <div className="text-green-600 font-semibold">✓ Done</div>
-      )}
-    </div>
+    <ModalShell>
+      <div className="space-y-5 text-center">
+        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-amber-100 text-6xl">
+          🏃
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900">Completing the task...</h2>
+        <p className="text-slate-500">The avatar is carrying out the promised action.</p>
+      </div>
+    </ModalShell>
   )
 }
 
-// ── Main modal component ──
+function ModalShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/60 p-4" style={{ pointerEvents: 'auto' }}>
+      <div className="w-full max-w-lg rounded-[2rem] bg-white p-8 shadow-2xl">
+        {children}
+      </div>
+    </div>
+  )
+}
 
 export default function PMTriggerModal() {
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
@@ -292,166 +257,191 @@ export default function PMTriggerModal() {
   const advancePMPipelineStep = useGameStore((s) => s.advancePMPipelineStep)
   const setPMPipelineState = useGameStore((s) => s.setPMPipelineState)
   const setGameTimeFrozen = useGameStore((s) => s.setGameTimeFrozen)
+  const setRobotSpeaking = useGameStore((s) => s.setRobotSpeaking)
+  const clearRobotSpeech = useGameStore((s) => s.clearRobotSpeech)
 
-  // Shuffled decoys — computed synchronously via useMemo to avoid async effect gap.
-  // taskId changes per trigger, so shuffle is stable within one trigger instance.
-  const shuffledDecoys = useMemo(() => {
-    if (!pmPipelineState?.taskId) return []
-    return shuffleArray(DECOY_OPTIONS[pmPipelineState.taskId] ?? [])
-  }, [pmPipelineState?.taskId])
+  const step = pmPipelineState?.step as PMPipelineStep | undefined
+  const taskId = pmPipelineState?.taskId ?? null
+  const triggerType = pmPipelineState?.triggerType ?? 'doorbell'
+  const isFake = Boolean(pmPipelineState?.isFake)
+  const guestName = pmPipelineState?.guestName
+    ?? (taskId ? PM_TASKS[taskId]?.guestName : undefined)
+    ?? (triggerType === 'doorbell' ? 'Visitor' : 'Caller')
+
+  const itemOptions = useMemo(() => {
+    if (!taskId) return []
+    return shuffleArray(pmPipelineState?.itemOptions ?? ITEM_SELECTION_OPTIONS[taskId] ?? [])
+  }, [pmPipelineState?.itemOptions, taskId])
 
   const close = useCallback(() => {
+    clearRobotSpeech()
     setPMPipelineState(null)
     setGameTimeFrozen(false)
-  }, [setPMPipelineState, setGameTimeFrozen])
+  }, [clearRobotSpeech, setGameTimeFrozen, setPMPipelineState])
 
-  // Auto-close on 'completed' step (never call setState during render)
-  const step = pmPipelineState?.step as PMPipelineStep | undefined
+  const send = useCallback((type: string, data: Record<string, unknown>) => {
+    const wsSend = useGameStore.getState().wsSend
+    if (wsSend) wsSend({ type, data })
+  }, [])
+
+  const markTriggerResponded = useCallback(() => {
+    if (!pmPipelineState) return
+    send('pm_trigger_responded', {
+      task_id: taskId,
+      trigger_type: triggerType,
+      is_fake: isFake,
+      game_time: nowSeconds(),
+    })
+    clearRobotSpeech()
+    advancePMPipelineStep('greeting')
+  }, [advancePMPipelineStep, clearRobotSpeech, isFake, pmPipelineState, send, taskId, triggerType])
+
   useEffect(() => {
-    if (step === 'completed') close()
-  }, [step, close])
-
-  // ── Stable action sent handler (useCallback so AvatarActionStep's dep stays stable) ──
-  const taskIdRef = useRef(pmPipelineState?.taskId ?? null)
-  taskIdRef.current = pmPipelineState?.taskId ?? null
-
-  const handleAvatarActionSent = useCallback(() => {
-    const send = useGameStore.getState().wsSend
-    const now = Date.now() / 1000
-    const tId = taskIdRef.current
-    if (send && tId) {
-      send({
-        type: 'pm_action_complete',
-        data: {
-          task_id: tId,
-          action_animation_start_time: now - 3,
-          action_animation_complete_time: now,
-        },
-      })
+    const handler = () => {
+      if (useGameStore.getState().pmPipelineState?.step === 'trigger_event') {
+        markTriggerResponded()
+      }
     }
-    close()
-  }, [close])
+    window.addEventListener('pm:doorbell_answered', handler)
+    return () => window.removeEventListener('pm:doorbell_answered', handler)
+  }, [markTriggerResponded])
+
+  useEffect(() => {
+    if (!pmPipelineState || step !== 'trigger_event') return
+    const nudge = setTimeout(() => {
+      setRobotSpeaking(triggerType === 'doorbell' ? "Someone's at the door" : 'You have a call')
+    }, TRIGGER_NUDGE_MS)
+    const timeout = setTimeout(() => {
+      send('pm_trigger_timed_out', {
+        task_id: taskId,
+        trigger_type: triggerType,
+        is_fake: isFake,
+        game_time: nowSeconds(),
+      })
+      clearRobotSpeech()
+      if (isFake) {
+        close()
+      } else {
+        advancePMPipelineStep('reminder')
+      }
+    }, TRIGGER_TIMEOUT_MS)
+    return () => {
+      clearTimeout(nudge)
+      clearTimeout(timeout)
+    }
+  }, [advancePMPipelineStep, clearRobotSpeech, close, isFake, pmPipelineState, send, setRobotSpeaking, step, taskId, triggerType])
+
+  useEffect(() => {
+    if (step === 'reminder' && taskId) {
+      send('pm_reminder_shown', { task_id: taskId, game_time: nowSeconds() })
+      setRobotSpeaking('Hey, I wanted to remind you...')
+    }
+    if (step !== 'reminder') clearRobotSpeech()
+  }, [clearRobotSpeech, send, setRobotSpeaking, step, taskId])
 
   if (!pmPipelineState || step === 'completed') return null
 
-  const { taskId, triggerType, isFake, firedAt } = pmPipelineState
-
-  // ── Greeting text ──
-  const getGreetingText = () => {
-    if (isFake) {
-      return triggerType === 'doorbell'
-        ? GREETING_PLACEHOLDERS['fake_doorbell']
-        : GREETING_PLACEHOLDERS['fake_phone_call']
-    }
-    return taskId ? (GREETING_PLACEHOLDERS[taskId] ?? '[Greeting - TBD]') : '[Greeting - TBD]'
-  }
-
-  // ── Reminder text — ONLY source is REMINDER_PLACEHOLDERS keyed by taskId + condition ──
-  const getReminderText = () => {
-    if (!taskId || !condition) return '[Reminder - TBD]'
-    return REMINDER_PLACEHOLDERS[taskId]?.[condition] ?? '[Reminder - TBD]'
-  }
-
-  // ── Step handlers ──
-
-  const handleAffordanceClick = () => {
-    advancePMPipelineStep('greeting')
-  }
+  const greetingLines = pmPipelineState.greetingLines
+    ?? (taskId ? PM_TASKS[taskId]?.greetingLines : undefined)
+    ?? [taskId ? GREETING_PLACEHOLDERS[taskId] : 'Hello.']
+  const fakeLines = pmPipelineState.fakeResolutionLines
+    ?? FAKE_TRIGGER_LINES[triggerType]
+    ?? ['No need to do anything right now.']
+  const reminderText = pmPipelineState.reminderText
+    ?? (taskId && condition ? REMINDER_PLACEHOLDERS[taskId]?.[condition] : undefined)
+    ?? '[Reminder - TBD]'
 
   const handleGreetingComplete = () => {
-    const send = useGameStore.getState().wsSend
-    if (send && taskId) {
-      send({ type: 'pm_greeting_complete', data: { task_id: taskId, game_time: Date.now() / 1000 } })
+    if (isFake) {
+      advancePMPipelineStep('fake_resolution')
+      return
     }
-    advancePMPipelineStep(isFake ? 'fake_reminder' : 'reminder')
+    if (taskId) send('pm_greeting_complete', { task_id: taskId, game_time: nowSeconds() })
+    advancePMPipelineStep('reminder')
+  }
+
+  const handleFakeComplete = () => {
+    send('fake_trigger_resolved', {
+      trigger_type: triggerType,
+      scheduled_game_time: pmPipelineState.firedAt,
+      resolved_at: nowSeconds(),
+    })
+    close()
   }
 
   const handleReminderAck = () => {
-    const send = useGameStore.getState().wsSend
-    if (send && taskId) {
-      send({ type: 'pm_reminder_ack', data: { task_id: taskId, game_time: Date.now() / 1000 } })
-    }
-    advancePMPipelineStep('decoy')
+    if (taskId) send('pm_reminder_ack', { task_id: taskId, game_time: nowSeconds() })
+    clearRobotSpeech()
+    advancePMPipelineStep('item_selection')
   }
 
-  const handleFakeAck = () => {
-    const send = useGameStore.getState().wsSend
-    if (send) {
-      send({ type: 'fake_trigger_ack', data: { scheduled_game_time: firedAt, trigger_type: triggerType } })
+  const handleItemSelect = (option: DecoyOption, responseTimeMs: number) => {
+    if (taskId) {
+      send('pm_item_selected', {
+        task_id: taskId,
+        item_options_order: itemOptions.map(o => o.id),
+        item_selected: option.id,
+        item_correct: option.isTarget,
+        response_time_ms: responseTimeMs,
+      })
+    }
+    advancePMPipelineStep('confidence_rating')
+  }
+
+  const handleConfidenceSubmit = (rating: number, responseTimeMs: number) => {
+    if (taskId) {
+      send('pm_confidence_rated', {
+        task_id: taskId,
+        confidence_rating: rating,
+        response_time_ms: responseTimeMs,
+      })
+    }
+    advancePMPipelineStep('auto_execute')
+  }
+
+  const handleAutoExecuteDone = (startedAt: number, finishedAt: number) => {
+    if (taskId) {
+      send('pm_action_complete', {
+        task_id: taskId,
+        action_animation_start_time: startedAt,
+        action_animation_complete_time: finishedAt,
+      })
     }
     close()
   }
 
-  const handleDecoySelect = (option: DecoyOption, responseTimeMs: number) => {
-    const send = useGameStore.getState().wsSend
-    if (send && taskId) {
-      send({
-        type: 'pm_decoy_selected',
-        data: {
-          task_id: taskId,
-          decoy_options_order: shuffledDecoys.map((o) => o.id),
-          selected_option: option.id,
-          decoy_correct: option.isTarget,
-          response_time_ms: responseTimeMs,
-        },
-      })
-    }
-    advancePMPipelineStep('confidence')
+  if (step === 'trigger_event') {
+    return triggerType === 'phone_call'
+      ? <PhoneCallScreen guestName={guestName} onAnswer={markTriggerResponded} />
+      : <DoorbellHint />
   }
 
-  const handleConfidenceSubmit = (rating: number, responseTimeMs: number) => {
-    const send = useGameStore.getState().wsSend
-    if (send && taskId) {
-      send({ type: 'pm_confidence_rated', data: { task_id: taskId, confidence_rating: rating, response_time_ms: responseTimeMs } })
-    }
-    advancePMPipelineStep('avatar_action')
+  if (step === 'greeting') {
+    return (
+      <DialogueStep
+        title={triggerLabel(triggerType) === 'phone' ? 'Call' : 'Greeting'}
+        speaker={guestName}
+        lines={greetingLines}
+        onComplete={handleGreetingComplete}
+      />
+    )
   }
 
-  // ── Render step content ──
-  const renderStep = () => {
-    switch (step) {
-      case 'trigger_affordance':
-        return <TriggerAffordance triggerType={triggerType} onOpen={handleAffordanceClick} />
-      case 'greeting':
-        return <GreetingStep greetingText={getGreetingText()} onContinue={handleGreetingComplete} />
-      case 'reminder':
-        return <ReminderStep reminderText={getReminderText()} onAck={handleReminderAck} />
-      case 'fake_reminder':
-        return <FakeReminderStep reminderText={PLACEHOLDER_FAKE_REMINDER_POOL[0] ?? '[Fake reminder]'} onAck={handleFakeAck} />
-      case 'decoy':
-        return <DecoyStep taskId={taskId ?? ''} shuffled={shuffledDecoys} onSelect={handleDecoySelect} />
-      case 'confidence':
-        return <ConfidenceStep onSubmit={handleConfidenceSubmit} />
-      case 'avatar_action':
-        return <AvatarActionStep onActionSent={handleAvatarActionSent} />
-      default:
-        return null
-    }
+  if (step === 'fake_resolution') {
+    return (
+      <DialogueStep
+        title={triggerLabel(triggerType) === 'phone' ? 'Call' : 'Greeting'}
+        speaker={guestName}
+        lines={fakeLines}
+        onComplete={handleFakeComplete}
+      />
+    )
   }
 
-  const content = renderStep()
+  if (step === 'reminder') return <ReminderStep text={reminderText} onAck={handleReminderAck} />
+  if (step === 'item_selection') return <ItemSelectionStep options={itemOptions} onSelect={handleItemSelect} />
+  if (step === 'confidence_rating') return <ConfidenceStep onSubmit={handleConfidenceSubmit} />
+  if (step === 'auto_execute') return <AutoExecuteStep onDone={handleAutoExecuteDone} />
 
-  return (
-    // z-[200] ensures this is always above all game elements (z-50, z-[60], etc.)
-    // pointer-events-auto is explicit: never inherit none from any ancestor
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4"
-      style={{ pointerEvents: 'auto' }}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* DEBUG STRIP — remove before study */}
-        <div className="mb-3 px-2 py-1 bg-yellow-100 rounded text-xs text-yellow-800 font-mono">
-          step={step ?? 'null'} | taskId={taskId ?? 'NULL!'} | decoys={shuffledDecoys.length}
-        </div>
-        {content ?? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-4 border-slate-300 border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
-      </div>
-    </div>
-  )
+  return null
 }

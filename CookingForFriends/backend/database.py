@@ -1,6 +1,7 @@
 """Database engine and session factory (async SQLAlchemy + asyncpg)."""
 
 import uuid
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from config import DATABASE_URL
 
@@ -19,6 +20,31 @@ async def init_db():
     import models.pm_module   # noqa: F401
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _patch_pm_schema(conn)
+
+
+async def _patch_pm_schema(conn):
+    """Add PM columns required by newer code when using an existing dev DB."""
+    await conn.execute(text(
+        "ALTER TABLE pm_task_events "
+        "ADD COLUMN IF NOT EXISTS trigger_responded_at FLOAT"
+    ))
+    await conn.execute(text(
+        "ALTER TABLE pm_task_events "
+        "ADD COLUMN IF NOT EXISTS trigger_timed_out BOOLEAN NOT NULL DEFAULT FALSE"
+    ))
+    await conn.execute(text(
+        "ALTER TABLE fake_trigger_events "
+        "ADD COLUMN IF NOT EXISTS trigger_responded_at FLOAT"
+    ))
+    await conn.execute(text(
+        "ALTER TABLE fake_trigger_events "
+        "ADD COLUMN IF NOT EXISTS trigger_timed_out BOOLEAN NOT NULL DEFAULT FALSE"
+    ))
+    await conn.execute(text(
+        "ALTER TABLE fake_trigger_events "
+        "ADD COLUMN IF NOT EXISTS resolved_at FLOAT"
+    ))
 
 
 async def seed_dev_participant():
@@ -107,4 +133,3 @@ async def get_db() -> AsyncSession:
     """Yield a database session."""
     async with async_session() as session:
         yield session
-

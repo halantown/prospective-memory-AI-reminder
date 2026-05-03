@@ -17,6 +17,8 @@ export default function GamePage() {
   const wsConnected = useGameStore((s) => s.wsConnected)
   const setPhase = useGameStore((s) => s.setPhase)
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
+  const pmBlocksOngoingTask = pmPipelineState && pmPipelineState.step !== 'trigger_event'
+  const pmBlocksPhone = Boolean(pmPipelineState)
 
   useEffect(() => {
     if (!sessionId) setPhase('welcome')
@@ -31,7 +33,7 @@ export default function GamePage() {
     <div className="h-screen w-screen flex overflow-hidden bg-slate-900 select-none">
       {/* World area — FloorPlanView replaces old WorldView tile layout.
            RobotAvatar is suppressed here; Pepper is rendered inside FloorPlanView. */}
-      <div className={`relative flex-1 min-w-0 ${pmPipelineState ? 'pointer-events-none' : ''}`}>
+      <div className={`relative flex-1 min-w-0 ${pmBlocksOngoingTask ? 'pointer-events-none' : ''}`}>
         <FloorPlanView />
         <HUD />
         {/* RobotAvatar hidden — robot sprite lives inside FloorPlanView on the map */}
@@ -47,7 +49,7 @@ export default function GamePage() {
       </div>
 
       {/* Phone sidebar (fixed 440px) */}
-      <div style={{ width: '440px' }} className={`flex-shrink-0 ${pmPipelineState ? 'pointer-events-none' : ''}`}>
+      <div style={{ width: '440px' }} className={`flex-shrink-0 ${pmBlocksPhone ? 'pointer-events-none' : ''}`}>
         <PhoneSidebar />
       </div>
 

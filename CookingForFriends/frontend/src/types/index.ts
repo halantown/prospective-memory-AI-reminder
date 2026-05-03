@@ -21,13 +21,13 @@ export type TaskOrder = 'A' | 'B' | 'C' | 'D'
 
 export type PMPipelineStep =
   | 'idle'
-  | 'trigger_affordance'
+  | 'trigger_event'
   | 'greeting'
   | 'reminder'
-  | 'fake_reminder'
-  | 'decoy'
-  | 'confidence'
-  | 'avatar_action'
+  | 'item_selection'
+  | 'confidence_rating'
+  | 'auto_execute'
+  | 'fake_resolution'
   | 'completed'
 
 export interface PMPipelineState {
@@ -39,6 +39,15 @@ export interface PMPipelineState {
   scheduleIndex: number
   firedAt: number               // client-side Date.now()/1000
   wasInterrupted: boolean
+  condition?: Condition
+  guestName?: string
+  reminderText?: string
+  greetingLines?: string[]
+  fakeResolutionLines?: string[]
+  itemOptions?: DecoyOption[]
+  triggerRespondedAt?: number | null
+  triggerTimedOut?: boolean
+  triggerTimeoutStage?: 0 | 1 | 2
 }
 
 export interface DecoyOption {

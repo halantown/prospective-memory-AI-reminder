@@ -193,14 +193,24 @@ async def _ws_receiver(
                     await _handle_task_action(participant_id, block_number, data, db_factory)
                 elif msg_type == "pm_greeting_complete":
                     await _handle_pm_greeting_complete(participant_id, data, db_factory)
+                elif msg_type == "pm_trigger_responded":
+                    await _handle_pm_trigger_responded(participant_id, data, db_factory)
+                elif msg_type == "pm_trigger_timed_out":
+                    await _handle_pm_trigger_timed_out(participant_id, block_number, data, db_factory)
+                elif msg_type == "pm_reminder_shown":
+                    await _handle_pm_reminder_shown(participant_id, data, db_factory)
                 elif msg_type == "pm_reminder_ack":
                     await _handle_pm_reminder_ack(participant_id, data, db_factory)
+                elif msg_type == "pm_item_selected":
+                    await _handle_pm_decoy_selected(participant_id, data, db_factory)
                 elif msg_type == "pm_decoy_selected":
                     await _handle_pm_decoy_selected(participant_id, data, db_factory)
                 elif msg_type == "pm_confidence_rated":
                     await _handle_pm_confidence_rated(participant_id, data, db_factory)
                 elif msg_type == "pm_action_complete":
                     await _handle_pm_action_complete(participant_id, block_number, data, db_factory)
+                elif msg_type == "fake_trigger_resolved":
+                    await _handle_fake_trigger_ack(participant_id, block_number, data, db_factory)
                 elif msg_type == "fake_trigger_ack":
                     await _handle_fake_trigger_ack(participant_id, block_number, data, db_factory)
                 elif msg_type == "phone_unlock":
@@ -409,6 +419,121 @@ async def _handle_cooking_action(participant_id, block_number, data, db_factory)
     await _handle_interaction(participant_id, block_number, "cooking_action", data, db_factory)
 
 
+async def _handle_pm_trigger_responded(participant_id: str, data: dict, db_factory):
+    """Record that the participant responded to the trigger affordance."""
+    ts = data.get("game_time", time.time())
+    if data.get("is_fake"):
+        trigger_type = data.get("trigger_type", "")
+        async with db_factory() as db:
+            from sqlalchemy import select
+            from models.pm_module import FakeTriggerEvent
+            result = await db.execute(
+                select(FakeTriggerEvent).where(
+                    FakeTriggerEvent.session_id == participant_id,
+                    FakeTriggerEvent.trigger_type == trigger_type,
+                    FakeTriggerEvent.resolved_at.is_(None),
+                ).order_by(FakeTriggerEvent.id.desc()).limit(1)
+            )
+            evt = result.scalar_one_or_none()
+            if evt:
+                evt.trigger_responded_at = ts
+                evt.trigger_timed_out = False
+                await db.commit()
+        return
+
+    task_id = data.get("task_id")
+    if not task_id:
+        return
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.pm_module import PMTaskEvent
+        result = await db.execute(
+            select(PMTaskEvent).where(
+                PMTaskEvent.session_id == participant_id,
+                PMTaskEvent.task_id == task_id,
+                PMTaskEvent.action_animation_complete_time.is_(None),
+            ).order_by(PMTaskEvent.id.desc()).limit(1)
+        )
+        evt = result.scalar_one_or_none()
+        if evt:
+            evt.trigger_responded_at = ts
+            evt.trigger_timed_out = False
+            await db.commit()
+
+
+async def _handle_pm_trigger_timed_out(participant_id: str, block_number: int, data: dict, db_factory):
+    """Record trigger timeout. Fake trigger timeout also resumes the PM scheduler."""
+    ts = data.get("game_time", time.time())
+    if data.get("is_fake"):
+        trigger_type = data.get("trigger_type", "")
+        async with db_factory() as db:
+            from sqlalchemy import select
+            from models.experiment import Participant
+            from models.pm_module import FakeTriggerEvent
+            result = await db.execute(
+                select(FakeTriggerEvent).where(
+                    FakeTriggerEvent.session_id == participant_id,
+                    FakeTriggerEvent.trigger_type == trigger_type,
+                    FakeTriggerEvent.resolved_at.is_(None),
+                ).order_by(FakeTriggerEvent.id.desc()).limit(1)
+            )
+            evt = result.scalar_one_or_none()
+            if evt:
+                evt.trigger_timed_out = True
+                evt.resolved_at = ts
+                evt.acknowledged = True
+            p_result = await db.execute(select(Participant).where(Participant.id == participant_id))
+            p = p_result.scalar_one_or_none()
+            if p:
+                unfreeze_game_time(p)
+            await db.commit()
+
+        runtime = _block_runtimes.get(participant_id)
+        if runtime:
+            runtime.resume("pm")
+        signal_pipeline_complete(participant_id)
+        return
+
+    task_id = data.get("task_id")
+    if not task_id:
+        return
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.pm_module import PMTaskEvent
+        result = await db.execute(
+            select(PMTaskEvent).where(
+                PMTaskEvent.session_id == participant_id,
+                PMTaskEvent.task_id == task_id,
+                PMTaskEvent.action_animation_complete_time.is_(None),
+            ).order_by(PMTaskEvent.id.desc()).limit(1)
+        )
+        evt = result.scalar_one_or_none()
+        if evt:
+            evt.trigger_timed_out = True
+            await db.commit()
+
+
+async def _handle_pm_reminder_shown(participant_id: str, data: dict, db_factory):
+    """Record reminder display time when the card appears."""
+    task_id = data.get("task_id")
+    if not task_id:
+        return
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.pm_module import PMTaskEvent
+        result = await db.execute(
+            select(PMTaskEvent).where(
+                PMTaskEvent.session_id == participant_id,
+                PMTaskEvent.task_id == task_id,
+                PMTaskEvent.action_animation_complete_time.is_(None),
+            ).order_by(PMTaskEvent.id.desc()).limit(1)
+        )
+        evt = result.scalar_one_or_none()
+        if evt and evt.reminder_display_time is None:
+            evt.reminder_display_time = data.get("game_time", time.time())
+            await db.commit()
+
+
 async def _handle_pm_greeting_complete(participant_id: str, data: dict, db_factory):
     """Mark PM greeting animation as complete."""
     task_id = data.get("task_id")
@@ -471,9 +596,9 @@ async def _handle_pm_decoy_selected(participant_id: str, data: dict, db_factory)
         )
         evt = result.scalar_one_or_none()
         if evt:
-            evt.decoy_options_order = data.get("decoy_options_order", [])
-            evt.decoy_selected_option = data.get("selected_option", "")
-            evt.decoy_correct = data.get("decoy_correct", False)
+            evt.decoy_options_order = data.get("item_options_order", data.get("decoy_options_order", []))
+            evt.decoy_selected_option = data.get("item_selected", data.get("selected_option", ""))
+            evt.decoy_correct = data.get("item_correct", data.get("decoy_correct", False))
             rt_ms = data.get("response_time_ms")
             evt.decoy_response_time = rt_ms / 1000.0 if rt_ms is not None else None
             await db.commit()
@@ -574,6 +699,10 @@ async def _handle_fake_trigger_ack(participant_id: str, block_number: int, data:
         evt = result.scalar_one_or_none()
         if evt:
             evt.acknowledged = True
+            now = time.time()
+            if evt.trigger_responded_at is None:
+                evt.trigger_responded_at = data.get("game_time", now)
+            evt.resolved_at = data.get("resolved_at", now)
             await db.commit()
 
         # Unfreeze game time

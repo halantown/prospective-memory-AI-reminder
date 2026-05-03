@@ -22,6 +22,9 @@ class PMTaskDef:
     trigger_type: str        # "doorbell" | "phone_call"
     target_room: str | None  # room where the target item lives (None for T4)
     action_type: str         # "bring_item" | "take_from_fridge" | "reply_in_chat"
+    greeting_lines: tuple[str, ...]
+    reminder_ec_plus: str
+    reminder_ec_minus: str
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,13 @@ TASK_DEFINITIONS: dict[str, PMTaskDef] = {
         trigger_type="doorbell",
         target_room="study",
         action_type="bring_item",
+        greeting_lines=(
+            "Hi! It smells great in here.",
+            "I am glad I made it before dinner.",
+            "Good to see you again.",
+        ),
+        reminder_ec_plus="Remember what you promised after you and Mei played games and ate pastries last time.",
+        reminder_ec_minus="You promised to give Mei something.",
     ),
     "T2": PMTaskDef(
         task_id="T2",
@@ -49,6 +59,13 @@ TASK_DEFINITIONS: dict[str, PMTaskDef] = {
         trigger_type="doorbell",
         target_room="kitchen",
         action_type="bring_item",
+        greeting_lines=(
+            "Hey, thanks for having me.",
+            "I came straight here after work.",
+            "I am excited for dinner.",
+        ),
+        reminder_ec_plus="Remember what Anna asked after she came back from her trip and met you at school.",
+        reminder_ec_minus="You promised to give Lina something.",
     ),
     "T3": PMTaskDef(
         task_id="T3",
@@ -56,6 +73,13 @@ TASK_DEFINITIONS: dict[str, PMTaskDef] = {
         trigger_type="phone_call",
         target_room="kitchen",
         action_type="take_from_fridge",
+        greeting_lines=(
+            "Hey, I am almost there.",
+            "I should arrive in a few minutes.",
+            "See you soon.",
+        ),
+        reminder_ec_plus="Remember what Tom asked after you camped and barbecued together last time.",
+        reminder_ec_minus="You promised to do something for Tom.",
     ),
     "T4": PMTaskDef(
         task_id="T4",
@@ -63,6 +87,13 @@ TASK_DEFINITIONS: dict[str, PMTaskDef] = {
         trigger_type="phone_call",
         target_room=None,
         action_type="reply_in_chat",
+        greeting_lines=(
+            "Hello, I am confirming your delivery order.",
+            "Is there anything else you want to add?",
+            "I can update it now.",
+        ),
+        reminder_ec_plus="Remember what you noticed this morning while changing the decorative light batteries.",
+        reminder_ec_minus="You wanted to add something to your delivery order.",
     ),
 }
 
@@ -119,6 +150,31 @@ def get_task(task_id: str) -> PMTaskDef:
 def get_decoys(task_id: str) -> list[DecoyOption]:
     """Return the 6 decoy options for the given task."""
     return TASK_DECOYS[task_id]
+
+
+def get_item_options(task_id: str) -> list[DecoyOption]:
+    """Return the 3 item-selection options: target + episode-internal distractors."""
+    return [o for o in TASK_DECOYS[task_id] if o.id in {"target", "intra1", "intra2"}]
+
+
+def get_reminder_text(task_id: str, condition: str) -> str:
+    """Return the EC+/EC- reminder text for a task."""
+    task = get_task(task_id)
+    return task.reminder_ec_plus if condition == "EC+" else task.reminder_ec_minus
+
+
+FAKE_TRIGGER_LINES: dict[str, tuple[str, ...]] = {
+    "doorbell": (
+        "Hi, I just came to drop this off.",
+        "No need to do anything right now.",
+        "Enjoy your dinner.",
+    ),
+    "phone_call": (
+        "Hi, just confirming I reached the right number.",
+        "That is all I needed.",
+        "Have a good evening.",
+    ),
+}
 
 
 # ──────────────────────────────────────────────

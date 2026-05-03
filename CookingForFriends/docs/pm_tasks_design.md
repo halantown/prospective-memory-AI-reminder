@@ -8,7 +8,7 @@
 
 - **4 independent PM tasks**, between-subject (每个被试4个task全同condition: all EC+ or all EC-)
 - **Setting**: Saturday evening, player at home preparing dinner, 4 friends arriving
-- **Each task**: Encoding cutscene (past episode) → delay (cooking ongoing task) → trigger → reminder (EC+ or EC-) → "I know" button → 6-option decoy → confidence rating
+- **Each task**: Encoding cutscene (past episode) → delay (cooking ongoing task) → trigger → reminder (EC+ or EC-) → "Got it" button → 3-option item selection → confidence rating
 - **Trigger types**: 2 doorbell + 2 phone call
 - **Cutscene timing**: ~4 segments × ~15s each ≈ 1 min per task, keep consistent across tasks
 
@@ -139,13 +139,23 @@ Anna刚从旅行回来，在学校咖啡厅见面，从礼品袋里拿出给你�
 
 ---
 
-## Decoy Structure (all tasks)
+## Item Selection Structure (current implementation)
 
-6-option multiple choice per task:
+3-option multiple choice per task:
 - 1 × target
 - 2 × episode-internal distractor (from same encoding cutscene)
-- 2 × cross-task items (from other tasks' encoding episodes)
-- 1 × unrelated item (TBD)
+
+The 3 options are randomised for every PM trigger. Selection records `item_selected`, `item_correct`, and the displayed option order. No correctness feedback is shown before the confidence rating.
+
+## Archived 6-option Decoy Structure
+
+Earlier design iterations used:
+- 1 × target
+- 2 × episode-internal distractor
+- 2 × cross-task items
+- 1 × unrelated item
+
+This is retained as a design note only; the current PM module implements the 3-option structure above.
 
 ### Cross-task Item Pool
 
@@ -177,14 +187,40 @@ Anna刚从旅行回来，在学校咖啡厅见面，从礼品袋里拿出给你�
 
 ### Trigger Flow
 1. Trigger event (doorbell / phone call)
-2. Open door / answer phone → greet
+2. Open door / answer phone → automatic greeting playback
 3. Reminder displayed (EC+ or EC-)
-4. "I know" button
-5. 6-option decoy selection
-6. Confidence rating (5-point Likert)
+4. "Got it" button
+5. 3-option item selection
+6. Confidence rating (7-point Likert)
+7. Auto-execute fixed avatar action
+
+Current strict PM state machine:
+
+Real trigger:
+
+```text
+trigger_event
+→ greeting
+→ reminder
+→ item_selection
+→ confidence_rating
+→ auto_execute
+→ completed
+```
+
+Fake trigger:
+
+```text
+trigger_event
+→ greeting
+→ fake_resolution
+→ completed
+```
+
+No UI control may skip or rewind states.
 
 ### Platform Interaction Differences by Task
-| Task | Post-decoy execution |
+| Task | Post-selection execution |
 |------|---------------------|
 | Mei | Navigate to room → pick up 烘焙书 → bring to Mei |
 | Anna/Lina | Navigate to room → pick up 巧克力 → bring to Lina |
@@ -227,6 +263,40 @@ If a prop from the purchased pack is visually close enough, it can be recolored 
 ### Fake Triggers
 - 保留，防止meta-strategy（被试一看到trigger就知道是PM task）
 - 与real trigger同类型混合（doorbell / phone call）
+- Entry interaction matches real triggers.
+- After greeting, fake triggers resolve with an unrelated/natural request and then restore the ongoing task.
+- If the participant does not respond within the trigger timeout, fake triggers end immediately and restore the ongoing task without showing fake resolution.
+
+### Trigger Timeout
+- 30 seconds after trigger with no response: Pepper speech bubble reminder.
+  - Doorbell: "Someone's at the door"
+  - Phone: "You have a call"
+- 45 seconds after trigger with no response:
+  - Real trigger: record `trigger_timed_out=true`, skip the trigger interaction, and show the reminder card.
+  - Fake trigger: record `trigger_timed_out=true`, end the fake pipeline, and restore ongoing task.
+
+### Data Record Per Trigger
+
+```json
+{
+  "task_id": "T1",
+  "trigger_type": "doorbell | phone",
+  "is_fake": false,
+  "condition": "EC+ | EC-",
+  "trigger_fired_at": 0,
+  "trigger_responded_at": null,
+  "trigger_timed_out": false,
+  "reminder_shown_at": 0,
+  "reminder_dismissed_at": 0,
+  "item_selected": "target",
+  "item_correct": true,
+  "confidence_rating": 7,
+  "auto_execute_started_at": 0,
+  "auto_execute_finished_at": 0
+}
+```
+
+Implementation note: runtime uses internal `phone_call`; export maps it to `phone`.
 
 ### Recap (Pilot Testing)
 - Pilot A: no recap after cutscenes

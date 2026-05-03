@@ -67,6 +67,8 @@ class PMTaskEvent(Base):
     trigger_scheduled_game_time: Mapped[float | None] = mapped_column(Float, nullable=True)
     trigger_actual_game_time: Mapped[float | None] = mapped_column(Float, nullable=True)
     trigger_type: Mapped[str] = mapped_column(String(20), nullable=False)    # "doorbell" | "phone_call"
+    trigger_responded_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trigger_timed_out: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Pipeline step timings (game time)
     greeting_complete_time: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -102,6 +104,9 @@ class FakeTriggerEvent(Base):
     scheduled_game_time: Mapped[float | None] = mapped_column(Float, nullable=True)
     actual_game_time: Mapped[float | None] = mapped_column(Float, nullable=True)
     trigger_type: Mapped[str] = mapped_column(String(20), nullable=False)    # "doorbell" | "phone_call"
+    trigger_responded_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trigger_timed_out: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    resolved_at: Mapped[float | None] = mapped_column(Float, nullable=True)
     acknowledged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     pipeline_was_interrupted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

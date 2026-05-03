@@ -226,17 +226,17 @@ async def get_session_state(token: str, db: AsyncSession = Depends(get_db)):
     pipeline_step: Optional[str] = None
     if evt:
         if evt.action_animation_start_time is not None:
-            pipeline_step = "action_animating"
+            pipeline_step = "auto_execute"
         elif evt.confidence_rating is not None:
-            pipeline_step = "action_pending"
+            pipeline_step = "auto_execute"
         elif evt.decoy_selected_option is not None:
-            pipeline_step = "confidence"
+            pipeline_step = "confidence_rating"
         elif evt.reminder_acknowledge_time is not None:
-            pipeline_step = "decoy"
+            pipeline_step = "item_selection"
         elif evt.greeting_complete_time is not None:
             pipeline_step = "reminder"
         else:
-            pipeline_step = "greeting"
+            pipeline_step = "trigger_event"
 
     return SessionStateResponse(
         session_id=p.id,
@@ -244,6 +244,7 @@ async def get_session_state(token: str, db: AsyncSession = Depends(get_db)):
         frozen=p.frozen_since is not None,
         game_time_elapsed_s=get_current_game_time(p),
         pipeline_step=pipeline_step,
+        current_task_id=evt.task_id if evt else None,
         is_test=bool(p.is_test),
         incomplete=bool(p.incomplete),
     )

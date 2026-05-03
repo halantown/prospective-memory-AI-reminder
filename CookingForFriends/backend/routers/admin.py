@@ -749,37 +749,54 @@ async def export_per_participant(
     include_test: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    """CSV export — one row per PMTaskEvent, joined with participant for token/task_order."""
-    query = (
+    """CSV export — one row per real or fake PM trigger."""
+    real_query = (
         select(PMTaskEvent, Participant.token, Participant.task_order)
         .join(Participant, Participant.id == PMTaskEvent.session_id)
         .order_by(PMTaskEvent.id)
     )
+    fake_query = (
+        select(FakeTriggerEvent, Participant.token, Participant.task_order, Participant.condition)
+        .join(Participant, Participant.id == FakeTriggerEvent.session_id)
+        .order_by(FakeTriggerEvent.id)
+    )
     if not include_test:
-        query = query.where(Participant.is_test == False)  # noqa: E712
-    result = await db.execute(query)
-    rows = result.all()
+        real_query = real_query.where(Participant.is_test == False)  # noqa: E712
+        fake_query = fake_query.where(Participant.is_test == False)  # noqa: E712
+    real_result = await db.execute(real_query)
+    fake_result = await db.execute(fake_query)
+    real_rows = real_result.all()
+    fake_rows = fake_result.all()
+
+    def export_trigger_type(value: str) -> str:
+        return "phone" if value == "phone_call" else value
 
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow([
-        "token", "session_id", "task_id", "position_in_order", "condition", "task_order",
-        "trigger_type", "trigger_scheduled_game_time", "trigger_actual_game_time",
-        "greeting_complete_time", "reminder_display_time", "reminder_acknowledge_time",
-        "decoy_options_order", "decoy_selected_option", "decoy_correct", "decoy_response_time",
-        "confidence_rating", "confidence_response_time",
-        "action_animation_start_time", "action_animation_complete_time",
+        "token", "session_id", "task_id", "trigger_type", "is_fake", "condition", "task_order",
+        "trigger_fired_at", "trigger_responded_at", "trigger_timed_out",
+        "reminder_shown_at", "reminder_dismissed_at",
+        "item_options_order", "item_selected", "item_correct",
+        "confidence_rating", "auto_execute_started_at", "auto_execute_finished_at",
         "pipeline_was_interrupted",
     ])
-    for e, token, p_task_order in rows:
+    for e, token, p_task_order in real_rows:
         w.writerow([
-            token, e.session_id, e.task_id, e.position_in_order, e.condition, p_task_order,
-            e.trigger_type, e.trigger_scheduled_game_time, e.trigger_actual_game_time,
-            e.greeting_complete_time, e.reminder_display_time, e.reminder_acknowledge_time,
+            token, e.session_id, e.task_id, export_trigger_type(e.trigger_type), False, e.condition, p_task_order,
+            e.trigger_actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
+            e.reminder_display_time, e.reminder_acknowledge_time,
             json.dumps(e.decoy_options_order) if e.decoy_options_order else "",
-            e.decoy_selected_option, e.decoy_correct, e.decoy_response_time,
-            e.confidence_rating, e.confidence_response_time,
+            e.decoy_selected_option, e.decoy_correct,
+            e.confidence_rating,
             e.action_animation_start_time, e.action_animation_complete_time,
+            e.pipeline_was_interrupted,
+        ])
+    for e, token, p_task_order, condition in fake_rows:
+        w.writerow([
+            token, e.session_id, "", export_trigger_type(e.trigger_type), True, condition, p_task_order,
+            e.actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
+            "", "", "", "", "", "", "", "",
             e.pipeline_was_interrupted,
         ])
     buf.seek(0)

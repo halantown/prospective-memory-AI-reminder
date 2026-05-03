@@ -24,13 +24,43 @@ export interface PMTaskFrontendDef {
   triggerType: 'doorbell' | 'phone_call'
   targetRoom: string | null
   actionType: 'bring_item' | 'take_from_fridge' | 'reply_in_chat'
+  greetingLines: string[]
+  fakeResolutionLines?: string[]
 }
 
 export const PM_TASKS: Record<string, PMTaskFrontendDef> = {
-  T1: { taskId: 'T1', guestName: 'Mei',    triggerType: 'doorbell',   targetRoom: 'study',   actionType: 'bring_item' },
-  T2: { taskId: 'T2', guestName: 'Lina',   triggerType: 'doorbell',   targetRoom: 'kitchen', actionType: 'bring_item' },
-  T3: { taskId: 'T3', guestName: 'Tom',    triggerType: 'phone_call', targetRoom: 'kitchen', actionType: 'take_from_fridge' },
-  T4: { taskId: 'T4', guestName: '送货员', triggerType: 'phone_call', targetRoom: null,      actionType: 'reply_in_chat' },
+  T1: {
+    taskId: 'T1',
+    guestName: 'Mei',
+    triggerType: 'doorbell',
+    targetRoom: 'study',
+    actionType: 'bring_item',
+    greetingLines: ['Hi! It smells great in here.', 'I am glad I made it before dinner.', 'Good to see you again.'],
+  },
+  T2: {
+    taskId: 'T2',
+    guestName: 'Lina',
+    triggerType: 'doorbell',
+    targetRoom: 'kitchen',
+    actionType: 'bring_item',
+    greetingLines: ['Hey, thanks for having me.', 'I came straight here after work.', 'I am excited for dinner.'],
+  },
+  T3: {
+    taskId: 'T3',
+    guestName: 'Tom',
+    triggerType: 'phone_call',
+    targetRoom: 'kitchen',
+    actionType: 'take_from_fridge',
+    greetingLines: ['Hey, I am almost there.', 'I should arrive in a few minutes.', 'See you soon.'],
+  },
+  T4: {
+    taskId: 'T4',
+    guestName: 'Delivery',
+    triggerType: 'phone_call',
+    targetRoom: null,
+    actionType: 'reply_in_chat',
+    greetingLines: ['Hello, I am confirming your delivery order.', 'Is there anything else you want to add?', 'I can update it now.'],
+  },
 }
 
 export const DECOY_OPTIONS: Record<string, DecoyOption[]> = {
@@ -65,5 +95,25 @@ export const DECOY_OPTIONS: Record<string, DecoyOption[]> = {
     { id: 'cross1',    label: '明信片',              isTarget: false },
     { id: 'cross2',    label: '蓝牙音箱',            isTarget: false },
     { id: 'unrelated', label: '[T4 unrelated TBD]', isTarget: false },
+  ],
+}
+
+export const ITEM_SELECTION_OPTIONS: Record<string, DecoyOption[]> = Object.fromEntries(
+  Object.entries(DECOY_OPTIONS).map(([taskId, options]) => [
+    taskId,
+    options.filter(option => ['target', 'intra1', 'intra2'].includes(option.id)),
+  ]),
+) as Record<string, DecoyOption[]>
+
+export const FAKE_TRIGGER_LINES: Record<'doorbell' | 'phone_call', string[]> = {
+  doorbell: [
+    'Hi, I just came to drop this off.',
+    'No need to do anything right now.',
+    'Enjoy your dinner.',
+  ],
+  phone_call: [
+    'Hi, just confirming I reached the right number.',
+    'That is all I needed.',
+    'Have a good evening.',
   ],
 }

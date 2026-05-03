@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import { getSessionState } from '../services/api'
-import type { ActivePMTrial, PMTaskConfig, RoomId } from '../types'
+import type { ActivePMTrial, PMPipelineStep, PMTaskConfig, RoomId } from '../types'
 
 const HEARTBEAT_INTERVAL = 30_000
 const RECONNECT_BASE_MS = 500
@@ -75,7 +75,7 @@ export function useWebSocket(sessionId: string | null) {
         }
 
         store.setPMPipelineState({
-          step: 'trigger_affordance',
+          step: 'trigger_event',
           taskId: isFake ? null : taskId,
           triggerType,
           isFake,
@@ -83,6 +83,15 @@ export function useWebSocket(sessionId: string | null) {
           scheduleIndex,
           firedAt: Date.now() / 1000,
           wasInterrupted: false,
+          condition: data.condition as 'EC+' | 'EC-' | undefined,
+          guestName: data.guest_name as string | undefined,
+          reminderText: data.reminder_text as string | undefined,
+          greetingLines: data.greeting_lines as string[] | undefined,
+          fakeResolutionLines: data.fake_resolution_lines as string[] | undefined,
+          itemOptions: data.item_options as Array<{ id: string; label: string; isTarget: boolean }> | undefined,
+          triggerRespondedAt: null,
+          triggerTimedOut: false,
+          triggerTimeoutStage: 0,
         })
         store.setGameTimeFrozen(true)
 
@@ -243,8 +252,8 @@ export function useWebSocket(sessionId: string | null) {
         getSessionState(sessionId).then((state) => {
           if (state?.pipeline_step && state.pipeline_step !== 'idle') {
             useGameStore.getState().setPMPipelineState({
-              step: 'trigger_affordance',
-              taskId: (state.task_id as string) || null,
+              step: (state.pipeline_step as PMPipelineStep) || 'trigger_event',
+              taskId: (state.current_task_id as string) || null,
               triggerType: (state.trigger_type as 'doorbell' | 'phone_call') || 'doorbell',
               isFake: Boolean(state.is_fake),
               taskPosition: (state.task_position as number) || null,
