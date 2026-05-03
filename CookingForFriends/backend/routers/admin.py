@@ -19,7 +19,7 @@ from models.experiment import Experiment, ExperimentStatus, Participant, Partici
 from models.block import Block, BlockStatus, PMTrial, PMAttemptRecord, ReminderMessage
 from models.logging import InteractionLog, PhoneMessageLog, GameStateSnapshot, MouseTrack, RobotIdleCommentLog
 from models.cooking import CookingStepRecord
-from models.pm_module import PMTaskEvent, FakeTriggerEvent, PhaseEvent, IntentionCheckEvent
+from models.pm_module import PMTaskEvent, FakeTriggerEvent, PhaseEvent, IntentionCheckEvent, ExperimentResponse
 from models.schemas import (
     ParticipantCreateResponse, ReminderImportItem,
     AdminParticipantCreateRequest,
@@ -364,7 +364,44 @@ async def get_participant_detail(session_id: str, db: AsyncSession = Depends(get
         "is_online": p.is_online,
         "created_at": p.created_at.isoformat() if p.created_at else None,
         "blocks": block_list,
+        "phase_history": await _phase_history(db, session_id),
+        "responses": await _experiment_responses(db, session_id),
     }
+
+
+async def _phase_history(db: AsyncSession, session_id: str) -> list[dict]:
+    result = await db.execute(
+        select(PhaseEvent)
+        .where(PhaseEvent.session_id == session_id)
+        .order_by(PhaseEvent.start_time, PhaseEvent.id)
+    )
+    return [
+        {
+            "phase": e.phase_name,
+            "entered_at": e.start_time,
+            "exited_at": e.end_time,
+        }
+        for e in result.scalars().all()
+    ]
+
+
+async def _experiment_responses(db: AsyncSession, session_id: str) -> list[dict]:
+    result = await db.execute(
+        select(ExperimentResponse)
+        .where(ExperimentResponse.session_id == session_id)
+        .order_by(ExperimentResponse.timestamp, ExperimentResponse.id)
+    )
+    return [
+        {
+            "phase": e.phase_name,
+            "question_id": e.question_id,
+            "response_type": e.response_type,
+            "value": e.value,
+            "timestamp": e.timestamp,
+            "metadata": e.extra_metadata,
+        }
+        for e in result.scalars().all()
+    ]
 
 
 @router.post("/participant/{session_id}/reset")
@@ -519,8 +556,16 @@ async def export_data(db: AsyncSession = Depends(get_db)):
             "participant_id": p.participant_id,
             "session_id": p.id,
             "condition": p.condition,
+            "task_order": p.task_order,
+            "is_test": p.is_test,
+            "incomplete": p.incomplete,
+            "current_phase": p.current_phase,
             "status": p.status.value if isinstance(p.status, ParticipantStatus) else p.status,
             "created_at": p.created_at.isoformat() if p.created_at else None,
+            "started_at": p.started_at.isoformat() if p.started_at else None,
+            "completed_at": p.completed_at.isoformat() if p.completed_at else None,
+            "phase_history": await _phase_history(db, p.id),
+            "responses": await _experiment_responses(db, p.id),
             "blocks": block_data,
             "log_count": len(logs),
         })
@@ -869,6 +914,36 @@ async def export_full_zip(
                 e.comment_id, e.text, e.shown_at,
             ])
 
+    phase_rows: list[list] = []
+    response_rows: list[list] = []
+    if session_ids:
+        phase_result = await db.execute(
+            select(PhaseEvent)
+            .where(PhaseEvent.session_id.in_(session_ids))
+            .order_by(PhaseEvent.session_id, PhaseEvent.start_time, PhaseEvent.id)
+        )
+        for e in phase_result.scalars().all():
+            participant_id, session_id = participant_fields(e.session_id)
+            phase_rows.append([
+                participant_id, session_id,
+                e.phase_name, e.start_time, e.end_time,
+            ])
+
+        response_result = await db.execute(
+            select(ExperimentResponse)
+            .where(ExperimentResponse.session_id.in_(session_ids))
+            .order_by(ExperimentResponse.session_id, ExperimentResponse.timestamp, ExperimentResponse.id)
+        )
+        for e in response_result.scalars().all():
+            participant_id, session_id = participant_fields(e.session_id)
+            response_rows.append([
+                participant_id, session_id,
+                e.phase_name, e.question_id, e.response_type,
+                json.dumps(e.value, ensure_ascii=False),
+                e.timestamp,
+                json.dumps(e.extra_metadata or {}, ensure_ascii=False),
+            ])
+
     navigation_rows: list[list] = []
     recipe_rows: list[list] = []
     if block_ids:
@@ -931,6 +1006,15 @@ async def export_full_zip(
             "participant_id", "session_id",
             "comment_id", "text", "shown_at",
         ], robot_rows))
+        zf.writestr("phase_history.csv", csv_bytes([
+            "participant_id", "session_id",
+            "phase", "entered_at", "exited_at",
+        ], phase_rows))
+        zf.writestr("experiment_responses.csv", csv_bytes([
+            "participant_id", "session_id",
+            "phase", "question_id", "response_type",
+            "value_json", "timestamp", "metadata_json",
+        ], response_rows))
         zf.writestr("room_navigation.csv", csv_bytes([
             "participant_id", "session_id",
             "from_room", "to_room", "navigated_at",
