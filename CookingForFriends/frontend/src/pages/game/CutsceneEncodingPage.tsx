@@ -26,9 +26,10 @@ import {
   DETAILCHECK_PLACEHOLDERS,
   INTENTIONCHECK_PLACEHOLDERS,
 } from '../../constants/placeholders'
-import CutscenePlayer from '../../components/game/CutscenePlayer'
 import DetailCheckModal from '../../components/game/DetailCheckModal'
 import IntentionCheckQuestion from '../../components/game/IntentionCheckQuestion'
+import FloorPlanView from '../../components/game/FloorPlanView'
+import PhoneSidebar from '../../components/game/PhoneSidebar'
 
 type Stage =
   | { kind: 'cutscene'; taskIdx: number; segIdx: number }
@@ -190,26 +191,60 @@ export default function CutsceneEncodingPage() {
 
   if (stage.kind === 'done') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-          <div className="text-5xl mb-4">✅</div>
-          <h2 className="text-xl font-bold text-slate-800">Encoding Complete</h2>
-          <p className="text-slate-500 mt-2">Starting the game…</p>
+      <div className="h-screen w-screen flex overflow-hidden bg-slate-900 select-none relative">
+        <div className="relative flex-1 min-w-0 pointer-events-none">
+          <FloorPlanView />
+        </div>
+        <div style={{ width: '440px' }} className="flex-shrink-0 pointer-events-none">
+          <PhoneSidebar />
+        </div>
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/70">
+          <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+            <div className="text-5xl mb-4">✅</div>
+            <h2 className="text-xl font-bold text-slate-800">Encoding Complete</h2>
+            <p className="text-slate-500 mt-2">Starting the game…</p>
+          </div>
         </div>
       </div>
     )
   }
 
+  const phoneWidth = 440
+
   if (stage.kind === 'cutscene') {
     const taskId = tasks[stage.taskIdx]
     const placeholder = CUTSCENE_PLACEHOLDERS[taskId]?.[stage.segIdx] ?? '[Cutscene - TBD]'
     return (
-      <CutscenePlayer
-        taskId={taskId}
-        segmentIndex={stage.segIdx}
-        placeholder={placeholder}
-        onNext={handleCutsceneNext}
-      />
+      <div className="h-screen w-screen flex overflow-hidden bg-slate-900 select-none relative">
+        <div className="relative flex-1 min-w-0 pointer-events-none">
+          <FloorPlanView />
+        </div>
+        <div style={{ width: `${phoneWidth}px` }} className="flex-shrink-0 pointer-events-none">
+          <PhoneSidebar />
+        </div>
+        {/* Galgame bottom dialogue panel */}
+        <div
+          className="absolute bottom-0 left-0 pointer-events-auto"
+          style={{ right: `${phoneWidth}px` }}
+        >
+          <div className="m-4 rounded-xl bg-slate-950/85 backdrop-blur-sm border border-slate-700 p-5 shadow-2xl">
+            <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3">
+              🎬 Scene · Task {taskId} · {stage.segIdx + 1} / 4
+            </p>
+            <p className="text-slate-100 text-sm leading-relaxed whitespace-pre-wrap mb-4 min-h-[3rem]">
+              {placeholder}
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={handleCutsceneNext}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm transition-colors"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -221,7 +256,14 @@ export default function CutsceneEncodingPage() {
       correctIndex: 0,
     }
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center">
+      <div className="h-screen w-screen flex overflow-hidden bg-slate-900 select-none relative">
+        <div className="relative flex-1 min-w-0 pointer-events-none">
+          <FloorPlanView />
+        </div>
+        <div style={{ width: `${phoneWidth}px` }} className="flex-shrink-0 pointer-events-none">
+          <PhoneSidebar />
+        </div>
+        {/* DetailCheckModal uses fixed inset-0 internally — renders over everything */}
         <DetailCheckModal
           question={checkData.question}
           options={checkData.options}
@@ -240,12 +282,26 @@ export default function CutsceneEncodingPage() {
       correctIndex: 0,
     }
     return (
-      <IntentionCheckQuestion
-        taskId={taskId}
-        data={data}
-        position={stage.taskIdx + 1}
-        onComplete={handleIntentionCheckComplete}
-      />
+      <div className="h-screen w-screen flex overflow-hidden bg-slate-900 select-none relative">
+        <div className="relative flex-1 min-w-0 pointer-events-none">
+          <FloorPlanView />
+        </div>
+        <div style={{ width: `${phoneWidth}px` }} className="flex-shrink-0 pointer-events-none">
+          <PhoneSidebar />
+        </div>
+        <div
+          className="absolute inset-0 z-40 bg-slate-950/60 flex items-center justify-center p-6 pointer-events-auto"
+          style={{ right: `${phoneWidth}px` }}
+        >
+          <IntentionCheckQuestion
+            taskId={taskId}
+            data={data}
+            position={stage.taskIdx + 1}
+            onComplete={handleIntentionCheckComplete}
+            className="w-full max-w-2xl"
+          />
+        </div>
+      </div>
     )
   }
 
