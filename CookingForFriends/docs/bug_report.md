@@ -33,6 +33,10 @@
   - cooking WS payload 已新增 `activated_game_time`、`deadline_game_time`、`started_game_time`；旧 `activated_at` / `started_at` 继续保留为 wall timestamp/backcompat。
   - cooking pause/resume 不再取消并重建 timeline/timeout task，而是 pause/resume clock；timeout task 会在 `clock.sleep_until(deadline_game_time)` 中等待。
   - 新增回归测试：PM pause 期间 active step 不 timeout，resume 后才 timeout；response time 不包含 pause wall time。
+- 第三批迁移（2026-05-03）：
+  - `game_handler.py` 新增 per-participant `_game_clocks`，timeline 和 `CookingEngine` 注入同一个 `GameClock` 实例。
+  - PM pause/resume 当前仍通过 legacy glue 调用 timeline/cooking，但二者现在共享同一个 clock；重复 pause/resume 是 idempotent。
+  - 这一步还不是完整 `BlockRuntime`，PM scheduler 仍暂时使用 DB-backed `game_time` polling。
 - 风险：
   - 当前仍是三套时间的边界同步，不是单一时间源。
   - process restart / reconnect 后，timeline/cooking 的运行态仍主要在内存里，不能作为生产级恢复机制。
@@ -85,10 +89,10 @@ Codebase review（2026-05-03）：
    - [x] 单元测试覆盖 start/pause/resume、嵌套/重复 pause no-op、sleep_until 被 pause 拉长但 game time 不前进。
 4. Phase 3 — 引入 `BlockRuntime` owner
 
-   - 新增 `backend/engine/block_runtime.py`，由 `game_handler.py` 创建并持有：`clock`、timeline task、`CookingEngine`、PM session task。
+   - [ ] 新增 `backend/engine/block_runtime.py`，由 `game_handler.py` 创建并持有：`clock`、timeline task、`CookingEngine`、PM session task。
    - `runtime.start()` 负责 start_game 后创建 timeline/cooking/pm_scheduler。
-   - `runtime.pause("pm")` 只 pause `GameClock`，必要时发送 clock snapshot；timeline/cooking 因等待同一个 clock 自动停住。
-   - `runtime.resume("pm")` 只 resume `GameClock` 并持久化 snapshot。
+   - [x] `runtime.pause("pm")` 只 pause `GameClock`，必要时发送 clock snapshot；timeline/cooking 因等待同一个 clock 自动停住。
+   - [x] `runtime.resume("pm")` 只 resume `GameClock` 并持久化 snapshot。
    - `game_handler.py` 不再分别 import/call `pause_timeline()`、`resume_timeline()`、`cooking.pause()`、`cooking.resume()`。
 5. Phase 4 — timeline 迁移
 

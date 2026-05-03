@@ -8,6 +8,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from websocket.connection_manager import manager, ws_pump
 from engine.timeline import run_timeline, cancel_timeline, pause_timeline, resume_timeline
 from engine.cooking_engine import CookingEngine
+from engine.game_clock import GameClock
 from engine.game_time import start_game_time, unfreeze_game_time, get_current_game_time
 from engine.pm_session import run_pm_session, signal_pipeline_complete
 from models.logging import InteractionLog, MouseTrack, PhoneMessageLog
@@ -17,8 +18,19 @@ logger = logging.getLogger(__name__)
 # Per-participant CookingEngine instances
 _cooking_engines: dict[str, CookingEngine] = {}
 
+# Per-participant gameplay clocks shared by timeline and cooking.
+_game_clocks: dict[str, GameClock] = {}
+
 # Per-participant PM session tasks
 _pm_session_tasks: dict[str, asyncio.Task] = {}
+
+
+def _get_game_clock(participant_id: str) -> GameClock:
+    clock = _game_clocks.get(participant_id)
+    if clock is None:
+        clock = GameClock()
+        _game_clocks[participant_id] = clock
+    return clock
 
 
 def _pause_gameplay_for_pm(participant_id: str, block_number: int) -> None:
@@ -144,6 +156,7 @@ async def handle_game_ws(
                             f"(> {COOKING_TOTAL_DURATION_S}s), ignoring stale start time"
                         )
                 logger.info(f"[GAME_HANDLER] Auto-starting timeline (block already PLAYING) for {participant_id} block {block_number}")
+                clock = _get_game_clock(participant_id)
                 timeline_task = await run_timeline(
                     participant_id=participant_id,
                     block_number=block_number,
@@ -151,6 +164,7 @@ async def handle_game_ws(
                     send_fn=send_event,
                     db_factory=db_factory,
                     block_start_time=block_start_ts,
+                    clock=clock,
                 )
                 logger.info(f"[GAME_HANDLER] Timeline resumed for {participant_id} block {block_number}")
 
@@ -162,9 +176,10 @@ async def handle_game_ws(
                             block_id=block_id,
                             send_fn=send_event,
                             db_factory=db_factory,
+                            clock=clock,
                         )
                         _cooking_engines[participant_id] = cooking
-                        cooking.start()
+                        cooking.start(block_start_ts)
                         logger.info(f"[GAME_HANDLER] CookingEngine restarted on reconnect for {participant_id} block {block_number}")
                     except Exception as ce:
                         logger.error(f"[GAME_HANDLER] CookingEngine restart failed on reconnect: {ce}")
@@ -215,6 +230,7 @@ async def handle_game_ws(
             if cooking:
                 await cooking.save_dish_scores()
                 await cooking.stop()
+            _game_clocks.pop(participant_id, None)
             # Cancel PM session task
             pm_task = _pm_session_tasks.pop(participant_id, None)
             if pm_task and not pm_task.done():
@@ -356,6 +372,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
                 await cooking.save_dish_scores()
                 await cooking.stop()
                 logger.info(f"[GAME_HANDLER] CookingEngine scores saved for {participant_id}")
+            _game_clocks.pop(participant_id, None)
 
             async with db_factory() as db:
                 from sqlalchemy import select
@@ -376,6 +393,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
 
     # Start the timeline — rollback block status on failure
     logger.info(f"[GAME_HANDLER] Creating TimelineEngine for {participant_id} block {block_number} ({condition})")
+    clock = _get_game_clock(participant_id)
     try:
         task = await run_timeline(
             participant_id=participant_id,
@@ -384,10 +402,12 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
             send_fn=send_fn,
             on_complete=_on_block_complete,
             db_factory=db_factory,
+            clock=clock,
         )
         logger.info(f"[GAME_HANDLER] Timeline task created: {task}")
     except Exception as e:
         logger.error(f"[GAME_HANDLER] Timeline start failed, rolling back block status: {e}")
+        _game_clocks.pop(participant_id, None)
         async with db_factory() as db:
             from sqlalchemy import update as sql_update
             await db.execute(
@@ -405,6 +425,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
             block_id=block_id,
             send_fn=send_fn,
             db_factory=db_factory,
+            clock=clock,
         )
         _cooking_engines[participant_id] = cooking
         cooking.start()

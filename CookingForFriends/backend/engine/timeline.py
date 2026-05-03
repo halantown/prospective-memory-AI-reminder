@@ -167,6 +167,7 @@ async def run_timeline(
     on_complete=None,
     db_factory=None,
     block_start_time: float | None = None,
+    clock: GameClock | None = None,
 ):
     """Start and run a block timeline.
 
@@ -208,9 +209,9 @@ async def run_timeline(
     clock_end_seconds = timeline.get("clock_end_seconds", DEFAULT_CLOCK_END_SECONDS)
     logger.info(f"[TIMELINE] Loaded timeline for {key}: {len(events)} events, {duration}s duration")
 
-    control = TimelineControl(
-        clock=GameClock(clock_end_seconds=clock_end_seconds),
-    )
+    timeline_clock = clock or GameClock(clock_end_seconds=clock_end_seconds)
+    timeline_clock.clock_end_seconds = clock_end_seconds
+    control = TimelineControl(clock=timeline_clock)
 
     async def _run():
         try:

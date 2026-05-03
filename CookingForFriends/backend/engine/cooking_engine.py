@@ -66,6 +66,7 @@ class CookingEngine:
         block_id: int,
         send_fn: SendFn,
         db_factory: Any,
+        clock: GameClock | None = None,
     ):
         self.participant_id = participant_id
         self.block_id = block_id
@@ -91,7 +92,7 @@ class CookingEngine:
         # Timeline scheduling
         self._timeline_task: asyncio.Task | None = None
         self._running = False
-        self._clock = GameClock()
+        self._clock = clock or GameClock()
         self._next_timeline_index: int = 0
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────

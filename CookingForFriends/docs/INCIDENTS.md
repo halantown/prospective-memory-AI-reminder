@@ -955,6 +955,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 | 01:55 | `GameClock` abstraction added and timeline migrated to it |
 | 02:04 | Backend compile/tests passed |
 | 02:18 | CookingEngine activation/timeout/response-time migrated to `GameClock` |
+| 02:25 | Timeline and CookingEngine wired to a shared per-participant `GameClock` |
 
 ### Root Cause
 > The PM pause fix was added after timeline and cooking scheduling already existed. Instead of one owner for gameplay time, the codebase had boundary synchronization: DB participant game time for PM triggers, `TimelineControl` for timeline events, and `CookingEngine` offsets for cooking. This made it easy for future gameplay scheduling to bypass PM pause semantics.
@@ -977,6 +978,8 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > `backend/engine/cooking_engine.py`: cooking timeline waits, active-step timeout, and response-time calculation now use `GameClock`. WebSocket payloads include `activated_game_time`, `deadline_game_time`, and `started_game_time`; wall-time fields remain for compatibility.
 >
 > `backend/tests/test_cooking_engine.py`: added regressions proving PM pause prevents cooking timeout and cooking response time excludes paused wall time.
+>
+> `backend/websocket/game_handler.py`: added a per-participant `_game_clocks` registry and injects the same `GameClock` into both `run_timeline()` and `CookingEngine`. Existing pause/resume glue remains for compatibility, but timeline and cooking now pause the same clock instance.
 
 ### Verification
 > `cd CookingForFriends/backend && conda run -n thesis_server python -m py_compile engine/game_clock.py engine/timeline.py engine/timeline_generator.py routers/timeline_editor.py` passes.
