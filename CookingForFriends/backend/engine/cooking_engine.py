@@ -19,7 +19,7 @@ from typing import Any, Callable, Awaitable, Literal
 
 from config import COOKING_STEP_WINDOW_S, COOKING_DISHES
 from data.cooking_recipes import ALL_RECIPES, CookingStepDef, DISH_LABELS, DISH_EMOJIS
-from data.cooking_timeline import COOKING_TIMELINE, TimelineEntry
+from data.cooking_timeline import COOKING_TIMELINE, ROBOT_IDLE_COMMENTS, TimelineEntry
 from engine.game_clock import GameClock
 
 logger = logging.getLogger(__name__)
@@ -91,6 +91,7 @@ class CookingEngine:
 
         # Timeline scheduling
         self._timeline_task: asyncio.Task | None = None
+        self._idle_comment_task: asyncio.Task | None = None
         self._running = False
         self._clock = clock or GameClock()
         self._next_timeline_index: int = 0
@@ -103,6 +104,7 @@ class CookingEngine:
         self._running = True
         self._next_timeline_index = 0
         self._timeline_task = asyncio.create_task(self._run_timeline())
+        self._idle_comment_task = asyncio.create_task(self._run_idle_comments())
         return self._timeline_task
 
     async def stop(self):
@@ -118,6 +120,9 @@ class CookingEngine:
         if self._timeline_task and not self._timeline_task.done():
             self._timeline_task.cancel()
         self._timeline_task = None
+        if self._idle_comment_task and not self._idle_comment_task.done():
+            self._idle_comment_task.cancel()
+        self._idle_comment_task = None
 
     def pause(self):
         """Pause all cooking timers (called during PM pipeline freeze)."""
@@ -150,6 +155,26 @@ class CookingEngine:
             logger.debug("CookingEngine timeline cancelled for block %d", self.block_id)
         except Exception:
             logger.exception("CookingEngine timeline error for block %d", self.block_id)
+
+    async def _run_idle_comments(self):
+        """Emit non-interactive robot comments during lighter cooking gaps."""
+        try:
+            for comment in ROBOT_IDLE_COMMENTS:
+                if not self._running:
+                    break
+                await self._clock.sleep_until(comment.t)
+                if not self._running:
+                    break
+                await self._send("robot_idle_comment", {
+                    "comment_id": comment.comment_id,
+                    "text": comment.text,
+                    "scheduled_game_time": comment.t,
+                    "game_time": self._clock.now(),
+                })
+        except asyncio.CancelledError:
+            logger.debug("CookingEngine idle comments cancelled for block %d", self.block_id)
+        except Exception:
+            logger.exception("CookingEngine idle comment error for block %d", self.block_id)
 
     async def _activate_entry(self, entry: TimelineEntry):
         """Activate a single timeline entry (step)."""

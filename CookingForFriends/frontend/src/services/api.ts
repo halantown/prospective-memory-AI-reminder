@@ -44,6 +44,19 @@ export async function getSessionStatus(sessionId: string) {
   }>(`/session/${sessionId}/status`)
 }
 
+export async function postMouseTrackingBatch(
+  sessionId: string,
+  records: Array<Record<string, unknown>>,
+  options?: { keepalive?: boolean },
+) {
+  return fetch(`${API_BASE}/mouse-tracking`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, records }),
+    keepalive: options?.keepalive,
+  })
+}
+
 export async function getBlockEncoding(sessionId: string) {
   return request<BlockEncoding>(`/session/${sessionId}/encoding`)
 }
@@ -213,6 +226,12 @@ export async function exportPerParticipant(includeTest = false): Promise<Blob> {
 
 export async function exportAggregated(includeTest = false): Promise<Blob> {
   const res = await fetch(`${API_BASE}/admin/export/aggregated?include_test=${includeTest}`)
+  if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+  return res.blob()
+}
+
+export async function exportFull(includeTest = false): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/admin/export/full?include_test=${includeTest}`)
   if (!res.ok) throw new Error(`Export failed: ${res.status}`)
   return res.blob()
 }

@@ -12,6 +12,22 @@
 - **Trigger types**: 2 doorbell + 2 phone call
 - **Cutscene timing**: ~4 segments × ~15s each ≈ 1 min per task, keep consistent across tasks
 
+## Counterbalance
+
+Participants are assigned automatically by backend participant count modulo 8.
+The 8 cells are `4 Latin-square orders × 2 EC conditions`; test sessions do not affect the count.
+
+Latin-square orders:
+
+| Order | Sequence |
+|-------|----------|
+| A | T1 T2 T4 T3 |
+| B | T2 T3 T1 T4 |
+| C | T3 T4 T2 T1 |
+| D | T4 T1 T3 T2 |
+
+The four real PM trigger slots are fixed in the cooking timeline. Slot timing does not bind trigger type: trigger type travels with the task assigned to that slot.
+
 ---
 
 ## Task 1: Mei — 烘焙书
@@ -297,6 +313,65 @@ If a prop from the purchased pack is visually close enough, it can be recolored 
 ```
 
 Implementation note: runtime uses internal `phone_call`; export maps it to `phone`.
+
+## Robot Idle Comments
+
+Robot idle comments are non-interactive social-presence events during the ongoing cooking task.
+They are scheduled in lighter cooking gaps and away from PM/fake trigger windows by at least 30 seconds.
+
+Current placeholder comments:
+
+| comment_id | Approx. time | Text |
+|------------|--------------|------|
+| idle_oven_vegetables | 130s | Vegetables are in the oven, smells good already. |
+| idle_soup_simmer | 250s | The soup is coming along nicely. |
+| idle_almost_there | 710s | Almost there, chef. |
+
+Frontend displays the same robot speech bubble style as PM reminder speech, without a reminder card, for 2-3 seconds. Display is logged as `{ comment_id, text, shown_at }`.
+
+## Mouse Tracking
+
+Mouse tracking is an exploratory behavioral correlate of confidence, not an independent DV.
+
+Collection:
+
+- Sample every 100ms.
+- Flush JSON batches over HTTP every 60 seconds to `/api/mouse-tracking`.
+- Flush remaining records when gameplay ends/unmounts.
+- `page_state` only distinguishes `item_selection` vs `other`.
+
+The mouse JSON stream contains coordinate samples and embedded event markers at the same level:
+
+```json
+[
+  { "type": "sample", "timestamp": 0, "x": 100, "y": 200, "page_state": "other" },
+  { "type": "event", "event": "item_selection_start", "timestamp": 0, "page_state": "item_selection", "task_id": "T1" },
+  { "type": "sample", "timestamp": 0, "x": 120, "y": 220, "page_state": "item_selection" },
+  { "type": "event", "event": "item_selection_end", "timestamp": 0, "page_state": "item_selection", "task_id": "T1", "selected_item": "baking_book" }
+]
+```
+
+Analysis slices trajectories from `item_selection_start` to `item_selection_end`. Planned metrics: MD, AUC, x-flips, IT, MT.
+
+## Export
+
+Unified export endpoint: `/api/admin/export/full`.
+
+It returns a zip containing:
+
+- `pm_events.csv`
+- `cooking_steps.csv`
+- `phone_messages.csv`
+- `robot_idle_comments.csv`
+- `room_navigation.csv`
+- `recipe_views.csv`
+- `mouse_tracking/<participant_id>_<session_id>.json`
+
+All CSV rows include `participant_id` and `session_id`. Cooking status mapping is:
+
+- `correct -> success`
+- `wrong -> wrong_choice`
+- `missed -> timeout`
 
 ### Recap (Pilot Testing)
 - Pilot A: no recap after cutscenes

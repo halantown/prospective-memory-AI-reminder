@@ -9,7 +9,7 @@ from websocket.connection_manager import manager, ws_pump
 from engine.block_runtime import BlockRuntime
 from engine.game_time import start_game_time, unfreeze_game_time, get_current_game_time
 from engine.pm_session import signal_pipeline_complete
-from models.logging import InteractionLog, MouseTrack, PhoneMessageLog
+from models.logging import InteractionLog, MouseTrack, PhoneMessageLog, RobotIdleCommentLog
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +231,8 @@ async def _ws_receiver(
                     await _handle_cooking_action(participant_id, block_number, data, db_factory)
                 elif msg_type == "recipe_view":
                     await _handle_interaction(participant_id, block_number, "recipe_view", data, db_factory)
+                elif msg_type == "robot_idle_comment_shown":
+                    await _handle_robot_idle_comment_shown(participant_id, block_number, data, db_factory)
                 elif msg_type == "mouse_position":
                     await _handle_mouse(participant_id, block_number, data, db_factory)
                 else:
@@ -882,6 +884,36 @@ async def _handle_mouse(participant_id, block_number, data, db_factory):
             data=samples,
         )
         db.add(track)
+        await db.commit()
+
+
+async def _handle_robot_idle_comment_shown(participant_id, block_number, data, db_factory):
+    """Persist a robot idle comment once the frontend displays it."""
+    comment_id = data.get("comment_id")
+    text = data.get("text")
+    if not comment_id or not text:
+        return
+
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.block import Block
+        result = await db.execute(
+            select(Block.id).where(
+                Block.participant_id == participant_id,
+                Block.block_number == block_number,
+            )
+        )
+        block_id = result.scalar_one_or_none()
+        if block_id is None:
+            return
+
+        db.add(RobotIdleCommentLog(
+            participant_id=participant_id,
+            block_id=block_id,
+            comment_id=str(comment_id),
+            text=str(text),
+            shown_at=data.get("shown_at", time.time()),
+        ))
         await db.commit()
 
 

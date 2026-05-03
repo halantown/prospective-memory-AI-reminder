@@ -36,10 +36,10 @@ CONDITIONS = ["EC+", "EC-"]
 
 # Task orders — fixed Latin square (4 orders × 4 tasks, balanced)
 TASK_ORDERS: dict[str, list[str]] = {
-    "A": ["T1", "T2", "T3", "T4"],
-    "B": ["T2", "T4", "T1", "T3"],
-    "C": ["T3", "T1", "T4", "T2"],
-    "D": ["T4", "T3", "T2", "T1"],
+    "A": ["T1", "T2", "T4", "T3"],
+    "B": ["T2", "T3", "T1", "T4"],
+    "C": ["T3", "T4", "T2", "T1"],
+    "D": ["T4", "T1", "T3", "T2"],
 }
 
 # Event-driven trigger schedule (delays measured in game time seconds)
@@ -72,8 +72,8 @@ MESSAGE_COOLDOWN_S = int(os.getenv("MESSAGE_COOLDOWN_S", "10"))  # Min gap betwe
 PHONE_MESSAGE_EXPIRY_MS = 20_000  # Per-message expiry (20s), must match frontend constant
 
 # Mouse tracking
-MOUSE_SAMPLE_INTERVAL_MS = 200
-MOUSE_BATCH_INTERVAL_S = 5
+MOUSE_SAMPLE_INTERVAL_MS = 100
+MOUSE_BATCH_INTERVAL_S = 60
 
 # Cooking system
 COOKING_STEP_WINDOW_S = 30        # Default window for participant to act on a cooking step

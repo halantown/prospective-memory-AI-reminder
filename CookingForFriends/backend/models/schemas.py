@@ -111,6 +111,11 @@ class FakeTriggerAckRequest(BaseModel):
     trigger_type: str
 
 
+class MouseTrackingBatchRequest(BaseModel):
+    session_id: str
+    records: list[dict[str, Any]] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # Admin participant management
 # ---------------------------------------------------------------------------

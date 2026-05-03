@@ -50,6 +50,22 @@ export function useWebSocket(sessionId: string | null) {
         robotSpeechTimerRef.current = setTimeout(() => store.clearRobotSpeech(), 5000)
         break
 
+      case 'robot_idle_comment':
+        store.setRobotSpeaking(data.text as string)
+        if (store.wsSend) {
+          store.wsSend({
+            type: 'robot_idle_comment_shown',
+            data: {
+              comment_id: data.comment_id,
+              text: data.text,
+              shown_at: Date.now() / 1000,
+            },
+          })
+        }
+        if (robotSpeechTimerRef.current) clearTimeout(robotSpeechTimerRef.current)
+        robotSpeechTimerRef.current = setTimeout(() => store.clearRobotSpeech(), 3000)
+        break
+
       case 'robot_move': {
         const VALID_ROOMS = ['kitchen', 'dining_room', 'living_room', 'study', 'bathroom', 'hallway']
         const toRoom = data.to_room as string

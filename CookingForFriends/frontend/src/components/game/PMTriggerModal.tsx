@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
+import { emitMouseTrackingEvent } from '../../hooks/useMouseTracker'
 import { FAKE_TRIGGER_LINES, ITEM_SELECTION_OPTIONS, PM_TASKS } from '../../constants/pmTasks'
 import { GREETING_PLACEHOLDERS, REMINDER_PLACEHOLDERS } from '../../constants/placeholders'
 import type { DecoyOption, PMPipelineStep } from '../../types'
@@ -154,13 +155,21 @@ function ReminderStep({
 }
 
 function ItemSelectionStep({
+  taskId,
   options,
   onSelect,
 }: {
+  taskId: string | null
   options: DecoyOption[]
   onSelect: (option: DecoyOption, responseTimeMs: number) => void
 }) {
   const startRef = useRef(Date.now())
+
+  useEffect(() => {
+    startRef.current = Date.now()
+    emitMouseTrackingEvent('item_selection_start', { task_id: taskId })
+  }, [taskId])
+
   return (
     <ModalShell>
       <div className="space-y-5">
@@ -169,7 +178,13 @@ function ItemSelectionStep({
           {options.map((option) => (
             <button
               key={option.id}
-              onClick={() => onSelect(option, Date.now() - startRef.current)}
+              onClick={() => {
+                emitMouseTrackingEvent('item_selection_end', {
+                  task_id: taskId,
+                  selected_item: option.id,
+                })
+                onSelect(option, Date.now() - startRef.current)
+              }}
               className="flex items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white px-5 py-4 text-left text-lg font-semibold text-slate-800 transition hover:border-amber-400 hover:bg-amber-50 active:scale-[0.99]"
             >
               <span className="text-2xl">{option.isTarget ? '🎯' : '📦'}</span>
@@ -439,7 +454,7 @@ export default function PMTriggerModal() {
   }
 
   if (step === 'reminder') return <ReminderStep text={reminderText} onAck={handleReminderAck} />
-  if (step === 'item_selection') return <ItemSelectionStep options={itemOptions} onSelect={handleItemSelect} />
+  if (step === 'item_selection') return <ItemSelectionStep taskId={taskId} options={itemOptions} onSelect={handleItemSelect} />
   if (step === 'confidence_rating') return <ConfidenceStep onSubmit={handleConfidenceSubmit} />
   if (step === 'auto_execute') return <AutoExecuteStep onDone={handleAutoExecuteDone} />
 

@@ -6,6 +6,7 @@ import uuid
 import json
 import time
 import logging
+import zipfile
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
@@ -16,7 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, async_session
 from models.experiment import Experiment, ExperimentStatus, Participant, ParticipantStatus
 from models.block import Block, BlockStatus, PMTrial, PMAttemptRecord, ReminderMessage
-from models.logging import InteractionLog, PhoneMessageLog, GameStateSnapshot
+from models.logging import InteractionLog, PhoneMessageLog, GameStateSnapshot, MouseTrack, RobotIdleCommentLog
+from models.cooking import CookingStepRecord
 from models.pm_module import PMTaskEvent, FakeTriggerEvent, PhaseEvent, IntentionCheckEvent
 from models.schemas import (
     ParticipantCreateResponse, ReminderImportItem,
@@ -742,6 +744,221 @@ async def advance_block(session_id: str, db: AsyncSession = Depends(get_db)):
         "status": "advanced",
         "completed_block": block.block_number,
     }
+
+
+@router.get("/export/full")
+async def export_full_zip(
+    include_test: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    """Unified experiment export: one zip with CSV tables and mouse JSON files."""
+    p_query = select(Participant).order_by(Participant.created_at)
+    if not include_test:
+        p_query = p_query.where(Participant.is_test == False)  # noqa: E712
+    p_result = await db.execute(p_query)
+    participants = p_result.scalars().all()
+    participant_by_session = {p.id: p for p in participants}
+    session_ids = list(participant_by_session.keys())
+
+    if session_ids:
+        block_result = await db.execute(
+            select(Block).where(Block.participant_id.in_(session_ids))
+        )
+        blocks = block_result.scalars().all()
+    else:
+        blocks = []
+    block_to_session = {b.id: b.participant_id for b in blocks}
+    block_ids = list(block_to_session.keys())
+
+    def export_trigger_type(value: str) -> str:
+        return "phone" if value == "phone_call" else value
+
+    def participant_fields(session_id: str) -> tuple[str, str]:
+        p = participant_by_session.get(session_id)
+        return (p.participant_id if p else "", session_id)
+
+    def csv_bytes(headers: list[str], rows: list[list]) -> bytes:
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(headers)
+        w.writerows(rows)
+        return buf.getvalue().encode("utf-8")
+
+    # PM data: real + fake triggers.
+    pm_rows: list[list] = []
+    if session_ids:
+        real_result = await db.execute(
+            select(PMTaskEvent)
+            .where(PMTaskEvent.session_id.in_(session_ids))
+            .order_by(PMTaskEvent.id)
+        )
+        fake_result = await db.execute(
+            select(FakeTriggerEvent)
+            .where(FakeTriggerEvent.session_id.in_(session_ids))
+            .order_by(FakeTriggerEvent.id)
+        )
+        for e in real_result.scalars().all():
+            participant_id, session_id = participant_fields(e.session_id)
+            pm_rows.append([
+                participant_id, session_id,
+                e.task_id, export_trigger_type(e.trigger_type), False, e.condition,
+                e.trigger_actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
+                e.reminder_display_time, e.reminder_acknowledge_time,
+                e.decoy_selected_option, e.decoy_correct, e.confidence_rating,
+                e.action_animation_start_time, e.action_animation_complete_time,
+            ])
+        for e in fake_result.scalars().all():
+            participant_id, session_id = participant_fields(e.session_id)
+            p = participant_by_session.get(e.session_id)
+            pm_rows.append([
+                participant_id, session_id,
+                "", export_trigger_type(e.trigger_type), True, p.condition if p else "",
+                e.actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
+                "", "", "", "", "", "", "",
+            ])
+
+    cooking_status = {
+        "correct": "success",
+        "wrong": "wrong_choice",
+        "missed": "timeout",
+    }
+    cooking_rows: list[list] = []
+    if block_ids:
+        result = await db.execute(
+            select(CookingStepRecord)
+            .where(CookingStepRecord.block_id.in_(block_ids))
+            .order_by(CookingStepRecord.id)
+        )
+        for e in result.scalars().all():
+            participant_id, session_id = participant_fields(e.participant_id)
+            cooking_rows.append([
+                participant_id, session_id,
+                e.step_id, e.dish_id, e.step_index, "active",
+                e.activated_at, e.completed_at,
+                cooking_status.get(e.result, e.result),
+                e.response_time_ms,
+            ])
+
+    phone_rows: list[list] = []
+    if block_ids:
+        result = await db.execute(
+            select(PhoneMessageLog)
+            .where(PhoneMessageLog.block_id.in_(block_ids))
+            .order_by(PhoneMessageLog.id)
+        )
+        for e in result.scalars().all():
+            participant_id, session_id = participant_fields(e.participant_id)
+            phone_rows.append([
+                participant_id, session_id,
+                e.message_id, e.sender, e.category,
+                e.sent_at, e.replied_at, e.response_time_ms,
+                e.user_choice, e.correct_answer, e.reply_correct, e.status,
+            ])
+
+    robot_rows: list[list] = []
+    if block_ids:
+        result = await db.execute(
+            select(RobotIdleCommentLog)
+            .where(RobotIdleCommentLog.block_id.in_(block_ids))
+            .order_by(RobotIdleCommentLog.id)
+        )
+        for e in result.scalars().all():
+            participant_id, session_id = participant_fields(e.participant_id)
+            robot_rows.append([
+                participant_id, session_id,
+                e.comment_id, e.text, e.shown_at,
+            ])
+
+    navigation_rows: list[list] = []
+    recipe_rows: list[list] = []
+    if block_ids:
+        result = await db.execute(
+            select(InteractionLog)
+            .where(
+                InteractionLog.block_id.in_(block_ids),
+                InteractionLog.event_type.in_(["room_switch", "recipe_view"]),
+            )
+            .order_by(InteractionLog.id)
+        )
+        for e in result.scalars().all():
+            session_id = block_to_session.get(e.block_id, e.participant_id)
+            participant_id, _ = participant_fields(session_id)
+            data = e.event_data or {}
+            if e.event_type == "room_switch":
+                navigation_rows.append([
+                    participant_id, session_id,
+                    data.get("from", ""), data.get("to", ""), e.timestamp,
+                ])
+            elif e.event_type == "recipe_view":
+                recipe_rows.append([
+                    participant_id, session_id,
+                    data.get("start_ts", ""), data.get("end_ts", ""), data.get("duration_ms", ""),
+                ])
+
+    mouse_by_session: dict[str, list] = {sid: [] for sid in session_ids}
+    if block_ids:
+        result = await db.execute(
+            select(MouseTrack)
+            .where(MouseTrack.block_id.in_(block_ids))
+            .order_by(MouseTrack.id)
+        )
+        for e in result.scalars().all():
+            session_id = e.participant_id
+            mouse_by_session.setdefault(session_id, []).extend(e.data or [])
+
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("pm_events.csv", csv_bytes([
+            "participant_id", "session_id",
+            "task_id", "trigger_type", "is_fake", "condition",
+            "trigger_fired_at", "trigger_responded_at", "trigger_timed_out",
+            "reminder_shown_at", "reminder_dismissed_at",
+            "item_selected", "item_correct", "confidence_rating",
+            "auto_execute_started_at", "auto_execute_finished_at",
+        ], pm_rows))
+        zf.writestr("cooking_steps.csv", csv_bytes([
+            "participant_id", "session_id",
+            "step_id", "dish_id", "step_index", "step_type",
+            "activated_at", "completed_at", "status", "response_time_ms",
+        ], cooking_rows))
+        zf.writestr("phone_messages.csv", csv_bytes([
+            "participant_id", "session_id",
+            "message_id", "contact_id", "category",
+            "arrived_at", "responded_at", "response_time_ms",
+            "user_choice", "correct_answer", "is_correct", "status",
+        ], phone_rows))
+        zf.writestr("robot_idle_comments.csv", csv_bytes([
+            "participant_id", "session_id",
+            "comment_id", "text", "shown_at",
+        ], robot_rows))
+        zf.writestr("room_navigation.csv", csv_bytes([
+            "participant_id", "session_id",
+            "from_room", "to_room", "navigated_at",
+        ], navigation_rows))
+        zf.writestr("recipe_views.csv", csv_bytes([
+            "participant_id", "session_id",
+            "opened_at", "closed_at", "duration_ms",
+        ], recipe_rows))
+        for session_id, records in mouse_by_session.items():
+            p = participant_by_session.get(session_id)
+            if not p:
+                continue
+            safe_pid = p.participant_id.replace("/", "_")
+            zf.writestr(
+                f"mouse_tracking/{safe_pid}_{session_id}.json",
+                json.dumps({
+                    "participant_id": p.participant_id,
+                    "session_id": session_id,
+                    "records": records,
+                }, ensure_ascii=False),
+            )
+
+    zip_buf.seek(0)
+    return StreamingResponse(
+        iter([zip_buf.getvalue()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=cooking_for_friends_export.zip"},
+    )
 
 
 @router.get("/export/per-participant")

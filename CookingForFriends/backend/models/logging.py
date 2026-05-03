@@ -39,6 +39,25 @@ class MouseTrack(Base):
     data: Mapped[list] = mapped_column(JSON, nullable=False)  # [{x, y, t}, ...]
 
 
+class RobotIdleCommentLog(Base):
+    """Robot idle comments shown during ongoing cooking."""
+    __tablename__ = "robot_idle_comment_logs"
+    __table_args__ = (
+        Index('ix_robot_idle_participant_block', 'participant_id', 'block_id'),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    participant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("participants.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    block_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("blocks.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    comment_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    shown_at: Mapped[float] = mapped_column(Float, nullable=False)
+
+
 class OngoingTaskScore(Base):
     __tablename__ = "ongoing_task_scores"
 
@@ -98,4 +117,3 @@ class PhoneMessageLog(Base):
     correct_answer: Mapped[str | None] = mapped_column(Text, nullable=True)  # correct reply text
     reply_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     status: Mapped[str | None] = mapped_column(String(30), nullable=True)  # answered_correct | answered_incorrect | expired | seen
-

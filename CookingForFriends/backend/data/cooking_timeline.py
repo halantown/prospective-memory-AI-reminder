@@ -23,6 +23,14 @@ class TimelineEntry:
     step_type: Literal["active", "wait"]      # active = participant must act; wait = auto
 
 
+@dataclass(frozen=True)
+class RobotIdleComment:
+    """One non-interactive robot comment scheduled in cooking game time."""
+    t: int
+    comment_id: str
+    text: str
+
+
 # ─── Full 15-minute cooking timeline ──────────────────────────────────────────
 #
 # Design principles:
@@ -82,6 +90,31 @@ COOKING_TIMELINE: list[TimelineEntry] = [
 
     # ── Session wind-down ─────────────────────────────────────────────────────
     # After t=870 (14:30): session winds down, block_end at t=900
+]
+
+
+# ─── Robot idle comments ─────────────────────────────────────────────────────
+#
+# These are intentionally scheduled in lighter cooking periods and away from
+# PM/fake trigger windows.  They create social presence without requiring
+# participant interaction.
+
+ROBOT_IDLE_COMMENTS: list[RobotIdleComment] = [
+    RobotIdleComment(
+        t=130,
+        comment_id="idle_oven_vegetables",
+        text="Vegetables are in the oven, smells good already.",
+    ),
+    RobotIdleComment(
+        t=250,
+        comment_id="idle_soup_simmer",
+        text="The soup is coming along nicely.",
+    ),
+    RobotIdleComment(
+        t=710,
+        comment_id="idle_almost_there",
+        text="Almost there, chef.",
+    ),
 ]
 
 

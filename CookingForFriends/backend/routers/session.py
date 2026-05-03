@@ -20,6 +20,7 @@ from models.schemas import (
     QuizSubmitRequest, QuizSubmitResponse, QuizResultItem,
     EncodingQuizAttemptRequest,
     PhaseUpdateRequest, CutsceneEventRequest, IntentionCheckRequest, SessionStateResponse,
+    MouseTrackingBatchRequest,
 )
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
@@ -95,6 +96,36 @@ async def get_cooking_definitions(session_id: str, db: AsyncSession = Depends(ge
     if not participant:
         raise HTTPException(404, "Session not found")
     return serialize_cooking_definitions()
+
+
+@router.post("/mouse-tracking")
+async def post_mouse_tracking_batch(
+    req: MouseTrackingBatchRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Store batched mouse samples and embedded behavioral event markers."""
+    MAX_MOUSE_BATCH = 10000
+    if len(req.records) > MAX_MOUSE_BATCH:
+        raise HTTPException(413, f"Mouse tracking batch exceeds {MAX_MOUSE_BATCH} records")
+
+    result = await db.execute(
+        select(Block.id).where(
+            Block.participant_id == req.session_id,
+            Block.block_number == 1,
+        )
+    )
+    block_id = result.scalar_one_or_none()
+    if block_id is None:
+        raise HTTPException(404, "Block not found")
+
+    from models.logging import MouseTrack
+    db.add(MouseTrack(
+        participant_id=req.session_id,
+        block_id=block_id,
+        data=req.records,
+    ))
+    await db.commit()
+    return {"status": "ok", "count": len(req.records)}
 
 
 @router.get("/session/{session_id}/status", response_model=StatusResponse)

@@ -8,25 +8,18 @@ from config import CONDITIONS, TASK_ORDERS, TOKEN_LENGTH, TOKEN_CHARSET
 
 
 async def assign_condition_and_order(db: AsyncSession) -> tuple[str, str]:
-    """Round-robin assignment across 8 (condition, task_order) combinations.
+    """Assign by real participant count modulo 8.
 
-    Counts only real participants (is_test=False) so test sessions never skew
-    the balance grid. Returns (condition, task_order).
+    The study design has 4 Latin-square orders × 2 EC conditions.  Test
+    sessions never affect the counterbalance cell.
     """
     result = await db.execute(
-        select(Participant.condition, Participant.task_order, func.count())
+        select(func.count(Participant.id))
         .where(Participant.is_test.is_(False))
-        .group_by(Participant.condition, Participant.task_order)
     )
-    counts: dict[tuple[str, str], int] = {
-        (c, o): 0 for c in CONDITIONS for o in TASK_ORDERS
-    }
-    for row in result:
-        combo = (row[0], row[1])
-        if combo in counts:
-            counts[combo] = row[2]
-    condition, order = min(counts, key=counts.get)
-    return condition, order
+    participant_count = result.scalar() or 0
+    cells = [(condition, order) for order in TASK_ORDERS for condition in CONDITIONS]
+    return cells[participant_count % len(cells)]
 
 
 async def generate_token(db: AsyncSession) -> str:
