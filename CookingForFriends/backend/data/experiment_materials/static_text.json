@@ -1,0 +1,49 @@
+{
+  "consent": {
+    "pdf_path": "documents/Informed_Consent_no_HREC.pdf",
+    "checkbox_label": "I have read and understood the information above and voluntarily agree to participate.",
+    "continue_button": "I Agree & Continue"
+  },
+  "welcome": {
+    "title": "Cooking for Friends",
+    "cover_story": "This study investigates how people manage multiple household tasks simultaneously in a simulated home environment. You will be asked to prepare dinner for friends while handling various everyday interruptions.",
+    "duration": "The experiment takes approximately 30-35 minutes.",
+    "training_notice": "You will receive a brief training session before the main task begins."
+  },
+  "story_intro": [
+    {
+      "speaker": "NARRATOR",
+      "text": "Saturday morning. Tonight you're hosting a dinner party for some friends.",
+      "stage_direction": "AVATAR wakes up"
+    },
+    {
+      "speaker": "ROBOT",
+      "text": "Good morning! I'm your household assistant. I'll help keep track of things today - reminders, schedules, that sort of thing.",
+      "stage_direction": "ROBOT fades in beside avatar"
+    },
+    {
+      "speaker": "AVATAR",
+      "text": "Before I start preparing, let me tell you about some things that happened recently...",
+      "stage_direction": "AVATAR stands up"
+    }
+  ],
+  "encoding_transition_lines": [
+    "There's something else that happened...",
+    "Oh, and also...",
+    "One more thing..."
+  ],
+  "avatar_post_encoding_line": "That's everything. Remember to remind me tonight, okay?",
+  "recap_intro": "Alright, let me go over tonight's to-do list:",
+  "recap_outro": "I'll remind you when the time comes!",
+  "evening_transition": {
+    "duration_ms": 2000,
+    "text": "It's now evening. Time to prepare dinner for your friends."
+  },
+  "debrief": {
+    "text": "Thank you for completing the study!\n\nWe'd like to let you know that the true purpose of this experiment was not only to study multitasking performance, but specifically to investigate how different types of robot reminders affect your experience with remembering tasks.\n\nThe robot's reminder messages were designed to either include or exclude details about how the tasks originally came up. Your cooking performance was not the main focus of measurement.\n\nIf you have any questions about this study, please contact: [EMAIL_PLACEHOLDER]\n\nThank you for your participation!"
+  },
+  "connection_issue": {
+    "title": "Connection issue",
+    "text": "Connection issue. Please contact the experimenter."
+  }
+}

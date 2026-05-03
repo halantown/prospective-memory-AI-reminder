@@ -104,6 +104,11 @@ app.include_router(session_router)
 app.include_router(admin_router)
 app.include_router(timeline_editor_router)
 
+# Research documents (e.g. consent PDF) are referenced by experiment materials.
+DOCUMENTS_DIR = Path(__file__).parent.parent / "documents"
+if DOCUMENTS_DIR.exists():
+    app.mount("/documents", StaticFiles(directory=str(DOCUMENTS_DIR)), name="documents")
+
 # --- WebSocket endpoints (at /ws/*, no /api prefix) ---
 from fastapi import WebSocket as _WebSocket
 from database import async_session

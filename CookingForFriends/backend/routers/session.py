@@ -6,7 +6,7 @@ import logging
 import collections
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, Request
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, Request, Query
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from models.schemas import (
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
 from engine.game_time import unfreeze_game_time, get_current_game_time
+from data.materials import get_experiment_config_for_phase
 from data.cooking_recipes import serialize_cooking_definitions
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,35 @@ async def get_cooking_definitions(session_id: str, db: AsyncSession = Depends(ge
     if not participant:
         raise HTTPException(404, "Session not found")
     return serialize_cooking_definitions()
+
+
+@router.get("/session/{session_id}/experiment-config")
+async def get_session_experiment_config(
+    session_id: str,
+    phase: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return participant-safe experiment material for one phase.
+
+    This endpoint intentionally scopes material by phase and strips correct
+    answer fields.  The frontend should not receive future phase content,
+    manipulation-check answers, retrospective answers, or the other EC
+    condition's reminder text.
+    """
+    result = await db.execute(select(Participant).where(Participant.id == session_id))
+    participant = result.scalar_one_or_none()
+    if not participant:
+        raise HTTPException(404, "Session not found")
+
+    phase_name = phase or participant.current_phase or "WELCOME"
+    try:
+        return get_experiment_config_for_phase(
+            phase=phase_name,
+            condition=participant.condition,
+            task_order=participant.task_order,
+        )
+    except (KeyError, IndexError) as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.post("/mouse-tracking")

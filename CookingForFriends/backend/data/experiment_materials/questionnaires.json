@@ -1,0 +1,32 @@
+{
+  "demographics": [
+    { "question_id": "age", "response_type": "integer", "label": "Age" },
+    { "question_id": "gender", "response_type": "choice", "label": "Gender" },
+    { "question_id": "native_language", "response_type": "text", "label": "Native language" },
+    { "question_id": "academic_discipline", "response_type": "text", "label": "Academic discipline" },
+    { "question_id": "normal_vision_hearing", "response_type": "boolean", "label": "Do you have normal or corrected-to-normal vision and hearing?" },
+    { "question_id": "neuro_psych_history", "response_type": "boolean", "label": "Do you have a neurological or psychiatric history?" }
+  ],
+  "mse": {
+    "status": "TBD",
+    "note": "Memory Self-Efficacy scale items to be confirmed with Mark."
+  },
+  "post_manip_check": [
+    {
+      "question_id": "robot_reminder_content_open",
+      "response_type": "text",
+      "label": "In your own words, describe what the robot's reminders contained."
+    }
+  ],
+  "subjective_dv": {
+    "status": "TBD",
+    "scales": ["confidence_self", "trust_agent", "perceived_usefulness"]
+  },
+  "nasa_tlx": {
+    "status": "TBD"
+  },
+  "retrospective_memory_check": {
+    "status": "TBD",
+    "note": "Correct answers remain server-side and must not be returned to the frontend."
+  }
+}

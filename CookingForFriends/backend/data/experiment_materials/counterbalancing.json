@@ -1,0 +1,18 @@
+{
+  "conditions": ["EC+", "EC-"],
+  "task_orders": {
+    "A": ["T1", "T2", "T4", "T3"],
+    "B": ["T2", "T3", "T1", "T4"],
+    "C": ["T3", "T4", "T2", "T1"],
+    "D": ["T4", "T1", "T3", "T2"]
+  },
+  "trigger_schedule": [
+    { "type": "real", "delay_after_previous_s": 180, "task_position": 1 },
+    { "type": "fake", "delay_after_previous_s": 120, "trigger_type": "doorbell" },
+    { "type": "real", "delay_after_previous_s": 60, "task_position": 2 },
+    { "type": "real", "delay_after_previous_s": 120, "task_position": 3 },
+    { "type": "fake", "delay_after_previous_s": 60, "trigger_type": "phone_call" },
+    { "type": "real", "delay_after_previous_s": 60, "task_position": 4 }
+  ],
+  "session_end_delay_after_last_trigger_s": 60
+}

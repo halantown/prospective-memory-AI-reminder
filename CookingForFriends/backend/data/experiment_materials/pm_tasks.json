@@ -1,0 +1,124 @@
+{
+  "tasks": {
+    "T1": {
+      "task_id": "T1",
+      "person": "Mei",
+      "trigger_type": "doorbell",
+      "target_room": "study",
+      "action_type": "bring_item",
+      "target_item": "book",
+      "assign_text": "Tonight, remember to give Mei the book when she visits.",
+      "recap_text": "Give Mei the book when she visits",
+      "greeting_lines": [
+        "Hi! It smells great in here.",
+        "I am glad I made it before dinner.",
+        "Good to see you again."
+      ],
+      "reminders": {
+        "EC+": "Remember what you promised after you and Mei played games and ate pastries last time.",
+        "EC-": "You promised to give Mei something."
+      },
+      "decoy_items": [
+        { "id": "target", "label": "烘焙书", "is_target": true },
+        { "id": "intra1", "label": "游戏手柄", "is_target": false },
+        { "id": "intra2", "label": "蛋糕盒子", "is_target": false },
+        { "id": "cross1", "label": "礼品袋", "is_target": false },
+        { "id": "cross2", "label": "烧烤架", "is_target": false },
+        { "id": "unrelated", "label": "[T1 unrelated TBD]", "is_target": false }
+      ]
+    },
+    "T2": {
+      "task_id": "T2",
+      "person": "Anna-Lina",
+      "trigger_type": "doorbell",
+      "target_room": "kitchen",
+      "action_type": "bring_item",
+      "target_item": "chocolate",
+      "assign_text": "Tonight, remember to give Anna-Lina the chocolate when she visits.",
+      "recap_text": "Give Anna-Lina the chocolate when she visits",
+      "greeting_lines": [
+        "Hey, thanks for having me.",
+        "I came straight here after work.",
+        "I am excited for dinner."
+      ],
+      "reminders": {
+        "EC+": "Remember what Anna-Lina asked after she studied with you recently.",
+        "EC-": "You promised to give Anna-Lina something."
+      },
+      "decoy_items": [
+        { "id": "target", "label": "巧克力", "is_target": true },
+        { "id": "intra1", "label": "礼品袋", "is_target": false },
+        { "id": "intra2", "label": "明信片", "is_target": false },
+        { "id": "cross1", "label": "游戏手柄", "is_target": false },
+        { "id": "cross2", "label": "旧电池", "is_target": false },
+        { "id": "unrelated", "label": "[T2 unrelated TBD]", "is_target": false }
+      ]
+    },
+    "T3": {
+      "task_id": "T3",
+      "person": "Tom",
+      "trigger_type": "phone_call",
+      "target_room": "kitchen",
+      "action_type": "take_from_fridge",
+      "target_item": "apple juice",
+      "assign_text": "Tonight, remember to give Tom the apple juice when he calls.",
+      "recap_text": "Give Tom the apple juice when he calls",
+      "greeting_lines": [
+        "Hey, I am almost there.",
+        "I should arrive in a few minutes.",
+        "See you soon."
+      ],
+      "reminders": {
+        "EC+": "Remember what Tom asked after you had a picnic together recently.",
+        "EC-": "You promised to do something for Tom."
+      },
+      "decoy_items": [
+        { "id": "target", "label": "苹果汁", "is_target": true },
+        { "id": "intra1", "label": "烧烤架", "is_target": false },
+        { "id": "intra2", "label": "蓝牙音箱", "is_target": false },
+        { "id": "cross1", "label": "蛋糕盒子", "is_target": false },
+        { "id": "cross2", "label": "纸箱", "is_target": false },
+        { "id": "unrelated", "label": "[T3 unrelated TBD]", "is_target": false }
+      ]
+    },
+    "T4": {
+      "task_id": "T4",
+      "person": "Delivery person",
+      "trigger_type": "phone_call",
+      "target_room": null,
+      "action_type": "reply_in_chat",
+      "target_item": "trash bags",
+      "assign_text": "Tonight, remember to give the delivery person the trash bags when they call.",
+      "recap_text": "Give the delivery person the trash bags when they call",
+      "greeting_lines": [
+        "Hello, I am confirming your delivery order.",
+        "Is there anything else you want to add?",
+        "I can update it now."
+      ],
+      "reminders": {
+        "EC+": "Remember what you noticed after the delivery person dropped off a package recently.",
+        "EC-": "You wanted to add something to your delivery order."
+      },
+      "decoy_items": [
+        { "id": "target", "label": "垃圾袋", "is_target": true },
+        { "id": "intra1", "label": "旧电池", "is_target": false },
+        { "id": "intra2", "label": "纸箱", "is_target": false },
+        { "id": "cross1", "label": "明信片", "is_target": false },
+        { "id": "cross2", "label": "蓝牙音箱", "is_target": false },
+        { "id": "unrelated", "label": "[T4 unrelated TBD]", "is_target": false }
+      ]
+    }
+  },
+  "fake_trigger_lines": {
+    "doorbell": [
+      "Hi, I just came to drop this off.",
+      "No need to do anything right now.",
+      "Enjoy your dinner."
+    ],
+    "phone_call": [
+      "Hi, just confirming I reached the right number.",
+      "That is all I needed.",
+      "Have a good evening."
+    ]
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "tasks": {
+    "T1": {
+      "video_src": "/assets/encoding/t1_mei.mp4",
+      "episode_label": "Mei episode",
+      "manipulation_check": {
+        "question": "What were you and Mei doing in the video?",
+        "options": [
+          { "id": "a", "text": "Baking together" },
+          { "id": "b", "text": "Watching a movie" },
+          { "id": "c", "text": "Cleaning the kitchen" }
+        ],
+        "correct_option_id": "a"
+      }
+    },
+    "T2": {
+      "video_src": "/assets/encoding/t2_anna_lina.mp4",
+      "episode_label": "Anna-Lina episode",
+      "manipulation_check": {
+        "question": "What were you and Anna-Lina doing in the video?",
+        "options": [
+          { "id": "a", "text": "Going for a walk" },
+          { "id": "b", "text": "Studying together" },
+          { "id": "c", "text": "Playing a board game" }
+        ],
+        "correct_option_id": "b"
+      }
+    },
+    "T3": {
+      "video_src": "/assets/encoding/t3_tom.mp4",
+      "episode_label": "Tom episode",
+      "manipulation_check": {
+        "question": "What were you and Tom doing in the video?",
+        "options": [
+          { "id": "a", "text": "Having a picnic" },
+          { "id": "b", "text": "Shopping for groceries" },
+          { "id": "c", "text": "Fixing a bike" }
+        ],
+        "correct_option_id": "a"
+      }
+    },
+    "T4": {
+      "video_src": "/assets/encoding/t4_delivery.mp4",
+      "episode_label": "Delivery person episode",
+      "manipulation_check": {
+        "question": "What happened with the delivery person in the video?",
+        "options": [
+          { "id": "a", "text": "They delivered furniture" },
+          { "id": "b", "text": "They asked for directions" },
+          { "id": "c", "text": "They dropped off a package" }
+        ],
+        "correct_option_id": "c"
+      }
+    }
+  }
+}

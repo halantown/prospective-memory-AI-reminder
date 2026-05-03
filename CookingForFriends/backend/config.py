@@ -2,6 +2,12 @@
 
 import os
 from pathlib import Path
+from data.materials import (
+    get_conditions,
+    get_session_end_delay_after_last_trigger_s,
+    get_task_orders,
+    get_trigger_schedule,
+)
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -32,30 +38,18 @@ TOKEN_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # No 0/O/1/I ambiguity
 
 # Experiment — EC+/EC- encoding-context design
 # Condition levels
-CONDITIONS = ["EC+", "EC-"]
+CONDITIONS = get_conditions()
 
 # Task orders — fixed Latin square (4 orders × 4 tasks, balanced)
-TASK_ORDERS: dict[str, list[str]] = {
-    "A": ["T1", "T2", "T4", "T3"],
-    "B": ["T2", "T3", "T1", "T4"],
-    "C": ["T3", "T4", "T2", "T1"],
-    "D": ["T4", "T1", "T3", "T2"],
-}
+TASK_ORDERS: dict[str, list[str]] = get_task_orders()
 
 # Event-driven trigger schedule (delays measured in game time seconds)
 # "real" entries: task_position is the index (1-based) into the participant's task_order
 # "fake" entries: trigger_type is the UI affordance ("doorbell" | "phone_call")
-TRIGGER_SCHEDULE: list[dict] = [
-    {"type": "real", "delay_after_previous_s": 180, "task_position": 1},
-    {"type": "fake", "delay_after_previous_s": 120, "trigger_type": "doorbell"},
-    {"type": "real", "delay_after_previous_s": 60,  "task_position": 2},
-    {"type": "real", "delay_after_previous_s": 120, "task_position": 3},
-    {"type": "fake", "delay_after_previous_s": 60,  "trigger_type": "phone_call"},
-    {"type": "real", "delay_after_previous_s": 60,  "task_position": 4},
-]
+TRIGGER_SCHEDULE: list[dict] = get_trigger_schedule()
 
 # Seconds of game time after last real trigger pipeline completes before → post_questionnaire
-SESSION_END_DELAY_AFTER_LAST_TRIGGER_S = 60
+SESSION_END_DELAY_AFTER_LAST_TRIGGER_S = get_session_end_delay_after_last_trigger_s()
 
 # Legacy execution-window constants (kept for timeline.py backward-compat)
 EXECUTION_WINDOW_S = 120   # Primary window: participant has 2 min to act

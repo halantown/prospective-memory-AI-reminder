@@ -1,0 +1,66 @@
+{
+  "phone_demo": {
+    "contact": { "id": "sophie_tutorial", "name": "Sophie", "avatar": "S" },
+    "message": "Hey! Quick question - how many days are in a week?",
+    "options": [
+      { "id": "a", "text": "7" },
+      { "id": "b", "text": "5" }
+    ],
+    "correct_option_id": "a",
+    "feedback": "Thanks!"
+  },
+  "fried_egg": {
+    "recipe_name": "Fried Egg",
+    "steps": [
+      {
+        "id": "choose_eggs",
+        "recipe_text": "Take out 2 eggs",
+        "options": [
+          { "id": "a", "text": "Butter" },
+          { "id": "b", "text": "Eggs" }
+        ],
+        "correct_option_id": "b"
+      },
+      {
+        "id": "add_oil",
+        "recipe_text": "Add a little cooking oil to the pan",
+        "options": [
+          { "id": "a", "text": "Cooking oil" },
+          { "id": "b", "text": "Water" }
+        ],
+        "correct_option_id": "a"
+      },
+      {
+        "id": "crack_eggs",
+        "recipe_text": "Crack the eggs into the pan",
+        "options": [
+          { "id": "a", "text": "Crack the eggs into the pan" },
+          { "id": "b", "text": "Stir the eggs in a bowl first" }
+        ],
+        "correct_option_id": "a"
+      },
+      {
+        "id": "season_salt",
+        "recipe_text": "Add a pinch of salt",
+        "options": [
+          { "id": "a", "text": "Sugar" },
+          { "id": "b", "text": "Salt" }
+        ],
+        "correct_option_id": "b"
+      },
+      {
+        "id": "finish",
+        "recipe_text": "When the edges turn golden, slide onto a plate",
+        "timer_s": 15
+      }
+    ]
+  },
+  "trigger_demo": {
+    "trigger_type": "doorbell",
+    "visitor": "Sam",
+    "visitor_line": "Hey! Good morning!",
+    "robot_line": "Sam is here to pick something up.",
+    "action_label": "Give Sam the newspaper",
+    "item": "newspaper"
+  }
+}
