@@ -35,7 +35,14 @@ const wpData = waypointData as unknown as WaypointData
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type FloorRoom = 'kitchen' | 'dining_hall' | 'bedroom' | 'living_room'
+export type FloorRoom = 'kitchen' | 'dining_hall' | 'bedroom' | 'living_room'
+
+interface FloorPlanViewProps {
+  initialRoom?: FloorRoom | null
+  initialCharRoom?: FloorRoom
+  initialRobotRoom?: FloorRoom
+  disableNavigation?: boolean
+}
 
 interface RoomDef {
   id: FloorRoom
@@ -150,12 +157,17 @@ function snapToDevicePixel(value: number) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function FloorPlanView() {
+export default function FloorPlanView({
+  initialRoom = null,
+  initialCharRoom = 'living_room',
+  initialRobotRoom = 'living_room',
+  disableNavigation = false,
+}: FloorPlanViewProps = {}) {
   const viewRef = useRef<HTMLDivElement>(null)
   const pointerInsideGameAreaRef = useRef(true)
   const [viewSize, setViewSize] = useState({ width: 0, height: 0 })
-  const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(null)
-  const [charRoom, setCharRoom] = useState<FloorRoom>('living_room')
+  const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(initialRoom)
+  const [charRoom, setCharRoom] = useState<FloorRoom>(initialCharRoom)
   const [isMoving, setIsMoving] = useState(false)
   const [stationPopupAnchor, setStationPopupAnchor] = useState<{ x: number; y: number } | null>(null)
 
@@ -163,7 +175,7 @@ export default function FloorPlanView() {
   const [showWaypointEditor, setShowWaypointEditor] = useState(false)
 
   // Robot state: follows user with a delay
-  const [robotRoom, setRobotRoom] = useState<FloorRoom>('living_room')
+  const [robotRoom, setRobotRoom] = useState<FloorRoom>(initialRobotRoom)
   const [isRobotMoving, setIsRobotMoving] = useState(false)
   const robotTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -185,8 +197,21 @@ export default function FloorPlanView() {
 
   const isZoomed = currentRoom !== null
 
+  useEffect(() => {
+    setCurrentRoom(initialRoom)
+    setCharRoom(initialCharRoom)
+    setRobotRoom(initialRobotRoom)
+
+    const roomMeta = initialRoom ? wpData.room_meta?.[initialRoom] : null
+    const entryId = resolveRoomPoint(roomMeta?.entry, initialRoom ?? undefined)
+    if (entryId) {
+      teleportTo(entryId)
+    }
+  }, [initialCharRoom, initialRobotRoom, initialRoom, teleportTo])
+
   // Navigate to a room: walk avatar to exit waypoint → camera cut → teleport to entry
   const navigateToRoom = useCallback((target: FloorRoom) => {
+    if (disableNavigation) return
     if (isMoving) return
     if (target === currentRoom) return
 
@@ -229,10 +254,11 @@ export default function FloorPlanView() {
     } else {
       doTransition()
     }
-  }, [currentRoom, doorbellActive, isMoving, isCharMoving, moveToWaypoint, teleportTo])
+  }, [currentRoom, disableNavigation, doorbellActive, isMoving, isCharMoving, moveToWaypoint, teleportTo])
 
   // Enter a room from overview — robot follows immediately with delay
   const enterRoom = useCallback((room: FloorRoom) => {
+    if (disableNavigation) return
     setCurrentRoom(room)
     setCharRoom(room)
     if (doorbellActive && room === 'living_room') {
@@ -247,13 +273,14 @@ export default function FloorPlanView() {
         setIsRobotMoving(false)
       }, 800)
     }, ROBOT_FOLLOW_DELAY_MS)
-  }, [doorbellActive])
+  }, [disableNavigation, doorbellActive])
 
   // Back to overview
   const exitToOverview = useCallback(() => {
+    if (disableNavigation) return
     setCurrentRoom(null)
     setIsMoving(false)
-  }, [])
+  }, [disableNavigation])
 
   // Cleanup timers
   useEffect(() => () => { if (robotTimer.current) clearTimeout(robotTimer.current) }, [])
@@ -389,7 +416,7 @@ export default function FloorPlanView() {
         })()}
 
         {/* Room click targets (overview mode) */}
-        {!isZoomed && ALL_ROOMS.map((rid) => {
+        {!isZoomed && !disableNavigation && ALL_ROOMS.map((rid) => {
           const r = ROOM_DEFS[rid]
           return (
             <div
@@ -524,7 +551,7 @@ export default function FloorPlanView() {
       </AnimatePresence>
 
       {/* ── Navigation edge buttons (zoomed mode) ── */}
-      {isZoomed && !isMoving && !isCharMoving && currentRoom && (
+      {isZoomed && !disableNavigation && !isMoving && !isCharMoving && currentRoom && (
         ADJACENCY[currentRoom].map((nav) => {
           const isDoorbellTarget = doorbellActive && nav.target === 'living_room'
           return (
@@ -551,7 +578,7 @@ export default function FloorPlanView() {
       )}
 
       {/* ── Overview / Zoom-out button ── */}
-      {isZoomed && !isMoving && !isCharMoving && (
+      {isZoomed && !disableNavigation && !isMoving && !isCharMoving && (
         <button
           className="absolute top-5 right-5 z-40 flex items-center gap-2 px-4 py-2.5
                      bg-slate-800/90 hover:bg-slate-700/95 backdrop-blur-sm

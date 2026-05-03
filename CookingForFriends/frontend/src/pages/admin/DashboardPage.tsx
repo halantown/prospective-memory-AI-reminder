@@ -717,11 +717,22 @@ function DataExportTab() {
 function TestModeTab() {
   const [condition, setCondition] = useState('EC+')
   const [order, setOrder] = useState('A')
-  const [startPhase, setStartPhase] = useState('welcome')
+  const [startPhase, setStartPhase] = useState('WELCOME')
   const [creating, setCreating] = useState(false)
   const [result, setResult] = useState<{ session_id: string; token: string; entry_url: string } | null>(null)
 
-  const PHASES = ['welcome', 'consent', 'introduction', 'encoding', 'playing', 'post_questionnaire', 'debrief']
+  const PHASES = [
+    'WELCOME',
+    'CONSENT',
+    'DEMOGRAPHICS',
+    'MSE_PRE',
+    'STORY_INTRO',
+    'ENCODING_VIDEO_1',
+    'TUTORIAL_PHONE',
+    'MAIN_EXPERIMENT',
+    'POST_MANIP_CHECK',
+    'DEBRIEF',
+  ]
 
   const handleCreate = async () => {
     setCreating(true)
@@ -734,9 +745,10 @@ function TestModeTab() {
 
   const handleOpen = () => {
     if (!result) return
-    // Open with token in URL — WelcomePage auto-starts when ?token= is present,
-    // and since the backend already advanced the phase, it lands directly there.
-    window.open(`${window.location.origin}/?token=${result.token}`, '_blank', 'noopener,noreferrer')
+    navigator.clipboard?.writeText(result.token).catch((e) => {
+      console.warn('[Admin] Failed to copy test token', e)
+    })
+    window.open(window.location.origin, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -783,8 +795,8 @@ function TestModeTab() {
             </p>
             <button onClick={handleOpen}
               className="flex items-center gap-2 text-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-              <ExternalLink className="w-4 h-4" />
-              Open Session
+              <Copy className="w-4 h-4" />
+              Copy Token & Open Login
             </button>
           </div>
         )}

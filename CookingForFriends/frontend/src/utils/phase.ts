@@ -70,7 +70,33 @@ export function renderPhaseFor(phase: string | null | undefined): RenderPhase {
 }
 
 export function frontendPhaseForBackend(phase: string | null | undefined): Phase {
-  return renderPhaseFor(phase) as Phase
+  if (!phase) return 'WELCOME'
+  if (CANONICAL_TO_RENDER[phase]) return phase as Phase
+
+  const upper = phase.toUpperCase()
+  if (CANONICAL_TO_RENDER[upper]) return upper as Phase
+
+  const legacyToCanonical: Record<string, Phase> = {
+    welcome: 'WELCOME',
+    onboarding: 'WELCOME',
+    consent: 'CONSENT',
+    demographics: 'DEMOGRAPHICS',
+    mse_pre: 'MSE_PRE',
+    story_intro: 'STORY_INTRO',
+    encoding: 'ENCODING_VIDEO_1',
+    encoding_flow: 'ENCODING_VIDEO_1',
+    tutorial_flow: 'TUTORIAL_PHONE',
+    introduction: 'STORY_INTRO',
+    playing: 'MAIN_EXPERIMENT',
+    pending: 'MAIN_EXPERIMENT',
+    post_test: 'POST_MANIP_CHECK',
+    post_questionnaire: 'POST_MANIP_CHECK',
+    debrief: 'DEBRIEF',
+    completed: 'COMPLETED',
+    complete: 'COMPLETED',
+  }
+
+  return legacyToCanonical[phase] ?? 'WELCOME'
 }
 
 export function isMainExperimentPhase(phase: string | null | undefined): boolean {

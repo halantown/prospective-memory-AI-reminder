@@ -45,7 +45,7 @@ export default function StoryIntroPage() {
   }
 
   return (
-    <ExperimentHomeShell>
+    <ExperimentHomeShell initialRoom="bedroom" morningMode disableNavigation>
       {current ? (
         <BubbleDialogue
           speaker={current.speaker}

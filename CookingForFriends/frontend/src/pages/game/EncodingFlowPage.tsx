@@ -111,7 +111,7 @@ export default function EncodingFlowPage() {
 
   if (!config) {
     return (
-      <ExperimentHomeShell>
+      <ExperimentHomeShell initialRoom="bedroom" morningMode disableNavigation>
         <div className="rounded-lg bg-white p-6 text-center text-sm text-slate-500 shadow-xl">
           Loading...
         </div>
@@ -120,7 +120,7 @@ export default function EncodingFlowPage() {
   }
 
   return (
-    <ExperimentHomeShell>
+    <ExperimentHomeShell initialRoom="bedroom" morningMode disableNavigation>
       <div className="rounded-lg border border-slate-300 bg-white/95 p-5 shadow-xl backdrop-blur">
         {kind === 'video' && (
           <div>
