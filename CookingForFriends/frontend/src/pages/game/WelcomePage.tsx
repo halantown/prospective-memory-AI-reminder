@@ -5,6 +5,16 @@ import { useGameStore } from '../../stores/gameStore'
 import { advancePhase, getPublicExperimentConfig, getSessionStatus, startSession } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
 
+const DEV_PHASES = [
+  { value: 'CONSENT',          label: 'Consent' },
+  { value: 'DEMOGRAPHICS',     label: 'Demographics' },
+  { value: 'MSE_PRE',          label: 'MSE Pre' },
+  { value: 'STORY_INTRO',      label: 'Story Intro' },
+  { value: 'MAIN_EXPERIMENT',  label: '🎮 Game (playing)' },
+  { value: 'POST_MANIP_CHECK', label: 'Post-test' },
+  { value: 'DEBRIEF',          label: 'Debrief' },
+] as const
+
 export default function WelcomePage() {
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(false)
@@ -14,12 +24,16 @@ export default function WelcomePage() {
     duration?: string
     training_notice?: string
   } | null>(null)
+  const [configLoaded, setConfigLoaded] = useState(false)
+  const [devOpen, setDevOpen] = useState(false)
+  const [jumpPhase, setJumpPhase] = useState<string>('MAIN_EXPERIMENT')
   const autoStartedRef = useRef(false)
 
   const setSession = useGameStore((s) => s.setSession)
   const setPhase = useGameStore((s) => s.setPhase)
 
-  const handleStart = async (tokenOverride?: string) => {
+  /** Start session and optionally jump to a specific phase. */
+  const startAndNavigate = async (tokenOverride?: string, targetPhase?: string) => {
     const t = (tokenOverride ?? token).trim().toUpperCase()
     if (t.length !== 6) {
       setError('Please enter the 6-character session token')
@@ -42,7 +56,6 @@ export default function WelcomePage() {
         current_phase: data.current_phase,
         cooking_definitions: data.cooking_definitions,
       })
-      // Persist session for page refresh recovery
       sessionStorage.setItem('cff_session', JSON.stringify({
         session_id: data.session_id,
         participant_id: data.participant_id,
@@ -54,7 +67,14 @@ export default function WelcomePage() {
         cooking_definitions: data.cooking_definitions,
       }))
 
-      // Check session status to resume at correct phase for returning participants
+      if (targetPhase) {
+        // Dev quick-jump: skip straight to the requested phase
+        const advanced = await advancePhase(data.session_id, targetPhase)
+        setPhase(frontendPhaseForBackend(advanced.current_phase))
+        return
+      }
+
+      // Normal flow: resume at current phase or advance past welcome
       try {
         const status = await getSessionStatus(data.session_id)
         if (status.status === 'completed') {
@@ -79,13 +99,16 @@ export default function WelcomePage() {
     }
   }
 
+  const handleStart = (tokenOverride?: string) => startAndNavigate(tokenOverride)
+  const handleDevJump = () => startAndNavigate(undefined, jumpPhase)
+
   useEffect(() => {
     getPublicExperimentConfig('WELCOME')
       .then((config) => {
-        const welcome = config.welcome as typeof welcomeText
-        setWelcomeText(welcome)
+        setWelcomeText(config.welcome as typeof welcomeText)
       })
       .catch(() => {})
+      .finally(() => setConfigLoaded(true))
   }, [])
 
   useEffect(() => {
@@ -109,10 +132,12 @@ export default function WelcomePage() {
         {/* Form */}
         <div className="px-8 py-6 space-y-5">
           <div>
-            <p className="text-slate-600 text-sm mb-4">
-              {welcomeText?.cover_story
-                ?? "Welcome! You'll be preparing dinner and completing a few memory tasks during this session."}
-            </p>
+            {configLoaded && (
+              <p className="text-slate-600 text-sm mb-4">
+                {welcomeText?.cover_story
+                  ?? "Welcome! You'll be preparing dinner and completing a few memory tasks during this session."}
+              </p>
+            )}
             {welcomeText?.duration && (
               <p className="text-slate-500 text-sm mb-2">{welcomeText.duration}</p>
             )}
@@ -158,6 +183,39 @@ export default function WelcomePage() {
           >
             {loading ? 'Starting…' : 'Start Session'}
           </button>
+
+          {/* Dev quick-jump panel */}
+          <div className="border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => setDevOpen((v) => !v)}
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors w-full text-left"
+            >
+              {devOpen ? '▾' : '▸'} Dev: quick phase jump
+            </button>
+            {devOpen && (
+              <div className="mt-2 flex gap-2">
+                <select
+                  value={jumpPhase}
+                  onChange={(e) => setJumpPhase(e.target.value)}
+                  disabled={loading}
+                  className="flex-1 rounded-lg border border-slate-300 px-2 py-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                >
+                  {DEV_PHASES.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleDevJump}
+                  disabled={loading || token.trim().length !== 6}
+                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold
+                             disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                >
+                  {loading ? '…' : 'Jump →'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
