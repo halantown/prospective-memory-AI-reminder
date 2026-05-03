@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, async_session
 from models.experiment import Participant, ParticipantStatus
 from models.block import Block, BlockStatus, PMTrial, EncodingQuizAttempt
-from models.pm_module import PhaseEvent, CutsceneEvent, IntentionCheckEvent, PMTaskEvent
+from models.pm_module import PhaseEvent, CutsceneEvent, IntentionCheckEvent, PMTaskEvent, ExperimentResponse
 from models.schemas import (
     TokenStartRequest, SessionStartResponse, BlockEncodingResponse,
     DebriefRequest, StatusResponse,
@@ -21,10 +21,12 @@ from models.schemas import (
     EncodingQuizAttemptRequest,
     PhaseUpdateRequest, CutsceneEventRequest, IntentionCheckRequest, SessionStateResponse,
     MouseTrackingBatchRequest,
+    PhaseAdvanceRequest, PhaseAdvanceResponse, ExperimentResponsesSubmitRequest,
 )
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
 from engine.game_time import unfreeze_game_time, get_current_game_time
+from engine.phase_state import close_phase, enter_phase, next_phase_after, normalize_phase
 from data.materials import get_experiment_config_for_phase
 from data.cooking_recipes import serialize_cooking_definitions
 
@@ -191,35 +193,90 @@ async def update_phase(
     session_id: str, req: PhaseUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Log a phase transition event and update participant.current_phase."""
+    """Backward-compatible phase logging endpoint.
+
+    New flow code should prefer `/phase/advance`.  This endpoint now uses the
+    same phase service so old frontend calls still produce coherent history.
+    """
     result = await db.execute(select(Participant).where(Participant.id == session_id))
     p = result.scalar_one_or_none()
     if not p:
         raise HTTPException(404, "Session not found")
 
-    now = time.time()
-    if req.event_type == "start":
-        evt = PhaseEvent(
-            session_id=session_id,
-            phase_name=req.phase_name,
-            start_time=now,
-        )
-        db.add(evt)
-        p.current_phase = req.phase_name
-    else:  # "end"
-        evt_result = await db.execute(
-            select(PhaseEvent).where(
-                PhaseEvent.session_id == session_id,
-                PhaseEvent.phase_name == req.phase_name,
-                PhaseEvent.end_time.is_(None),
-            ).order_by(PhaseEvent.id.desc()).limit(1)
-        )
-        evt = evt_result.scalar_one_or_none()
-        if evt:
-            evt.end_time = now
+    try:
+        if req.event_type == "start":
+            await enter_phase(db, p, req.phase_name)
+        elif req.event_type == "end":
+            await close_phase(db, p, req.phase_name)
+        else:
+            raise HTTPException(400, "event_type must be 'start' or 'end'")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
     await db.commit()
     return {"status": "ok"}
+
+
+@router.post("/session/{session_id}/phase/advance", response_model=PhaseAdvanceResponse)
+async def advance_phase(
+    session_id: str,
+    req: PhaseAdvanceRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Advance to the next canonical phase, or to an explicit phase."""
+    result = await db.execute(select(Participant).where(Participant.id == session_id))
+    participant = result.scalar_one_or_none()
+    if not participant:
+        raise HTTPException(404, "Session not found")
+
+    try:
+        target = req.next_phase
+        if target is None:
+            target_phase = next_phase_after(participant.current_phase)
+            if target_phase is None:
+                raise HTTPException(400, "Participant is already at final phase")
+            target = target_phase.value
+        previous, current = await enter_phase(db, participant, target)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    await db.commit()
+    return PhaseAdvanceResponse(previous_phase=previous, current_phase=current)
+
+
+@router.post("/session/{session_id}/responses")
+async def submit_experiment_responses(
+    session_id: str,
+    req: ExperimentResponsesSubmitRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Store normalized participant responses for questionnaires and phase tasks."""
+    result = await db.execute(select(Participant).where(Participant.id == session_id))
+    participant = result.scalar_one_or_none()
+    if not participant:
+        raise HTTPException(404, "Session not found")
+
+    now = time.time()
+    rows = []
+    try:
+        for item in req.responses:
+            phase_name = normalize_phase(item.phase or participant.current_phase).value
+            row = ExperimentResponse(
+                session_id=session_id,
+                phase_name=phase_name,
+                question_id=item.question_id,
+                response_type=item.response_type,
+                value=item.value,
+                timestamp=item.timestamp if item.timestamp is not None else now,
+                extra_metadata=item.metadata,
+            )
+            rows.append(row)
+            db.add(row)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    await db.commit()
+    return {"status": "recorded", "count": len(rows)}
 
 
 @router.post("/session/{session_id}/cutscene-event")

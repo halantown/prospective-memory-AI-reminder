@@ -48,6 +48,28 @@ class PhaseUpdateRequest(BaseModel):
     event_type: str          # "start" | "end"
 
 
+class PhaseAdvanceRequest(BaseModel):
+    next_phase: Optional[str] = None
+
+
+class PhaseAdvanceResponse(BaseModel):
+    previous_phase: str
+    current_phase: str
+
+
+class ExperimentResponseItem(BaseModel):
+    phase: Optional[str] = None
+    question_id: str
+    response_type: str
+    value: Any = None
+    timestamp: Optional[float] = None
+    metadata: Optional[dict[str, Any]] = None
+
+
+class ExperimentResponsesSubmitRequest(BaseModel):
+    responses: list[ExperimentResponseItem]
+
+
 # ---------------------------------------------------------------------------
 # Encoding / cutscene logging
 # ---------------------------------------------------------------------------

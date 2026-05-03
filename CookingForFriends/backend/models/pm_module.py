@@ -24,6 +24,23 @@ class PhaseEvent(Base):
     end_time: Mapped[float | None] = mapped_column(Float, nullable=True)     # wall time
 
 
+class ExperimentResponse(Base):
+    """Normalized participant response row for questionnaires and phase tasks."""
+    __tablename__ = "experiment_responses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("participants.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    phase_name: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    question_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    response_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    value: Mapped[dict | list | str | int | float | bool | None] = mapped_column(JSON, nullable=True)
+    timestamp: Mapped[float] = mapped_column(Float, nullable=False)
+    extra_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
 class CutsceneEvent(Base):
     """Records display and dismissal of each cutscene segment plus detail-check answer."""
     __tablename__ = "cutscene_events"
