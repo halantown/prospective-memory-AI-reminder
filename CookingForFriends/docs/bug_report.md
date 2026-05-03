@@ -314,9 +314,12 @@ Wall time
   - `characterStore` 新增 `subscribeCharacterPosition()` transient subscription。移动过程中只通知需要直接写 DOM transform 的 avatar/minimap；Zustand store 的 `position` 不再每帧更新。
   - `AvatarSprite` 删除 `useState/useEffect/setInterval` 帧推进，改为 CSS keyframes + `steps(frameCount)`；React 只在 `animation/facing/scale` 改变时重新渲染。
   - `index.css` 增加 `avatar-sprite-frames` keyframes，sprite sheet 的最终 background offset 由 CSS variable 注入。
+  - `FloorPlanView` 的 zoom transform 从百分比 `translate(...)` 改为根据容器尺寸计算的 device-pixel snapped `translate3d(px)`，减少 pixel-art 背景边缘在缩放/动画重绘时的亚像素重采样抖动。
+  - `floorplan.png` 背景图被包进独立 paint/compositing layer，和角色、机器人、门铃、hotspot 等动画层隔离，降低静态背景被动画 sibling 反复重栅格化的概率。
 - 解决方案原则：
   - React/Zustand 负责低频语义状态：开始走、停止、朝向变化、到达 waypoint、显示气泡。
   - 高频视觉状态直接走 DOM transform / CSS animation，避免进入 React reconciliation。
   - 会影响 layout 的属性（`left/top`）改为 compositor 友好的 `transform`，降低 layout/repaint 压力。
+  - Pixel art 背景尽量固定在稳定 layer 上；父层平移要贴近 device pixel，避免高对比像素边缘落在半个物理像素上。
 - Verification:
   - `cd CookingForFriends/frontend && npm run build` 通过。

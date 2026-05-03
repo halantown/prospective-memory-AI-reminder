@@ -143,11 +143,17 @@ const KITCHEN_MAX_OFFSET_Y = 25
 const TRANSIT_DELAY_MS = 1500
 const ROBOT_FOLLOW_DELAY_MS = 2200
 
+function snapToDevicePixel(value: number) {
+  const dpr = window.devicePixelRatio || 1
+  return Math.round(value * dpr) / dpr
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function FloorPlanView() {
   const viewRef = useRef<HTMLDivElement>(null)
   const pointerInsideGameAreaRef = useRef(true)
+  const [viewSize, setViewSize] = useState({ width: 0, height: 0 })
   const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(null)
   const [charRoom, setCharRoom] = useState<FloorRoom>('living_room')
   const [isMoving, setIsMoving] = useState(false)
@@ -252,6 +258,23 @@ export default function FloorPlanView() {
   // Cleanup timers
   useEffect(() => () => { if (robotTimer.current) clearTimeout(robotTimer.current) }, [])
 
+  useEffect(() => {
+    const el = viewRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+
+    const updateSize = () => {
+      setViewSize({
+        width: el.clientWidth,
+        height: el.clientHeight,
+      })
+    }
+    updateSize()
+
+    const observer = new ResizeObserver(updateSize)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   // Station popup belongs only to the kitchen view.
   useEffect(() => {
     if (currentRoom !== 'kitchen') {
@@ -289,7 +312,7 @@ export default function FloorPlanView() {
   // Formula: tx = clamp((0.5 − S·cx/100)·100, (1−S)·100, 0)
   // This ensures the image always fills the container with no black borders.
   const floorTransform = useMemo(() => {
-    if (!isZoomed) return 'translate(0%, 0%) scale(1)'
+    if (!isZoomed) return 'translate3d(0px, 0px, 0) scale(1)'
     const room = ROOM_DEFS[currentRoom!]
     const isKitchen = currentRoom === 'kitchen'
     const S = isKitchen ? ZOOM_SCALE_KITCHEN : ZOOM_SCALE
@@ -300,8 +323,10 @@ export default function FloorPlanView() {
     const maxTy = isKitchen ? KITCHEN_MAX_OFFSET_Y : 0
     const tx = Math.min(maxTx, Math.max(minT, rawTx))
     const ty = Math.min(maxTy, Math.max(minT, rawTy))
-    return `translate(${tx}%, ${ty}%) scale(${S})`
-  }, [isZoomed, currentRoom])
+    const txPx = snapToDevicePixel((tx / 100) * viewSize.width)
+    const tyPx = snapToDevicePixel((ty / 100) * viewSize.height)
+    return `translate3d(${txPx}px, ${tyPx}px, 0) scale(${S})`
+  }, [isZoomed, currentRoom, viewSize.height, viewSize.width])
 
   // Always keep transform-origin at top-left so the clamped math above is exact.
   const transformOrigin = '0% 0%'
@@ -325,16 +350,26 @@ export default function FloorPlanView() {
           transform: floorTransform,
           transformOrigin,
           transition: 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), transform-origin 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
+          willChange: 'transform',
         }}
       >
         {/* Background image — fills container without letterboxing */}
-        <img
-          src="/assets/floorplan.png"
-          alt="Floor plan"
-          draggable={false}
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ objectFit: 'fill', imageRendering: 'pixelated' }}
-        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            transform: 'translateZ(0)',
+            backfaceVisibility: 'hidden',
+            contain: 'paint',
+          }}
+        >
+          <img
+            src="/assets/floorplan.png"
+            alt="Floor plan"
+            draggable={false}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            style={{ objectFit: 'fill', imageRendering: 'pixelated' }}
+          />
+        </div>
 
         {/* ── Kitchen overlay — furniture sprites + interactive hotspots ── */}
         {(() => {
