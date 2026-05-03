@@ -5,6 +5,8 @@ type RenderPhase =
   | 'consent'
   | 'demographics'
   | 'mse_pre'
+  | 'story_intro'
+  | 'encoding_flow'
   | 'introduction'
   | 'playing'
   | 'post_questionnaire'
@@ -17,20 +19,20 @@ const CANONICAL_TO_RENDER: Record<string, RenderPhase> = {
   CONSENT: 'consent',
   DEMOGRAPHICS: 'demographics',
   MSE_PRE: 'mse_pre',
-  STORY_INTRO: 'introduction',
-  ENCODING_VIDEO_1: 'introduction',
-  MANIP_CHECK_1: 'introduction',
-  ASSIGN_1: 'introduction',
-  ENCODING_VIDEO_2: 'introduction',
-  MANIP_CHECK_2: 'introduction',
-  ASSIGN_2: 'introduction',
-  ENCODING_VIDEO_3: 'introduction',
-  MANIP_CHECK_3: 'introduction',
-  ASSIGN_3: 'introduction',
-  ENCODING_VIDEO_4: 'introduction',
-  MANIP_CHECK_4: 'introduction',
-  ASSIGN_4: 'introduction',
-  RECAP: 'introduction',
+  STORY_INTRO: 'story_intro',
+  ENCODING_VIDEO_1: 'encoding_flow',
+  MANIP_CHECK_1: 'encoding_flow',
+  ASSIGN_1: 'encoding_flow',
+  ENCODING_VIDEO_2: 'encoding_flow',
+  MANIP_CHECK_2: 'encoding_flow',
+  ASSIGN_2: 'encoding_flow',
+  ENCODING_VIDEO_3: 'encoding_flow',
+  MANIP_CHECK_3: 'encoding_flow',
+  ASSIGN_3: 'encoding_flow',
+  ENCODING_VIDEO_4: 'encoding_flow',
+  MANIP_CHECK_4: 'encoding_flow',
+  ASSIGN_4: 'encoding_flow',
+  RECAP: 'encoding_flow',
   TUTORIAL_PHONE: 'introduction',
   TUTORIAL_COOKING: 'introduction',
   TUTORIAL_TRIGGER: 'introduction',

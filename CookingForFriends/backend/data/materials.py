@@ -152,6 +152,18 @@ def _tutorial_payload(key: str) -> dict[str, Any]:
     return _strip_correct_fields(get_tutorial_materials()[key])
 
 
+def evaluate_manipulation_check(task_id: str, selected_option_id: str) -> dict[str, Any]:
+    check = get_encoding_materials()["tasks"][task_id]["manipulation_check"]
+    correct_option_id = check["correct_option_id"]
+    correct = selected_option_id == correct_option_id
+    return {
+        "task_id": task_id,
+        "selected_option_id": selected_option_id,
+        "correct": correct,
+        "exclusion_flag": not correct,
+    }
+
+
 def get_experiment_config_for_phase(
     *,
     phase: str,
@@ -282,4 +294,3 @@ def get_experiment_config_for_phase(
         return {**base, "completed": True}
 
     return {**base, "material": None}
-

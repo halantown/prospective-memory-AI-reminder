@@ -10,6 +10,8 @@ import ConsentPage from './pages/game/ConsentPage'
 import DemographicsPage from './pages/game/DemographicsPage'
 import IntroductionPage from './pages/game/IntroductionPage'
 import MSEPrePage from './pages/game/MSEPrePage'
+import StoryIntroPage from './pages/game/StoryIntroPage'
+import EncodingFlowPage from './pages/game/EncodingFlowPage'
 import GamePage from './pages/game/GamePage'
 import PostQuestionnairePage from './pages/game/PostQuestionnairePage'
 import DebriefPage from './pages/game/DebriefPage'
@@ -139,6 +141,10 @@ function GameShell() {
       return <DemographicsPage />
     case 'mse_pre':
       return <MSEPrePage />
+    case 'story_intro':
+      return <StoryIntroPage />
+    case 'encoding_flow':
+      return <EncodingFlowPage />
     case 'introduction':
       return <IntroductionPage />
     case 'playing':

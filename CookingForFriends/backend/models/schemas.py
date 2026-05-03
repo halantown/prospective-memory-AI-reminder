@@ -70,6 +70,13 @@ class ExperimentResponsesSubmitRequest(BaseModel):
     responses: list[ExperimentResponseItem]
 
 
+class ManipulationCheckSubmitRequest(BaseModel):
+    phase: str
+    task_id: str
+    selected_option_id: str
+    response_time_ms: Optional[int] = None
+
+
 # ---------------------------------------------------------------------------
 # Encoding / cutscene logging
 # ---------------------------------------------------------------------------

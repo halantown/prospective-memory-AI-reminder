@@ -22,12 +22,13 @@ from models.schemas import (
     PhaseUpdateRequest, CutsceneEventRequest, IntentionCheckRequest, SessionStateResponse,
     MouseTrackingBatchRequest,
     PhaseAdvanceRequest, PhaseAdvanceResponse, ExperimentResponsesSubmitRequest,
+    ManipulationCheckSubmitRequest,
 )
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
 from engine.game_time import unfreeze_game_time, get_current_game_time
 from engine.phase_state import close_phase, enter_phase, next_phase_after, normalize_phase
-from data.materials import get_experiment_config_for_phase
+from data.materials import evaluate_manipulation_check, get_experiment_config_for_phase
 from data.cooking_recipes import serialize_cooking_definitions
 
 logger = logging.getLogger(__name__)
@@ -295,6 +296,42 @@ async def submit_experiment_responses(
 
     await db.commit()
     return {"status": "recorded", "count": len(rows)}
+
+
+@router.post("/session/{session_id}/responses/manip-check")
+async def submit_manipulation_check_response(
+    session_id: str,
+    req: ManipulationCheckSubmitRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Store an encoding manipulation check and evaluate correctness server-side."""
+    result = await db.execute(select(Participant).where(Participant.id == session_id))
+    participant = result.scalar_one_or_none()
+    if not participant:
+        raise HTTPException(404, "Session not found")
+
+    try:
+        phase_name = normalize_phase(req.phase).value
+        evaluation = evaluate_manipulation_check(req.task_id, req.selected_option_id)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    db.add(ExperimentResponse(
+        session_id=session_id,
+        phase_name=phase_name,
+        question_id=f"{req.task_id}_manipulation_check",
+        response_type="choice",
+        value=req.selected_option_id,
+        timestamp=time.time(),
+        extra_metadata={
+            "task_id": req.task_id,
+            "response_time_ms": req.response_time_ms,
+            "correct": evaluation["correct"],
+            "exclusion_flag": evaluation["exclusion_flag"],
+        },
+    ))
+    await db.commit()
+    return {"status": "recorded", **evaluation}
 
 
 @router.post("/session/{session_id}/cutscene-event")

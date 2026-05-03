@@ -123,6 +123,27 @@ export async function submitExperimentResponses(sessionId: string, responses: Ex
   })
 }
 
+export async function submitManipulationCheck(
+  sessionId: string,
+  data: {
+    phase: string
+    task_id: string
+    selected_option_id: string
+    response_time_ms?: number
+  },
+) {
+  return request<{
+    status: string
+    task_id: string
+    selected_option_id: string
+    correct: boolean
+    exclusion_flag: boolean
+  }>(`/session/${sessionId}/responses/manip-check`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
 // ── Encoding events ──
 
 export interface CutsceneEventData {
