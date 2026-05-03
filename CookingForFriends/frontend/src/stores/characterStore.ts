@@ -15,9 +15,11 @@ const TURN_DURATION = 400 // ms — brief facing animation on station arrival
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type AnimationState = 'idle' | 'walk' | 'sit'
+type CharacterPosition = { x: number; y: number }
+type PositionSubscriber = (position: CharacterPosition) => void
 
 interface CharacterState {
-  position: { x: number; y: number }
+  position: CharacterPosition
   facing: FacingDir
   animation: AnimationState
   isMoving: boolean
@@ -52,6 +54,24 @@ function getWaypoint(id: string) {
   return wpData.waypoints[id] ?? null
 }
 
+let transientPosition: CharacterPosition = { x: 28.5, y: 17.5 }
+const positionSubscribers = new Set<PositionSubscriber>()
+
+export function subscribeCharacterPosition(subscriber: PositionSubscriber) {
+  positionSubscribers.add(subscriber)
+  subscriber(transientPosition)
+  return () => {
+    positionSubscribers.delete(subscriber)
+  }
+}
+
+function setTransientPosition(position: CharacterPosition) {
+  transientPosition = position
+  for (const subscriber of positionSubscribers) {
+    subscriber(position)
+  }
+}
+
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 export const useCharacterStore = create<CharacterState>((set, get) => ({
@@ -68,7 +88,8 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
   // ── Movement API ─────────────────────────────────────────────────────────────
 
   moveToWaypoint(targetId, onArrival) {
-    const { currentWaypointId, position } = get()
+    const { currentWaypointId } = get()
+    const position = transientPosition
 
     // Determine BFS start: if we're at a known waypoint use it, else find nearest
     let fromId = currentWaypointId
@@ -79,7 +100,9 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       // No graph yet (waypoints.json empty) — just teleport
       const target = getWaypoint(targetId)
       if (target) {
-        set({ position: { x: target.x, y: target.y }, currentWaypointId: targetId })
+        const nextPosition = { x: target.x, y: target.y }
+        setTransientPosition(nextPosition)
+        set({ position: nextPosition, currentWaypointId: targetId })
         onArrival?.()
       }
       return
@@ -118,8 +141,10 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
   teleportTo(waypointId) {
     const node = getWaypoint(waypointId)
     if (!node) return
+    const nextPosition = { x: node.x, y: node.y }
+    setTransientPosition(nextPosition)
     set({
-      position: { x: node.x, y: node.y },
+      position: nextPosition,
       facing: node.facing ?? 'down',
       currentWaypointId: waypointId,
       isMoving: false,
@@ -130,7 +155,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
   },
 
   stopMovement() {
-    set({ isMoving: false, animation: 'idle', path: [], onArrival: null })
+    set({ position: transientPosition, isMoving: false, animation: 'idle', path: [], onArrival: null })
     stopMovementLoop()
   },
 
@@ -159,7 +184,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       return
     }
 
-    const { position } = state
+    const position = transientPosition
     const dx = nextNode.x - position.x
     const dy = nextNode.y - position.y
     const distance = Math.sqrt(dx * dx + dy * dy)
@@ -171,6 +196,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       // Arrived at this waypoint
       const newPath = state.path.slice(1)
       const newPos = { x: nextNode.x, y: nextNode.y }
+      setTransientPosition(newPos)
 
       if (newPath.length === 0) {
         // Reached final destination
@@ -200,9 +226,8 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
             get().dismissIdleBubble()
           }, 1500)
         }
-      } else {
+        } else {
         set({
-          position: newPos,
           facing,
           currentWaypointId: nextId,
           path: newPath,
@@ -211,10 +236,10 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
     } else {
       // Still walking toward next waypoint
       const ratio = step / distance
-      set({
-        position: { x: position.x + dx * ratio, y: position.y + dy * ratio },
-        facing,
-      })
+      setTransientPosition({ x: position.x + dx * ratio, y: position.y + dy * ratio })
+      if (facing !== state.facing) {
+        set({ facing })
+      }
     }
   },
 }))
@@ -255,6 +280,7 @@ function tick(now: number) {
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     stopMovementLoop()
+    positionSubscribers.clear()
   })
 }
 

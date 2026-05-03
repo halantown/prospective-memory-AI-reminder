@@ -26,7 +26,7 @@ import KitchenRoom, { KitchenStationOverlay } from './rooms/KitchenRoom'
 import KitchenFurniture from './rooms/KitchenFurniture'
 import WaypointEditor from './debug/WaypointEditor'
 import PlayerAvatar from './PlayerAvatar'
-import { useCharacterStore } from '../../stores/characterStore'
+import { subscribeCharacterPosition, useCharacterStore } from '../../stores/characterStore'
 import waypointData from '../../data/waypoints.json'
 import type { WaypointData } from '../../utils/waypointGraph'
 import { resolveRoomPoint } from '../../utils/waypointGraph'
@@ -616,13 +616,7 @@ function MinimapAvatarDot() {
   }, [])
 
   useEffect(() => {
-    updateDotTransform(useCharacterStore.getState().position)
-
-    const unsubscribe = useCharacterStore.subscribe((state, prevState) => {
-      if (state.position !== prevState.position) {
-        updateDotTransform(state.position)
-      }
-    })
+    const unsubscribe = subscribeCharacterPosition(updateDotTransform)
 
     const parent = dotRef.current?.parentElement
     const resizeObserver = parent && typeof ResizeObserver !== 'undefined'

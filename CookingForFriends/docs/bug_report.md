@@ -283,11 +283,18 @@ Wall time
   - `_tick()` 在移动中每帧更新 Zustand store 的 `position` 和 `facing`。
   - `frontend/src/components/game/PlayerAvatar.tsx` 订阅 `position/facing/animation`，用 React render 改 `left/top`。
   - `frontend/src/components/game/FloorPlanView.tsx` 也订阅 `characterStore.position`，仅用于 minimap character dot，但这会拖着整个 FloorPlanView 每帧重渲染。
+- 如何发现：
+  - 从卡顿症状入手，搜索前端所有 `requestAnimationFrame` / `moveToWaypoint` / `PlayerAvatar` / `useCharacterStore` 订阅点。
+  - 对照组件树发现 `position` 是 60fps 高频状态，但被 `FloorPlanView` 这种大型页面组件直接订阅。
+  - 检查 `AvatarSprite` 后发现 sprite 帧动画也用 `setInterval + setState` 推进，虽然只有 8fps，但仍会让 React 参与角色动画帧。
+  - waypoint 图只有 21 个点、18 条边，BFS pathfinding 不是瓶颈；瓶颈集中在渲染和状态通知。
 - 主要根因：
   - 60fps 动画状态放进全局 Zustand，并由 React render 驱动。
   - 大型父组件 `FloorPlanView` 误订阅每帧变化的 `position`，导致 floor plan、厨房 overlay、robot、nav buttons、minimap、dev editor 等一起参与每帧 render。
   - Avatar 位置用 `left/top` 更新，而不是 GPU-friendly 的 `transform: translate3d(...)`。
   - `characterStore` 的 rAF loop 在模块加载时永久启动；生产通常只有一个 loop，但 Vite dev HMR 下如果模块热重载，可能叠加多个 loop。
+  - 第一轮修复后，`position` 仍每帧写入 Zustand。即便 React 大组件不再订阅它，Zustand 仍要通知订阅者和执行 selector，对低配机器仍有额外主线程开销。
+  - `AvatarSprite` 的帧推进属于纯视觉动画，不应该使用 React state；每次 `setFrame` 都会进入 React render/reconcile 路径。
 - 风险：
   - 后续继续把高频动画状态接到页面级组件，会让卡顿越来越难定位。
   - 如果 dev HMR 多 loop 叠加，开发环境会比生产更卡，容易误判性能问题来源。
@@ -296,11 +303,20 @@ Wall time
   - [x] `PlayerAvatar` 改为 `ref + useCharacterStore.subscribe`，直接写 DOM `style.transform = translate3d(...)`，不要每帧 React render。
   - [x] Avatar movement 使用 `transform`，避免 `left/top` 每帧变化。
   - [x] 给 `characterStore` 的 rAF loop 增加按需启动/停止和 HMR cleanup：`import.meta.hot.dispose(() => cancelAnimationFrame(rafId))`。
+  - [x] 将移动中的高频 position 从 Zustand store 更新链路移到 lightweight transient position subscribers；store 只在 teleport / stop / waypoint 到达时同步最终位置。
+  - [x] 将 `AvatarSprite` 从 `setInterval + setState` 改成 CSS `steps()` sprite sheet animation，避免 React 参与帧推进。
   - [ ] 进一步收敛 `FloorPlanView`：把 minimap、room navigation、robot、station popup、dev waypoint editor 拆成较小组件，避免一个低层状态变化带动整张地图重渲染。
 - 已做修复（2026-05-03）：
   - `PlayerAvatar` 不再订阅 `position` 触发 React render；移动时通过父 floorplan 尺寸把 waypoint 百分比转换为像素，写入 `translate3d(...)`，仍跟随父层 zoom transform。
   - `MinimapAvatarDot` 也改为 ref subscription + `translate3d(...)`，移动时不触发 minimap React render。
   - `characterStore` 删除模块加载即永久启动的 rAF loop；现在只在 `moveToWaypoint()` 进入移动状态时启动，路径结束 / teleport / stop 时停止。
   - HMR dispose 时取消未完成的 rAF，避免 Vite dev 下叠加 movement loops。
+  - `characterStore` 新增 `subscribeCharacterPosition()` transient subscription。移动过程中只通知需要直接写 DOM transform 的 avatar/minimap；Zustand store 的 `position` 不再每帧更新。
+  - `AvatarSprite` 删除 `useState/useEffect/setInterval` 帧推进，改为 CSS keyframes + `steps(frameCount)`；React 只在 `animation/facing/scale` 改变时重新渲染。
+  - `index.css` 增加 `avatar-sprite-frames` keyframes，sprite sheet 的最终 background offset 由 CSS variable 注入。
+- 解决方案原则：
+  - React/Zustand 负责低频语义状态：开始走、停止、朝向变化、到达 waypoint、显示气泡。
+  - 高频视觉状态直接走 DOM transform / CSS animation，避免进入 React reconciliation。
+  - 会影响 layout 的属性（`left/top`）改为 compositor 友好的 `transform`，降低 layout/repaint 压力。
 - Verification:
   - `cd CookingForFriends/frontend && npm run build` 通过。

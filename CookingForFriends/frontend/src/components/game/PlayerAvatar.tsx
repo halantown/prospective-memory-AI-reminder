@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCharacterStore } from '../../stores/characterStore'
+import { subscribeCharacterPosition, useCharacterStore } from '../../stores/characterStore'
 import AvatarSprite from './AvatarSprite'
 
 export default function PlayerAvatar() {
@@ -30,13 +30,7 @@ export default function PlayerAvatar() {
   }, [])
 
   useEffect(() => {
-    updateAvatarTransform(useCharacterStore.getState().position)
-
-    const unsubscribe = useCharacterStore.subscribe((state, prevState) => {
-      if (state.position !== prevState.position) {
-        updateAvatarTransform(state.position)
-      }
-    })
+    const unsubscribe = subscribeCharacterPosition(updateAvatarTransform)
 
     const parent = avatarRef.current?.parentElement
     const resizeObserver = parent && typeof ResizeObserver !== 'undefined'

@@ -12,7 +12,7 @@
  *   element: 48×96px
  */
 
-import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { FacingDir } from '../../utils/waypointGraph'
 import type { AnimationState } from '../../stores/characterStore'
 
@@ -50,25 +50,6 @@ interface AvatarSpriteProps {
 }
 
 export default function AvatarSprite({ animation, facing, scale = 1, className = '' }: AvatarSpriteProps) {
-  const [frame, setFrame] = useState(0)
-  const prevAnimRef = useRef(animation)
-
-  // Reset frame on animation change
-  useEffect(() => {
-    if (prevAnimRef.current !== animation) {
-      setFrame(0)
-      prevAnimRef.current = animation
-    }
-  }, [animation])
-
-  // Advance frame at FRAME_RATE fps
-  useEffect(() => {
-    const id = setInterval(() => {
-      setFrame(f => (f + 1) % FRAME_COUNT[animation])
-    }, 1000 / FRAME_RATE)
-    return () => clearInterval(id)
-  }, [animation])
-
   // Resolve direction — sit only has right/left
   const effectiveFacing: FacingDir =
     animation === 'sit'
@@ -76,23 +57,30 @@ export default function AvatarSprite({ animation, facing, scale = 1, className =
       : facing
 
   const startFrame = FRAME_START[animation][effectiveFacing] ?? 0
-  const frameIndex = startFrame + frame
+  const frameCount = FRAME_COUNT[animation]
 
   const w = 48 * scale
   const h = 96 * scale
+  const startX = -startFrame * w
+  const endX = -(startFrame + frameCount) * w
+  const durationS = frameCount / FRAME_RATE
+  const style = {
+    width: w,
+    height: h,
+    backgroundImage: `url(${SPRITE_SHEETS[animation]})`,
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: `auto ${h}px`,
+    backgroundPosition: `${startX}px 0px`,
+    imageRendering: 'pixelated',
+    animation: `avatar-sprite-frames ${durationS}s steps(${frameCount}) infinite`,
+    '--avatar-sprite-end-x': `${endX}px`,
+  } as CSSProperties
 
   return (
     <div
+      key={`${animation}-${effectiveFacing}-${scale}`}
       className={className}
-      style={{
-        width: w,
-        height: h,
-        backgroundImage: `url(${SPRITE_SHEETS[animation]})`,
-        backgroundRepeat: 'no-repeat',
-        backgroundSize: `auto ${h}px`,
-        backgroundPosition: `calc(${frameIndex} * ${-w}px) 0px`,
-        imageRendering: 'pixelated',
-      }}
+      style={style}
     />
   )
 }
