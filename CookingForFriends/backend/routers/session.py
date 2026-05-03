@@ -256,6 +256,9 @@ async def advance_phase(
                 raise HTTPException(400, "Participant is already at final phase")
             target = target_phase.value
         previous, current = await enter_phase(db, participant, target)
+        if current == "COMPLETED":
+            participant.status = ParticipantStatus.COMPLETED
+            participant.completed_at = datetime.now(timezone.utc)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
