@@ -4,7 +4,7 @@ import { advancePhase, submitExperimentResponses } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say', 'Other'] as const
-const PROFICIENCY_OPTIONS = ['Native / near-native', 'Advanced', 'Intermediate', 'Beginner'] as const
+const PROFICIENCY_OPTIONS = ['Beginner', 'Intermediate', 'Advanced', 'Native / near-native'] as const
 
 export default function DemographicsPage() {
   const sessionId = useGameStore((s) => s.sessionId)
@@ -151,4 +151,3 @@ export default function DemographicsPage() {
     </div>
   )
 }
-

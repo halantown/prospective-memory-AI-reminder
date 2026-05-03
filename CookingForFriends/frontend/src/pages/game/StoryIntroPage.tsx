@@ -3,6 +3,7 @@ import { useGameStore } from '../../stores/gameStore'
 import { advancePhase, getExperimentConfig } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
 import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
+import ExperimentHomeShell from '../../components/game/ExperimentHomeShell'
 
 interface ScriptLine {
   speaker: string
@@ -44,29 +45,25 @@ export default function StoryIntroPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1f2937] flex items-end justify-center p-6">
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-700 to-slate-950" />
-      <div className="relative mb-6 w-full max-w-4xl">
-        {current ? (
-          <BubbleDialogue
-            speaker={current.speaker}
-            text={current.text}
-            avatar={current.speaker === 'ROBOT' ? 'R' : current.speaker === 'AVATAR' ? 'A' : 'N'}
-            continueLabel={index < script.length - 1 ? 'Continue' : 'Start'}
-            loading={loading}
-            onContinue={handleContinue}
-          >
-            {current.stage_direction && (
-              <div className="text-xs italic text-slate-500">{current.stage_direction}</div>
-            )}
-          </BubbleDialogue>
-        ) : (
-          <div className="rounded-lg bg-white p-6 text-center text-sm text-slate-500 shadow-xl">
-            Loading...
-          </div>
-        )}
-      </div>
-    </div>
+    <ExperimentHomeShell>
+      {current ? (
+        <BubbleDialogue
+          speaker={current.speaker}
+          text={current.text}
+          avatar={current.speaker === 'ROBOT' ? 'R' : current.speaker === 'AVATAR' ? 'A' : 'N'}
+          continueLabel={index < script.length - 1 ? 'Continue' : 'Start'}
+          loading={loading}
+          onContinue={handleContinue}
+        >
+          {current.stage_direction && (
+            <div className="text-xs italic text-slate-500">{current.stage_direction}</div>
+          )}
+        </BubbleDialogue>
+      ) : (
+        <div className="rounded-lg bg-white p-6 text-center text-sm text-slate-500 shadow-xl">
+          Loading...
+        </div>
+      )}
+    </ExperimentHomeShell>
   )
 }
-

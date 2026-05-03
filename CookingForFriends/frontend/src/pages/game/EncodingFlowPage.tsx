@@ -7,6 +7,8 @@ import {
   submitManipulationCheck,
 } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
+import ExperimentHomeShell from '../../components/game/ExperimentHomeShell'
+import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
 
 interface Option {
   id: string
@@ -109,20 +111,25 @@ export default function EncodingFlowPage() {
 
   if (!config) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-sm text-slate-300">
-        Loading...
-      </div>
+      <ExperimentHomeShell>
+        <div className="rounded-lg bg-white p-6 text-center text-sm text-slate-500 shadow-xl">
+          Loading...
+        </div>
+      </ExperimentHomeShell>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="w-full max-w-3xl rounded-xl bg-white p-8 shadow-xl">
-        <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-
+    <ExperimentHomeShell>
+      <div className="rounded-lg border border-slate-300 bg-white/95 p-5 shadow-xl backdrop-blur">
         {kind === 'video' && (
-          <div className="mt-6">
-            <div className="flex aspect-video items-center justify-center rounded-lg border border-slate-300 bg-slate-100 text-center text-sm text-slate-500">
+          <div>
+            <BubbleDialogue
+              speaker="AVATAR"
+              text="Watch carefully. Let me tell you what happened recently."
+              avatar="A"
+            />
+            <div className="mt-4 flex aspect-video max-h-[34vh] items-center justify-center rounded-lg border border-slate-300 bg-slate-100 text-center text-sm text-slate-500">
               Video asset placeholder
               <br />
               {encoding?.video_src}
@@ -138,8 +145,9 @@ export default function EncodingFlowPage() {
         )}
 
         {kind === 'manip' && manip && (
-          <div className="mt-6">
-            <p className="text-base font-medium text-slate-800">{manip.question}</p>
+          <div>
+            <h1 className="text-lg font-bold text-slate-900">{title}</h1>
+            <p className="mt-3 text-base font-medium text-slate-800">{manip.question}</p>
             <div className="mt-4 space-y-2">
               {manip.options.map((option) => (
                 <button
@@ -166,7 +174,7 @@ export default function EncodingFlowPage() {
         )}
 
         {kind === 'assign' && assign && (
-          <div className="mt-6">
+          <div>
             {Boolean(config.transition_line) && (
               <p className="mb-4 text-sm italic text-slate-500">{String(config.transition_line)}</p>
             )}
@@ -184,7 +192,7 @@ export default function EncodingFlowPage() {
         )}
 
         {kind === 'recap' && (
-          <div className="mt-6">
+          <div>
             <p className="text-sm text-slate-600">{String(config.intro ?? '')}</p>
             <ol className="mt-4 space-y-2">
               {recapTasks.map((task) => (
@@ -204,6 +212,6 @@ export default function EncodingFlowPage() {
           </div>
         )}
       </div>
-    </div>
+    </ExperimentHomeShell>
   )
 }
