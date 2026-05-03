@@ -450,35 +450,8 @@ export default function FloorPlanView() {
         )}
       </AnimatePresence>
 
-      {/* ── Overlay: "Moving to..." indicator ── */}
-      <AnimatePresence>
-        {isMoving && currentRoom && (
-          <motion.div
-            className="absolute top-6 left-1/2 -translate-x-1/2 z-50"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            <div className="bg-slate-900/90 backdrop-blur-sm rounded-xl px-5 py-2.5 border border-amber-500/40 shadow-lg">
-              <div className="flex items-center gap-2">
-                <motion.span
-                  className="text-lg"
-                  animate={{ x: [0, 4, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.6 }}
-                >
-                  🚶
-                </motion.span>
-                <span className="text-sm font-medium text-amber-200">
-                  Moving to {ROOM_DEFS[currentRoom].label}...
-                </span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* ── Navigation edge buttons (zoomed mode) ── */}
-      {isZoomed && !isMoving && currentRoom && (
+      {isZoomed && !isMoving && !isCharMoving && currentRoom && (
         ADJACENCY[currentRoom].map((nav) => {
           const isDoorbellTarget = doorbellActive && nav.target === 'living_room'
           return (
@@ -505,7 +478,7 @@ export default function FloorPlanView() {
       )}
 
       {/* ── Overview / Zoom-out button ── */}
-      {isZoomed && !isMoving && (
+      {isZoomed && !isMoving && !isCharMoving && (
         <button
           className="absolute top-5 right-5 z-40 flex items-center gap-2 px-4 py-2.5
                      bg-slate-800/90 hover:bg-slate-700/95 backdrop-blur-sm

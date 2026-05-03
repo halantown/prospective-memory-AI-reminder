@@ -1,19 +1,55 @@
 /** Phone tab bar — bottom navigation: Chats and Recipe tabs. */
 
-import { useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
+
+const BOUNCE_DURATION_MS = 2000
+const CHATS_BOUNCE_COOLDOWN_MS = 60_000
+const CHATS_UNREAD_THRESHOLD = 3
+
+const BOUNCE_KEYFRAMES = { y: [0, -8, 0, -5, 0, -2, 0] }
+const BOUNCE_TRANSITION = { duration: BOUNCE_DURATION_MS / 1000, ease: 'easeInOut' as const }
 
 export default function PhoneTabBar() {
   const activeTab = useGameStore((s) => s.activePhoneTab)
   const setActiveTab = useGameStore((s) => s.setActivePhoneTab)
   const phoneMessages = useGameStore((s) => s.phoneMessages)
   const recipeTabBounce = useGameStore((s) => s.recipeTabBounce)
+  const setRecipeTabBounce = useGameStore((s) => s.setRecipeTabBounce)
   const wsSend = useGameStore((s) => s.wsSend)
 
   const totalUnread = useMemo(() => {
     return phoneMessages.filter((m) => m.channel === 'chat' && !m.read).length
   }, [phoneMessages])
+
+  // ── Chats bounce: ≥3 unread, rate-limited 60s ──────────────────────────────
+  const [chatsBouncing, setChatsBouncing] = useState(false)
+  const lastChatsBounceAt = useRef<number>(0)
+  const chatsBounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (
+      totalUnread >= CHATS_UNREAD_THRESHOLD &&
+      activeTab !== 'chats' &&
+      Date.now() - lastChatsBounceAt.current > CHATS_BOUNCE_COOLDOWN_MS
+    ) {
+      lastChatsBounceAt.current = Date.now()
+      setChatsBouncing(true)
+      if (chatsBounceTimer.current) clearTimeout(chatsBounceTimer.current)
+      chatsBounceTimer.current = setTimeout(() => setChatsBouncing(false), BOUNCE_DURATION_MS)
+    }
+    return () => {
+      if (chatsBounceTimer.current) clearTimeout(chatsBounceTimer.current)
+    }
+  }, [totalUnread, activeTab])
+
+  // ── Recipe bounce: auto-reset after 2s ──────────────────────────────────────
+  useEffect(() => {
+    if (!recipeTabBounce) return
+    const t = setTimeout(() => setRecipeTabBounce(false), BOUNCE_DURATION_MS)
+    return () => clearTimeout(t)
+  }, [recipeTabBounce, setRecipeTabBounce])
 
   const handleTabClick = (tab: 'chats' | 'recipe') => {
     if (tab === activeTab) return
@@ -29,8 +65,10 @@ export default function PhoneTabBar() {
   return (
     <div className="flex items-center justify-around border-t border-slate-700/40 py-1.5 shrink-0 bg-slate-800/60">
       {/* Chats tab */}
-      <button
+      <motion.button
         onClick={() => handleTabClick('chats')}
+        animate={chatsBouncing ? BOUNCE_KEYFRAMES : {}}
+        transition={BOUNCE_TRANSITION}
         className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-colors relative
                     ${activeTab === 'chats' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-300'}`}
       >
@@ -48,13 +86,13 @@ export default function PhoneTabBar() {
             className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-400 rounded-full"
           />
         )}
-      </button>
+      </motion.button>
 
       {/* Recipe tab */}
       <motion.button
         onClick={() => handleTabClick('recipe')}
-        animate={recipeTabBounce ? { scale: [1, 1.2, 1, 1.15, 1] } : {}}
-        transition={{ duration: 0.6, ease: 'easeInOut' }}
+        animate={recipeTabBounce ? BOUNCE_KEYFRAMES : {}}
+        transition={BOUNCE_TRANSITION}
         className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-colors relative
                     ${activeTab === 'recipe' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-300'}`}
       >

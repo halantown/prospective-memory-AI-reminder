@@ -451,6 +451,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       activeCookingSteps: [...s.activeCookingSteps.filter(
         st => !(st.dishId === step.dishId && st.stepIndex === step.stepIndex)
       ), step],
+      recipeTabBounce: true,
       cookingWaitSteps: s.cookingWaitSteps.filter(w => w.dishId !== step.dishId),
       dishes: {
         ...s.dishes,
