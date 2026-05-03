@@ -7,7 +7,9 @@ import type { Phase } from './types'
 import { frontendPhaseForBackend, isMainExperimentPhase, renderPhaseFor } from './utils/phase'
 import WelcomePage from './pages/game/WelcomePage'
 import ConsentPage from './pages/game/ConsentPage'
+import DemographicsPage from './pages/game/DemographicsPage'
 import IntroductionPage from './pages/game/IntroductionPage'
+import MSEPrePage from './pages/game/MSEPrePage'
 import GamePage from './pages/game/GamePage'
 import PostQuestionnairePage from './pages/game/PostQuestionnairePage'
 import DebriefPage from './pages/game/DebriefPage'
@@ -133,6 +135,10 @@ function GameShell() {
       return <WelcomePage />
     case 'consent':
       return <ConsentPage />
+    case 'demographics':
+      return <DemographicsPage />
+    case 'mse_pre':
+      return <MSEPrePage />
     case 'introduction':
       return <IntroductionPage />
     case 'playing':

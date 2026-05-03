@@ -2,12 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
-import { startSession, getSessionStatus } from '../../services/api'
+import { advancePhase, getPublicExperimentConfig, getSessionStatus, startSession } from '../../services/api'
+import { frontendPhaseForBackend } from '../../utils/phase'
 
 export default function WelcomePage() {
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [welcomeText, setWelcomeText] = useState<{
+    cover_story?: string
+    duration?: string
+    training_notice?: string
+  } | null>(null)
   const autoStartedRef = useRef(false)
 
   const setSession = useGameStore((s) => s.setSession)
@@ -53,13 +59,17 @@ export default function WelcomePage() {
         const status = await getSessionStatus(data.session_id)
         if (status.status === 'completed') {
           setPhase('complete')
-        } else if (status.phase === 'playing') {
-          setPhase('playing')
         } else {
-          setPhase('playing')
+          const current = frontendPhaseForBackend(status.phase || data.current_phase)
+          if (current === 'welcome') {
+            const advanced = await advancePhase(data.session_id, 'CONSENT')
+            setPhase(frontendPhaseForBackend(advanced.current_phase))
+          } else {
+            setPhase(current)
+          }
         }
       } catch {
-        setPhase('playing')
+        setPhase(frontendPhaseForBackend(data.current_phase || 'CONSENT'))
       }
     } catch (err: unknown) {
       console.error('[Welcome] Failed:', err)
@@ -68,6 +78,15 @@ export default function WelcomePage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    getPublicExperimentConfig('WELCOME')
+      .then((config) => {
+        const welcome = config.welcome as typeof welcomeText
+        setWelcomeText(welcome)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (autoStartedRef.current) return
@@ -91,8 +110,15 @@ export default function WelcomePage() {
         <div className="px-8 py-6 space-y-5">
           <div>
             <p className="text-slate-600 text-sm mb-4">
-              Welcome! You'll be preparing dinner and completing a few memory tasks during this session.
+              {welcomeText?.cover_story
+                ?? "Welcome! You'll be preparing dinner and completing a few memory tasks during this session."}
             </p>
+            {welcomeText?.duration && (
+              <p className="text-slate-500 text-sm mb-2">{welcomeText.duration}</p>
+            )}
+            {welcomeText?.training_notice && (
+              <p className="text-slate-500 text-sm">{welcomeText.training_notice}</p>
+            )}
           </div>
 
           <div>

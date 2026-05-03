@@ -1,45 +1,85 @@
-/** Consent page — shows informed consent text, participant agrees to continue. */
+/** Consent page — embeds consent PDF and records consent timestamp. */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
-import { updatePhase } from '../../services/api'
-import { PLACEHOLDER_INFORMED_CONSENT } from '../../constants/placeholders'
+import { advancePhase, getExperimentConfig, submitExperimentResponses } from '../../services/api'
+import { frontendPhaseForBackend } from '../../utils/phase'
 
 export default function ConsentPage() {
   const sessionId = useGameStore((s) => s.sessionId)
   const setPhase = useGameStore((s) => s.setPhase)
   const [loading, setLoading] = useState(false)
+  const [checked, setChecked] = useState(false)
+  const [consent, setConsent] = useState<{
+    pdf_path?: string
+    checkbox_label?: string
+    continue_button?: string
+  } | null>(null)
+
+  useEffect(() => {
+    if (!sessionId) return
+    getExperimentConfig(sessionId, 'CONSENT')
+      .then((config) => setConsent(config.consent as typeof consent))
+      .catch((e) => console.error('[Consent] config load failed', e))
+  }, [sessionId])
 
   const handleAgree = async () => {
-    if (!sessionId || loading) return
+    if (!sessionId || loading || !checked) return
     setLoading(true)
     try {
-      await updatePhase(sessionId, 'consent', 'end')
+      await submitExperimentResponses(sessionId, [{
+        phase: 'CONSENT',
+        question_id: 'informed_consent_agreement',
+        response_type: 'boolean',
+        value: true,
+        timestamp: Date.now() / 1000,
+        metadata: { consent_pdf_path: consent?.pdf_path ?? null },
+      }])
+      const advanced = await advancePhase(sessionId, 'DEMOGRAPHICS')
+      setPhase(frontendPhaseForBackend(advanced.current_phase))
     } catch (e) {
-      console.error('[Consent] phase update failed', e)
+      console.error('[Consent] submit failed', e)
     } finally {
       setLoading(false)
-      setPhase('introduction')
     }
   }
 
+  const pdfSrc = consent?.pdf_path ? `/${consent.pdf_path}` : null
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-8">
-        <div className="text-4xl mb-4 text-center">📋</div>
+      <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full p-8">
         <h1 className="text-2xl font-bold text-slate-800 mb-6 text-center">
           Informed Consent
         </h1>
-        <div className="bg-slate-50 rounded-xl p-6 mb-8 text-slate-700 leading-relaxed whitespace-pre-wrap text-sm">
-          {PLACEHOLDER_INFORMED_CONSENT}
+        <div className="h-[60vh] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 mb-5">
+          {pdfSrc ? (
+            <iframe title="Informed consent" src={pdfSrc} className="h-full w-full" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-slate-500">
+              Loading consent form...
+            </div>
+          )}
         </div>
+        <label className="mb-6 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => setChecked(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-blue-600"
+          />
+          <span>
+            {consent?.checkbox_label
+              ?? 'I have read and understood the information above and voluntarily agree to participate.'}
+          </span>
+        </label>
         <button
           onClick={handleAgree}
-          disabled={loading}
+          disabled={loading || !checked}
           className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300
                      text-white font-semibold rounded-xl transition-colors text-base"
         >
-          {loading ? 'Please wait…' : 'I agree and wish to continue'}
+          {loading ? 'Please wait...' : consent?.continue_button ?? 'I Agree & Continue'}
         </button>
       </div>
     </div>

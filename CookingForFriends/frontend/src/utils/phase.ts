@@ -3,6 +3,8 @@ import type { Phase } from '../types'
 type RenderPhase =
   | 'welcome'
   | 'consent'
+  | 'demographics'
+  | 'mse_pre'
   | 'introduction'
   | 'playing'
   | 'post_questionnaire'
@@ -13,8 +15,8 @@ const CANONICAL_TO_RENDER: Record<string, RenderPhase> = {
   TOKEN_INPUT: 'welcome',
   WELCOME: 'welcome',
   CONSENT: 'consent',
-  DEMOGRAPHICS: 'introduction',
-  MSE_PRE: 'introduction',
+  DEMOGRAPHICS: 'demographics',
+  MSE_PRE: 'mse_pre',
   STORY_INTRO: 'introduction',
   ENCODING_VIDEO_1: 'introduction',
   MANIP_CHECK_1: 'introduction',
@@ -69,4 +71,3 @@ export function frontendPhaseForBackend(phase: string | null | undefined): Phase
 export function isMainExperimentPhase(phase: string | null | undefined): boolean {
   return phase === 'MAIN_EXPERIMENT' || phase === 'playing'
 }
-

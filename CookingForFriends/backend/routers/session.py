@@ -39,6 +39,24 @@ _RATE_LIMIT_WINDOW = 60  # seconds
 _RATE_LIMIT_MAX = 10     # max attempts per window
 
 
+@router.get("/experiment-config")
+async def get_public_experiment_config(phase: str = Query(default="WELCOME")):
+    """Return non-sensitive public material before token login.
+
+    Only token input and welcome text are exposed without a participant session.
+    Condition-specific and answer-bearing materials require the session-scoped
+    endpoint.
+    """
+    normalized = phase.strip().upper()
+    if normalized not in {"TOKEN_INPUT", "WELCOME"}:
+        raise HTTPException(403, "This phase requires a participant session")
+    return get_experiment_config_for_phase(
+        phase=normalized,
+        condition="EC+",
+        task_order="A",
+    )
+
+
 @router.post("/session/start", response_model=SessionStartResponse)
 async def start_session(req: TokenStartRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Start a session by presenting the 6-char token."""

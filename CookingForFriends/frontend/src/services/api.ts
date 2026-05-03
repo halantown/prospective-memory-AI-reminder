@@ -42,6 +42,10 @@ export async function getExperimentConfig(sessionId: string, phase?: string) {
   return request<ExperimentConfig>(`/session/${sessionId}/experiment-config${query}`)
 }
 
+export async function getPublicExperimentConfig(phase = 'WELCOME') {
+  return request<ExperimentConfig>(`/experiment-config?phase=${encodeURIComponent(phase)}`)
+}
+
 export async function getSessionStatus(sessionId: string) {
   return request<{
     status: string
