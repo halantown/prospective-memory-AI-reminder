@@ -1,50 +1,54 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
-import { advancePhase, getExperimentConfig, submitExperimentResponses } from '../../services/api'
+import { advancePhase, submitExperimentResponses } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
 
-interface DemographicQuestion {
-  question_id: string
-  response_type: string
-  label: string
-}
+const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say', 'Other'] as const
+const PROFICIENCY_OPTIONS = ['Native / near-native', 'Advanced', 'Intermediate', 'Beginner'] as const
 
 export default function DemographicsPage() {
   const sessionId = useGameStore((s) => s.sessionId)
   const setPhase = useGameStore((s) => s.setPhase)
-  const [questions, setQuestions] = useState<DemographicQuestion[]>([])
-  const [values, setValues] = useState<Record<string, string>>({})
+  const [age, setAge] = useState('')
+  const [gender, setGender] = useState('')
+  const [genderOther, setGenderOther] = useState('')
+  const [proficiency, setProficiency] = useState('')
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (!sessionId) return
-    getExperimentConfig(sessionId, 'DEMOGRAPHICS')
-      .then((config) => setQuestions((config.questions as DemographicQuestion[]) ?? []))
-      .catch((e) => console.error('[Demographics] config load failed', e))
-  }, [sessionId])
+  const effectiveGender = gender === 'Other' ? genderOther.trim() : gender
 
-  const setValue = (id: string, value: string) => {
-    setValues((prev) => ({ ...prev, [id]: value }))
-  }
-
-  const isComplete = questions.every((q) => values[q.question_id]?.trim())
+  const isComplete =
+    age !== '' &&
+    Number.isInteger(Number(age)) &&
+    Number(age) >= 18 &&
+    Number(age) <= 99 &&
+    effectiveGender !== '' &&
+    proficiency !== ''
 
   const handleSubmit = async () => {
     if (!sessionId || loading || !isComplete) return
     setLoading(true)
     try {
-      await submitExperimentResponses(sessionId, questions.map((q) => {
-        const raw = values[q.question_id]
-        let value: unknown = raw
-        if (q.response_type === 'integer') value = Number.parseInt(raw, 10)
-        if (q.response_type === 'boolean') value = raw === 'yes'
-        return {
+      await submitExperimentResponses(sessionId, [
+        {
           phase: 'DEMOGRAPHICS',
-          question_id: q.question_id,
-          response_type: q.response_type,
-          value,
-        }
-      }))
+          question_id: 'age',
+          response_type: 'integer',
+          value: Number.parseInt(age, 10),
+        },
+        {
+          phase: 'DEMOGRAPHICS',
+          question_id: 'gender',
+          response_type: 'text',
+          value: effectiveGender,
+        },
+        {
+          phase: 'DEMOGRAPHICS',
+          question_id: 'english_proficiency',
+          response_type: 'text',
+          value: proficiency,
+        },
+      ])
       const advanced = await advancePhase(sessionId, 'MSE_PRE')
       setPhase(frontendPhaseForBackend(advanced.current_phase))
     } catch (e) {
@@ -56,33 +60,86 @@ export default function DemographicsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl rounded-xl bg-white p-8 shadow-xl">
-        <h1 className="text-2xl font-bold text-slate-900">Background Questions</h1>
-        <div className="mt-6 space-y-4">
-          {questions.map((q) => (
-            <div key={q.question_id}>
-              <label className="mb-1 block text-sm font-medium text-slate-700">{q.label}</label>
-              {q.response_type === 'boolean' ? (
-                <select
-                  value={values[q.question_id] ?? ''}
-                  onChange={(e) => setValue(q.question_id, e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                >
-                  <option value="">Select...</option>
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
-              ) : (
-                <input
-                  type={q.response_type === 'integer' ? 'number' : 'text'}
-                  value={values[q.question_id] ?? ''}
-                  onChange={(e) => setValue(q.question_id, e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                />
-              )}
-            </div>
-          ))}
-        </div>
+      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-xl">
+        <h1 className="text-xl font-bold text-slate-900 mb-6">Background Questions</h1>
+        <form
+          autoComplete="off"
+          onSubmit={(e) => e.preventDefault()}
+          className="space-y-5"
+        >
+          {/* Age */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Age <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              autoComplete="off"
+              name="study-participant-age"
+              min={18}
+              max={99}
+              step={1}
+              value={age}
+              placeholder="e.g. 24"
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === '' || /^\d+$/.test(v)) setAge(v)
+              }}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+            />
+          </div>
+
+          {/* Gender */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Gender <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={gender}
+              autoComplete="off"
+              name="study-participant-gender"
+              onChange={(e) => { setGender(e.target.value); setGenderOther('') }}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+            >
+              <option value="">Select…</option>
+              {GENDER_OPTIONS.map((o) => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
+            {gender === 'Other' && (
+              <input
+                type="text"
+                autoComplete="off"
+                name="study-participant-gender-other"
+                value={genderOther}
+                placeholder="Please specify"
+                onChange={(e) => setGenderOther(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+              />
+            )}
+          </div>
+
+          {/* English proficiency */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              English proficiency <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={proficiency}
+              autoComplete="off"
+              name="study-participant-english"
+              onChange={(e) => setProficiency(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+            >
+              <option value="">Select…</option>
+              {PROFICIENCY_OPTIONS.map((o) => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
+          </div>
+        </form>
+
         <button
           onClick={handleSubmit}
           disabled={!isComplete || loading}
