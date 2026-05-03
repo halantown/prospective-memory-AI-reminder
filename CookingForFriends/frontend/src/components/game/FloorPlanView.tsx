@@ -147,6 +147,7 @@ const ROBOT_FOLLOW_DELAY_MS = 2200
 
 export default function FloorPlanView() {
   const viewRef = useRef<HTMLDivElement>(null)
+  const pointerInsideGameAreaRef = useRef(true)
   const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(null)
   const [charRoom, setCharRoom] = useState<FloorRoom>('living_room')
   const [isMoving, setIsMoving] = useState(false)
@@ -258,16 +259,23 @@ export default function FloorPlanView() {
     if (!activeStation) setStationPopupAnchor(null)
   }, [activeStation])
 
-  const openStationPopup = useCallback((event: React.MouseEvent<HTMLElement>) => {
+  const openStationPopup = useCallback((point: { clientX: number; clientY: number }) => {
+    if (!pointerInsideGameAreaRef.current) return false
     const rect = viewRef.current?.getBoundingClientRect()
-    if (!rect) return
+    if (!rect) return false
     setStationPopupAnchor({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
+      x: point.clientX - rect.left,
+      y: point.clientY - rect.top,
     })
+    return true
+  }, [])
+
+  const handleGameAreaMouseEnter = useCallback(() => {
+    pointerInsideGameAreaRef.current = true
   }, [])
 
   const handleGameAreaMouseLeave = useCallback(() => {
+    pointerInsideGameAreaRef.current = false
     setActiveStation(null)
     setStationPopupAnchor(null)
   }, [setActiveStation])
@@ -301,6 +309,7 @@ export default function FloorPlanView() {
     <div
       ref={viewRef}
       className="absolute inset-0 overflow-hidden bg-slate-950 select-none"
+      onMouseEnter={handleGameAreaMouseEnter}
       onMouseLeave={handleGameAreaMouseLeave}
     >
 

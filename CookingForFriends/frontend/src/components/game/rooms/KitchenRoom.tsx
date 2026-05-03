@@ -74,14 +74,14 @@ const STATION_POSITIONS: Record<KitchenStationId, { left: string; top: string; w
 type FeedbackType = 'correct' | 'wrong' | 'missed' | null
 
 /** Set to true to show live mouse coordinates for hotspot calibration */
-const DEBUG_COORDS = true
+const DEBUG_COORDS = false
 
 export default function KitchenRoom({
   isActive,
   onStationOpen,
 }: {
   isActive: boolean
-  onStationOpen?: (event: React.MouseEvent<HTMLElement>) => void
+  onStationOpen?: (point: { clientX: number; clientY: number }) => boolean
 }) {
   const activeStation = useGameStore((s) => s.activeStation)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
@@ -116,14 +116,14 @@ export default function KitchenRoom({
     }
     // Close any open popup immediately, then walk to new station
     setActiveStation(null)
-    const clickEvent = event
+    const clickPoint = { clientX: event.clientX, clientY: event.clientY }
     moveToStation(station, () => {
       const hasActiveStep = useGameStore.getState().activeCookingSteps.some(
         step => stationMatches(station, step.station)
       )
       if (hasActiveStep) {
-        onStationOpen?.(clickEvent)
-        setActiveStation(station)
+        const canOpen = onStationOpen ? onStationOpen(clickPoint) : true
+        if (canOpen) setActiveStation(station)
       }
       // else: characterStore shows idle bubble automatically
     })
