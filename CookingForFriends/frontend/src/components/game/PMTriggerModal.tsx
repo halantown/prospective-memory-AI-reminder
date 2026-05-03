@@ -11,6 +11,7 @@ import { emitMouseTrackingEvent } from '../../hooks/useMouseTracker'
 import { FAKE_TRIGGER_LINES, ITEM_SELECTION_OPTIONS, PM_TASKS } from '../../constants/pmTasks'
 import { GREETING_PLACEHOLDERS, REMINDER_PLACEHOLDERS } from '../../constants/placeholders'
 import type { DecoyOption, PMPipelineStep } from '../../types'
+import BubbleDialogue from './dialogue/BubbleDialogue'
 import type { ReactNode } from 'react'
 
 const TRIGGER_NUDGE_MS = 30_000
@@ -103,25 +104,20 @@ function DialogueStep({
   }, [index, lines.length, onComplete])
 
   return (
-    <ModalShell>
-      <div className="space-y-5">
-        <p className="text-sm uppercase tracking-[0.25em] text-amber-600">{title}</p>
-        <div className="flex items-start gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-amber-100 text-3xl">
-            {title === 'Call' ? '📞' : '👋'}
-          </div>
-          <div className="min-h-[110px] flex-1 rounded-3xl bg-slate-100 px-5 py-4 text-slate-800 shadow-inner">
-            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{speaker}</div>
-            <div className="text-lg leading-relaxed">{lines[index] ?? ''}</div>
-          </div>
-        </div>
+    <InGameShell>
+      <div className="space-y-3">
+        <BubbleDialogue
+          speaker={speaker}
+          text={lines[index] ?? ''}
+          avatar={title === 'Call' ? 'P' : speaker.slice(0, 1).toUpperCase()}
+        />
         <div className="flex justify-center gap-2">
           {lines.map((_, i) => (
             <div key={i} className={`h-2 w-2 rounded-full ${i <= index ? 'bg-amber-500' : 'bg-slate-300'}`} />
           ))}
         </div>
       </div>
-    </ModalShell>
+    </InGameShell>
   )
 }
 
@@ -133,24 +129,16 @@ function ReminderStep({
   onAck: () => void
 }) {
   return (
-    <ModalShell>
-      <div className="space-y-5">
-        <div className="rounded-3xl bg-cyan-50 px-5 py-4 text-slate-800 shadow-inner">
-          <div className="mb-2 text-xs font-bold uppercase tracking-wide text-cyan-700">Pepper</div>
-          <p>Hey, I wanted to remind you...</p>
-        </div>
-        <div className="rounded-3xl border-2 border-cyan-200 bg-white p-6 shadow-lg">
-          <h2 className="mb-3 text-xl font-bold text-slate-900">Robot Reminder</h2>
-          <p className="text-lg leading-relaxed text-slate-700">{text}</p>
-        </div>
-        <button
-          onClick={onAck}
-          className="w-full rounded-2xl bg-cyan-600 py-4 text-lg font-bold text-white transition hover:bg-cyan-500 active:scale-95"
-        >
-          Got it
-        </button>
-      </div>
-    </ModalShell>
+    <InGameShell>
+      <BubbleDialogue
+        speaker="Pepper"
+        text={`Hey, I wanted to remind you... ${text}`}
+        avatar="R"
+        align="right"
+        continueLabel="Got it"
+        onContinue={onAck}
+      />
+    </InGameShell>
   )
 }
 
@@ -171,29 +159,23 @@ function ItemSelectionStep({
   }, [taskId])
 
   return (
-    <ModalShell>
-      <div className="space-y-5">
-        <h2 className="text-2xl font-bold text-slate-900">What did you promise?</h2>
-        <div className="grid gap-3">
-          {options.map((option) => (
-            <button
-              key={option.id}
-              onClick={() => {
-                emitMouseTrackingEvent('item_selection_end', {
-                  task_id: taskId,
-                  selected_item: option.id,
-                })
-                onSelect(option, Date.now() - startRef.current)
-              }}
-              className="flex items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white px-5 py-4 text-left text-lg font-semibold text-slate-800 transition hover:border-amber-400 hover:bg-amber-50 active:scale-[0.99]"
-            >
-              <span className="text-2xl">{option.isTarget ? '🎯' : '📦'}</span>
-              <span>{option.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </ModalShell>
+    <InGameShell>
+      <BubbleDialogue
+        speaker="AVATAR"
+        text="What did you promise?"
+        avatar="A"
+        choices={options.map((option) => ({ id: option.id, label: option.label }))}
+        onChoice={(choice) => {
+          const option = options.find((o) => o.id === choice.id)
+          if (!option) return
+          emitMouseTrackingEvent('item_selection_end', {
+            task_id: taskId,
+            selected_item: option.id,
+          })
+          onSelect(option, Date.now() - startRef.current)
+        }}
+      />
+    </InGameShell>
   )
 }
 
@@ -204,29 +186,29 @@ function ConfidenceStep({
 }) {
   const startRef = useRef(Date.now())
   return (
-    <ModalShell>
-      <div className="space-y-6">
+    <InGameShell>
+      <div className="rounded-lg border border-slate-300 bg-white p-5 shadow-xl">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">How confident are you in your choice?</h2>
+          <h2 className="text-base font-bold text-slate-900">How confident are you in your choice?</h2>
           <p className="mt-2 text-sm text-slate-500">1 = Not at all confident, 7 = Extremely confident</p>
         </div>
-        <div className="grid grid-cols-7 gap-2">
+        <div className="mt-4 grid grid-cols-7 gap-2">
           {[1, 2, 3, 4, 5, 6, 7].map((n) => (
             <button
               key={n}
               onClick={() => onSubmit(n, Date.now() - startRef.current)}
-              className="rounded-2xl border-2 border-slate-200 bg-white py-4 text-xl font-bold text-slate-700 transition hover:border-amber-500 hover:bg-amber-50 hover:text-amber-700 active:scale-95"
+              className="rounded-md border border-slate-300 bg-white py-3 text-base font-bold text-slate-700 transition hover:border-amber-500 hover:bg-amber-50 hover:text-amber-700 active:scale-95"
             >
               {n}
             </button>
           ))}
         </div>
-        <div className="flex justify-between text-xs text-slate-500">
+        <div className="mt-2 flex justify-between text-xs text-slate-500">
           <span>Not at all confident</span>
           <span>Extremely confident</span>
         </div>
       </div>
-    </ModalShell>
+    </InGameShell>
   )
 }
 
@@ -244,22 +226,19 @@ function AutoExecuteStep({ onDone }: { onDone: (startedAt: number, finishedAt: n
   }, [])
 
   return (
-    <ModalShell>
-      <div className="space-y-5 text-center">
-        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-amber-100 text-6xl">
-          🏃
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900">Completing the task...</h2>
-        <p className="text-slate-500">The avatar is carrying out the promised action.</p>
+    <InGameShell>
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-5 text-center shadow-xl">
+        <h2 className="text-base font-bold text-amber-950">Completing the task...</h2>
+        <p className="mt-2 text-sm text-amber-900">The avatar is carrying out the promised action.</p>
       </div>
-    </ModalShell>
+    </InGameShell>
   )
 }
 
-function ModalShell({ children }: { children: ReactNode }) {
+function InGameShell({ children }: { children: ReactNode }) {
   return (
-    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/60 p-4" style={{ pointerEvents: 'auto' }}>
-      <div className="w-full max-w-lg rounded-[2rem] bg-white p-8 shadow-2xl">
+    <div className="fixed inset-x-0 bottom-0 z-[220] flex justify-center bg-gradient-to-t from-black/55 to-transparent p-4" style={{ pointerEvents: 'auto' }}>
+      <div className="w-full max-w-3xl">
         {children}
       </div>
     </div>
