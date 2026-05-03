@@ -37,6 +37,10 @@
   - `game_handler.py` 新增 per-participant `_game_clocks`，timeline 和 `CookingEngine` 注入同一个 `GameClock` 实例。
   - PM pause/resume 当前仍通过 legacy glue 调用 timeline/cooking，但二者现在共享同一个 clock；重复 pause/resume 是 idempotent。
   - 这一步还不是完整 `BlockRuntime`，PM scheduler 仍暂时使用 DB-backed `game_time` polling。
+- 第四批迁移（2026-05-03）：
+  - `pm_session.py` 接收共享 `GameClock`，trigger delay 和 session_end delay 已改为 `clock.sleep_for()`。
+  - DB `Participant.game_time_elapsed_s/frozen_since` 保留为 snapshot/heartbeat/admin 状态，不再作为 PM scheduler 的等待 loop owner。
+  - `game_handler.py` 启动/恢复 PM session 时传入同一个 per-participant clock。
 - 风险：
   - 当前仍是三套时间的边界同步，不是单一时间源。
   - process restart / reconnect 后，timeline/cooking 的运行态仍主要在内存里，不能作为生产级恢复机制。
@@ -113,8 +117,8 @@ Codebase review（2026-05-03）：
    - 如果第 5 项 cooking event-chain 重构同时做，则每道菜下一步等待上一 active step result/timeout 后再调度；否则先保持绝对 cooking timeline，但统一 clock。
 7. Phase 6 — PM pipeline 迁移
 
-   - `pm_session.py` 不再直接调用低层 `freeze_game_time()` / `_wait_game_seconds()` DB polling。
-   - 改成使用 `clock.sleep_for(delay_remaining)` 等待 trigger；trigger 前调用 `runtime.pause("pm")` 并记录 `game_time_fired = clock.now()`。
+   - [x] `pm_session.py` 不再直接调用低层 `freeze_game_time()` / `_wait_game_seconds()` DB polling。
+   - [x] 改成使用 `clock.sleep_for(delay_remaining)` 等待 trigger；trigger 前调用 `runtime.pause("pm")` 并记录 `game_time_fired = clock.now()`。
    - pipeline 完成后由 `game_handler.py` 调用 `runtime.resume("pm")` 和 `signal_pipeline_complete()`。
    - 保留 fake trigger 和 real trigger 的相同 pause/resume 边界。
    - 注意：PM modal 内部 decoy/confidence RT 仍用 wall time，因为它测的是弹窗内实际作答时长，不是 cooking/timeline game time。

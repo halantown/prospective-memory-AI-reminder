@@ -956,6 +956,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 | 02:04 | Backend compile/tests passed |
 | 02:18 | CookingEngine activation/timeout/response-time migrated to `GameClock` |
 | 02:25 | Timeline and CookingEngine wired to a shared per-participant `GameClock` |
+| 02:31 | PM scheduler trigger/session-end waits moved from DB polling to shared `GameClock` |
 
 ### Root Cause
 > The PM pause fix was added after timeline and cooking scheduling already existed. Instead of one owner for gameplay time, the codebase had boundary synchronization: DB participant game time for PM triggers, `TimelineControl` for timeline events, and `CookingEngine` offsets for cooking. This made it easy for future gameplay scheduling to bypass PM pause semantics.
@@ -980,6 +981,8 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > `backend/tests/test_cooking_engine.py`: added regressions proving PM pause prevents cooking timeout and cooking response time excludes paused wall time.
 >
 > `backend/websocket/game_handler.py`: added a per-participant `_game_clocks` registry and injects the same `GameClock` into both `run_timeline()` and `CookingEngine`. Existing pause/resume glue remains for compatibility, but timeline and cooking now pause the same clock instance.
+>
+> `backend/engine/pm_session.py`: accepts the shared `GameClock` and uses it for trigger delay and session-end delay waits. Participant DB game-time fields remain as heartbeat/admin snapshots instead of the scheduler wait owner.
 
 ### Verification
 > `cd CookingForFriends/backend && conda run -n thesis_server python -m py_compile engine/game_clock.py engine/timeline.py engine/timeline_generator.py routers/timeline_editor.py` passes.
@@ -988,6 +991,6 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 
 ### Follow-up Actions
 > - [x] Move `CookingEngine` activation, timeout, and response-time calculation onto `GameClock`
-> - [ ] Move PM scheduler off DB polling and onto `BlockRuntime` / `GameClock`
+> - [x] Move PM scheduler off DB polling and onto `BlockRuntime` / `GameClock`
 > - [ ] Replace `game_handler.py` glue pause/resume calls with a single `BlockRuntime.pause()` / `resume()`
 > - [ ] Add timeline integration test proving PM pause blocks `time_tick`, phone messages, and block end

@@ -2,8 +2,10 @@
 
 import asyncio
 import logging
+import time
 from config import TRIGGER_SCHEDULE, TASK_ORDERS, SESSION_END_DELAY_AFTER_LAST_TRIGGER_S
 from engine.game_time import freeze_game_time, get_current_game_time
+from engine.game_clock import GameClock
 from engine.pm_tasks import get_task
 
 logger = logging.getLogger(__name__)
@@ -19,11 +21,20 @@ def signal_pipeline_complete(session_id: str):
         ev.set()
 
 
-async def _wait_game_seconds(session_id: str, seconds: float, db_factory) -> None:
+async def _wait_game_seconds(
+    session_id: str,
+    seconds: float,
+    db_factory,
+    clock: GameClock | None = None,
+) -> None:
     """Wait until `seconds` of game time have elapsed since this call was made.
 
-    Polls the DB every 1s. Frozen time does not advance the counter.
+    Uses GameClock when available. Falls back to DB polling for legacy callers.
     """
+    if clock is not None:
+        await clock.sleep_for(seconds)
+        return
+
     from sqlalchemy import select
     from models.experiment import Participant
 
@@ -55,8 +66,15 @@ async def _wait_game_seconds(session_id: str, seconds: float, db_factory) -> Non
             logger.exception("_wait_game_seconds: poll error for %s", session_id)
 
 
-async def _get_current_game_time(session_id: str, db_factory) -> float:
+async def _get_current_game_time(
+    session_id: str,
+    db_factory,
+    clock: GameClock | None = None,
+) -> float:
     """Return participant game time, or 0 if the participant no longer exists."""
+    if clock is not None:
+        return clock.now()
+
     from sqlalchemy import select
     from models.experiment import Participant
 
@@ -103,12 +121,13 @@ async def run_pm_session(
     send_fn,
     db_factory,
     on_pipeline_start=None,
+    clock: GameClock | None = None,
 ):
     """Drive the PM trigger schedule for one session as a background task.
 
     For each TRIGGER_SCHEDULE entry:
       1. Wait delay_after_previous_s of game time (frozen time excluded)
-      2. Freeze game time
+      2. Snapshot/freeze game time
       3. Pause non-PM gameplay via on_pipeline_start, if provided
       4. Fire pm_trigger WS event (real or fake)
       5. Wait for pipeline-complete signal (set by signal_pipeline_complete)
@@ -143,7 +162,7 @@ async def run_pm_session(
         for entry_index, entry in enumerate(TRIGGER_SCHEDULE[fired_count:], start=fired_count + 1):
             schedule_index = entry_index
             delay = entry["delay_after_previous_s"]
-            current_gt = await _get_current_game_time(session_id, db_factory)
+            current_gt = await _get_current_game_time(session_id, db_factory, clock)
             if last_trigger_game_time is None:
                 delay_remaining = max(0.0, delay - current_gt)
             else:
@@ -153,7 +172,7 @@ async def run_pm_session(
                 "[PM_SESSION] Waiting %.1fs game time before trigger %d (delay=%ds, current_gt=%.1f, last_trigger_gt=%s, session=%s)",
                 delay_remaining, schedule_index, delay, current_gt, last_trigger_game_time, session_id,
             )
-            await _wait_game_seconds(session_id, delay_remaining, db_factory)
+            await _wait_game_seconds(session_id, delay_remaining, db_factory, clock)
 
             # Freeze game time and snapshot the fired game time
             async with db_factory() as db:
@@ -161,8 +180,13 @@ async def run_pm_session(
                 participant = result.scalar_one_or_none()
                 if not participant:
                     return
-                freeze_game_time(participant)
-                game_time_fired = participant.game_time_elapsed_s
+                if clock is not None:
+                    game_time_fired = clock.now()
+                    participant.game_time_elapsed_s = game_time_fired
+                    participant.frozen_since = time.time()
+                else:
+                    freeze_game_time(participant)
+                    game_time_fired = participant.game_time_elapsed_s
                 await db.commit()
 
             if on_pipeline_start:
@@ -248,7 +272,12 @@ async def run_pm_session(
             "[PM_SESSION] All triggers done. Waiting %ds game time (session=%s)",
             SESSION_END_DELAY_AFTER_LAST_TRIGGER_S, session_id,
         )
-        await _wait_game_seconds(session_id, SESSION_END_DELAY_AFTER_LAST_TRIGGER_S, db_factory)
+        await _wait_game_seconds(
+            session_id,
+            SESSION_END_DELAY_AFTER_LAST_TRIGGER_S,
+            db_factory,
+            clock,
+        )
 
         await send_fn("session_end", {"reason": "pm_schedule_complete"})
         logger.info("[PM_SESSION] session_end sent (session=%s)", session_id)

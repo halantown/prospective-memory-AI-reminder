@@ -61,7 +61,14 @@ def _resume_gameplay_after_pm(participant_id: str, block_number: int) -> None:
     )
 
 
-def _ensure_pm_session_task(participant_id: str, task_order: str, block_number: int, send_fn, db_factory) -> None:
+def _ensure_pm_session_task(
+    participant_id: str,
+    task_order: str,
+    block_number: int,
+    send_fn,
+    db_factory,
+    clock: GameClock | None = None,
+) -> None:
     """Start or resume the PM scheduler if this process is not already running one."""
     existing = _pm_session_tasks.get(participant_id)
     if existing and not existing.done():
@@ -75,6 +82,7 @@ def _ensure_pm_session_task(participant_id: str, task_order: str, block_number: 
             send_fn,
             db_factory,
             on_pipeline_start=lambda: _pause_gameplay_for_pm(participant_id, block_number),
+            clock=clock,
         )
     )
     _pm_session_tasks[participant_id] = pm_task
@@ -187,7 +195,7 @@ async def handle_game_ws(
                     logger.info(f"[GAME_HANDLER] CookingEngine already running for {participant_id}, skipping restart")
 
                 try:
-                    _ensure_pm_session_task(participant_id, task_order, block_number, send_event, db_factory)
+                    _ensure_pm_session_task(participant_id, task_order, block_number, send_event, db_factory, clock)
                 except Exception as pe:
                     logger.error(f"[GAME_HANDLER] PM session resume failed on reconnect: {pe}")
             else:
@@ -435,7 +443,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
 
     # Start the PM session task
     try:
-        _ensure_pm_session_task(participant_id, task_order, block_number, send_fn, db_factory)
+        _ensure_pm_session_task(participant_id, task_order, block_number, send_fn, db_factory, clock)
     except Exception as e:
         logger.error(f"[GAME_HANDLER] PM session start failed: {e}")
 
