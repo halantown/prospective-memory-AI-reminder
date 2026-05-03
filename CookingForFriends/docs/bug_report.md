@@ -323,3 +323,27 @@ Wall time
   - Pixel art 背景尽量固定在稳定 layer 上；父层平移要贴近 device pixel，避免高对比像素边缘落在半个物理像素上。
 - Verification:
   - `cd CookingForFriends/frontend && npm run build` 通过。
+
+8. Kitchen station popup delayed arrival race
+
+- 记录日期：2026-05-03
+- 状态：Resolved（frontend build verified，2026-05-03）
+- 严重性：P2 中
+- 观察：
+  - 被试点击一个 active 厨具后，avatar 到达该厨具。
+  - 如果在到达后的短时间内立即点击另一个厨具，旧厨具的 popup 仍会弹出。
+- 如何发现：
+  - 对照 `KitchenRoom.tsx` 的 `handleStationClick()` 和 `characterStore.ts` 的 arrival flow。
+  - `moveToStation()` 将 station popup 打开逻辑作为 `onArrival` callback 传入 store。
+  - `_tick()` 到达最终 waypoint 后会先把 avatar 设为 idle，然后用 `setTimeout(..., TURN_DURATION)` 延迟 400ms 执行 `onArrival()`。
+  - 用户在这 400ms 内点击另一个厨具时，新的移动开始了，但旧的 delayed callback 没有被取消，所以旧 popup 仍然打开。
+- 根因：
+  - movement arrival callback 缺少取消语义。
+  - `isMoving=false` 和 popup callback 执行之间存在一个 turn-delay window；这个窗口内的新交互没有 invalidate 旧 callback。
+- 修复：
+  - `characterStore.ts` 新增 `movementVersion` generation token。
+  - 每次 `moveToWaypoint()` / `teleportTo()` / `stopMovement()` 都调用 `invalidateDelayedMovementEffects()`，递增 generation 并清理旧 arrival / idle-bubble timer。
+  - arrival delay 执行前检查 generation 是否仍然匹配；如果用户已经启动了新移动，旧 callback 直接丢弃，不会打开旧 popup。
+  - 新移动时同步隐藏旧 idle bubble，避免 stale feedback 留在屏幕上。
+- Verification:
+  - `cd CookingForFriends/frontend && npm run build` 通过。

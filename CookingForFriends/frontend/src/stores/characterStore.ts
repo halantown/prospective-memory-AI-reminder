@@ -56,6 +56,9 @@ function getWaypoint(id: string) {
 
 let transientPosition: CharacterPosition = { x: 28.5, y: 17.5 }
 const positionSubscribers = new Set<PositionSubscriber>()
+let movementVersion = 0
+let arrivalDelayTimer: ReturnType<typeof setTimeout> | null = null
+let idleBubbleTimer: ReturnType<typeof setTimeout> | null = null
 
 export function subscribeCharacterPosition(subscriber: PositionSubscriber) {
   positionSubscribers.add(subscriber)
@@ -69,6 +72,18 @@ function setTransientPosition(position: CharacterPosition) {
   transientPosition = position
   for (const subscriber of positionSubscribers) {
     subscriber(position)
+  }
+}
+
+function invalidateDelayedMovementEffects() {
+  movementVersion++
+  if (arrivalDelayTimer) {
+    clearTimeout(arrivalDelayTimer)
+    arrivalDelayTimer = null
+  }
+  if (idleBubbleTimer) {
+    clearTimeout(idleBubbleTimer)
+    idleBubbleTimer = null
   }
 }
 
@@ -88,6 +103,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
   // ── Movement API ─────────────────────────────────────────────────────────────
 
   moveToWaypoint(targetId, onArrival) {
+    invalidateDelayedMovementEffects()
     const { currentWaypointId } = get()
     const position = transientPosition
 
@@ -123,6 +139,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       isMoving: true,
       animation: 'walk',
       onArrival: onArrival ?? null,
+      showIdleBubble: false,
     })
     startMovementLoop()
   },
@@ -141,6 +158,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
   teleportTo(waypointId) {
     const node = getWaypoint(waypointId)
     if (!node) return
+    invalidateDelayedMovementEffects()
     const nextPosition = { x: node.x, y: node.y }
     setTransientPosition(nextPosition)
     set({
@@ -150,12 +168,24 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       isMoving: false,
       animation: 'idle',
       path: [],
+      onArrival: null,
+      pendingInteraction: null,
+      showIdleBubble: false,
     })
     stopMovementLoop()
   },
 
   stopMovement() {
-    set({ position: transientPosition, isMoving: false, animation: 'idle', path: [], onArrival: null })
+    invalidateDelayedMovementEffects()
+    set({
+      position: transientPosition,
+      isMoving: false,
+      animation: 'idle',
+      path: [],
+      onArrival: null,
+      pendingInteraction: null,
+      showIdleBubble: false,
+    })
     stopMovementLoop()
   },
 
@@ -216,13 +246,17 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
 
         if (onArrival) {
           // Brief turn delay before triggering interaction
-          setTimeout(() => {
+          const arrivalVersion = movementVersion
+          arrivalDelayTimer = setTimeout(() => {
+            arrivalDelayTimer = null
+            if (movementVersion !== arrivalVersion) return
             onArrival()
           }, TURN_DURATION)
         } else if (pendingInteraction) {
           // Station had no active step
           set({ showIdleBubble: true })
-          setTimeout(() => {
+          idleBubbleTimer = setTimeout(() => {
+            idleBubbleTimer = null
             get().dismissIdleBubble()
           }, 1500)
         }
@@ -280,6 +314,7 @@ function tick(now: number) {
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     stopMovementLoop()
+    invalidateDelayedMovementEffects()
     positionSubscribers.clear()
   })
 }
