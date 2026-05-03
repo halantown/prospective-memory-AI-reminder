@@ -8,25 +8,59 @@
  * Renders an optional "Nothing to do here" idle bubble when showIdleBubble=true.
  */
 
+import { useCallback, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useCharacterStore } from '../../stores/characterStore'
 import AvatarSprite from './AvatarSprite'
 
 export default function PlayerAvatar() {
-  const position    = useCharacterStore(s => s.position)
   const facing      = useCharacterStore(s => s.facing)
   const animation   = useCharacterStore(s => s.animation)
   const showIdleBubble = useCharacterStore(s => s.showIdleBubble)
+  const avatarRef = useRef<HTMLDivElement>(null)
+
+  const updateAvatarTransform = useCallback((position: { x: number; y: number }) => {
+    const el = avatarRef.current
+    const parent = el?.parentElement
+    if (!el || !parent) return
+
+    const xPx = (position.x / 100) * parent.clientWidth
+    const yPx = (position.y / 100) * parent.clientHeight
+    el.style.transform = `translate3d(${xPx}px, ${yPx}px, 0) translate(-50%, -100%)`
+  }, [])
+
+  useEffect(() => {
+    updateAvatarTransform(useCharacterStore.getState().position)
+
+    const unsubscribe = useCharacterStore.subscribe((state, prevState) => {
+      if (state.position !== prevState.position) {
+        updateAvatarTransform(state.position)
+      }
+    })
+
+    const parent = avatarRef.current?.parentElement
+    const resizeObserver = parent && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => updateAvatarTransform(useCharacterStore.getState().position))
+      : null
+    if (parent && resizeObserver) resizeObserver.observe(parent)
+
+    return () => {
+      unsubscribe()
+      resizeObserver?.disconnect()
+    }
+  }, [updateAvatarTransform])
 
   return (
     <>
       {/* Avatar sprite */}
       <div
+        ref={avatarRef}
         className="absolute pointer-events-none"
         style={{
-          left: `${position.x}%`,
-          top:  `${position.y}%`,
-          transform: 'translate(-50%, -100%)',
+          left: 0,
+          top: 0,
+          transform: 'translate3d(0, 0, 0) translate(-50%, -100%)',
+          willChange: 'transform',
           zIndex: 30,
         }}
       >

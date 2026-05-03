@@ -275,7 +275,7 @@ Wall time
 7. Frontend avatar movement performance review
 
 - 记录日期：2026-05-03
-- 状态：Open
+- 状态：Resolved（frontend build verified，2026-05-03）
 - 严重性：P1 高
 - 观察：
   - 人物移动时前端明显卡顿。
@@ -292,8 +292,15 @@ Wall time
   - 后续继续把高频动画状态接到页面级组件，会让卡顿越来越难定位。
   - 如果 dev HMR 多 loop 叠加，开发环境会比生产更卡，容易误判性能问题来源。
 - 建议修复：
-  - [ ] 从 `FloorPlanView` 移除 `avatarPosition` 订阅；把 minimap character dot 抽成独立 `MinimapAvatarDot` 子组件，只让小点订阅 `position`。
-  - [ ] `PlayerAvatar` 改为 `ref + useCharacterStore.subscribe`，直接写 DOM `style.transform = translate3d(...)`，不要每帧 React render。
-  - [ ] Avatar movement 使用 `transform`，避免 `left/top` 每帧变化。
-  - [ ] 给 `characterStore` 的 module-level rAF 增加 HMR cleanup：`import.meta.hot.dispose(() => cancelAnimationFrame(rafId))`。
+  - [x] 从 `FloorPlanView` 移除 `avatarPosition` 订阅；把 minimap character dot 抽成独立 `MinimapAvatarDot`，并用 ref subscription 直接写 DOM transform，避免每帧 React render。
+  - [x] `PlayerAvatar` 改为 `ref + useCharacterStore.subscribe`，直接写 DOM `style.transform = translate3d(...)`，不要每帧 React render。
+  - [x] Avatar movement 使用 `transform`，避免 `left/top` 每帧变化。
+  - [x] 给 `characterStore` 的 rAF loop 增加按需启动/停止和 HMR cleanup：`import.meta.hot.dispose(() => cancelAnimationFrame(rafId))`。
   - [ ] 进一步收敛 `FloorPlanView`：把 minimap、room navigation、robot、station popup、dev waypoint editor 拆成较小组件，避免一个低层状态变化带动整张地图重渲染。
+- 已做修复（2026-05-03）：
+  - `PlayerAvatar` 不再订阅 `position` 触发 React render；移动时通过父 floorplan 尺寸把 waypoint 百分比转换为像素，写入 `translate3d(...)`，仍跟随父层 zoom transform。
+  - `MinimapAvatarDot` 也改为 ref subscription + `translate3d(...)`，移动时不触发 minimap React render。
+  - `characterStore` 删除模块加载即永久启动的 rAF loop；现在只在 `moveToWaypoint()` 进入移动状态时启动，路径结束 / teleport / stop 时停止。
+  - HMR dispose 时取消未完成的 rAF，避免 Vite dev 下叠加 movement loops。
+- Verification:
+  - `cd CookingForFriends/frontend && npm run build` 通过。

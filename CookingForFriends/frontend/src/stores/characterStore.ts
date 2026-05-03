@@ -101,6 +101,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       animation: 'walk',
       onArrival: onArrival ?? null,
     })
+    startMovementLoop()
   },
 
   moveToStation(stationId, onArrival) {
@@ -125,10 +126,12 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       animation: 'idle',
       path: [],
     })
+    stopMovementLoop()
   },
 
   stopMovement() {
     set({ isMoving: false, animation: 'idle', path: [], onArrival: null })
+    stopMovementLoop()
   },
 
   setFacing(facing) {
@@ -221,15 +224,39 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
 let rafId: number | null = null
 let lastTime: number | null = null
 
-function tick(now: number) {
-  const deltaMs = lastTime !== null ? Math.min(now - lastTime, 100) : 16
-  lastTime = now
-  useCharacterStore.getState()._tick(deltaMs)
+function startMovementLoop() {
+  if (rafId !== null) return
+  lastTime = null
   rafId = requestAnimationFrame(tick)
 }
 
-// Start the loop immediately (it's a no-op when isMoving=false)
-rafId = requestAnimationFrame(tick)
+function stopMovementLoop() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
+  lastTime = null
+}
+
+function tick(now: number) {
+  rafId = null
+  const deltaMs = lastTime !== null ? Math.min(now - lastTime, 100) : 16
+  lastTime = now
+  useCharacterStore.getState()._tick(deltaMs)
+
+  const state = useCharacterStore.getState()
+  if (state.isMoving && state.path.length > 0) {
+    rafId = requestAnimationFrame(tick)
+  } else {
+    lastTime = null
+  }
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    stopMovementLoop()
+  })
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
