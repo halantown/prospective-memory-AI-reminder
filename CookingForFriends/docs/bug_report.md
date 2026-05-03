@@ -41,8 +41,13 @@
   - `pm_session.py` 接收共享 `GameClock`，trigger delay 和 session_end delay 已改为 `clock.sleep_for()`。
   - DB `Participant.game_time_elapsed_s/frozen_since` 保留为 snapshot/heartbeat/admin 状态，不再作为 PM scheduler 的等待 loop owner。
   - `game_handler.py` 启动/恢复 PM session 时传入同一个 per-participant clock。
+- 第五批迁移（2026-05-03）：
+  - 新增 `backend/engine/block_runtime.py`，由 `BlockRuntime` 持有同一个 block 的 `GameClock`、timeline task、`CookingEngine` 和 PM session task。
+  - `game_handler.py` 删除 `_cooking_engines`、`_game_clocks`、`_pm_session_tasks` 三张并行运行态表，改为单一 `_block_runtimes` registry。
+  - PM pipeline 开始时只调用 `runtime.pause("pm")`，PM 完成 / fake ack 后只调用 `runtime.resume("pm")`；timeline/cooking/PM scheduler 都因共享 `GameClock` 自动停住/恢复。
+  - start_game、reconnect、disconnect、block_complete 的清理路径统一走 `BlockRuntime.start()` / `BlockRuntime.stop()`。
 - 风险：
-  - 当前仍是三套时间的边界同步，不是单一时间源。
+  - gameplay schedule 已收敛到 `BlockRuntime + GameClock`，但 timeline/cooking 内部仍保留少量兼容薄层和 wall timestamp 字段。
   - process restart / reconnect 后，timeline/cooking 的运行态仍主要在内存里，不能作为生产级恢复机制。
   - 后续功能如果继续直接使用 `time.time()` 或裸 `asyncio.sleep()`，会绕过 PM pause 语义。
 
@@ -93,11 +98,11 @@ Codebase review（2026-05-03）：
    - [x] 单元测试覆盖 start/pause/resume、嵌套/重复 pause no-op、sleep_until 被 pause 拉长但 game time 不前进。
 4. Phase 3 — 引入 `BlockRuntime` owner
 
-   - [ ] 新增 `backend/engine/block_runtime.py`，由 `game_handler.py` 创建并持有：`clock`、timeline task、`CookingEngine`、PM session task。
-   - `runtime.start()` 负责 start_game 后创建 timeline/cooking/pm_scheduler。
+   - [x] 新增 `backend/engine/block_runtime.py`，由 `game_handler.py` 创建并持有：`clock`、timeline task、`CookingEngine`、PM session task。
+   - [x] `runtime.start()` 负责 start_game 后创建 timeline/cooking/pm_scheduler。
    - [x] `runtime.pause("pm")` 只 pause `GameClock`，必要时发送 clock snapshot；timeline/cooking 因等待同一个 clock 自动停住。
    - [x] `runtime.resume("pm")` 只 resume `GameClock` 并持久化 snapshot。
-   - `game_handler.py` 不再分别 import/call `pause_timeline()`、`resume_timeline()`、`cooking.pause()`、`cooking.resume()`。
+   - [x] `game_handler.py` 不再分别 import/call `pause_timeline()`、`resume_timeline()`、`cooking.pause()`、`cooking.resume()`。
 5. Phase 4 — timeline 迁移
 
    - [x] `timeline.py` 事件等待改为 `clock.sleep_until(event.t)`。
@@ -130,7 +135,7 @@ Codebase review（2026-05-03）：
    - PM freeze 状态以 backend clock snapshot/heartbeat 为准，前端 `setGameTimeFrozen(false)` 只做 optimistic UI，不能作为权威时钟恢复。
 9. Phase 8 — lifecycle 策略收敛
 
-   - `game_handler.py` 成为 `BlockRuntime` 的创建/销毁入口。
+   - [x] `game_handler.py` 成为 `BlockRuntime` 的创建/销毁入口。
    - disconnect 不再默认重建 timeline/cooking 内存任务并猜测状态；短重连只重绑 WS send_fn，长断线标记 incomplete。
    - 如果实验层面不支持恢复，超过 `MAX_DISCONNECT_DURATION_S` 直接标记 invalid/incomplete，并在 admin UI 显示。
 10. Phase 9 — 测试
@@ -217,28 +222,31 @@ Codebase review（2026-05-03）：
 
 **三套时间系统（codebase review 后的当前状态）**
 
-系统中仍有三类时间语义，但“第三套”已经从 frontend countdown 变成 backend cooking runtime：
+系统中仍有三类时间语义，但 gameplay schedule owner 已经收敛为 `BlockRuntime + GameClock`：
 
 | 套 | 当前 owner | 单位/来源 | 用途 | 风险 |
 |----|------------|-----------|------|------|
-| 1. Timeline elapsed | `backend/engine/timeline.py` + `engine/game_clock.py` | `GameClock.now()` | 剧情事件、phone message、HUD `time_tick`、block_end | 已迁到 `GameClock`，但还未纳入 `BlockRuntime` 总 owner |
-| 2. PM game time | `backend/engine/game_time.py` + `Participant` DB fields | accumulated game seconds | PM trigger schedule、freeze/unfreeze snapshot | 只服务 PM scheduler；timeline/cooking 不读它 |
-| 3. Cooking runtime time | `backend/engine/cooking_engine.py` | `_block_start_time` + `time.time()` + `asyncio.sleep()` | cooking step activation、timeout、response time | 自己实现 pause/resume/offset，容易和 timeline/PM 漏同步 |
+| 1. Gameplay runtime time | `backend/engine/block_runtime.py` + `engine/game_clock.py` | `GameClock.now()` | timeline event、phone message、HUD `time_tick`、block_end、cooking activation/timeout/RT、PM trigger/session_end delay | 主要迁移完成；timeline/cooking 仍有少量兼容函数 |
+| 2. PM DB snapshot time | `backend/engine/game_time.py` + `Participant` DB fields | snapshot of accumulated game seconds | heartbeat/admin/session-state freeze 状态、PM fired time 持久化 | 不再是 scheduler owner；只作为观测/恢复辅助 |
+| 3. Wall-clock telemetry time | `time.time()` / client timestamp | epoch seconds / ms | heartbeat、disconnect、mouse trace、phone send/read log、PM modal internal RT、execution window scoring | 必须保持命名边界，不能拿来驱动 gameplay schedule |
 
 前端当前只是消费 `time_tick` 和 cooking WS state。`activeCookingSteps.activatedAt` / `CookingWaitStep.startedAt` 仍是 epoch timestamp，但 UI 目前主要显示 cue，不再是独立的倒计时 owner。
 
-三套 gameplay 时间之间**没有单一 owner**。关系如下：
+当前关系如下：
 
 ```
-timeline elapsed（秒）
-    │
-    ├─ ÷10，min(60) ──→ game_clock "17:xx"     [前端显示，上限18:00]
-    │
-    └─ 直接比较 event.t ──→ timeline events     [phone/robot/block_end]
+BlockRuntime
+    └─ GameClock.now()/sleep_until()/sleep_for()
+          ├─ timeline events / phone cooldown / block_end
+          ├─ HUD/phone display clock "17:xx"
+          ├─ cooking activation / timeout / response time
+          └─ PM trigger schedule / session_end delay
 
-PM scheduler game_time_elapsed_s ──→ PM trigger schedule / freeze snapshot
+Participant.game_time_elapsed_s / frozen_since
+    └─ snapshot for heartbeat/admin/session-state, not the active scheduler
 
-cooking _block_start_time + time.time() ──→ cooking activation / timeout / RT
+Wall time
+    └─ transport/logging/telemetry/PM modal internal RT/execution-window scoring
 ```
 
 **为什么 `duration_seconds=900` 而时钟跨度是 600s？**

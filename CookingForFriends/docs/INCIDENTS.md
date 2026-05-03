@@ -937,7 +937,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 |--------------|--------|
 | Date         | 2026-05-03 |
 | Severity     | P1 High |
-| Status       | Monitoring — timeline and cooking migrated; PM scheduler/BlockRuntime pending |
+| Status       | Resolved — gameplay schedule now owned by BlockRuntime + GameClock |
 | Reported by  | Codebase review of three independent time systems |
 | Affected area| TimelineEngine, game clock display, PM pause semantics |
 
@@ -957,6 +957,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 | 02:18 | CookingEngine activation/timeout/response-time migrated to `GameClock` |
 | 02:25 | Timeline and CookingEngine wired to a shared per-participant `GameClock` |
 | 02:31 | PM scheduler trigger/session-end waits moved from DB polling to shared `GameClock` |
+| 02:48 | `BlockRuntime` introduced; `game_handler.py` glue registries and pause/resume calls removed |
 
 ### Root Cause
 > The PM pause fix was added after timeline and cooking scheduling already existed. Instead of one owner for gameplay time, the codebase had boundary synchronization: DB participant game time for PM triggers, `TimelineControl` for timeline events, and `CookingEngine` offsets for cooking. This made it easy for future gameplay scheduling to bypass PM pause semantics.
@@ -980,7 +981,9 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 >
 > `backend/tests/test_cooking_engine.py`: added regressions proving PM pause prevents cooking timeout and cooking response time excludes paused wall time.
 >
-> `backend/websocket/game_handler.py`: added a per-participant `_game_clocks` registry and injects the same `GameClock` into both `run_timeline()` and `CookingEngine`. Existing pause/resume glue remains for compatibility, but timeline and cooking now pause the same clock instance.
+> `backend/engine/block_runtime.py`: added `BlockRuntime`, the single in-memory owner for one block's shared `GameClock`, timeline task, `CookingEngine`, and PM session task.
+>
+> `backend/websocket/game_handler.py`: replaced `_cooking_engines`, `_game_clocks`, and `_pm_session_tasks` with one `_block_runtimes` registry. `start_game`, reconnect, disconnect, and block-complete cleanup now go through `BlockRuntime.start()` / `stop()`. PM complete/fake ack resumes via `runtime.resume("pm")`; PM scheduler starts the overlay via `runtime.pause("pm")`.
 >
 > `backend/engine/pm_session.py`: accepts the shared `GameClock` and uses it for trigger delay and session-end delay waits. Participant DB game-time fields remain as heartbeat/admin snapshots instead of the scheduler wait owner.
 
@@ -988,9 +991,11 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > `cd CookingForFriends/backend && conda run -n thesis_server python -m py_compile engine/game_clock.py engine/timeline.py engine/timeline_generator.py routers/timeline_editor.py` passes.
 >
 > `cd CookingForFriends/backend && conda run -n thesis_server pytest tests -q` passes: 27 passed.
+>
+> `cd CookingForFriends && conda run -n thesis_server python -m py_compile backend/engine/block_runtime.py backend/websocket/game_handler.py` passes.
 
 ### Follow-up Actions
 > - [x] Move `CookingEngine` activation, timeout, and response-time calculation onto `GameClock`
 > - [x] Move PM scheduler off DB polling and onto `BlockRuntime` / `GameClock`
-> - [ ] Replace `game_handler.py` glue pause/resume calls with a single `BlockRuntime.pause()` / `resume()`
+> - [x] Replace `game_handler.py` glue pause/resume calls with a single `BlockRuntime.pause()` / `resume()`
 > - [ ] Add timeline integration test proving PM pause blocks `time_tick`, phone messages, and block end
