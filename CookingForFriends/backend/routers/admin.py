@@ -25,6 +25,7 @@ from models.schemas import (
     AdminParticipantCreateRequest, TestSessionRequest,
 )
 from engine.condition_assigner import assign_condition_and_order, generate_token, next_participant_id
+from engine.phase_state import enter_phase
 from engine.pm_tasks import get_task, BLOCK_TRIGGER_ORDER
 from websocket.connection_manager import manager
 from config import ADMIN_API_KEY, CONDITIONS, TASK_ORDERS
