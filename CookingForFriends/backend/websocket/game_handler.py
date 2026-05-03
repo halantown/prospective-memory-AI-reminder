@@ -6,87 +6,16 @@ import logging
 import time
 from fastapi import WebSocket, WebSocketDisconnect
 from websocket.connection_manager import manager, ws_pump
-from engine.timeline import run_timeline, cancel_timeline, pause_timeline, resume_timeline
-from engine.cooking_engine import CookingEngine
-from engine.game_clock import GameClock
+from engine.block_runtime import BlockRuntime
 from engine.game_time import start_game_time, unfreeze_game_time, get_current_game_time
-from engine.pm_session import run_pm_session, signal_pipeline_complete
+from engine.pm_session import signal_pipeline_complete
 from models.logging import InteractionLog, MouseTrack, PhoneMessageLog
 
 logger = logging.getLogger(__name__)
 
-# Per-participant CookingEngine instances
-_cooking_engines: dict[str, CookingEngine] = {}
-
-# Per-participant gameplay clocks shared by timeline and cooking.
-_game_clocks: dict[str, GameClock] = {}
-
-# Per-participant PM session tasks
-_pm_session_tasks: dict[str, asyncio.Task] = {}
-
-
-def _get_game_clock(participant_id: str) -> GameClock:
-    clock = _game_clocks.get(participant_id)
-    if clock is None:
-        clock = GameClock()
-        _game_clocks[participant_id] = clock
-    return clock
-
-
-def _pause_gameplay_for_pm(participant_id: str, block_number: int) -> None:
-    """Pause non-PM gameplay while a PM/fake trigger modal owns the UI."""
-    timeline_paused = pause_timeline(participant_id, block_number)
-    cooking = _cooking_engines.get(participant_id)
-    if cooking:
-        cooking.pause()
-    logger.info(
-        "[GAME_HANDLER] Gameplay paused for PM pipeline: participant=%s timeline=%s cooking=%s",
-        participant_id,
-        timeline_paused,
-        cooking is not None,
-    )
-
-
-def _resume_gameplay_after_pm(participant_id: str, block_number: int) -> None:
-    """Resume non-PM gameplay after the PM/fake trigger pipeline completes."""
-    cooking = _cooking_engines.get(participant_id)
-    if cooking:
-        cooking.resume()
-    timeline_resumed = resume_timeline(participant_id, block_number)
-    logger.info(
-        "[GAME_HANDLER] Gameplay resumed after PM pipeline: participant=%s timeline=%s cooking=%s",
-        participant_id,
-        timeline_resumed,
-        cooking is not None,
-    )
-
-
-def _ensure_pm_session_task(
-    participant_id: str,
-    task_order: str,
-    block_number: int,
-    send_fn,
-    db_factory,
-    clock: GameClock | None = None,
-) -> None:
-    """Start or resume the PM scheduler if this process is not already running one."""
-    existing = _pm_session_tasks.get(participant_id)
-    if existing and not existing.done():
-        logger.info(f"[GAME_HANDLER] PM session task already running for {participant_id}, skipping restart")
-        return
-
-    pm_task = asyncio.create_task(
-        run_pm_session(
-            participant_id,
-            task_order,
-            send_fn,
-            db_factory,
-            on_pipeline_start=lambda: _pause_gameplay_for_pm(participant_id, block_number),
-            clock=clock,
-        )
-    )
-    _pm_session_tasks[participant_id] = pm_task
-    logger.info(f"[GAME_HANDLER] PM session task ensured for {participant_id} (order={task_order})")
+# Per-participant active block runtime.  Single-session study flow means one
+# active block per participant; reconnect is intentionally best-effort.
+_block_runtimes: dict[str, BlockRuntime] = {}
 
 
 async def handle_game_ws(
@@ -163,41 +92,30 @@ async def handle_game_ws(
                             f"[GAME_HANDLER] Block {block_number} started {age_s:.0f}s ago "
                             f"(> {COOKING_TOTAL_DURATION_S}s), ignoring stale start time"
                         )
-                logger.info(f"[GAME_HANDLER] Auto-starting timeline (block already PLAYING) for {participant_id} block {block_number}")
-                clock = _get_game_clock(participant_id)
-                timeline_task = await run_timeline(
-                    participant_id=participant_id,
-                    block_number=block_number,
-                    condition=condition,
-                    send_fn=send_event,
-                    db_factory=db_factory,
-                    block_start_time=block_start_ts,
-                    clock=clock,
-                )
-                logger.info(f"[GAME_HANDLER] Timeline resumed for {participant_id} block {block_number}")
-
-                # Also restart CookingEngine — it was stopped when the previous connection closed
-                if participant_id not in _cooking_engines:
-                    try:
-                        cooking = CookingEngine(
-                            participant_id=participant_id,
-                            block_id=block_id,
-                            send_fn=send_event,
-                            db_factory=db_factory,
-                            clock=clock,
-                        )
-                        _cooking_engines[participant_id] = cooking
-                        cooking.start(block_start_ts)
-                        logger.info(f"[GAME_HANDLER] CookingEngine restarted on reconnect for {participant_id} block {block_number}")
-                    except Exception as ce:
-                        logger.error(f"[GAME_HANDLER] CookingEngine restart failed on reconnect: {ce}")
+                runtime = _block_runtimes.get(participant_id)
+                if runtime is None:
+                    logger.info(
+                        f"[GAME_HANDLER] Auto-starting runtime (block already PLAYING) for {participant_id} block {block_number}"
+                    )
+                    runtime = BlockRuntime(
+                        participant_id=participant_id,
+                        block_number=block_number,
+                        block_id=block_id,
+                        condition=condition,
+                        task_order=task_order,
+                        send_fn=send_event,
+                        db_factory=db_factory,
+                        block_start_time=block_start_ts,
+                    )
+                    _block_runtimes[participant_id] = runtime
+                    await runtime.start()
+                    timeline_task = runtime.timeline_task
+                    logger.info(f"[GAME_HANDLER] Runtime resumed for {participant_id} block {block_number}")
                 else:
-                    logger.info(f"[GAME_HANDLER] CookingEngine already running for {participant_id}, skipping restart")
-
-                try:
-                    _ensure_pm_session_task(participant_id, task_order, block_number, send_event, db_factory, clock)
-                except Exception as pe:
-                    logger.error(f"[GAME_HANDLER] PM session resume failed on reconnect: {pe}")
+                    timeline_task = runtime.timeline_task
+                    logger.info(
+                        f"[GAME_HANDLER] Runtime already running for {participant_id}, keeping existing tasks"
+                    )
             else:
                 block_status = block.status if block else "NO_BLOCK"
                 logger.info(f"[GAME_HANDLER] Block status on connect: {block_status} (not auto-starting)")
@@ -230,19 +148,11 @@ async def handle_game_ws(
         # Only cancel timeline/pm_session if this connection is still the latest.
         # A newer connection may have already started a new timeline.
         if manager.is_latest_connection(participant_id, conn_id):
-            if timeline_task and not timeline_task.done():
+            runtime = _block_runtimes.pop(participant_id, None)
+            if runtime:
+                await runtime.stop(save_scores=True)
+            elif timeline_task and not timeline_task.done():
                 timeline_task.cancel()
-            cancel_timeline(participant_id, block_number)
-            # Stop and save cooking engine
-            cooking = _cooking_engines.pop(participant_id, None)
-            if cooking:
-                await cooking.save_dish_scores()
-                await cooking.stop()
-            _game_clocks.pop(participant_id, None)
-            # Cancel PM session task
-            pm_task = _pm_session_tasks.pop(participant_id, None)
-            if pm_task and not pm_task.done():
-                pm_task.cancel()
         else:
             logger.info(f"Skipping timeline/pm_session cleanup for {participant_id} — superseded by newer connection")
         # Only mark offline if no active connections remain
@@ -370,17 +280,15 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         await db.commit()
         condition = block.condition
         block_id = block.id
+        block_start_ts = block.started_at.timestamp() if block.started_at else None
 
     async def _on_block_complete():
         """Mark block as completed when timeline finishes normally."""
         try:
-            # Save cooking scores before marking block complete
-            cooking = _cooking_engines.pop(participant_id, None)
-            if cooking:
-                await cooking.save_dish_scores()
-                await cooking.stop()
-                logger.info(f"[GAME_HANDLER] CookingEngine scores saved for {participant_id}")
-            _game_clocks.pop(participant_id, None)
+            runtime = _block_runtimes.pop(participant_id, None)
+            if runtime:
+                await runtime.stop(save_scores=True)
+                logger.info(f"[GAME_HANDLER] Runtime stopped and cooking scores saved for {participant_id}")
 
             async with db_factory() as db:
                 from sqlalchemy import select
@@ -399,23 +307,30 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         except Exception as e:
             logger.error(f"[GAME_HANDLER] Failed to mark block complete: {e}")
 
-    # Start the timeline — rollback block status on failure
-    logger.info(f"[GAME_HANDLER] Creating TimelineEngine for {participant_id} block {block_number} ({condition})")
-    clock = _get_game_clock(participant_id)
+    runtime = BlockRuntime(
+        participant_id=participant_id,
+        block_number=block_number,
+        block_id=block_id,
+        condition=condition,
+        task_order=task_order,
+        send_fn=send_fn,
+        db_factory=db_factory,
+        block_start_time=block_start_ts,
+    )
+    old_runtime = _block_runtimes.pop(participant_id, None)
+    if old_runtime:
+        await old_runtime.stop(save_scores=False)
+    _block_runtimes[participant_id] = runtime
+
+    # Start runtime — rollback block status on failure
+    logger.info(f"[GAME_HANDLER] Creating BlockRuntime for {participant_id} block {block_number} ({condition})")
     try:
-        task = await run_timeline(
-            participant_id=participant_id,
-            block_number=block_number,
-            condition=condition,
-            send_fn=send_fn,
-            on_complete=_on_block_complete,
-            db_factory=db_factory,
-            clock=clock,
-        )
-        logger.info(f"[GAME_HANDLER] Timeline task created: {task}")
+        await runtime.start(on_complete=_on_block_complete)
+        logger.info(f"[GAME_HANDLER] BlockRuntime started: timeline={runtime.timeline_task}")
     except Exception as e:
-        logger.error(f"[GAME_HANDLER] Timeline start failed, rolling back block status: {e}")
-        _game_clocks.pop(participant_id, None)
+        logger.error(f"[GAME_HANDLER] Runtime start failed, rolling back block status: {e}")
+        _block_runtimes.pop(participant_id, None)
+        await runtime.stop(save_scores=False)
         async with db_factory() as db:
             from sqlalchemy import update as sql_update
             await db.execute(
@@ -425,27 +340,6 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
             )
             await db.commit()
         raise
-
-    # Start the CookingEngine for this block
-    try:
-        cooking = CookingEngine(
-            participant_id=participant_id,
-            block_id=block_id,
-            send_fn=send_fn,
-            db_factory=db_factory,
-            clock=clock,
-        )
-        _cooking_engines[participant_id] = cooking
-        cooking.start()
-        logger.info(f"[GAME_HANDLER] CookingEngine started for {participant_id} block {block_number}")
-    except Exception as e:
-        logger.error(f"[GAME_HANDLER] CookingEngine start failed: {e}")
-
-    # Start the PM session task
-    try:
-        _ensure_pm_session_task(participant_id, task_order, block_number, send_fn, db_factory, clock)
-    except Exception as e:
-        logger.error(f"[GAME_HANDLER] PM session start failed: {e}")
 
 
 async def _handle_heartbeat(participant_id: str, db_factory) -> dict:
@@ -478,7 +372,8 @@ async def _handle_task_action(participant_id, block_number, data, db_factory):
 
 async def _handle_cooking_action(participant_id, block_number, data, db_factory):
     """Route a cooking action to the CookingEngine and log it."""
-    cooking = _cooking_engines.get(participant_id)
+    runtime = _block_runtimes.get(participant_id)
+    cooking = runtime.cooking if runtime else None
     if not cooking:
         logger.warning(f"[GAME_HANDLER] cooking_action but no CookingEngine for {participant_id}")
         return
@@ -652,7 +547,11 @@ async def _handle_pm_action_complete(participant_id: str, block_number: int, dat
             unfreeze_game_time(p)
             await db.commit()
 
-    _resume_gameplay_after_pm(participant_id, block_number)
+    runtime = _block_runtimes.get(participant_id)
+    if runtime:
+        runtime.resume("pm")
+    else:
+        logger.warning("[GAME_HANDLER] PM complete but no BlockRuntime for %s", participant_id)
 
     # Advance PM session to next trigger
     signal_pipeline_complete(participant_id)
@@ -686,7 +585,11 @@ async def _handle_fake_trigger_ack(participant_id: str, block_number: int, data:
             unfreeze_game_time(p)
             await db.commit()
 
-    _resume_gameplay_after_pm(participant_id, block_number)
+    runtime = _block_runtimes.get(participant_id)
+    if runtime:
+        runtime.resume("pm")
+    else:
+        logger.warning("[GAME_HANDLER] fake trigger ack but no BlockRuntime for %s", participant_id)
 
     signal_pipeline_complete(participant_id)
 
