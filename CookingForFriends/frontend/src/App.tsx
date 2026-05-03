@@ -1,9 +1,10 @@
 /** App root — path-based routing with session recovery. */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useGameStore } from './stores/gameStore'
 import { getCookingDefinitions, getSessionStatus } from './services/api'
 import type { Phase } from './types'
+import { frontendPhaseForBackend, isMainExperimentPhase, renderPhaseFor } from './utils/phase'
 import WelcomePage from './pages/game/WelcomePage'
 import ConsentPage from './pages/game/ConsentPage'
 import IntroductionPage from './pages/game/IntroductionPage'
@@ -43,6 +44,7 @@ function GameShell() {
   const setSession = useGameStore((s) => s.setSession)
   const setPhase = useGameStore((s) => s.setPhase)
   const initializeCookingDefinitions = useGameStore((s) => s.initializeCookingDefinitions)
+  const [recoveryBlocked, setRecoveryBlocked] = useState(false)
 
   // Prevent browser back-button during experiment
   useEffect(() => {
@@ -57,7 +59,7 @@ function GameShell() {
 
   // Warn before tab close during active gameplay or early phases
   useEffect(() => {
-    const activePhases: Phase[] = ['playing', 'consent', 'introduction']
+    const activePhases: Phase[] = ['playing', 'consent', 'introduction', 'MAIN_EXPERIMENT', 'CONSENT']
     if (!activePhases.includes(phase)) return
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
@@ -96,22 +98,14 @@ function GameShell() {
           .then(initializeCookingDefinitions)
           .catch(() => {
             console.warn('[App] Failed to restore cooking definitions')
+            if (isMainExperimentPhase(data.current_phase)) {
+              setRecoveryBlocked(true)
+            }
           })
       }
       getSessionStatus(data.session_id)
         .then((status) => {
-          // Map backend status/phase to frontend phase
-          const phaseMap: Record<string, Phase> = {
-            pending: 'playing',
-            encoding: 'playing',
-            playing: 'playing',
-            completed: 'debrief',
-            consent: 'consent',
-            introduction: 'introduction',
-            post_questionnaire: 'post_questionnaire',
-            debrief: 'debrief',
-          }
-          const resolvedPhase: Phase = phaseMap[status.phase || ''] || 'welcome'
+          const resolvedPhase: Phase = frontendPhaseForBackend(status.phase)
           if (status.status === 'completed') {
             setPhase('complete')
           } else if (status.status === 'in_progress') {
@@ -119,7 +113,10 @@ function GameShell() {
           }
         })
         .catch(() => {
-          // Session invalid — clear and go to welcome
+          if (isMainExperimentPhase(data.current_phase)) {
+            setRecoveryBlocked(true)
+            return
+          }
           sessionStorage.removeItem('cff_session')
         })
     } catch {
@@ -127,10 +124,12 @@ function GameShell() {
     }
   }, [])
 
-  switch (phase) {
+  if (recoveryBlocked) {
+    return <ConnectionIssuePage participantId={useGameStore.getState().participantId} />
+  }
+
+  switch (renderPhaseFor(phase)) {
     case 'welcome':
-      return <WelcomePage />
-    case 'onboarding':
       return <WelcomePage />
     case 'consent':
       return <ConsentPage />
@@ -147,6 +146,24 @@ function GameShell() {
     default:
       return <WelcomePage />
   }
+}
+
+function ConnectionIssuePage({ participantId }: { participantId: string | null }) {
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+      <div className="w-full max-w-md rounded-lg border border-red-300 bg-white p-6 text-center shadow-xl">
+        <h1 className="text-xl font-bold text-slate-900">Connection issue</h1>
+        <p className="mt-3 text-sm leading-relaxed text-slate-600">
+          Connection issue. Please contact the experimenter.
+        </p>
+        {participantId && (
+          <p className="mt-4 rounded bg-slate-100 px-3 py-2 font-mono text-xs text-slate-600">
+            Participant: {participantId}
+          </p>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function CompletePage() {

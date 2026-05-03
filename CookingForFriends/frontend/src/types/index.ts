@@ -6,7 +6,40 @@
 export type ConditionLegacy = 'CONTROL' | 'AF' | 'AFCB'
 export type Condition = 'EC+' | 'EC-'
 
-export type Phase =
+export type ExperimentPhase =
+  | 'TOKEN_INPUT'
+  | 'WELCOME'
+  | 'CONSENT'
+  | 'DEMOGRAPHICS'
+  | 'MSE_PRE'
+  | 'STORY_INTRO'
+  | 'ENCODING_VIDEO_1'
+  | 'MANIP_CHECK_1'
+  | 'ASSIGN_1'
+  | 'ENCODING_VIDEO_2'
+  | 'MANIP_CHECK_2'
+  | 'ASSIGN_2'
+  | 'ENCODING_VIDEO_3'
+  | 'MANIP_CHECK_3'
+  | 'ASSIGN_3'
+  | 'ENCODING_VIDEO_4'
+  | 'MANIP_CHECK_4'
+  | 'ASSIGN_4'
+  | 'RECAP'
+  | 'TUTORIAL_PHONE'
+  | 'TUTORIAL_COOKING'
+  | 'TUTORIAL_TRIGGER'
+  | 'EVENING_TRANSITION'
+  | 'MAIN_EXPERIMENT'
+  | 'POST_MANIP_CHECK'
+  | 'POST_SUBJECTIVE_DV'
+  | 'POST_NASA_TLX'
+  | 'POST_MSE'
+  | 'POST_RETRO_CHECK'
+  | 'DEBRIEF'
+  | 'COMPLETED'
+
+export type LegacyPhase =
   | 'welcome'
   | 'onboarding'       // kept for backward compat
   | 'consent'
@@ -17,7 +50,25 @@ export type Phase =
   | 'debrief'
   | 'complete'
 
+export type Phase = LegacyPhase | ExperimentPhase
+
 export type TaskOrder = 'A' | 'B' | 'C' | 'D'
+
+export interface ExperimentConfig {
+  phase: ExperimentPhase | string
+  condition: Condition | string
+  task_order: TaskOrder | string
+  [key: string]: unknown
+}
+
+export interface ExperimentResponseInput {
+  phase?: ExperimentPhase | string
+  question_id: string
+  response_type: 'integer' | 'text' | 'choice' | 'scale' | 'boolean' | 'object' | string
+  value: unknown
+  timestamp?: number
+  metadata?: Record<string, unknown>
+}
 
 export type PMPipelineStep =
   | 'idle'

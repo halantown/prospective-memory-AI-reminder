@@ -1,6 +1,6 @@
 /** API service — all HTTP calls to backend. */
 
-import type { BlockEncoding, CookingDefinitions } from '../types'
+import type { BlockEncoding, CookingDefinitions, ExperimentConfig, ExperimentResponseInput } from '../types'
 
 const API_BASE = '/api'
 
@@ -35,6 +35,11 @@ export async function startSession(token: string) {
 
 export async function getCookingDefinitions(sessionId: string) {
   return request<CookingDefinitions>(`/session/${sessionId}/cooking-definitions`)
+}
+
+export async function getExperimentConfig(sessionId: string, phase?: string) {
+  const query = phase ? `?phase=${encodeURIComponent(phase)}` : ''
+  return request<ExperimentConfig>(`/session/${sessionId}/experiment-config${query}`)
 }
 
 export async function getSessionStatus(sessionId: string) {
@@ -97,6 +102,20 @@ export async function updatePhase(sessionId: string, phaseName: string, eventTyp
   return request<{ status: string }>(`/session/${sessionId}/phase`, {
     method: 'POST',
     body: JSON.stringify({ phase_name: phaseName, event_type: eventType }),
+  })
+}
+
+export async function advancePhase(sessionId: string, nextPhase?: string) {
+  return request<{ previous_phase: string; current_phase: string }>(`/session/${sessionId}/phase/advance`, {
+    method: 'POST',
+    body: JSON.stringify({ next_phase: nextPhase ?? null }),
+  })
+}
+
+export async function submitExperimentResponses(sessionId: string, responses: ExperimentResponseInput[]) {
+  return request<{ status: string; count: number }>(`/session/${sessionId}/responses`, {
+    method: 'POST',
+    body: JSON.stringify({ responses }),
   })
 }
 
