@@ -56,8 +56,8 @@ welcome → [block 1..3]:
 4. Wrong answers → re-show card with highlight → retry (max 2 fails then auto-pass)
 
 ### Playing Phase
-- **Duration**: 900 real seconds = 60 game minutes (17:00–18:00)
-- **Time ticks**: emitted every 15 real seconds (= 1 game minute)
+- **Duration**: 900 gameplay seconds; display clock spans 17:00–18:00 via `clock_end_seconds=600`
+- **Time ticks**: emitted every 10 gameplay seconds (= 1 displayed minute)
 - **Layout**: `FloorPlanView` (flex-1) + `PhoneSidebar` (440px fixed)
 - **Ongoing tasks**: Multi-dish cooking engine (4 dishes, backend-driven steps with distractors at kitchen stations)
 - **PM triggers**: 4 per block, at predefined times or activity-based
@@ -85,7 +85,7 @@ ws://host/ws/game/{session_id}/{block_number}?auto_start={bool}
 | Event | Data | Description |
 |-------|------|-------------|
 | `block_start` | `{}` | Block timeline started |
-| `time_tick` | `{elapsed, game_clock}` | Clock update (every 10s) |
+| `time_tick` | `{elapsed, game_time_s, game_clock, frozen, clock_end_seconds}` | Pause-aware gameplay clock update (every 10 game seconds; `elapsed` kept for compatibility) |
 | `pm_trigger` | `{trigger_id, trigger_event, task_config, server_trigger_ts}` | PM task activated |
 | `fake_trigger` | `{trigger_type, duration}` | Decoy trigger (no PM task) |
 | `phone_message` | `{id, channel, text, contact_id?, correct_choice?, wrong_choice?, correct_position?, feedback_correct?, feedback_incorrect?, sender?}` | Chat message (`channel:"chat"`) or system notification (`channel:"notification"`) |

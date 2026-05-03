@@ -23,6 +23,11 @@
   - `game_handler.py` 在 PM pipeline 开始时暂停 timeline + cooking，在 `pm_action_complete` / `fake_trigger_ack` 后恢复。
   - `timeline.py` 增加 pause/resume control，timeline elapsed 和 sleeps 排除暂停时长。
   - `cooking_engine.py` pause 时保存 active step timeout 剩余时间，resume 时恢复 timeout 并平移 response-time 基准。
+- 本批迁移（2026-05-03）：
+  - 新增 `backend/engine/game_clock.py`，集中定义 `GameClock`、`format_game_clock()`、`GAME_SECONDS_PER_CLOCK_MINUTE` 和 `DEFAULT_CLOCK_END_SECONDS`。
+  - `timeline.py` 的 pause-aware elapsed、sleep、`time_tick` 显示和 `pm_watch_activity` fallback 已改为通过 `GameClock`。
+  - timeline JSON / generator / admin editor 已支持 `clock_end_seconds=600`，和 `duration_seconds=900` 解耦。
+  - `time_tick` payload 已新增 `game_time_s`、`frozen`、`clock_end_seconds`，旧 `elapsed` 字段短期保留。
 - 风险：
   - 当前仍是三套时间的边界同步，不是单一时间源。
   - process restart / reconnect 后，timeline/cooking 的运行态仍主要在内存里，不能作为生产级恢复机制。
@@ -38,7 +43,7 @@
 
 Codebase review（2026-05-03）：
 
-- `backend/engine/timeline.py` 仍然自己维护 `TimelineControl.paused_at/total_paused_s`，用 `_timeline_elapsed()` 推进事件、HUD `time_tick`、phone cooldown 和 tail loop。
+- `backend/engine/timeline.py` 已开始迁移到 `GameClock`；当前仍保留 `TimelineControl` / `_timeline_elapsed()` / `_sleep_timeline()` 作为兼容薄层，但内部 clock owner 已是 `GameClock`。
 - `backend/engine/cooking_engine.py` 仍然自己维护 `_block_start_time/_paused_at/_next_timeline_index`，step activation、timeout 和 response time 都基于 `time.time()` / `asyncio.sleep()`。
 - `backend/engine/game_time.py` 是 DB-backed PM scheduler clock，只服务 `pm_session.py` 的 trigger wait/freeze；timeline/cooking 不读取它。
 - `backend/websocket/game_handler.py` 当前是 glue code：PM trigger 时分别 pause timeline + cooking + DB game time，PM 完成后再分别 resume。这个边界同步容易漏模块。
@@ -62,17 +67,17 @@ Codebase review（2026-05-03）：
    - 先把代码中所有 gameplay-scheduling 的 `time.time()` / `asyncio.sleep()` 调用列成 allowlist，确认哪些是 wall time by design，哪些必须迁移。
 2. Phase 1 — 抽出 clock math 和显示语义
 
-   - 新增 `backend/engine/clock_types.py` 或 `game_clock.py` 中的纯函数/常量：`GAME_SECONDS_PER_CLOCK_MINUTE = 10`、`CLOCK_START_HOUR = 17`、`DEFAULT_CLOCK_END_SECONDS = 600`、`format_game_clock(game_seconds, clock_end_seconds)`。
-   - 在 timeline JSON schema 中显式加入 `clock_end_seconds: 600`，与 `duration_seconds: 900` 解耦。
-   - `timeline.py` 先使用 `format_game_clock()` 生成 `time_tick`，去掉散落的 `// 10` / `min(tick_num, 60)`。
-   - 增加纯单元测试：0/10/590/600/900s 分别显示 17:00/17:01/17:59/18:00/18:00。
+   - [x] 新增 `backend/engine/clock_types.py` 或 `game_clock.py` 中的纯函数/常量：`GAME_SECONDS_PER_CLOCK_MINUTE = 10`、`CLOCK_START_HOUR = 17`、`DEFAULT_CLOCK_END_SECONDS = 600`、`format_game_clock(game_seconds, clock_end_seconds)`。
+   - [x] 在 timeline JSON schema 中显式加入 `clock_end_seconds: 600`，与 `duration_seconds: 900` 解耦。
+   - [x] `timeline.py` 先使用 `format_game_clock()` 生成 `time_tick`，去掉散落的 `// 10` / `min(tick_num, 60)`。
+   - [x] 增加纯单元测试：0/10/590/600/900s 分别显示 17:00/17:01/17:59/18:00/18:00。
 3. Phase 2 — 引入 `GameClock` runtime
 
-   - 新增 `backend/engine/game_clock.py`。
-   - 提供 `start(started_at_wall_ts=None)`、`now()`、`pause(reason)`、`resume(reason)`、`sleep_for(game_seconds)`、`sleep_until(game_second)`、`snapshot()`。
-   - 内部用 monotonic/wall adapter 支持测试注入；pause 时所有 `sleep_*` 不消耗 game seconds，resume 后继续。
+   - [x] 新增 `backend/engine/game_clock.py`。
+   - [x] 提供 `start(started_at_wall_ts=None)`、`now()`、`pause(reason)`、`resume(reason)`、`sleep_for(game_seconds)`、`sleep_until(game_second)`、`snapshot()`。
+   - [x] 内部用 wall-time adapter 支持测试注入；pause 时所有 `sleep_*` 不消耗 game seconds，resume 后继续。
    - 复用现有 `Participant.game_time_elapsed_s`、`frozen_since`、`last_unfreeze_at` 做 DB snapshot，先不做 migration。
-   - 单元测试覆盖 start/pause/resume、嵌套/重复 pause no-op、sleep_until 被 pause 拉长但 game time 不前进。
+   - [x] 单元测试覆盖 start/pause/resume、嵌套/重复 pause no-op、sleep_until 被 pause 拉长但 game time 不前进。
 4. Phase 3 — 引入 `BlockRuntime` owner
 
    - 新增 `backend/engine/block_runtime.py`，由 `game_handler.py` 创建并持有：`clock`、timeline task、`CookingEngine`、PM session task。
@@ -82,11 +87,11 @@ Codebase review（2026-05-03）：
    - `game_handler.py` 不再分别 import/call `pause_timeline()`、`resume_timeline()`、`cooking.pause()`、`cooking.resume()`。
 5. Phase 4 — timeline 迁移
 
-   - `timeline.py` 事件等待改为 `clock.sleep_until(event.t)`。
-   - HUD `time_tick` 由 `clock.now()` 推导。
-   - phone message cooldown 使用 game time。
-   - `pm_watch_activity` fallback 改为 `clock.sleep_until(fallback_game_time)`，不能再用 wall deadline。
-   - 移除 `TimelineControl` / `_timeline_elapsed()` / `_sleep_timeline()`。
+   - [x] `timeline.py` 事件等待改为 `clock.sleep_until(event.t)`。
+   - [x] HUD `time_tick` 由 `clock.now()` 推导。
+   - [x] phone message cooldown 使用 game time。
+   - [x] `pm_watch_activity` fallback 改为 `clock.sleep_until(fallback_game_time)`，不能再用 wall deadline。
+   - [ ] 移除 `TimelineControl` / `_timeline_elapsed()` / `_sleep_timeline()`。
    - 旧 timeline `pm_trigger` 兼容逻辑保留，但不再作为 EC+/EC- 的 PM scheduler。
 6. Phase 5 — cooking engine 迁移
 
@@ -203,7 +208,7 @@ Codebase review（2026-05-03）：
 
 | 套 | 当前 owner | 单位/来源 | 用途 | 风险 |
 |----|------------|-----------|------|------|
-| 1. Timeline elapsed | `backend/engine/timeline.py` | `time.time() - start_time - total_paused_s` | 剧情事件、phone message、HUD `time_tick`、block_end | 自己有 pause control，和 DB game time 不是同一个 source |
+| 1. Timeline elapsed | `backend/engine/timeline.py` + `engine/game_clock.py` | `GameClock.now()` | 剧情事件、phone message、HUD `time_tick`、block_end | 已迁到 `GameClock`，但还未纳入 `BlockRuntime` 总 owner |
 | 2. PM game time | `backend/engine/game_time.py` + `Participant` DB fields | accumulated game seconds | PM trigger schedule、freeze/unfreeze snapshot | 只服务 PM scheduler；timeline/cooking 不读它 |
 | 3. Cooking runtime time | `backend/engine/cooking_engine.py` | `_block_start_time` + `time.time()` + `asyncio.sleep()` | cooking step activation、timeout、response time | 自己实现 pause/resume/offset，容易和 timeline/PM 漏同步 |
 
@@ -234,14 +239,14 @@ cooking _block_start_time + time.time() ──→ cooking activation / timeout /
 
 **本节具体重构计划**：
 
-- [ ] 在 JSON schema 中加 `clock_end_seconds: 600` 字段，与 `duration_seconds` 解耦：
+- [x] 在 JSON schema 中加 `clock_end_seconds: 600` 字段，与 `duration_seconds` 解耦：
   ```json
   { "duration_seconds": 900, "clock_end_seconds": 600 }
   ```
   Python: `game_minutes = min(game_time_s // GAME_SECONDS_PER_CLOCK_MINUTE, clock_end_seconds // GAME_SECONDS_PER_CLOCK_MINUTE)`
-- [ ] 新增 `format_game_clock(game_time_s, clock_end_seconds)`，由 backend `time_tick` 统一使用；前端只展示后端给出的 `game_clock`。
-- [ ] 在 `timeline.py` / 新 `game_clock.py` 顶部加 `GAME_SECONDS_PER_CLOCK_MINUTE = 10`，让 `// 10` 有名字。
+- [x] 新增 `format_game_clock(game_time_s, clock_end_seconds)`，由 backend `time_tick` 统一使用；前端只展示后端给出的 `game_clock`。
+- [x] 在 `timeline.py` / 新 `game_clock.py` 顶部加 `GAME_SECONDS_PER_CLOCK_MINUTE = 10`，让 `// 10` 有名字。
 - [ ] `duration_seconds` 暂时保留，语义改名/注释为 `block_runtime_seconds` 或 `timeline_end_seconds`；是否删除放到 GameClock 完成后决定，因为当前 tail loop 仍依赖它。
 - [ ] cooking 不应由 frontend `Date.now()` 驱动。未来如果显示剩余秒数，应由 `deadline_game_time - gameTimeSeconds` 派生；backend timeout 也必须由同一个 `GameClock.sleep_until(deadline_game_time)` 控制。
-- [ ] `time_tick` payload 建议从 `{ elapsed, game_clock }` 迁移到 `{ game_time_s, game_clock, frozen, clock_end_seconds }`，旧 `elapsed` 可短期保留为兼容字段。
+- [x] `time_tick` payload 建议从 `{ elapsed, game_clock }` 迁移到 `{ game_time_s, game_clock, frozen, clock_end_seconds }`，旧 `elapsed` 可短期保留为兼容字段。
 - [ ] 清理命名：frontend `elapsedSeconds` 改名或注释为 `gameTimeSeconds`；backend wall timestamp 字段保留 `*_at`，gameplay schedule 字段使用 `*_game_time`。

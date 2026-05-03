@@ -3,6 +3,7 @@
   "condition": "default",
   "day_story": "Day 1: Cooking steak dinner for friends",
   "duration_seconds": 900,
+  "clock_end_seconds": 600,
   "events": [
     { "t": 0,   "type": "block_start", "data": {} },
 

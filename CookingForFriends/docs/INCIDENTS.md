@@ -928,3 +928,58 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > - [ ] Add frontend store/unit tests for timeout/result/wait state rendering once frontend test tooling exists
 > - [ ] Add backend integration test for full cooking event order across one dish
 > - [ ] Refactor cooking scheduling so timeline controls only each dish's first step and later same-dish steps are activated by completion/timeout events
+
+---
+
+## INC-018 — Gameplay timeline still used its own clock after PM pause fixes
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-03 |
+| Severity     | P1 High |
+| Status       | Monitoring — first migration batch completed |
+| Reported by  | Codebase review of three independent time systems |
+| Affected area| TimelineEngine, game clock display, PM pause semantics |
+
+### Background
+> Gameplay scheduling should use one pause-aware game-time source. During a PM overlay, timeline events, phone-message cooldowns, activity-trigger fallbacks, cooking timeouts, and block end should stop advancing until the overlay completes.
+
+### Incident Description
+> Earlier stopgap fixes paused `timeline.py`, `cooking_engine.py`, and DB-backed PM game time at their boundaries, but each subsystem still owned its own clock. `timeline.py` kept `TimelineControl.paused_at/total_paused_s`, generated the HUD clock inline, and scheduled `pm_watch_activity` fallback using wall-clock deadlines.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 01:35 | Three-time-system review started from `bug_report.md` plan |
+| 01:45 | Root cause confirmed in `timeline.py`, `game_time.py`, and `cooking_engine.py` |
+| 01:55 | `GameClock` abstraction added and timeline migrated to it |
+| 02:04 | Backend compile/tests passed |
+
+### Root Cause
+> The PM pause fix was added after timeline and cooking scheduling already existed. Instead of one owner for gameplay time, the codebase had boundary synchronization: DB participant game time for PM triggers, `TimelineControl` for timeline events, and `CookingEngine` offsets for cooking. This made it easy for future gameplay scheduling to bypass PM pause semantics.
+
+### Contributing Factors
+> - No shared backend clock abstraction before PM trigger work
+> - Timeline display clock mixed clock formatting with event scheduling
+> - `duration_seconds` and display-clock end time were conflated until the 18:00 cap fix
+> - No unit tests for pause-aware game-time sleep
+
+### Fix
+> `backend/engine/game_clock.py`: added `GameClock`, `GameClockSnapshot`, `format_game_clock()`, and display constants. `GameClock.sleep_for()` and `sleep_until()` use gameplay seconds and ignore paused wall-clock intervals.
+>
+> `backend/engine/timeline.py`: timeline elapsed, pause/resume, event waits, phone-message cooldown, activity fallback, and `time_tick` payload now go through `GameClock`. `time_tick` now includes `game_time_s`, `frozen`, and `clock_end_seconds`; old `elapsed` remains for frontend compatibility.
+>
+> `backend/data/timelines/block_default.json`, `backend/engine/timeline_generator.py`, and `backend/routers/timeline_editor.py`: added `clock_end_seconds=600` so display-clock span is explicit and separate from `duration_seconds=900`.
+>
+> `backend/tests/test_game_clock.py`: added unit tests for display formatting, pause/resume, snapshot, and `sleep_until()` excluding paused wall time.
+
+### Verification
+> `cd CookingForFriends/backend && conda run -n thesis_server python -m py_compile engine/game_clock.py engine/timeline.py engine/timeline_generator.py routers/timeline_editor.py` passes.
+>
+> `cd CookingForFriends/backend && conda run -n thesis_server pytest tests -q` passes: 25 passed.
+
+### Follow-up Actions
+> - [ ] Move `CookingEngine` activation, timeout, and response-time calculation onto `GameClock`
+> - [ ] Move PM scheduler off DB polling and onto `BlockRuntime` / `GameClock`
+> - [ ] Replace `game_handler.py` glue pause/resume calls with a single `BlockRuntime.pause()` / `resume()`
+> - [ ] Add timeline integration test proving PM pause blocks `time_tick`, phone messages, and block end

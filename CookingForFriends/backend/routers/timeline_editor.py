@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 
 from config import DATA_DIR, MESSAGE_COOLDOWN_S, ADMIN_API_KEY
+from engine.game_clock import DEFAULT_CLOCK_END_SECONDS
 from engine.timeline import load_timeline
 from engine.timeline_generator import generate_block_timeline
 from engine.pm_tasks import BLOCK_TRIGGER_ORDER, BLOCK_TRIGGER_TIMES, BLOCK_GUESTS
@@ -51,6 +52,7 @@ class TimelineEvent(BaseModel):
 
 class TimelineSaveRequest(BaseModel):
     duration_seconds: int = 600
+    clock_end_seconds: int = DEFAULT_CLOCK_END_SECONDS
     events: list[TimelineEvent]
 
 
@@ -80,6 +82,7 @@ async def list_timelines():
                     "condition": data.get("condition", "default"),
                     "event_count": len(data.get("events", [])),
                     "duration_seconds": data.get("duration_seconds", 600),
+                    "clock_end_seconds": data.get("clock_end_seconds", DEFAULT_CLOCK_END_SECONDS),
                 })
             except (json.JSONDecodeError, OSError):
                 files.append({
@@ -151,6 +154,7 @@ async def save_timeline_file(filename: str, body: TimelineSaveRequest):
         "block_number": _infer_block_number(filename),
         "condition": _infer_condition(filename),
         "duration_seconds": body.duration_seconds,
+        "clock_end_seconds": body.clock_end_seconds,
         "events": events,
     }
 

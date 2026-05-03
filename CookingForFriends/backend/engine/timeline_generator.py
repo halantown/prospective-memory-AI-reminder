@@ -220,5 +220,6 @@ def generate_block_timeline(
         "guest": guest,
         "day_story": f"Day {block_number}: Cooking dinner for {guest}",
         "duration_seconds": COOKING_TOTAL_DURATION_S,
+        "clock_end_seconds": 600,
         "events": events,
     }

@@ -8,6 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from config import DATA_DIR, MESSAGE_COOLDOWN_S
 from engine.execution_window import start_window
+from engine.game_clock import (
+    DEFAULT_CLOCK_END_SECONDS,
+    GameClock,
+    format_game_clock,
+)
 from engine.message_loader import load_message_pool, build_ws_payload, get_message, get_contacts
 
 logger = logging.getLogger(__name__)
@@ -19,8 +24,7 @@ _active_timelines: dict[str, asyncio.Task] = {}
 @dataclass
 class TimelineControl:
     task: asyncio.Task | None = None
-    paused_at: float | None = None
-    total_paused_s: float = 0.0
+    clock: GameClock | None = None
 
 
 _timeline_controls: dict[str, TimelineControl] = {}
@@ -51,28 +55,38 @@ def _timeline_key(participant_id: str, block_number: int) -> str:
 
 def _timeline_elapsed(start_time: float, control: TimelineControl) -> float:
     """Return timeline seconds with explicit pause intervals excluded."""
-    now = control.paused_at if control.paused_at is not None else time.time()
-    return max(0.0, now - start_time - control.total_paused_s)
+    if control.clock is not None:
+        return control.clock.now()
+    return max(0.0, time.time() - start_time)
 
 
 async def _sleep_timeline(seconds: float, control: TimelineControl) -> None:
     """Sleep for unpaused timeline seconds."""
-    remaining = max(0.0, seconds)
-    last = time.time()
+    if control.clock is not None:
+        await control.clock.sleep_for(seconds)
+        return
+    await asyncio.sleep(max(0.0, seconds))
 
-    while remaining > 0:
-        if control.paused_at is not None:
-            await asyncio.sleep(0.2)
-            last = time.time()
-            continue
 
-        await asyncio.sleep(min(1.0, remaining))
-        now = time.time()
-        if control.paused_at is None:
-            remaining -= now - last
-        else:
-            remaining -= max(0.0, control.paused_at - last)
-        last = now
+async def _emit_time_tick(
+    send_fn,
+    elapsed: float,
+    clock_end_seconds: int,
+    *,
+    tail: bool = False,
+) -> None:
+    """Emit one authoritative gameplay clock tick."""
+    try:
+        await send_fn("time_tick", {
+            "elapsed": int(elapsed),  # Backward-compatible field.
+            "game_time_s": int(elapsed),
+            "game_clock": format_game_clock(elapsed, clock_end_seconds),
+            "frozen": False,
+            "clock_end_seconds": clock_end_seconds,
+        })
+    except Exception as e:
+        suffix = " (tail)" if tail else ""
+        logger.error(f"[TIMELINE] Failed to send time_tick{suffix}: {e}")
 
 
 def pause_timeline(participant_id: str, block_number: int) -> bool:
@@ -81,22 +95,24 @@ def pause_timeline(participant_id: str, block_number: int) -> bool:
     control = _timeline_controls.get(key)
     if not control or not control.task or control.task.done():
         return False
-    if control.paused_at is None:
-        control.paused_at = time.time()
+    if control.clock and control.clock.is_paused:
+        return True
+    if control.clock and control.clock.pause("pm"):
         logger.info(f"[TIMELINE] Paused: {key}")
-    return True
+        return True
+    return False
 
 
 def resume_timeline(participant_id: str, block_number: int) -> bool:
     """Resume a previously paused timeline."""
     key = _timeline_key(participant_id, block_number)
     control = _timeline_controls.get(key)
-    if not control or control.paused_at is None:
+    if not control or not control.clock:
         return False
-    control.total_paused_s += time.time() - control.paused_at
-    control.paused_at = None
-    logger.info(f"[TIMELINE] Resumed: {key}")
-    return True
+    if control.clock.resume("pm"):
+        logger.info(f"[TIMELINE] Resumed: {key}")
+        return True
+    return False
 
 
 def load_timeline(block_number: int, condition: str, **kwargs) -> dict:
@@ -126,13 +142,21 @@ def load_timeline(block_number: int, condition: str, **kwargs) -> dict:
         path = DATA_DIR / "timelines" / "block_default.json"
     if not path.exists():
         logger.warning(f"No timeline template found for block {block_number}, using empty")
-        return {"events": [], "duration_seconds": 600}
+        return {
+            "events": [],
+            "duration_seconds": 600,
+            "clock_end_seconds": DEFAULT_CLOCK_END_SECONDS,
+        }
     try:
         with open(path) as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         logger.error(f"Failed to load timeline from {path}: {e}")
-        return {"events": [], "duration_seconds": 600}
+        return {
+            "events": [],
+            "duration_seconds": 600,
+            "clock_end_seconds": DEFAULT_CLOCK_END_SECONDS,
+        }
 
 
 async def run_timeline(
@@ -181,13 +205,18 @@ async def run_timeline(
     )
     events = timeline.get("events", [])
     duration = timeline.get("duration_seconds", 600)
+    clock_end_seconds = timeline.get("clock_end_seconds", DEFAULT_CLOCK_END_SECONDS)
     logger.info(f"[TIMELINE] Loaded timeline for {key}: {len(events)} events, {duration}s duration")
 
-    control = TimelineControl()
+    control = TimelineControl(
+        clock=GameClock(clock_end_seconds=clock_end_seconds),
+    )
 
     async def _run():
         try:
             start_time = block_start_time if block_start_time else time.time()
+            if control.clock:
+                control.clock.start(start_time)
             # How far into the block are we already?  0 on first start, >0 on reconnect.
             resume_offset = _timeline_elapsed(start_time, control) if block_start_time else 0.0
             logger.info(f"[TIMELINE] _run started: {key} ({len(events)} events, {duration}s, resume_offset={resume_offset:.1f}s)")
@@ -234,23 +263,16 @@ async def run_timeline(
                     tick_num = int(elapsed) // 10
                     if tick_num != last_tick_num:
                         last_tick_num = tick_num
-                        game_minutes = min(tick_num, 60)  # cap at 18:00
-                        game_hour = 17 + game_minutes // 60
-                        game_min = game_minutes % 60
-                        game_clock = f"{game_hour}:{game_min:02d}"
-                        try:
-                            await send_fn("time_tick", {
-                                "elapsed": int(elapsed),
-                                "game_clock": game_clock,
-                            })
-                        except Exception as e:
-                            logger.error(f"[TIMELINE] Failed to send time_tick: {e}")
+                        await _emit_time_tick(send_fn, elapsed, clock_end_seconds)
                     await _sleep_timeline(1.0, control)
                     elapsed = _timeline_elapsed(start_time, control)
 
                 wait = t - elapsed
                 if wait > 0:
-                    await _sleep_timeline(wait, control)
+                    if control.clock is not None:
+                        await control.clock.sleep_until(t)
+                    else:
+                        await _sleep_timeline(wait, control)
 
                 event_type = event.get("type", "unknown")
                 event_data = dict(event.get("data", {}))  # shallow copy to avoid mutating template
@@ -357,11 +379,10 @@ async def run_timeline(
                     task_id = event_data.get("task_id", "")
                     watch_condition = event_data.get("watch_condition", "")
                     fallback_time_offset = event_data.get("fallback_time", 530)
-                    fallback_at = start_time + fallback_time_offset
 
                     logger.info(
                         f"[TIMELINE] Registering activity watcher: {task_id} "
-                        f"condition={watch_condition} fallback_at={fallback_time_offset}s"
+                        f"condition={watch_condition} fallback_game_time={fallback_time_offset}s"
                     )
 
                     # Register watcher — the game_handler will check registered
@@ -369,7 +390,8 @@ async def run_timeline(
                     # For now, also schedule a fallback.
                     _register_activity_watcher(
                         participant_id, task_id, watch_condition,
-                        fallback_at, trial_lookup, factory, send_fn,
+                        fallback_time_offset, trial_lookup, factory, send_fn,
+                        control.clock,
                     )
                     continue  # don't forward this internal event to frontend
 
@@ -391,17 +413,7 @@ async def run_timeline(
                 tick_num = int(elapsed) // 10
                 if tick_num != last_tick_num:
                     last_tick_num = tick_num
-                    game_minutes = min(tick_num, 60)  # cap at 18:00
-                    game_hour = 17 + game_minutes // 60
-                    game_min = game_minutes % 60
-                    game_clock = f"{game_hour}:{game_min:02d}"
-                    try:
-                        await send_fn("time_tick", {
-                            "elapsed": int(elapsed),
-                            "game_clock": game_clock,
-                        })
-                    except Exception as e:
-                        logger.error(f"[TIMELINE] Failed to send time_tick (tail): {e}")
+                    await _emit_time_tick(send_fn, elapsed, clock_end_seconds, tail=True)
                 await _sleep_timeline(1.0, control)
                 remaining = duration - _timeline_elapsed(start_time, control)
 
@@ -647,10 +659,11 @@ def _register_activity_watcher(
     participant_id: str,
     task_id: str,
     watch_condition: str,
-    fallback_at: float,
+    fallback_game_time: float,
     trial_lookup: dict,
     db_factory,
     send_fn,
+    clock: GameClock | None = None,
 ):
     """Register an activity watcher with a fallback timer.
 
@@ -662,11 +675,14 @@ def _register_activity_watcher(
 
     async def _fallback():
         """Fire the trigger if condition not met by deadline."""
-        wait = fallback_at - time.time()
-        # Cap wait time to prevent extremely long sleeps from clock adjustments
-        max_wait = 900  # 15 minutes absolute maximum
-        if wait > 0:
-            await asyncio.sleep(min(wait, max_wait))
+        if clock is not None:
+            await clock.sleep_until(fallback_game_time)
+        else:
+            wait = fallback_game_time - time.time()
+            # Cap wait time to prevent extremely long sleeps from clock adjustments
+            max_wait = 900  # 15 minutes absolute maximum
+            if wait > 0:
+                await asyncio.sleep(min(wait, max_wait))
 
         if watcher_key not in _activity_watchers:
             return  # already fired by condition
@@ -688,7 +704,7 @@ def _register_activity_watcher(
 
     logger.info(
         f"[ACTIVITY_WATCHER] Registered: {watcher_key} "
-        f"condition={watch_condition} fallback_at={fallback_at:.0f}"
+        f"condition={watch_condition} fallback_game_time={fallback_game_time:.0f}"
     )
 
 

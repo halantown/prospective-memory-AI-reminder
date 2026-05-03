@@ -59,16 +59,17 @@ Backend: main.py @app.websocket("/ws/game/{session_id}/{block_num}")
 
 ```python
 async def _run():
-    start_time = time.time()
+    clock = GameClock(clock_end_seconds=timeline.get("clock_end_seconds", 600))
+    clock.start()
     trial_lookup = await _build_trial_lookup(...)  # DB query: task_id → trial info
 
     for event in events:
-        # 1. Wait for event time, emitting time_tick every 10 real seconds
-        while event.t - elapsed > 1.0:
-            tick_num = int(elapsed) // 10
+        # 1. Wait for event game time, emitting time_tick every 10 game seconds
+        while event.t - clock.now() > 1.0:
+            tick_num = int(clock.now()) // 10
             if tick_num != last_tick_num:
-                await send_fn("time_tick", { elapsed, game_clock })
-            await asyncio.sleep(1.0)
+                await send_fn("time_tick", { elapsed, game_time_s, game_clock, clock_end_seconds })
+            await clock.sleep_for(1.0)
 
         # 2. Shallow-copy event data (prevent template mutation)
         event_data = dict(event["data"])
@@ -91,11 +92,11 @@ async def _run():
 
 ### 2.4 Time System
 
-- **Real time**: `time.time()` tracks wall-clock elapsed seconds
-- **Game clock**: Each 10 real seconds = 1 game minute. Starts at 17:00.
-  - `tick_num = int(elapsed) // 10`
-  - `game_clock = f"{17 + tick_num // 60}:{tick_num % 60:02d}"`
-- **time_tick events**: Emitted every 10s while waiting between events
+- **Game time**: `engine.game_clock.GameClock` tracks pause-aware gameplay seconds.
+- **Wall time**: `time.time()` is still used for telemetry/log timestamps, not gameplay scheduling.
+- **Game clock display**: Each 10 game seconds = 1 displayed minute. Starts at 17:00 and caps at `clock_end_seconds` (default 600 = 18:00).
+  - `game_clock = format_game_clock(game_time_s, clock_end_seconds)`
+- **time_tick events**: Emitted every 10 gameplay seconds while waiting between events. Payload includes `{elapsed, game_time_s, game_clock, frozen, clock_end_seconds}`; `elapsed` is retained for backward compatibility.
 
 ### 2.5 WebSocket Message Flow
 
