@@ -441,6 +441,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       station: data.station as KitchenStationId,
       options: (data.options as CookingStepOption[]) || [],
       activatedAt: data.activated_at ? (data.activated_at as number) * 1000 : Date.now(),
+      activatedGameTime: data.activated_game_time as number | undefined,
+      deadlineGameTime: data.deadline_game_time as number | undefined,
       windowSeconds: data.window_s as number || 30,
       stepType: (data.step_type as 'active' | 'wait') || 'active',
       waitDurationS: data.wait_duration_s as number | undefined,
@@ -575,6 +577,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       stepDescription: data.description as string || '',
       station: data.station as KitchenStationId,
       startedAt: data.started_at ? (data.started_at as number) * 1000 : Date.now(),
+      startedGameTime: data.started_game_time as number | undefined,
       durationS: data.wait_duration_s as number || 60,
     }
     set((s) => ({

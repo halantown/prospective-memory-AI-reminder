@@ -20,6 +20,7 @@ from typing import Any, Callable, Awaitable, Literal
 from config import COOKING_STEP_WINDOW_S, COOKING_DISHES
 from data.cooking_recipes import ALL_RECIPES, CookingStepDef, DISH_LABELS, DISH_EMOJIS
 from data.cooking_timeline import COOKING_TIMELINE, TimelineEntry
+from engine.game_clock import GameClock
 
 logger = logging.getLogger(__name__)
 
@@ -83,23 +84,22 @@ class CookingEngine:
         self._active_step: dict[str, TimelineEntry | None] = {d: None for d in COOKING_DISHES}
         self._active_wait: dict[str, TimelineEntry | None] = {d: None for d in COOKING_DISHES}
         self._timeout_tasks: dict[str, asyncio.Task] = {}
-        self._timeout_remaining_s: dict[str, float] = {}
         self._step_activated_at: dict[str, float] = {}
+        self._step_activated_game_time: dict[str, float] = {}
+        self._step_deadline_game_time: dict[str, float] = {}
 
         # Timeline scheduling
         self._timeline_task: asyncio.Task | None = None
         self._running = False
-        self._block_start_time: float = 0.0
-        self._paused_at: float | None = None
+        self._clock = GameClock()
         self._next_timeline_index: int = 0
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def start(self, block_start_time: float | None = None) -> asyncio.Task:
         """Start the cooking timeline. Returns the background task."""
-        self._block_start_time = block_start_time or time.time()
+        self._clock.start(block_start_time)
         self._running = True
-        self._paused_at = None
         self._next_timeline_index = 0
         self._timeline_task = asyncio.create_task(self._run_timeline())
         return self._timeline_task
@@ -107,11 +107,11 @@ class CookingEngine:
     async def stop(self):
         """Stop the cooking engine and cancel pending timers."""
         self._running = False
-        self._paused_at = None
         for task in self._timeout_tasks.values():
             task.cancel()
         self._timeout_tasks.clear()
-        self._timeout_remaining_s.clear()
+        self._step_deadline_game_time.clear()
+        self._step_activated_game_time.clear()
         for dish_id in self._active_wait:
             self._active_wait[dish_id] = None
         if self._timeline_task and not self._timeline_task.done():
@@ -120,54 +120,11 @@ class CookingEngine:
 
     def pause(self):
         """Pause all cooking timers (called during PM pipeline freeze)."""
-        if self._paused_at is not None:
-            return  # already paused
-        now = time.time()
-        self._paused_at = now
-        self._running = False
-
-        for dish_id, task in self._timeout_tasks.items():
-            activated_at = self._step_activated_at.get(dish_id)
-            if activated_at is not None:
-                self._timeout_remaining_s[dish_id] = max(
-                    0.0,
-                    COOKING_STEP_WINDOW_S - (now - activated_at),
-                )
-            task.cancel()
-        self._timeout_tasks.clear()
-
-        if self._timeline_task and not self._timeline_task.done():
-            self._timeline_task.cancel()
-        self._timeline_task = None
+        self._clock.pause("pm")
 
     def resume(self):
         """Resume cooking timers (called when game time unfreezes)."""
-        if self._paused_at is None:
-            return  # not paused
-        offset = time.time() - self._paused_at
-        self._block_start_time += offset
-        self._paused_at = None
-        self._running = True
-
-        for dish_id, remaining_s in list(self._timeout_remaining_s.items()):
-            entry = self._active_step.get(dish_id)
-            if entry is None:
-                continue
-            activated_at = self._step_activated_at.get(dish_id, time.time())
-            adjusted_activated_at = activated_at + offset
-            self._step_activated_at[dish_id] = adjusted_activated_at
-            self._timeout_tasks[dish_id] = asyncio.create_task(
-                self._step_timeout(
-                    dish_id,
-                    entry.step_index,
-                    adjusted_activated_at,
-                    remaining_s,
-                )
-            )
-        self._timeout_remaining_s.clear()
-
-        if self._timeline_task is None or self._timeline_task.done():
-            self._timeline_task = asyncio.create_task(self._run_timeline())
+        self._clock.resume("pm")
 
     # ── Timeline Runner ───────────────────────────────────────────────────────
 
@@ -180,11 +137,7 @@ class CookingEngine:
                 entry = COOKING_TIMELINE[self._next_timeline_index]
 
                 # Wait until the scheduled time
-                now = time.time()
-                target_time = self._block_start_time + entry.t
-                wait_seconds = target_time - now
-                if wait_seconds > 0:
-                    await asyncio.sleep(wait_seconds)
+                await self._clock.sleep_until(entry.t)
 
                 if not self._running:
                     break
@@ -199,6 +152,8 @@ class CookingEngine:
 
     async def _activate_entry(self, entry: TimelineEntry):
         """Activate a single timeline entry (step)."""
+        if not self._clock.is_started:
+            self._clock.start()
         dish = self.dishes[entry.dish_id]
         step_def = dish.steps[entry.step_index]
 
@@ -210,7 +165,6 @@ class CookingEngine:
             await self._mark_step_missed(
                 entry.dish_id,
                 previous_active.step_index,
-                self._step_activated_at.get(entry.dish_id, time.time()),
                 reason="superseded",
             )
 
@@ -248,13 +202,18 @@ class CookingEngine:
                 "station": step_def.station,
                 "wait_duration_s": step_def.wait_duration_s,
                 "started_at": time.time(),
+                "started_game_time": self._clock.now(),
             })
         else:
             # Active steps: notify frontend with options, start timeout
             dish.phase = "active"
             self._active_step[entry.dish_id] = entry
             activated_at = time.time()
+            activated_game_time = self._clock.now()
+            deadline_game_time = activated_game_time + COOKING_STEP_WINDOW_S
             self._step_activated_at[entry.dish_id] = activated_at
+            self._step_activated_game_time[entry.dish_id] = activated_game_time
+            self._step_deadline_game_time[entry.dish_id] = deadline_game_time
 
             # Build option list from config (fixed order, no shuffle)
             options = [{"id": f"option_{i}", "text": t} for i, t in enumerate(step_def.options)]
@@ -273,11 +232,13 @@ class CookingEngine:
                 "options": options,
                 "window_s": COOKING_STEP_WINDOW_S,
                 "activated_at": activated_at,
+                "activated_game_time": activated_game_time,
+                "deadline_game_time": deadline_game_time,
             })
 
             # Start timeout timer
             self._timeout_tasks[entry.dish_id] = asyncio.create_task(
-                self._step_timeout(entry.dish_id, entry.step_index, activated_at)
+                self._step_timeout(entry.dish_id, entry.step_index, deadline_game_time)
             )
 
     # ── Timeout Handler ───────────────────────────────────────────────────────
@@ -286,12 +247,11 @@ class CookingEngine:
         self,
         dish_id: str,
         step_index: int,
-        activated_at: float,
-        delay_s: float | None = None,
+        deadline_game_time: float,
     ):
         """Called after COOKING_STEP_WINDOW_S if participant hasn't acted."""
         try:
-            await asyncio.sleep(COOKING_STEP_WINDOW_S if delay_s is None else delay_s)
+            await self._clock.sleep_until(deadline_game_time)
         except asyncio.CancelledError:
             return
         finally:
@@ -304,13 +264,12 @@ class CookingEngine:
         if entry.step_index != step_index:
             return
 
-        await self._mark_step_missed(dish_id, step_index, activated_at, reason="timeout")
+        await self._mark_step_missed(dish_id, step_index, reason="timeout")
 
     async def _mark_step_missed(
         self,
         dish_id: str,
         step_index: int,
-        activated_at: float,
         reason: str,
     ) -> None:
         """Record and emit a missed step for timeout or superseded activation."""
@@ -331,12 +290,14 @@ class CookingEngine:
             result="missed",
             chosen_option=None,
             correct_option=step_def.options[step_def.correct_index] if step_def.options else "",
-            activated_at=activated_at,
+            activated_at=self._step_activated_at.get(dish_id, now),
             completed_at=now,
             response_time_ms=None,
         )
         dish.results.append(result)
         self._active_step[dish_id] = None
+        self._step_deadline_game_time.pop(dish_id, None)
+        self._step_activated_game_time.pop(dish_id, None)
 
         # Check if dish is complete
         dish_completed = self._check_dish_complete(dish_id)
@@ -415,9 +376,10 @@ class CookingEngine:
 
         # Determine correctness
         activated_at = self._step_activated_at.get(dish_id, timestamp)
+        activated_game_time = self._step_activated_game_time.get(dish_id, self._clock.now())
         is_correct = chosen_option_id == f"option_{step_def.correct_index}"
         now = time.time()
-        response_time_ms = int((now - activated_at) * 1000)
+        response_time_ms = int(max(0.0, self._clock.now() - activated_game_time) * 1000)
 
         correct_option_text = step_def.options[step_def.correct_index] if step_def.options else ""
         result_str: Literal["correct", "wrong"] = "correct" if is_correct else "wrong"
@@ -435,6 +397,8 @@ class CookingEngine:
         )
         dish.results.append(result)
         self._active_step[dish_id] = None
+        self._step_deadline_game_time.pop(dish_id, None)
+        self._step_activated_game_time.pop(dish_id, None)
 
         # Check if dish is complete
         dish_completed = self._check_dish_complete(dish_id)
@@ -450,6 +414,8 @@ class CookingEngine:
             "chosen_option_id": chosen_option_id,
             "correct_option": correct_option_text,
             "response_time_ms": response_time_ms,
+            "activated_game_time": activated_game_time,
+            "completed_game_time": self._clock.now(),
         }
         await self._send("ongoing_task_event", event_data)
         if dish_completed:

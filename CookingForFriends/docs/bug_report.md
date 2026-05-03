@@ -28,6 +28,11 @@
   - `timeline.py` 的 pause-aware elapsed、sleep、`time_tick` 显示和 `pm_watch_activity` fallback 已改为通过 `GameClock`。
   - timeline JSON / generator / admin editor 已支持 `clock_end_seconds=600`，和 `duration_seconds=900` 解耦。
   - `time_tick` payload 已新增 `game_time_s`、`frozen`、`clock_end_seconds`，旧 `elapsed` 字段短期保留。
+- 第二批迁移（2026-05-03）：
+  - `CookingEngine` 内部 step activation、timeline wait、timeout 和 response time 已改为使用 `GameClock`。
+  - cooking WS payload 已新增 `activated_game_time`、`deadline_game_time`、`started_game_time`；旧 `activated_at` / `started_at` 继续保留为 wall timestamp/backcompat。
+  - cooking pause/resume 不再取消并重建 timeline/timeout task，而是 pause/resume clock；timeout task 会在 `clock.sleep_until(deadline_game_time)` 中等待。
+  - 新增回归测试：PM pause 期间 active step 不 timeout，resume 后才 timeout；response time 不包含 pause wall time。
 - 风险：
   - 当前仍是三套时间的边界同步，不是单一时间源。
   - process restart / reconnect 后，timeline/cooking 的运行态仍主要在内存里，不能作为生产级恢复机制。
@@ -95,12 +100,12 @@ Codebase review（2026-05-03）：
    - 旧 timeline `pm_trigger` 兼容逻辑保留，但不再作为 EC+/EC- 的 PM scheduler。
 6. Phase 5 — cooking engine 迁移
 
-   - step activation 使用 `activated_game_time`。
-   - timeout 使用 `deadline_game_time`。
-   - response time 使用 `clock.now() - activated_game_time`。
-   - 移除 cooking engine 自己维护的 `block_start_time` / pause offset 逻辑。
-   - WS `step_activate` payload 增加 `activated_game_time`、`deadline_game_time`；epoch `activated_at` 仅作为 wall log/backcompat，前端不要用它算 gameplay countdown。
-   - `CookingEngine` 的 timeline runner 用 `clock.sleep_until(entry.t)`；step timeout 用 `clock.sleep_until(deadline_game_time)`。
+   - [x] step activation 使用 `activated_game_time`。
+   - [x] timeout 使用 `deadline_game_time`。
+   - [x] response time 使用 `clock.now() - activated_game_time`。
+   - [x] 移除 cooking engine 自己维护的 `block_start_time` / pause offset 逻辑。
+   - [x] WS `step_activate` payload 增加 `activated_game_time`、`deadline_game_time`；epoch `activated_at` 仅作为 wall log/backcompat，前端不要用它算 gameplay countdown。
+   - [x] `CookingEngine` 的 timeline runner 用 `clock.sleep_until(entry.t)`；step timeout 用 `clock.sleep_until(deadline_game_time)`。
    - 如果第 5 项 cooking event-chain 重构同时做，则每道菜下一步等待上一 active step result/timeout 后再调度；否则先保持绝对 cooking timeline，但统一 clock。
 7. Phase 6 — PM pipeline 迁移
 
@@ -247,6 +252,32 @@ cooking _block_start_time + time.time() ──→ cooking activation / timeout /
 - [x] 新增 `format_game_clock(game_time_s, clock_end_seconds)`，由 backend `time_tick` 统一使用；前端只展示后端给出的 `game_clock`。
 - [x] 在 `timeline.py` / 新 `game_clock.py` 顶部加 `GAME_SECONDS_PER_CLOCK_MINUTE = 10`，让 `// 10` 有名字。
 - [ ] `duration_seconds` 暂时保留，语义改名/注释为 `block_runtime_seconds` 或 `timeline_end_seconds`；是否删除放到 GameClock 完成后决定，因为当前 tail loop 仍依赖它。
-- [ ] cooking 不应由 frontend `Date.now()` 驱动。未来如果显示剩余秒数，应由 `deadline_game_time - gameTimeSeconds` 派生；backend timeout 也必须由同一个 `GameClock.sleep_until(deadline_game_time)` 控制。
+- [x] cooking 不应由 frontend `Date.now()` 驱动。未来如果显示剩余秒数，应由 `deadline_game_time - gameTimeSeconds` 派生；backend timeout 也必须由同一个 `GameClock.sleep_until(deadline_game_time)` 控制。
 - [x] `time_tick` payload 建议从 `{ elapsed, game_clock }` 迁移到 `{ game_time_s, game_clock, frozen, clock_end_seconds }`，旧 `elapsed` 可短期保留为兼容字段。
 - [ ] 清理命名：frontend `elapsedSeconds` 改名或注释为 `gameTimeSeconds`；backend wall timestamp 字段保留 `*_at`，gameplay schedule 字段使用 `*_game_time`。
+
+7. Frontend avatar movement performance review
+
+- 记录日期：2026-05-03
+- 状态：Open
+- 严重性：P1 高
+- 观察：
+  - 人物移动时前端明显卡顿。
+  - `frontend/src/stores/characterStore.ts` 使用 module-level `requestAnimationFrame` 驱动 movement loop，每帧调用 `_tick()`。
+  - `_tick()` 在移动中每帧更新 Zustand store 的 `position` 和 `facing`。
+  - `frontend/src/components/game/PlayerAvatar.tsx` 订阅 `position/facing/animation`，用 React render 改 `left/top`。
+  - `frontend/src/components/game/FloorPlanView.tsx` 也订阅 `characterStore.position`，仅用于 minimap character dot，但这会拖着整个 FloorPlanView 每帧重渲染。
+- 主要根因：
+  - 60fps 动画状态放进全局 Zustand，并由 React render 驱动。
+  - 大型父组件 `FloorPlanView` 误订阅每帧变化的 `position`，导致 floor plan、厨房 overlay、robot、nav buttons、minimap、dev editor 等一起参与每帧 render。
+  - Avatar 位置用 `left/top` 更新，而不是 GPU-friendly 的 `transform: translate3d(...)`。
+  - `characterStore` 的 rAF loop 在模块加载时永久启动；生产通常只有一个 loop，但 Vite dev HMR 下如果模块热重载，可能叠加多个 loop。
+- 风险：
+  - 后续继续把高频动画状态接到页面级组件，会让卡顿越来越难定位。
+  - 如果 dev HMR 多 loop 叠加，开发环境会比生产更卡，容易误判性能问题来源。
+- 建议修复：
+  - [ ] 从 `FloorPlanView` 移除 `avatarPosition` 订阅；把 minimap character dot 抽成独立 `MinimapAvatarDot` 子组件，只让小点订阅 `position`。
+  - [ ] `PlayerAvatar` 改为 `ref + useCharacterStore.subscribe`，直接写 DOM `style.transform = translate3d(...)`，不要每帧 React render。
+  - [ ] Avatar movement 使用 `transform`，避免 `left/top` 每帧变化。
+  - [ ] 给 `characterStore` 的 module-level rAF 增加 HMR cleanup：`import.meta.hot.dispose(() => cancelAnimationFrame(rafId))`。
+  - [ ] 进一步收敛 `FloorPlanView`：把 minimap、room navigation、robot、station popup、dev waypoint editor 拆成较小组件，避免一个低层状态变化带动整张地图重渲染。

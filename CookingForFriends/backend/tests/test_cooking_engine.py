@@ -224,6 +224,58 @@ class TestTimeout:
         assert events == ["step_activate", "step_timeout", "step_activate"]
         assert engine.get_state()["tomato_soup"]["active_step"] == 1
 
+    @pytest.mark.asyncio
+    async def test_pause_prevents_active_step_timeout_until_resume(self, engine, sender):
+        """PM pause should stop cooking step timeout countdown."""
+        from data.cooking_timeline import TimelineEntry
+        from unittest.mock import patch
+
+        entry = TimelineEntry(t=0, dish_id="tomato_soup", step_index=0, step_type="active")
+
+        with patch("engine.cooking_engine.COOKING_STEP_WINDOW_S", 0.05):
+            await engine._activate_entry(entry)
+            engine.pause()
+            await asyncio.sleep(0.08)
+
+            dish = engine.dishes["tomato_soup"]
+            assert dish.results == []
+            assert engine.get_state()["tomato_soup"]["active_step"] == 0
+
+            engine.resume()
+            await asyncio.sleep(0.08)
+
+        dish = engine.dishes["tomato_soup"]
+        assert len(dish.results) == 1
+        assert dish.results[0].result == "missed"
+
+    @pytest.mark.asyncio
+    async def test_response_time_excludes_pm_pause(self, engine, sender):
+        """Cooking response time is measured in game time, not paused wall time."""
+        from data.cooking_timeline import TimelineEntry
+        from unittest.mock import patch
+
+        entry = TimelineEntry(t=0, dish_id="spaghetti", step_index=0, step_type="active")
+        step_def = ALL_RECIPES["spaghetti"][0]
+
+        with patch("engine.cooking_engine.COOKING_STEP_WINDOW_S", 1.0):
+            await engine._activate_entry(entry)
+            await asyncio.sleep(0.02)
+            engine.pause()
+            await asyncio.sleep(0.08)
+            engine.resume()
+            await asyncio.sleep(0.02)
+
+            result = await engine.handle_action(
+                dish_id="spaghetti",
+                chosen_option_id=f"option_{step_def.correct_index}",
+                chosen_option_text=step_def.options[step_def.correct_index],
+                station=step_def.station,
+                timestamp=0,
+            )
+
+        assert result["result"] == "correct"
+        assert result["response_time_ms"] < 80
+
 
 class TestWaitStep:
     @pytest.mark.asyncio

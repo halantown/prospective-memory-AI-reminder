@@ -937,7 +937,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 |--------------|--------|
 | Date         | 2026-05-03 |
 | Severity     | P1 High |
-| Status       | Monitoring — first migration batch completed |
+| Status       | Monitoring — timeline and cooking migrated; PM scheduler/BlockRuntime pending |
 | Reported by  | Codebase review of three independent time systems |
 | Affected area| TimelineEngine, game clock display, PM pause semantics |
 
@@ -954,6 +954,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 | 01:45 | Root cause confirmed in `timeline.py`, `game_time.py`, and `cooking_engine.py` |
 | 01:55 | `GameClock` abstraction added and timeline migrated to it |
 | 02:04 | Backend compile/tests passed |
+| 02:18 | CookingEngine activation/timeout/response-time migrated to `GameClock` |
 
 ### Root Cause
 > The PM pause fix was added after timeline and cooking scheduling already existed. Instead of one owner for gameplay time, the codebase had boundary synchronization: DB participant game time for PM triggers, `TimelineControl` for timeline events, and `CookingEngine` offsets for cooking. This made it easy for future gameplay scheduling to bypass PM pause semantics.
@@ -972,14 +973,18 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > `backend/data/timelines/block_default.json`, `backend/engine/timeline_generator.py`, and `backend/routers/timeline_editor.py`: added `clock_end_seconds=600` so display-clock span is explicit and separate from `duration_seconds=900`.
 >
 > `backend/tests/test_game_clock.py`: added unit tests for display formatting, pause/resume, snapshot, and `sleep_until()` excluding paused wall time.
+>
+> `backend/engine/cooking_engine.py`: cooking timeline waits, active-step timeout, and response-time calculation now use `GameClock`. WebSocket payloads include `activated_game_time`, `deadline_game_time`, and `started_game_time`; wall-time fields remain for compatibility.
+>
+> `backend/tests/test_cooking_engine.py`: added regressions proving PM pause prevents cooking timeout and cooking response time excludes paused wall time.
 
 ### Verification
 > `cd CookingForFriends/backend && conda run -n thesis_server python -m py_compile engine/game_clock.py engine/timeline.py engine/timeline_generator.py routers/timeline_editor.py` passes.
 >
-> `cd CookingForFriends/backend && conda run -n thesis_server pytest tests -q` passes: 25 passed.
+> `cd CookingForFriends/backend && conda run -n thesis_server pytest tests -q` passes: 27 passed.
 
 ### Follow-up Actions
-> - [ ] Move `CookingEngine` activation, timeout, and response-time calculation onto `GameClock`
+> - [x] Move `CookingEngine` activation, timeout, and response-time calculation onto `GameClock`
 > - [ ] Move PM scheduler off DB polling and onto `BlockRuntime` / `GameClock`
 > - [ ] Replace `game_handler.py` glue pause/resume calls with a single `BlockRuntime.pause()` / `resume()`
 > - [ ] Add timeline integration test proving PM pause blocks `time_tick`, phone messages, and block end

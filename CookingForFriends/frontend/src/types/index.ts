@@ -172,6 +172,8 @@ export interface ActiveCookingStep {
   station: KitchenStationId
   options: CookingStepOption[]
   activatedAt: number
+  activatedGameTime?: number
+  deadlineGameTime?: number
   windowSeconds: number
   stepType: 'active' | 'wait'
   waitDurationS?: number
@@ -184,6 +186,7 @@ export interface CookingWaitStep {
   stepDescription: string
   station: KitchenStationId
   startedAt: number
+  startedGameTime?: number
   durationS: number
 }
 
