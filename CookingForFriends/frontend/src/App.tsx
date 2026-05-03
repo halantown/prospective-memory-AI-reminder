@@ -12,6 +12,8 @@ import IntroductionPage from './pages/game/IntroductionPage'
 import MSEPrePage from './pages/game/MSEPrePage'
 import StoryIntroPage from './pages/game/StoryIntroPage'
 import EncodingFlowPage from './pages/game/EncodingFlowPage'
+import TutorialFlowPage from './pages/game/TutorialFlowPage'
+import EveningTransitionPage from './pages/game/EveningTransitionPage'
 import GamePage from './pages/game/GamePage'
 import PostQuestionnairePage from './pages/game/PostQuestionnairePage'
 import DebriefPage from './pages/game/DebriefPage'
@@ -145,6 +147,10 @@ function GameShell() {
       return <StoryIntroPage />
     case 'encoding_flow':
       return <EncodingFlowPage />
+    case 'tutorial_flow':
+      return <TutorialFlowPage />
+    case 'evening_transition':
+      return <EveningTransitionPage />
     case 'introduction':
       return <IntroductionPage />
     case 'playing':

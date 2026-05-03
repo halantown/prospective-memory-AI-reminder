@@ -7,6 +7,8 @@ type RenderPhase =
   | 'mse_pre'
   | 'story_intro'
   | 'encoding_flow'
+  | 'tutorial_flow'
+  | 'evening_transition'
   | 'introduction'
   | 'playing'
   | 'post_questionnaire'
@@ -33,10 +35,10 @@ const CANONICAL_TO_RENDER: Record<string, RenderPhase> = {
   MANIP_CHECK_4: 'encoding_flow',
   ASSIGN_4: 'encoding_flow',
   RECAP: 'encoding_flow',
-  TUTORIAL_PHONE: 'introduction',
-  TUTORIAL_COOKING: 'introduction',
-  TUTORIAL_TRIGGER: 'introduction',
-  EVENING_TRANSITION: 'introduction',
+  TUTORIAL_PHONE: 'tutorial_flow',
+  TUTORIAL_COOKING: 'tutorial_flow',
+  TUTORIAL_TRIGGER: 'tutorial_flow',
+  EVENING_TRANSITION: 'evening_transition',
   MAIN_EXPERIMENT: 'playing',
   POST_MANIP_CHECK: 'post_questionnaire',
   POST_SUBJECTIVE_DV: 'post_questionnaire',
