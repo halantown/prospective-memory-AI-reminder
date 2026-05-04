@@ -3,7 +3,7 @@ import { useGameStore } from '../../stores/gameStore'
 import { advancePhase, getExperimentConfig } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
 import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
-import ExperimentHomeShell from '../../components/game/ExperimentHomeShell'
+import TrainingHomeShell from '../../components/game/TrainingHomeShell'
 
 interface ScriptLine {
   speaker: string
@@ -45,7 +45,7 @@ export default function StoryIntroPage() {
   }
 
   return (
-    <ExperimentHomeShell initialRoom="bedroom" morningMode disableNavigation>
+    <TrainingHomeShell phase="STORY_INTRO">
       {current ? (
         <BubbleDialogue
           speaker={current.speaker}
@@ -64,6 +64,6 @@ export default function StoryIntroPage() {
           Loading...
         </div>
       )}
-    </ExperimentHomeShell>
+    </TrainingHomeShell>
   )
 }

@@ -7,7 +7,7 @@ import {
   submitManipulationCheck,
 } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
-import ExperimentHomeShell from '../../components/game/ExperimentHomeShell'
+import TrainingHomeShell from '../../components/game/TrainingHomeShell'
 import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
 
 interface Option {
@@ -111,16 +111,16 @@ export default function EncodingFlowPage() {
 
   if (!config) {
     return (
-      <ExperimentHomeShell initialRoom="bedroom" morningMode disableNavigation>
+      <TrainingHomeShell phase={currentPhase}>
         <div className="rounded-lg bg-white p-6 text-center text-sm text-slate-500 shadow-xl">
           Loading...
         </div>
-      </ExperimentHomeShell>
+      </TrainingHomeShell>
     )
   }
 
   return (
-    <ExperimentHomeShell initialRoom="bedroom" morningMode disableNavigation>
+    <TrainingHomeShell phase={currentPhase}>
       <div className="rounded-lg border border-slate-300 bg-white/95 p-5 shadow-xl backdrop-blur">
         {kind === 'video' && (
           <div>
@@ -212,6 +212,6 @@ export default function EncodingFlowPage() {
           </div>
         )}
       </div>
-    </ExperimentHomeShell>
+    </TrainingHomeShell>
   )
 }

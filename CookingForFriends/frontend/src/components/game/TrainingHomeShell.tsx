@@ -1,0 +1,79 @@
+import { useEffect, useMemo } from 'react'
+import type { ReactNode } from 'react'
+import { useGameStore } from '../../stores/gameStore'
+import ExperimentHomeShell from './ExperimentHomeShell'
+import type { FloorRoom } from './FloorPlanView'
+
+interface TrainingHomeShellProps {
+  children: ReactNode
+  phase: string
+}
+
+interface TrainingSceneConfig {
+  room: FloorRoom
+  startMinute: number
+  phoneDisabled: boolean
+}
+
+const TRAINING_SCENES: Record<string, TrainingSceneConfig> = {
+  STORY_INTRO: { room: 'bedroom', startMinute: 8 * 60, phoneDisabled: true },
+  ENCODING_VIDEO_1: { room: 'bedroom', startMinute: 8 * 60 + 2, phoneDisabled: true },
+  MANIP_CHECK_1: { room: 'bedroom', startMinute: 8 * 60 + 4, phoneDisabled: true },
+  ASSIGN_1: { room: 'bedroom', startMinute: 8 * 60 + 5, phoneDisabled: true },
+  ENCODING_VIDEO_2: { room: 'bedroom', startMinute: 8 * 60 + 7, phoneDisabled: true },
+  MANIP_CHECK_2: { room: 'bedroom', startMinute: 8 * 60 + 9, phoneDisabled: true },
+  ASSIGN_2: { room: 'bedroom', startMinute: 8 * 60 + 10, phoneDisabled: true },
+  ENCODING_VIDEO_3: { room: 'bedroom', startMinute: 8 * 60 + 12, phoneDisabled: true },
+  MANIP_CHECK_3: { room: 'bedroom', startMinute: 8 * 60 + 14, phoneDisabled: true },
+  ASSIGN_3: { room: 'bedroom', startMinute: 8 * 60 + 15, phoneDisabled: true },
+  ENCODING_VIDEO_4: { room: 'bedroom', startMinute: 8 * 60 + 17, phoneDisabled: true },
+  MANIP_CHECK_4: { room: 'bedroom', startMinute: 8 * 60 + 19, phoneDisabled: true },
+  ASSIGN_4: { room: 'bedroom', startMinute: 8 * 60 + 20, phoneDisabled: true },
+  RECAP: { room: 'bedroom', startMinute: 8 * 60 + 22, phoneDisabled: true },
+  TUTORIAL_PHONE: { room: 'bedroom', startMinute: 8 * 60 + 30, phoneDisabled: false },
+  TUTORIAL_COOKING: { room: 'kitchen', startMinute: 8 * 60 + 40, phoneDisabled: true },
+  TUTORIAL_TRIGGER: { room: 'living_room', startMinute: 8 * 60 + 55, phoneDisabled: true },
+}
+
+function formatClock(totalMinutes: number) {
+  const minutesInDay = ((totalMinutes % 1440) + 1440) % 1440
+  const h = Math.floor(minutesInDay / 60)
+  const m = minutesInDay % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+export function trainingSceneForPhase(phase: string): TrainingSceneConfig {
+  return TRAINING_SCENES[phase] ?? TRAINING_SCENES.STORY_INTRO
+}
+
+export default function TrainingHomeShell({ children, phase }: TrainingHomeShellProps) {
+  const setGameClock = useGameStore((s) => s.setGameClock)
+  const setElapsedSeconds = useGameStore((s) => s.setElapsedSeconds)
+  const scene = useMemo(() => trainingSceneForPhase(phase), [phase])
+
+  useEffect(() => {
+    const mountedAt = Date.now()
+
+    const updateTrainingClock = () => {
+      const elapsedRealSeconds = Math.floor((Date.now() - mountedAt) / 1000)
+      const elapsedTrainingMinutes = Math.floor(elapsedRealSeconds / 15)
+      const currentMinute = scene.startMinute + elapsedTrainingMinutes
+      setGameClock(formatClock(currentMinute))
+      setElapsedSeconds(currentMinute * 60)
+    }
+
+    updateTrainingClock()
+    const timer = window.setInterval(updateTrainingClock, 1000)
+    return () => window.clearInterval(timer)
+  }, [scene.startMinute, setElapsedSeconds, setGameClock])
+
+  return (
+    <ExperimentHomeShell
+      initialRoom={scene.room}
+      phoneDisabled={scene.phoneDisabled}
+      disableNavigation
+    >
+      {children}
+    </ExperimentHomeShell>
+  )
+}

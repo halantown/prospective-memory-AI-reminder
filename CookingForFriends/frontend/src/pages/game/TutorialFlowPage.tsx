@@ -3,7 +3,7 @@ import { useGameStore } from '../../stores/gameStore'
 import { advancePhase, getExperimentConfig, submitExperimentResponses } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
 import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
-import ExperimentHomeShell from '../../components/game/ExperimentHomeShell'
+import TrainingHomeShell from '../../components/game/TrainingHomeShell'
 
 interface Option {
   id: string
@@ -74,11 +74,11 @@ export default function TutorialFlowPage() {
 
   if (!config) {
     return (
-      <ExperimentHomeShell initialRoom="bedroom" morningMode disableNavigation>
+      <TrainingHomeShell phase={phase}>
         <div className="rounded-lg bg-white p-6 text-center text-sm text-slate-500 shadow-xl">
           Loading...
         </div>
-      </ExperimentHomeShell>
+      </TrainingHomeShell>
     )
   }
 
@@ -90,7 +90,7 @@ export default function TutorialFlowPage() {
       feedback: string
     }
     return (
-      <ExperimentHomeShell initialRoom="bedroom" morningMode disableNavigation phoneDisabled={false}>
+      <TrainingHomeShell phase={phase}>
         <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
           <h1 className="text-xl font-bold text-slate-900">Phone Practice</h1>
           <div className="mt-5 rounded-lg bg-slate-900 p-4 text-white">
@@ -118,7 +118,7 @@ export default function TutorialFlowPage() {
             {loading ? 'Saving...' : 'Send Reply'}
           </button>
         </div>
-      </ExperimentHomeShell>
+      </TrainingHomeShell>
     )
   }
 
@@ -130,7 +130,7 @@ export default function TutorialFlowPage() {
     const step = friedEgg.steps[stepIndex]
     const isLast = stepIndex >= friedEgg.steps.length - 1
     return (
-      <ExperimentHomeShell initialRoom="kitchen" morningMode disableNavigation>
+      <TrainingHomeShell phase={phase}>
         <div className="w-full max-w-2xl rounded-xl bg-white p-8 shadow-xl">
           <h1 className="text-2xl font-bold text-slate-900">{friedEgg.recipe_name}</h1>
           <div className="mt-4 rounded-lg bg-amber-100 p-4 text-sm text-amber-950">
@@ -178,7 +178,7 @@ export default function TutorialFlowPage() {
             {isLast ? 'Finish Practice' : 'Next Step'}
           </button>
         </div>
-      </ExperimentHomeShell>
+      </TrainingHomeShell>
     )
   }
 
@@ -189,7 +189,7 @@ export default function TutorialFlowPage() {
     action_label: string
   }
   return (
-    <ExperimentHomeShell initialRoom="living_room" morningMode disableNavigation>
+    <TrainingHomeShell phase={phase}>
       <div className="w-full max-w-3xl space-y-3 pb-8">
         <BubbleDialogue speaker={trigger.visitor} text={trigger.visitor_line} avatar="S" />
         <BubbleDialogue speaker="ROBOT" text={trigger.robot_line} avatar="R" align="right" />
@@ -201,6 +201,6 @@ export default function TutorialFlowPage() {
           {loading ? 'Saving...' : trigger.action_label}
         </button>
       </div>
-    </ExperimentHomeShell>
+    </TrainingHomeShell>
   )
 }
