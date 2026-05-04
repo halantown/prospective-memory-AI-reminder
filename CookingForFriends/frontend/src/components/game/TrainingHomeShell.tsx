@@ -13,26 +13,34 @@ interface TrainingSceneConfig {
   room: FloorRoom
   startMinute: number
   phoneDisabled: boolean
+  disableNavigation: boolean
+  highlightedRoom?: FloorRoom | null
 }
 
 const TRAINING_SCENES: Record<string, TrainingSceneConfig> = {
-  STORY_INTRO: { room: 'bedroom', startMinute: 8 * 60, phoneDisabled: true },
-  ENCODING_VIDEO_1: { room: 'bedroom', startMinute: 8 * 60 + 2, phoneDisabled: true },
-  MANIP_CHECK_1: { room: 'bedroom', startMinute: 8 * 60 + 4, phoneDisabled: true },
-  ASSIGN_1: { room: 'bedroom', startMinute: 8 * 60 + 5, phoneDisabled: true },
-  ENCODING_VIDEO_2: { room: 'bedroom', startMinute: 8 * 60 + 7, phoneDisabled: true },
-  MANIP_CHECK_2: { room: 'bedroom', startMinute: 8 * 60 + 9, phoneDisabled: true },
-  ASSIGN_2: { room: 'bedroom', startMinute: 8 * 60 + 10, phoneDisabled: true },
-  ENCODING_VIDEO_3: { room: 'bedroom', startMinute: 8 * 60 + 12, phoneDisabled: true },
-  MANIP_CHECK_3: { room: 'bedroom', startMinute: 8 * 60 + 14, phoneDisabled: true },
-  ASSIGN_3: { room: 'bedroom', startMinute: 8 * 60 + 15, phoneDisabled: true },
-  ENCODING_VIDEO_4: { room: 'bedroom', startMinute: 8 * 60 + 17, phoneDisabled: true },
-  MANIP_CHECK_4: { room: 'bedroom', startMinute: 8 * 60 + 19, phoneDisabled: true },
-  ASSIGN_4: { room: 'bedroom', startMinute: 8 * 60 + 20, phoneDisabled: true },
-  RECAP: { room: 'bedroom', startMinute: 8 * 60 + 22, phoneDisabled: true },
-  TUTORIAL_PHONE: { room: 'bedroom', startMinute: 8 * 60 + 30, phoneDisabled: false },
-  TUTORIAL_COOKING: { room: 'kitchen', startMinute: 8 * 60 + 40, phoneDisabled: true },
-  TUTORIAL_TRIGGER: { room: 'living_room', startMinute: 8 * 60 + 55, phoneDisabled: true },
+  STORY_INTRO: { room: 'bedroom', startMinute: 8 * 60, phoneDisabled: true, disableNavigation: true },
+  ENCODING_VIDEO_1: { room: 'bedroom', startMinute: 8 * 60 + 2, phoneDisabled: true, disableNavigation: true },
+  MANIP_CHECK_1: { room: 'bedroom', startMinute: 8 * 60 + 4, phoneDisabled: true, disableNavigation: true },
+  ASSIGN_1: { room: 'bedroom', startMinute: 8 * 60 + 5, phoneDisabled: true, disableNavigation: true },
+  ENCODING_VIDEO_2: { room: 'bedroom', startMinute: 8 * 60 + 7, phoneDisabled: true, disableNavigation: true },
+  MANIP_CHECK_2: { room: 'bedroom', startMinute: 8 * 60 + 9, phoneDisabled: true, disableNavigation: true },
+  ASSIGN_2: { room: 'bedroom', startMinute: 8 * 60 + 10, phoneDisabled: true, disableNavigation: true },
+  ENCODING_VIDEO_3: { room: 'bedroom', startMinute: 8 * 60 + 12, phoneDisabled: true, disableNavigation: true },
+  MANIP_CHECK_3: { room: 'bedroom', startMinute: 8 * 60 + 14, phoneDisabled: true, disableNavigation: true },
+  ASSIGN_3: { room: 'bedroom', startMinute: 8 * 60 + 15, phoneDisabled: true, disableNavigation: true },
+  ENCODING_VIDEO_4: { room: 'bedroom', startMinute: 8 * 60 + 17, phoneDisabled: true, disableNavigation: true },
+  MANIP_CHECK_4: { room: 'bedroom', startMinute: 8 * 60 + 19, phoneDisabled: true, disableNavigation: true },
+  ASSIGN_4: { room: 'bedroom', startMinute: 8 * 60 + 20, phoneDisabled: true, disableNavigation: true },
+  RECAP: { room: 'bedroom', startMinute: 8 * 60 + 22, phoneDisabled: true, disableNavigation: true },
+  TUTORIAL_PHONE: { room: 'bedroom', startMinute: 8 * 60 + 30, phoneDisabled: false, disableNavigation: true },
+  TUTORIAL_COOKING: {
+    room: 'bedroom',
+    startMinute: 8 * 60 + 40,
+    phoneDisabled: false,
+    disableNavigation: false,
+    highlightedRoom: 'kitchen',
+  },
+  TUTORIAL_TRIGGER: { room: 'living_room', startMinute: 8 * 60 + 55, phoneDisabled: true, disableNavigation: true },
 }
 
 function formatClock(totalMinutes: number) {
@@ -71,7 +79,8 @@ export default function TrainingHomeShell({ children, phase }: TrainingHomeShell
     <ExperimentHomeShell
       initialRoom={scene.room}
       phoneDisabled={scene.phoneDisabled}
-      disableNavigation
+      disableNavigation={scene.disableNavigation}
+      highlightedRoom={scene.highlightedRoom ?? null}
     >
       {children}
     </ExperimentHomeShell>

@@ -4,6 +4,7 @@ import { advancePhase, getExperimentConfig, submitExperimentResponses } from '..
 import { frontendPhaseForBackend } from '../../utils/phase'
 import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
 import TrainingHomeShell from '../../components/game/TrainingHomeShell'
+import type { CookingDefinitions, CookingStepOption } from '../../types'
 
 interface Option {
   id: string
@@ -21,18 +22,34 @@ export default function TutorialFlowPage() {
   const sessionId = useGameStore((s) => s.sessionId)
   const phase = String(useGameStore((s) => s.phase))
   const setPhase = useGameStore((s) => s.setPhase)
+  const setContacts = useGameStore((s) => s.setContacts)
+  const addPhoneMessage = useGameStore((s) => s.addPhoneMessage)
+  const phoneMessages = useGameStore((s) => s.phoneMessages)
+  const setActiveContactId = useGameStore((s) => s.setActiveContactId)
+  const setActivePhoneTab = useGameStore((s) => s.setActivePhoneTab)
+  const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
+  const initializeCookingDefinitions = useGameStore((s) => s.initializeCookingDefinitions)
+  const handleCookingStepActivate = useGameStore((s) => s.handleCookingStepActivate)
+  const handleCookingStepResult = useGameStore((s) => s.handleCookingStepResult)
+  const setWsSend = useGameStore((s) => s.setWsSend)
+  const setElapsedSeconds = useGameStore((s) => s.setElapsedSeconds)
+  const setGameClock = useGameStore((s) => s.setGameClock)
   const [config, setConfig] = useState<Record<string, unknown> | null>(null)
-  const [selected, setSelected] = useState<string | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [timerReady, setTimerReady] = useState(false)
   const startedAtRef = useRef(Date.now())
+  const phoneAdvancedRef = useRef(false)
+  const cookingSetupRef = useRef(false)
   const kind = tutorialKind(phase)
 
   useEffect(() => {
     if (!sessionId) return
     setConfig(null)
-    setSelected(null)
     setStepIndex(0)
+    setTimerReady(false)
+    phoneAdvancedRef.current = false
+    cookingSetupRef.current = false
     startedAtRef.current = Date.now()
     getExperimentConfig(sessionId, phase)
       .then((next) => setConfig(next as Record<string, unknown>))
@@ -51,6 +68,180 @@ export default function TutorialFlowPage() {
       setLoading(false)
     }
   }
+
+  const phoneDemo = config?.phone_demo as {
+    contact: { id: string; name: string; avatar: string }
+    message: string
+    options: Option[]
+    correct_option_id: string
+    feedback: string
+  } | undefined
+
+  useEffect(() => {
+    if (kind !== 'phone' || !phoneDemo) return
+    const correct = phoneDemo.options.find((option) => option.id === phoneDemo.correct_option_id)
+    const wrong = phoneDemo.options.find((option) => option.id !== phoneDemo.correct_option_id)
+    if (!correct || !wrong) return
+
+    setContacts([phoneDemo.contact])
+    setActiveContactId(phoneDemo.contact.id)
+    setActivePhoneTab('chats')
+    setPhoneLocked(false)
+    addPhoneMessage({
+      id: 'tutorial_phone_practice',
+      channel: 'chat',
+      contactId: phoneDemo.contact.id,
+      text: phoneDemo.message,
+      correctChoice: correct.text,
+      wrongChoice: wrong.text,
+      correctPosition: 0,
+      feedbackCorrect: phoneDemo.feedback,
+      feedbackIncorrect: phoneDemo.feedback,
+      timestamp: Date.now(),
+      read: false,
+      answered: false,
+    })
+  }, [addPhoneMessage, kind, phoneDemo, setActiveContactId, setActivePhoneTab, setContacts, setPhoneLocked])
+
+  const phonePracticeMessage = phoneMessages.find((message) => message.id === 'tutorial_phone_practice')
+
+  useEffect(() => {
+    if (kind !== 'phone' || !phonePracticeMessage?.answered || phoneAdvancedRef.current) return
+    phoneAdvancedRef.current = true
+    recordAndAdvance('tutorial_phone_reply', phonePracticeMessage.userChoice ?? null, {
+      answered_correct: phonePracticeMessage.answeredCorrect ?? null,
+      response_time_ms: Date.now() - startedAtRef.current,
+    })
+  }, [kind, phonePracticeMessage])
+
+  const friedEgg = config?.fried_egg as {
+    recipe_name: string
+    steps: Array<{ id: string; recipe_text: string; options?: Option[]; correct_option_id?: string; timer_s?: number }>
+  } | undefined
+
+  const currentCookingStep = friedEgg?.steps[stepIndex]
+  const isLastCookingStep = friedEgg ? stepIndex >= friedEgg.steps.length - 1 : false
+
+  useEffect(() => {
+    if (kind !== 'cooking' || !friedEgg) return
+
+    setPhoneLocked(false)
+    setActivePhoneTab('recipe')
+    setElapsedSeconds((8 * 60 + 40) * 60)
+    setGameClock('08:40')
+
+    if (!cookingSetupRef.current) {
+      cookingSetupRef.current = true
+      const definitions: CookingDefinitions = {
+        recipe_version: 'tutorial-fried-egg',
+        dish_order: ['spaghetti'],
+        dishes: {
+          spaghetti: {
+            id: 'spaghetti',
+            label: friedEgg.recipe_name,
+            emoji: '🍳',
+            steps: friedEgg.steps.map((step, index) => ({
+              id: step.id,
+              label: step.recipe_text,
+              station: tutorialStationForStep(step.id),
+              description: step.recipe_text,
+              step_type: 'active',
+              wait_duration_s: step.timer_s ?? 0,
+            })),
+          },
+          steak: { id: 'steak', label: 'Steak', emoji: '🥩', steps: [] },
+          tomato_soup: { id: 'tomato_soup', label: 'Soup', emoji: '🍅', steps: [] },
+          roasted_vegetables: { id: 'roasted_vegetables', label: 'Roast Veg', emoji: '🥕', steps: [] },
+        },
+        timeline: [],
+      }
+      initializeCookingDefinitions(definitions)
+    }
+
+    const step = friedEgg.steps[stepIndex]
+    const options: CookingStepOption[] = step.options?.map((option) => ({
+      id: option.id,
+      text: option.text,
+    })) ?? [{ id: 'done', text: step.recipe_text }]
+
+    handleCookingStepActivate({
+      dish: 'spaghetti',
+      step_index: stepIndex,
+      label: step.recipe_text,
+      description: step.recipe_text,
+      station: tutorialStationForStep(step.id),
+      options,
+      window_s: 120,
+      step_type: 'active',
+      activated_at: Date.now() / 1000,
+    })
+  }, [
+    friedEgg,
+    handleCookingStepActivate,
+    initializeCookingDefinitions,
+    kind,
+    setActivePhoneTab,
+    setElapsedSeconds,
+    setGameClock,
+    setPhoneLocked,
+    stepIndex,
+  ])
+
+  useEffect(() => {
+    if (kind !== 'cooking' || !friedEgg || !currentCookingStep || !sessionId) return
+    const previousWsSend = useGameStore.getState().wsSend
+
+    setWsSend((message) => {
+      if (message.type !== 'cooking_action') {
+        previousWsSend?.(message)
+        return
+      }
+
+      const data = message.data as { chosen_option_id?: string; chosen_option_text?: string }
+      const correctId = currentCookingStep.correct_option_id ?? 'done'
+      const isCorrect = data.chosen_option_id === correctId
+
+      submitExperimentResponses(sessionId!, [{
+        phase,
+        question_id: `tutorial_cooking_${currentCookingStep.id}`,
+        response_type: 'choice',
+        value: data.chosen_option_id ?? null,
+        metadata: {
+          chosen_text: data.chosen_option_text ?? null,
+          correct_option_id: correctId,
+          answered_correct: isCorrect,
+          step_index: stepIndex,
+        },
+      }]).catch((e) => console.error('[TutorialFlow] cooking response submit failed', e))
+
+      handleCookingStepResult({
+        dish: 'spaghetti',
+        step_index: stepIndex,
+        result: isCorrect ? 'correct' : 'wrong',
+        chosen_option_id: data.chosen_option_id,
+        response_time_ms: Date.now() - startedAtRef.current,
+      })
+
+      if (isLastCookingStep) {
+        advance()
+      } else {
+        setStepIndex((i) => i + 1)
+      }
+    })
+
+    return () => setWsSend(previousWsSend)
+  }, [
+    advance,
+    currentCookingStep,
+    friedEgg,
+    handleCookingStepResult,
+    isLastCookingStep,
+    kind,
+    phase,
+    sessionId,
+    setWsSend,
+    stepIndex,
+  ])
 
   const recordAndAdvance = async (questionId: string, value: unknown, metadata?: Record<string, unknown>) => {
     if (!sessionId || loading) return
@@ -83,101 +274,39 @@ export default function TutorialFlowPage() {
   }
 
   if (kind === 'phone') {
-    const demo = config.phone_demo as {
-      contact: { name: string }
-      message: string
-      options: Option[]
-      feedback: string
-    }
     return (
       <TrainingHomeShell phase={phase}>
-        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-          <h1 className="text-xl font-bold text-slate-900">Phone Practice</h1>
-          <div className="mt-5 rounded-lg bg-slate-900 p-4 text-white">
-            <div className="text-xs uppercase tracking-wide text-slate-400">{demo.contact.name}</div>
-            <div className="mt-2 text-sm">{demo.message}</div>
-          </div>
-          <div className="mt-4 grid gap-2">
-            {demo.options.map((option) => (
-              <button
-                key={option.id}
-                onClick={() => setSelected(option.id)}
-                className={`rounded-lg border px-4 py-3 text-left text-sm ${
-                  selected === option.id ? 'border-slate-900 bg-slate-100' : 'border-slate-300 bg-white'
-                }`}
-              >
-                {option.text}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => recordAndAdvance('tutorial_phone_reply', selected, { response_time_ms: Date.now() - startedAtRef.current })}
-            disabled={!selected || loading}
-            className="mt-5 w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white disabled:bg-slate-300"
-          >
-            {loading ? 'Saving...' : 'Send Reply'}
-          </button>
-        </div>
+        <BubbleDialogue
+          speaker="ROBOT"
+          text="A message has arrived on your phone. Open the chat and choose a reply."
+          avatar="R"
+          align="right"
+        />
       </TrainingHomeShell>
     )
   }
 
   if (kind === 'cooking') {
-    const friedEgg = config.fried_egg as {
-      recipe_name: string
-      steps: Array<{ id: string; recipe_text: string; options?: Option[]; timer_s?: number }>
-    }
-    const step = friedEgg.steps[stepIndex]
-    const isLast = stepIndex >= friedEgg.steps.length - 1
     return (
       <TrainingHomeShell phase={phase}>
-        <div className="w-full max-w-2xl rounded-xl bg-white p-8 shadow-xl">
-          <h1 className="text-2xl font-bold text-slate-900">{friedEgg.recipe_name}</h1>
-          <div className="mt-4 rounded-lg bg-amber-100 p-4 text-sm text-amber-950">
-            Recipe says: {step.recipe_text}
-          </div>
-          {step.options ? (
-            <div className="mt-4 grid gap-2">
-              {step.options.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => setSelected(option.id)}
-                  className={`rounded-lg border px-4 py-3 text-left text-sm ${
-                    selected === option.id ? 'border-slate-900 bg-slate-100' : 'border-slate-300 bg-white'
-                  }`}
-                >
-                  {option.text}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
-              Timer demo: {step.timer_s ?? 15} seconds
-            </div>
+        <BubbleDialogue
+          speaker="ROBOT"
+          text={currentCookingStep
+            ? `Go to the kitchen. Hold the recipe tab on the phone, then use the highlighted station for: ${currentCookingStep.recipe_text}`
+            : 'Go to the kitchen and use the phone recipe to prepare the fried egg.'}
+          avatar="R"
+          align="right"
+        >
+          {currentCookingStep?.timer_s && (
+            <button
+              onClick={() => setTimerReady(true)}
+              disabled={timerReady}
+              className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-400"
+            >
+              {timerReady ? 'Timer running...' : 'Start timer practice'}
+            </button>
           )}
-          <button
-            onClick={async () => {
-              if (!sessionId || loading) return
-              await submitExperimentResponses(sessionId, [{
-                phase,
-                question_id: `tutorial_cooking_${step.id}`,
-                response_type: step.options ? 'choice' : 'boolean',
-                value: step.options ? selected : true,
-                metadata: { step_index: stepIndex },
-              }])
-              if (isLast) {
-                await advance()
-              } else {
-                setSelected(null)
-                setStepIndex((i) => i + 1)
-              }
-            }}
-            disabled={(Boolean(step.options) && !selected) || loading}
-            className="mt-6 w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white disabled:bg-slate-300"
-          >
-            {isLast ? 'Finish Practice' : 'Next Step'}
-          </button>
-        </div>
+        </BubbleDialogue>
       </TrainingHomeShell>
     )
   }
@@ -191,6 +320,16 @@ export default function TutorialFlowPage() {
   return (
     <TrainingHomeShell phase={phase}>
       <div className="w-full max-w-3xl space-y-3 pb-8">
+        <div className="flex justify-start">
+          <div className="rounded-lg border border-white/20 bg-slate-950/70 px-4 py-3 shadow-lg">
+            <img
+              src="/assets/characters/character_01.png"
+              alt={trigger.visitor}
+              className="h-28 w-auto object-contain [image-rendering:pixelated]"
+              draggable={false}
+            />
+          </div>
+        </div>
         <BubbleDialogue speaker={trigger.visitor} text={trigger.visitor_line} avatar="S" />
         <BubbleDialogue speaker="ROBOT" text={trigger.robot_line} avatar="R" align="right" />
         <button
@@ -203,4 +342,12 @@ export default function TutorialFlowPage() {
       </div>
     </TrainingHomeShell>
   )
+}
+
+function tutorialStationForStep(stepId: string) {
+  if (stepId === 'choose_eggs') return 'fridge'
+  if (stepId === 'add_oil') return 'burner1'
+  if (stepId === 'crack_eggs') return 'burner1'
+  if (stepId === 'season_salt') return 'spice_rack'
+  return 'plating_area'
 }

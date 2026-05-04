@@ -16,6 +16,10 @@ export default function GamePage() {
   const sessionId = useGameStore((s) => s.sessionId)
   const wsConnected = useGameStore((s) => s.wsConnected)
   const setPhase = useGameStore((s) => s.setPhase)
+  const setGameClock = useGameStore((s) => s.setGameClock)
+  const setElapsedSeconds = useGameStore((s) => s.setElapsedSeconds)
+  const setActivePhoneTab = useGameStore((s) => s.setActivePhoneTab)
+  const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
   const pmBlocksOngoingTask = pmPipelineState && pmPipelineState.step !== 'trigger_event'
   const pmBlocksPhone = Boolean(pmPipelineState)
@@ -23,6 +27,13 @@ export default function GamePage() {
   useEffect(() => {
     if (!sessionId) setPhase('welcome')
   }, [sessionId, setPhase])
+
+  useEffect(() => {
+    setGameClock('17:00')
+    setElapsedSeconds(0)
+    setActivePhoneTab('chats')
+    setPhoneLocked(true)
+  }, [setActivePhoneTab, setElapsedSeconds, setGameClock, setPhoneLocked])
 
   useWebSocket(sessionId)
   useMouseTracker()

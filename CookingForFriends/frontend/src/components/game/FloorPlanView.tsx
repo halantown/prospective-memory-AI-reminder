@@ -42,6 +42,7 @@ interface FloorPlanViewProps {
   initialCharRoom?: FloorRoom
   initialRobotRoom?: FloorRoom
   disableNavigation?: boolean
+  highlightedRoom?: FloorRoom | null
 }
 
 interface RoomDef {
@@ -162,6 +163,7 @@ export default function FloorPlanView({
   initialCharRoom = 'living_room',
   initialRobotRoom = 'living_room',
   disableNavigation = false,
+  highlightedRoom = null,
 }: FloorPlanViewProps = {}) {
   const viewRef = useRef<HTMLDivElement>(null)
   const pointerInsideGameAreaRef = useRef(true)
@@ -418,6 +420,7 @@ export default function FloorPlanView({
         {/* Room click targets (overview mode) */}
         {!isZoomed && !disableNavigation && ALL_ROOMS.map((rid) => {
           const r = ROOM_DEFS[rid]
+          const isHighlightedTarget = highlightedRoom === rid
           return (
             <div
               key={rid}
@@ -426,7 +429,11 @@ export default function FloorPlanView({
               onClick={() => enterRoom(rid)}
             >
               {/* Hover highlight */}
-              <div className="absolute inset-0 rounded-sm bg-amber-400/0 group-hover:bg-amber-400/15 transition-colors duration-200 border-2 border-transparent group-hover:border-amber-400/40" />
+              <div className={`absolute inset-0 rounded-sm transition-colors duration-200 border-2 ${
+                isHighlightedTarget
+                  ? 'bg-amber-400/20 border-amber-300/80 shadow-[0_0_24px_rgba(251,191,36,0.55)]'
+                  : 'bg-amber-400/0 border-transparent group-hover:bg-amber-400/15 group-hover:border-amber-400/40'
+              }`} />
               {/* Room label */}
               <div className="absolute top-2 left-2 pointer-events-none">
                 <div className="inline-flex items-center gap-1 bg-slate-900/70 backdrop-blur-sm rounded-md px-2 py-1">
@@ -554,6 +561,7 @@ export default function FloorPlanView({
       {isZoomed && !disableNavigation && !isMoving && !isCharMoving && currentRoom && (
         ADJACENCY[currentRoom].map((nav) => {
           const isDoorbellTarget = doorbellActive && nav.target === 'living_room'
+          const isHighlightedTarget = highlightedRoom === nav.target
           return (
             <button
               key={nav.target}
@@ -562,7 +570,7 @@ export default function FloorPlanView({
                          rounded-xl shadow-lg whitespace-nowrap
                          transition-all duration-200 hover:scale-105 active:scale-95
                          cursor-pointer
-                         ${isDoorbellTarget
+                         ${isDoorbellTarget || isHighlightedTarget
                            ? 'border-2 border-amber-400 text-amber-200 hover:text-amber-100 animate-pulse ring-2 ring-amber-400/50'
                            : 'border border-slate-600/50 hover:border-amber-400/60 text-slate-200 hover:text-amber-200'
                          }`}
@@ -572,6 +580,7 @@ export default function FloorPlanView({
               <span className="text-base font-bold">{ARROWS[nav.direction]}</span>
               <span className="text-sm font-medium">{nav.label}</span>
               {isDoorbellTarget && <span className="text-base">🔔</span>}
+              {isHighlightedTarget && !isDoorbellTarget && <span className="text-base">●</span>}
             </button>
           )
         })
