@@ -12,6 +12,13 @@ export default function EveningTransitionPage() {
   const [duration, setDuration] = useState(2000)
   const [ready, setReady] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [visible, setVisible] = useState(false)
+  const [exiting, setExiting] = useState(false)
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setVisible(true))
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
 
   useEffect(() => {
     if (!sessionId) return
@@ -35,26 +42,32 @@ export default function EveningTransitionPage() {
   const continueToDinner = async () => {
     if (!sessionId || loading) return
     setLoading(true)
-    setGameClock('17:00')
-    setElapsedSeconds(0)
-    try {
-      const advanced = await advancePhase(sessionId)
-      setPhase(frontendPhaseForBackend(advanced.current_phase))
-    } catch (e) {
-      console.error('[EveningTransition] advance failed', e)
-      setLoading(false)
-    }
+    setExiting(true)
+    window.setTimeout(async () => {
+      setGameClock('17:00')
+      setElapsedSeconds(0)
+      try {
+        const advanced = await advancePhase(sessionId)
+        setPhase(frontendPhaseForBackend(advanced.current_phase))
+      } catch (e) {
+        console.error('[EveningTransition] advance failed', e)
+        setLoading(false)
+        setExiting(false)
+      }
+    }, 650)
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-6 text-center">
-      <div>
+    <div className={`min-h-screen bg-black flex items-center justify-center p-6 text-center transition-opacity duration-700 ${
+      visible && !exiting ? 'opacity-100' : 'opacity-0'
+    }`}>
+      <div className="relative flex min-h-[220px] w-full max-w-xl flex-col items-center justify-center">
         <p className="max-w-lg text-2xl font-semibold leading-relaxed text-white">{text}</p>
         {ready && (
           <button
             onClick={continueToDinner}
             disabled={loading}
-            className="mt-8 rounded-lg border border-white/25 bg-white px-6 py-3 text-sm font-semibold text-slate-950 disabled:bg-slate-400"
+            className="absolute bottom-0 rounded-lg border border-white/25 bg-white px-6 py-3 text-sm font-semibold text-slate-950 disabled:bg-slate-400"
           >
             {loading ? 'Starting...' : 'Continue'}
           </button>

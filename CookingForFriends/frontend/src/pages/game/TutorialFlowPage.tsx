@@ -43,6 +43,7 @@ export default function TutorialFlowPage() {
   const [loading, setLoading] = useState(false)
   const [timerReady, setTimerReady] = useState(false)
   const [tabPromptTimedOut, setTabPromptTimedOut] = useState(false)
+  const [triggerResting, setTriggerResting] = useState(false)
   const startedAtRef = useRef(Date.now())
   const phoneAdvancedRef = useRef(false)
   const cookingSetupRef = useRef(false)
@@ -55,6 +56,7 @@ export default function TutorialFlowPage() {
     setStepIndex(0)
     setTimerReady(false)
     setTabPromptTimedOut(false)
+    setTriggerResting(false)
     phoneAdvancedRef.current = false
     cookingSetupRef.current = false
     startedAtRef.current = Date.now()
@@ -307,6 +309,33 @@ export default function TutorialFlowPage() {
     }
   }
 
+  const finishTriggerTutorial = async (actionLabel: string) => {
+    if (!sessionId || loading) return
+    setLoading(true)
+    try {
+      await submitExperimentResponses(sessionId, [{
+        phase,
+        question_id: 'tutorial_trigger_action',
+        response_type: 'boolean',
+        value: true,
+        metadata: { action_label: actionLabel },
+      }])
+      setTriggerResting(true)
+      window.setTimeout(async () => {
+        try {
+          const advanced = await advancePhase(sessionId)
+          setPhase(frontendPhaseForBackend(advanced.current_phase))
+        } catch (e) {
+          console.error('[TutorialFlow] trigger advance failed', e)
+          setLoading(false)
+        }
+      }, 2200)
+    } catch (e) {
+      console.error('[TutorialFlow] trigger response submit failed', e)
+      setLoading(false)
+    }
+  }
+
   if (!config) {
     return (
       <TrainingHomeShell phase={phase}>
@@ -384,15 +413,25 @@ export default function TutorialFlowPage() {
             <div className="mt-1 text-center text-xs font-semibold text-white/80">{trigger.visitor}</div>
           </div>
         </div>
-        <BubbleDialogue speaker={trigger.visitor} text={trigger.visitor_line} avatar="S" />
-        <BubbleDialogue speaker="ROBOT" text={trigger.robot_line} avatar="R" align="right" />
-        <button
-          onClick={() => recordAndAdvance('tutorial_trigger_action', true, { action_label: trigger.action_label })}
-          disabled={loading}
-          className="w-full rounded-lg bg-white py-3 text-sm font-semibold text-slate-900 shadow-lg disabled:bg-slate-300"
-        >
-          {loading ? 'Saving...' : trigger.action_label}
-        </button>
+        {triggerResting ? (
+          <BubbleDialogue
+            speaker="AVATAR"
+            text="OK, I can rest now and wait until tonight to start cooking."
+            avatar="A"
+          />
+        ) : (
+          <>
+            <BubbleDialogue speaker={trigger.visitor} text={trigger.visitor_line} avatar="S" />
+            <BubbleDialogue speaker="ROBOT" text={trigger.robot_line} avatar="R" align="right" />
+            <button
+              onClick={() => finishTriggerTutorial(trigger.action_label)}
+              disabled={loading}
+              className="w-full rounded-lg bg-white py-3 text-sm font-semibold text-slate-900 shadow-lg disabled:bg-slate-300"
+            >
+              {loading ? 'Saving...' : trigger.action_label}
+            </button>
+          </>
+        )}
       </div>
     </TrainingHomeShell>
   )

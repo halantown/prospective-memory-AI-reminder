@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import { getSessionState } from '../services/api'
+import { isMainExperimentPhase } from '../utils/phase'
 import type { ActivePMTrial, PMPipelineStep, PMTaskConfig, RoomId } from '../types'
 
 const HEARTBEAT_INTERVAL = 30_000
@@ -240,7 +241,7 @@ export function useWebSocket(sessionId: string | null) {
 
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    const autoStart = useGameStore.getState().phase === 'playing'
+    const autoStart = isMainExperimentPhase(useGameStore.getState().phase)
     const url = `${proto}//${host}/ws/game/${sessionId}?auto_start=${autoStart}`
 
     console.log('[WS] Connecting:', url)
@@ -259,7 +260,7 @@ export function useWebSocket(sessionId: string | null) {
       }
       useGameStore.getState().setWsSend(sendFn)
 
-      if (useGameStore.getState().phase === 'playing') {
+      if (isMainExperimentPhase(useGameStore.getState().phase)) {
         sendFn({ type: 'start_game', data: {} })
       }
 
