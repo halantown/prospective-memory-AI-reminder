@@ -17,6 +17,8 @@ export default function PhoneTabBar() {
   const phoneMessages = useGameStore((s) => s.phoneMessages)
   const recipeTabBounce = useGameStore((s) => s.recipeTabBounce)
   const setRecipeTabBounce = useGameStore((s) => s.setRecipeTabBounce)
+  const phoneTabPrompt = useGameStore((s) => s.phoneTabPrompt)
+  const setPhoneTabPrompt = useGameStore((s) => s.setPhoneTabPrompt)
   const wsSend = useGameStore((s) => s.wsSend)
 
   const totalUnread = useMemo(() => {
@@ -52,6 +54,9 @@ export default function PhoneTabBar() {
   }, [recipeTabBounce, setRecipeTabBounce])
 
   const handleTabClick = (tab: 'chats' | 'recipe') => {
+    if (phoneTabPrompt === tab) {
+      setPhoneTabPrompt(null)
+    }
     if (tab === activeTab) return
     setActiveTab(tab)
     if (wsSend) {
@@ -67,10 +72,11 @@ export default function PhoneTabBar() {
       {/* Chats tab */}
       <motion.button
         onClick={() => handleTabClick('chats')}
-        animate={chatsBouncing ? BOUNCE_KEYFRAMES : {}}
-        transition={BOUNCE_TRANSITION}
+        animate={chatsBouncing || phoneTabPrompt === 'chats' ? BOUNCE_KEYFRAMES : {}}
+        transition={phoneTabPrompt === 'chats' ? { ...BOUNCE_TRANSITION, repeat: Infinity, repeatDelay: 0.2 } : BOUNCE_TRANSITION}
         className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-colors relative
-                    ${activeTab === 'chats' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-300'}`}
+                    ${activeTab === 'chats' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-300'}
+                    ${phoneTabPrompt === 'chats' ? 'bg-amber-400/15 ring-2 ring-amber-300/70 shadow-[0_0_16px_rgba(251,191,36,0.55)]' : ''}`}
       >
         <span className="text-base">💬</span>
         <span className="text-[12px] font-medium">Chats</span>
@@ -80,10 +86,10 @@ export default function PhoneTabBar() {
             {totalUnread}
           </span>
         )}
-        {activeTab === 'chats' && (
+        {(activeTab === 'chats' || phoneTabPrompt === 'chats') && (
           <motion.div
             layoutId="phoneTabIndicator"
-            className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-400 rounded-full"
+            className={`absolute bottom-0 left-2 right-2 h-0.5 rounded-full ${phoneTabPrompt === 'chats' ? 'bg-amber-300' : 'bg-blue-400'}`}
           />
         )}
       </motion.button>
@@ -91,17 +97,18 @@ export default function PhoneTabBar() {
       {/* Recipe tab */}
       <motion.button
         onClick={() => handleTabClick('recipe')}
-        animate={recipeTabBounce ? BOUNCE_KEYFRAMES : {}}
-        transition={BOUNCE_TRANSITION}
+        animate={recipeTabBounce || phoneTabPrompt === 'recipe' ? BOUNCE_KEYFRAMES : {}}
+        transition={phoneTabPrompt === 'recipe' ? { ...BOUNCE_TRANSITION, repeat: Infinity, repeatDelay: 0.2 } : BOUNCE_TRANSITION}
         className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-colors relative
-                    ${activeTab === 'recipe' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-300'}`}
+                    ${activeTab === 'recipe' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-300'}
+                    ${phoneTabPrompt === 'recipe' ? 'bg-amber-400/15 ring-2 ring-amber-300/70 shadow-[0_0_16px_rgba(251,191,36,0.55)]' : ''}`}
       >
         <span className="text-base">📖</span>
         <span className="text-[12px] font-medium">Recipe</span>
-        {activeTab === 'recipe' && (
+        {(activeTab === 'recipe' || phoneTabPrompt === 'recipe') && (
           <motion.div
             layoutId="phoneTabIndicator"
-            className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-400 rounded-full"
+            className={`absolute bottom-0 left-2 right-2 h-0.5 rounded-full ${phoneTabPrompt === 'recipe' ? 'bg-amber-300' : 'bg-blue-400'}`}
           />
         )}
       </motion.button>

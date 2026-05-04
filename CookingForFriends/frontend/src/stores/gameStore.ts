@@ -74,6 +74,7 @@ interface GameState {
   activeContactId: string | null
   activePhoneTab: 'chats' | 'recipe'
   recipeTabBounce: boolean
+  phoneTabPrompt: 'chats' | 'recipe' | null
   lockSystemNotifications: Array<{ id: string; sender: string; text: string; timestamp: number }>
 
   // ── Robot ──
@@ -155,6 +156,7 @@ interface GameState {
   setActiveContactId: (id: string | null) => void
   setActivePhoneTab: (tab: 'chats' | 'recipe') => void
   setRecipeTabBounce: (bounce: boolean) => void
+  setPhoneTabPrompt: (tab: 'chats' | 'recipe' | null) => void
   addLockSystemNotification: (notif: { id: string; sender: string; text: string; timestamp: number }) => void
 
   // Robot actions
@@ -290,6 +292,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   activeContactId: null,
   activePhoneTab: 'chats',
   recipeTabBounce: false,
+  phoneTabPrompt: null,
   lockSystemNotifications: [],
 
   // ── Robot ──
@@ -701,6 +704,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setActiveContactId: (id) => set({ activeContactId: id }),
   setActivePhoneTab: (tab) => set({ activePhoneTab: tab }),
   setRecipeTabBounce: (bounce) => set({ recipeTabBounce: bounce }),
+  setPhoneTabPrompt: (tab) => set({ phoneTabPrompt: tab }),
   addLockSystemNotification: (notif) => set((s) => ({
     lockSystemNotifications: [...s.lockSystemNotifications, notif].slice(-2),
   })),
@@ -864,6 +868,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     activeContactId: null,
     activePhoneTab: 'chats',
     recipeTabBounce: false,
+    phoneTabPrompt: null,
     lockSystemNotifications: [],
     robot: { room: 'kitchen', speaking: false, text: '', visible: true },
     activePMTrials: [],

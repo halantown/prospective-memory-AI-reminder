@@ -27,7 +27,8 @@ export default function TutorialFlowPage() {
   const phoneMessages = useGameStore((s) => s.phoneMessages)
   const setPhoneBanner = useGameStore((s) => s.setPhoneBanner)
   const setActiveContactId = useGameStore((s) => s.setActiveContactId)
-  const setActivePhoneTab = useGameStore((s) => s.setActivePhoneTab)
+  const activePhoneTab = useGameStore((s) => s.activePhoneTab)
+  const setPhoneTabPrompt = useGameStore((s) => s.setPhoneTabPrompt)
   const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
   const initializeCookingDefinitions = useGameStore((s) => s.initializeCookingDefinitions)
   const handleCookingStepActivate = useGameStore((s) => s.handleCookingStepActivate)
@@ -39,16 +40,19 @@ export default function TutorialFlowPage() {
   const [stepIndex, setStepIndex] = useState(0)
   const [loading, setLoading] = useState(false)
   const [timerReady, setTimerReady] = useState(false)
+  const [tabPromptTimedOut, setTabPromptTimedOut] = useState(false)
   const startedAtRef = useRef(Date.now())
   const phoneAdvancedRef = useRef(false)
   const cookingSetupRef = useRef(false)
   const kind = tutorialKind(phase)
+  const targetPhoneTab = kind === 'phone' ? 'chats' : kind === 'cooking' ? 'recipe' : null
 
   useEffect(() => {
     if (!sessionId) return
     setConfig(null)
     setStepIndex(0)
     setTimerReady(false)
+    setTabPromptTimedOut(false)
     phoneAdvancedRef.current = false
     cookingSetupRef.current = false
     startedAtRef.current = Date.now()
@@ -56,6 +60,26 @@ export default function TutorialFlowPage() {
       .then((next) => setConfig(next as Record<string, unknown>))
       .catch((e) => console.error('[TutorialFlow] config load failed', e))
   }, [sessionId, phase])
+
+  useEffect(() => {
+    setPhoneTabPrompt(targetPhoneTab)
+    setTabPromptTimedOut(false)
+    return () => setPhoneTabPrompt(null)
+  }, [setPhoneTabPrompt, targetPhoneTab])
+
+  useEffect(() => {
+    if (!targetPhoneTab || activePhoneTab === targetPhoneTab) {
+      setTabPromptTimedOut(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      if (useGameStore.getState().activePhoneTab !== targetPhoneTab) {
+        setTabPromptTimedOut(true)
+      }
+    }, 10_000)
+    return () => window.clearTimeout(timer)
+  }, [activePhoneTab, targetPhoneTab])
 
   const advance = async () => {
     if (!sessionId || loading) return
@@ -108,7 +132,6 @@ export default function TutorialFlowPage() {
 
     setContacts([contact])
     setActiveContactId(contact.id)
-    setActivePhoneTab('chats')
     setPhoneLocked(false)
     addPhoneMessage(message)
     setPhoneBanner(message)
@@ -119,7 +142,6 @@ export default function TutorialFlowPage() {
     phonePracticeMessageId,
     sessionId,
     setActiveContactId,
-    setActivePhoneTab,
     setContacts,
     setPhoneBanner,
     setPhoneLocked,
@@ -148,7 +170,6 @@ export default function TutorialFlowPage() {
     if (kind !== 'cooking' || !friedEgg) return
 
     setPhoneLocked(false)
-    setActivePhoneTab('recipe')
     setElapsedSeconds((8 * 60 + 40) * 60)
     setGameClock('08:40')
 
@@ -202,7 +223,6 @@ export default function TutorialFlowPage() {
     handleCookingStepActivate,
     initializeCookingDefinitions,
     kind,
-    setActivePhoneTab,
     setElapsedSeconds,
     setGameClock,
     setPhoneLocked,
@@ -298,6 +318,10 @@ export default function TutorialFlowPage() {
   if (kind === 'phone') {
     return (
       <TrainingHomeShell phase={phase}>
+        <PhoneTabPromptOverlay
+          visible={tabPromptTimedOut && activePhoneTab !== 'chats'}
+          target="Chats"
+        />
         <BubbleDialogue
           speaker="ROBOT"
           text="A message has arrived on your phone. Open the chat and choose a reply."
@@ -311,6 +335,10 @@ export default function TutorialFlowPage() {
   if (kind === 'cooking') {
     return (
       <TrainingHomeShell phase={phase}>
+        <PhoneTabPromptOverlay
+          visible={tabPromptTimedOut && activePhoneTab !== 'recipe'}
+          target="Recipe"
+        />
         <BubbleDialogue
           speaker="ROBOT"
           text={currentCookingStep
@@ -372,4 +400,15 @@ function tutorialStationForStep(stepId: string) {
   if (stepId === 'crack_eggs') return 'burner1'
   if (stepId === 'season_salt') return 'spice_rack'
   return 'plating_area'
+}
+
+function PhoneTabPromptOverlay({ visible, target }: { visible: boolean; target: string }) {
+  if (!visible) return null
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[500] flex items-center justify-center bg-black/55">
+      <div className="rounded-lg border border-white/20 bg-slate-950/80 px-6 py-4 text-center shadow-2xl">
+        <p className="text-base font-semibold text-white">Click the highlighted {target} tab on the phone.</p>
+      </div>
+    </div>
+  )
 }
