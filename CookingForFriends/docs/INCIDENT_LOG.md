@@ -942,3 +942,57 @@ any significant timeline refactor, consider:
 ### Follow-up Actions
 > - [ ] Add an integration test for `POST /admin/test-session` verifying that `current_phase` equals `start_phase` after creation.
 > - [ ] Consider consolidating `AdminParticipantCreateRequest` and `TestSessionRequest` into a single schema.
+
+---
+
+## INC-017 — Test entry auto-start and encoding phase alias broke manual testing
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-04 |
+| Severity     | P2 Medium |
+| Status       | Resolved |
+| Reported by  | Developer — manual admin test with token `VUSMC3` |
+| Affected area| Admin dashboard Test Mode; frontend phase recovery; encoding/tutorial UI shell |
+
+### Background
+> Admin Test Mode should let the experimenter create a test token, open the participant page, open DevTools, and then manually enter the token. Encoding and tutorial phases should run in a morning home scene, separate from the formal evening main experiment runtime.
+
+### Incident Description
+> Clicking "Open Session" immediately opened `/?token=...`, causing WelcomePage to auto-start before DevTools could be opened. During story intro, advancing from "Before I start preparing..." could return to the login page because backend canonical phases such as `ENCODING_VIDEO_1` were stored in the frontend as render aliases such as `encoding_flow`. The next phase request then used a value the backend state machine does not own.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 01:05 | Developer reported admin auto-start and story intro returning to login |
+| 01:12 | `VUSMC3` inspected in PostgreSQL; backend phase was still `ENCODING_VIDEO_1` |
+| 01:20 | Phase alias bug and admin entry behavior identified |
+| 01:35 | Frontend fixes implemented and build verified |
+| 01:45 | Training shell added for scripted morning room/time state |
+
+### Root Cause
+> 1. **Admin entry regression**: Test Mode reused the participant deep link with a `?token=` query parameter. WelcomePage intentionally auto-starts when a token query is present.
+> 2. **Frontend phase aliasing**: `frontendPhaseForBackend()` returned render-phase aliases. Those aliases are useful for React routing, but invalid as backend phase identifiers.
+> 3. **Training scene coupling**: Story, encoding, and tutorial screens each hand-coded partial game-shell state instead of deriving room/time/phone state from canonical phase.
+
+### Contributing Factors
+> - Render routing and backend phase ownership were represented by the same `Phase` store value.
+> - Admin Test Mode optimized for skipping directly into a session, but the current debugging workflow needs manual token entry.
+> - Encoding assets are still placeholders, so phase transition failures were easy to confuse with missing media.
+
+### Fix
+> **Frontend**:
+> - `utils/phase.ts`: `frontendPhaseForBackend()` now preserves canonical backend phases; `renderPhaseFor()` remains the only place that maps canonical phases to React render pages.
+> - `pages/admin/DashboardPage.tsx`: Test Mode now copies the token and opens `/` without `?token=`, preventing auto-start.
+> - `components/game/FloorPlanView.tsx`: Added explicit initial room/actor props and disabled-navigation support for scripted scenes.
+> - `components/game/ExperimentHomeShell.tsx`: Supports scripted room initialization.
+> - `components/game/TrainingHomeShell.tsx`: Centralized story/encoding/tutorial scene config. Each canonical training phase maps to a room, morning clock time, and phone availability.
+> - Story, encoding, and tutorial pages now render inside `TrainingHomeShell`.
+
+### Verification
+> `npm run build` passed. Manual database check confirmed token `VUSMC3` was not corrupted server-side and remained at `ENCODING_VIDEO_1`.
+
+### Follow-up Actions
+> - [ ] Add a frontend regression test for backend phase preservation.
+> - [ ] Add an admin Test Mode integration test verifying the opened URL does not include `?token=`.
+> - [ ] Replace encoding video placeholders with approved media assets when available.
