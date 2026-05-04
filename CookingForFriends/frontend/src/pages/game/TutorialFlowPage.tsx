@@ -25,6 +25,7 @@ export default function TutorialFlowPage() {
   const setContacts = useGameStore((s) => s.setContacts)
   const addPhoneMessage = useGameStore((s) => s.addPhoneMessage)
   const phoneMessages = useGameStore((s) => s.phoneMessages)
+  const setPhoneBanner = useGameStore((s) => s.setPhoneBanner)
   const setActiveContactId = useGameStore((s) => s.setActiveContactId)
   const setActivePhoneTab = useGameStore((s) => s.setActivePhoneTab)
   const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
@@ -73,24 +74,27 @@ export default function TutorialFlowPage() {
     contact: { id: string; name: string; avatar: string }
     message: string
     options: Option[]
-    correct_option_id: string
+    correct_option_id?: string
     feedback: string
   } | undefined
+  const phonePracticeMessageId = sessionId ? `tutorial_phone_practice_${sessionId}` : 'tutorial_phone_practice'
 
   useEffect(() => {
-    if (kind !== 'phone' || !phoneDemo) return
-    const correct = phoneDemo.options.find((option) => option.id === phoneDemo.correct_option_id)
-    const wrong = phoneDemo.options.find((option) => option.id !== phoneDemo.correct_option_id)
+    if (kind !== 'phone' || !phoneDemo || !sessionId) return
+    const contact = {
+      ...phoneDemo.contact,
+      id: `${phoneDemo.contact.id}_${sessionId}`,
+    }
+    const correct = phoneDemo.correct_option_id
+      ? phoneDemo.options.find((option) => option.id === phoneDemo.correct_option_id)
+      : phoneDemo.options[0]
+    const wrong = phoneDemo.options.find((option) => option.id !== correct?.id)
     if (!correct || !wrong) return
 
-    setContacts([phoneDemo.contact])
-    setActiveContactId(phoneDemo.contact.id)
-    setActivePhoneTab('chats')
-    setPhoneLocked(false)
-    addPhoneMessage({
-      id: 'tutorial_phone_practice',
-      channel: 'chat',
-      contactId: phoneDemo.contact.id,
+    const message = {
+      id: phonePracticeMessageId,
+      channel: 'chat' as const,
+      contactId: contact.id,
       text: phoneDemo.message,
       correctChoice: correct.text,
       wrongChoice: wrong.text,
@@ -100,10 +104,28 @@ export default function TutorialFlowPage() {
       timestamp: Date.now(),
       read: false,
       answered: false,
-    })
-  }, [addPhoneMessage, kind, phoneDemo, setActiveContactId, setActivePhoneTab, setContacts, setPhoneLocked])
+    }
 
-  const phonePracticeMessage = phoneMessages.find((message) => message.id === 'tutorial_phone_practice')
+    setContacts([contact])
+    setActiveContactId(contact.id)
+    setActivePhoneTab('chats')
+    setPhoneLocked(false)
+    addPhoneMessage(message)
+    setPhoneBanner(message)
+  }, [
+    addPhoneMessage,
+    kind,
+    phoneDemo,
+    phonePracticeMessageId,
+    sessionId,
+    setActiveContactId,
+    setActivePhoneTab,
+    setContacts,
+    setPhoneBanner,
+    setPhoneLocked,
+  ])
+
+  const phonePracticeMessage = phoneMessages.find((message) => message.id === phonePracticeMessageId)
 
   useEffect(() => {
     if (kind !== 'phone' || !phonePracticeMessage?.answered || phoneAdvancedRef.current) return
@@ -198,8 +220,8 @@ export default function TutorialFlowPage() {
       }
 
       const data = message.data as { chosen_option_id?: string; chosen_option_text?: string }
-      const correctId = currentCookingStep.correct_option_id ?? 'done'
-      const isCorrect = data.chosen_option_id === correctId
+      const correctId = currentCookingStep.correct_option_id
+      const isCorrect = correctId ? data.chosen_option_id === correctId : true
 
       submitExperimentResponses(sessionId!, [{
         phase,
@@ -208,7 +230,7 @@ export default function TutorialFlowPage() {
         value: data.chosen_option_id ?? null,
         metadata: {
           chosen_text: data.chosen_option_text ?? null,
-          correct_option_id: correctId,
+          correct_option_id: correctId ?? null,
           answered_correct: isCorrect,
           step_index: stepIndex,
         },
