@@ -1,5 +1,15 @@
 # Experiment Materials Architecture (0503)
 
+See also:
+
+```text
+CookingForFriends/docs/experiment_flow_implementation_notes_0504.md
+```
+
+That note records the current full-flow implementation decisions, including
+canonical vs legacy phase terminology, training runtime behavior, admin test
+mode behavior, and recent 0503/0504 changes.
+
 ## Goal
 
 Experiment-facing text and task materials must have one backend-authoritative
@@ -95,4 +105,3 @@ participant-facing PDF URL is:
 ```text
 /documents/Informed_Consent_no_HREC.pdf
 ```
-
