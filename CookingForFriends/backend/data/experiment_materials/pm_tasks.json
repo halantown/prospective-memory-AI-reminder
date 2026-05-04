@@ -19,11 +19,11 @@
         "EC-": "You promised to give Mei something."
       },
       "decoy_items": [
-        { "id": "target", "label": "烘焙书", "is_target": true },
-        { "id": "intra1", "label": "游戏手柄", "is_target": false },
-        { "id": "intra2", "label": "蛋糕盒子", "is_target": false },
-        { "id": "cross1", "label": "礼品袋", "is_target": false },
-        { "id": "cross2", "label": "烧烤架", "is_target": false },
+        { "id": "target", "label": "Baking book", "is_target": true },
+        { "id": "intra1", "label": "Game controller", "is_target": false },
+        { "id": "intra2", "label": "Cake box", "is_target": false },
+        { "id": "cross1", "label": "Gift bag", "is_target": false },
+        { "id": "cross2", "label": "Barbecue grill", "is_target": false },
         { "id": "unrelated", "label": "[T1 unrelated TBD]", "is_target": false }
       ]
     },
@@ -46,11 +46,11 @@
         "EC-": "You promised to give Anna-Lina something."
       },
       "decoy_items": [
-        { "id": "target", "label": "巧克力", "is_target": true },
-        { "id": "intra1", "label": "礼品袋", "is_target": false },
-        { "id": "intra2", "label": "明信片", "is_target": false },
-        { "id": "cross1", "label": "游戏手柄", "is_target": false },
-        { "id": "cross2", "label": "旧电池", "is_target": false },
+        { "id": "target", "label": "Chocolate", "is_target": true },
+        { "id": "intra1", "label": "Gift bag", "is_target": false },
+        { "id": "intra2", "label": "Postcard", "is_target": false },
+        { "id": "cross1", "label": "Game controller", "is_target": false },
+        { "id": "cross2", "label": "Old battery", "is_target": false },
         { "id": "unrelated", "label": "[T2 unrelated TBD]", "is_target": false }
       ]
     },
@@ -73,11 +73,11 @@
         "EC-": "You promised to do something for Tom."
       },
       "decoy_items": [
-        { "id": "target", "label": "苹果汁", "is_target": true },
-        { "id": "intra1", "label": "烧烤架", "is_target": false },
-        { "id": "intra2", "label": "蓝牙音箱", "is_target": false },
-        { "id": "cross1", "label": "蛋糕盒子", "is_target": false },
-        { "id": "cross2", "label": "纸箱", "is_target": false },
+        { "id": "target", "label": "Apple juice", "is_target": true },
+        { "id": "intra1", "label": "Barbecue grill", "is_target": false },
+        { "id": "intra2", "label": "Bluetooth speaker", "is_target": false },
+        { "id": "cross1", "label": "Cake box", "is_target": false },
+        { "id": "cross2", "label": "Cardboard box", "is_target": false },
         { "id": "unrelated", "label": "[T3 unrelated TBD]", "is_target": false }
       ]
     },
@@ -100,11 +100,11 @@
         "EC-": "You wanted to add something to your delivery order."
       },
       "decoy_items": [
-        { "id": "target", "label": "垃圾袋", "is_target": true },
-        { "id": "intra1", "label": "旧电池", "is_target": false },
-        { "id": "intra2", "label": "纸箱", "is_target": false },
-        { "id": "cross1", "label": "明信片", "is_target": false },
-        { "id": "cross2", "label": "蓝牙音箱", "is_target": false },
+        { "id": "target", "label": "Trash bags", "is_target": true },
+        { "id": "intra1", "label": "Old battery", "is_target": false },
+        { "id": "intra2", "label": "Cardboard box", "is_target": false },
+        { "id": "cross1", "label": "Postcard", "is_target": false },
+        { "id": "cross2", "label": "Bluetooth speaker", "is_target": false },
         { "id": "unrelated", "label": "[T4 unrelated TBD]", "is_target": false }
       ]
     }
