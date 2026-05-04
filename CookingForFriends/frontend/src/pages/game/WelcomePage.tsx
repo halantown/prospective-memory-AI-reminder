@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { advancePhase, getPublicExperimentConfig, getSessionStatus, startSession } from '../../services/api'
-import { frontendPhaseForBackend } from '../../utils/phase'
+import { frontendPhaseForBackend, renderPhaseFor } from '../../utils/phase'
 
 const DEV_PHASES = [
   { value: 'CONSENT',          label: 'Consent' },
@@ -15,6 +15,12 @@ const DEV_PHASES = [
   { value: 'DEBRIEF',          label: 'Debrief' },
 ] as const
 
+const DEFAULT_WELCOME_TEXT = {
+  cover_story: 'This study investigates how people manage multiple household tasks simultaneously in a simulated home environment. You will be asked to prepare dinner for friends while handling various everyday interruptions.',
+  duration: 'The experiment takes approximately 30-35 minutes.',
+  training_notice: 'You will receive a brief training session before the main task begins.',
+}
+
 export default function WelcomePage() {
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,8 +29,7 @@ export default function WelcomePage() {
     cover_story?: string
     duration?: string
     training_notice?: string
-  } | null>(null)
-  const [configLoaded, setConfigLoaded] = useState(false)
+  }>(DEFAULT_WELCOME_TEXT)
   const [devOpen, setDevOpen] = useState(false)
   const [jumpPhase, setJumpPhase] = useState<string>('MAIN_EXPERIMENT')
   const autoStartedRef = useRef(false)
@@ -81,7 +86,7 @@ export default function WelcomePage() {
           setPhase('complete')
         } else {
           const current = frontendPhaseForBackend(status.phase || data.current_phase)
-          if (current === 'welcome') {
+          if (renderPhaseFor(current) === 'welcome') {
             const advanced = await advancePhase(data.session_id, 'CONSENT')
             setPhase(frontendPhaseForBackend(advanced.current_phase))
           } else {
@@ -105,10 +110,12 @@ export default function WelcomePage() {
   useEffect(() => {
     getPublicExperimentConfig('WELCOME')
       .then((config) => {
-        setWelcomeText(config.welcome as typeof welcomeText)
+        setWelcomeText({
+          ...DEFAULT_WELCOME_TEXT,
+          ...((config.welcome as Partial<typeof DEFAULT_WELCOME_TEXT> | undefined) ?? {}),
+        })
       })
       .catch(() => {})
-      .finally(() => setConfigLoaded(true))
   }, [])
 
   useEffect(() => {
@@ -132,12 +139,9 @@ export default function WelcomePage() {
         {/* Form */}
         <div className="px-8 py-6 space-y-5">
           <div>
-            {configLoaded && (
-              <p className="text-slate-600 text-sm mb-4">
-                {welcomeText?.cover_story
-                  ?? "Welcome! You'll be preparing dinner and completing a few memory tasks during this session."}
-              </p>
-            )}
+            <p className="text-slate-600 text-sm mb-4">
+              {welcomeText.cover_story}
+            </p>
             {welcomeText?.duration && (
               <p className="text-slate-500 text-sm mb-2">{welcomeText.duration}</p>
             )}
