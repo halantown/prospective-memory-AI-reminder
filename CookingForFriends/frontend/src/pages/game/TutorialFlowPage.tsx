@@ -4,6 +4,8 @@ import { advancePhase, getExperimentConfig, submitExperimentResponses } from '..
 import { frontendPhaseForBackend } from '../../utils/phase'
 import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
 import TrainingHomeShell from '../../components/game/TrainingHomeShell'
+import SpriteSheet from '../../components/game/_archive/sprites/SpriteSheet'
+import { CHAR_ANIMATIONS, CHAR_SHEET } from '../../components/game/_archive/sprites/characterAnimations'
 import type { CookingDefinitions, CookingStepOption } from '../../types'
 
 interface Option {
@@ -308,9 +310,7 @@ export default function TutorialFlowPage() {
   if (!config) {
     return (
       <TrainingHomeShell phase={phase}>
-        <div className="rounded-lg bg-white p-6 text-center text-sm text-slate-500 shadow-xl">
-          Loading...
-        </div>
+        <div className="sr-only">Loading tutorial materials...</div>
       </TrainingHomeShell>
     )
   }
@@ -372,12 +372,16 @@ export default function TutorialFlowPage() {
       <div className="w-full max-w-3xl space-y-3 pb-8">
         <div className="flex justify-start">
           <div className="rounded-lg border border-white/20 bg-slate-950/70 px-4 py-3 shadow-lg">
-            <img
-              src="/assets/characters/character_01.png"
-              alt={trigger.visitor}
-              className="h-28 w-auto object-contain [image-rendering:pixelated]"
-              draggable={false}
+            <SpriteSheet
+              src={CHAR_SHEET.src}
+              sheetCols={CHAR_SHEET.sheetCols}
+              frameW={CHAR_SHEET.frameW}
+              frameH={CHAR_SHEET.frameH}
+              animation={CHAR_ANIMATIONS.idle_down}
+              scale={2}
+              className="drop-shadow-lg"
             />
+            <div className="mt-1 text-center text-xs font-semibold text-white/80">{trigger.visitor}</div>
           </div>
         </div>
         <BubbleDialogue speaker={trigger.visitor} text={trigger.visitor_line} avatar="S" />
