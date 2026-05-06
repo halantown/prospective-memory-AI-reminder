@@ -130,7 +130,7 @@ asyncio.run(create())
 - **No sound** — robot doesn't speak audio yet
 - **No persistence across tabs** — session only in current browser tab
 - **No animations** — basic CSS/Framer Motion (not polished)
-- **Kitchen timers visual only** — no actual cooking mechanics scoring yet
+- **Cooking feedback visible** — active steps use the Kitchen Timer banner; missed steps flash red, and station choices flash green/red before advancing
 - **PM scoring hidden** — all PM attempts scored server-side but not shown to participant
 
 ## API Endpoints (for testing)

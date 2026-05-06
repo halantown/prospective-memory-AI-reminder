@@ -60,8 +60,8 @@ CookingForFriends/
 │       ├── pages/game/       # WelcomePage, ConsentPage, IntroductionPage, CutsceneEncodingPage,
 │       │                       GamePage, PostQuestionnairePage, DebriefPage
 │       ├── pages/admin/      # DashboardPage (6 tabs)
-│       ├── components/game/  # PMTriggerModal (full pipeline), CutscenePlayer, DetailCheckModal,
-│       │                       IntentionCheckQuestion, WorldView, RobotAvatar, PhoneSidebar, HUD
+│       ├── components/game/  # PMTriggerModal (full pipeline), FloorPlanView,
+│       │                       PhoneSidebar, KitchenTimerBanner, HUD
 │       ├── constants/
 │       │   ├── placeholders.ts  # All PLACEHOLDER_* constants (researcher fills later)
 │       │   └── pmTasks.ts       # TASK_ORDERS, TRIGGER_SCHEDULE, PM_TASKS, DECOY_OPTIONS (Chinese labels)

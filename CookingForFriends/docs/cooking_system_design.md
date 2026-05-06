@@ -130,6 +130,8 @@ Time    Event                                           Active dishes
 ## 5. Recipe Display (Phone)
 
 The recipe lives in the **Recipe tab** on the phone (bottom tab bar: 💬 Chats | 📖 Recipe).
+The phone no longer locks during the active experiment; chats, recipe, and system banners remain immediately accessible.
+The Kitchen Timer banner is the primary recurring pressure cue and stays visible above both phone tabs.
 
 **Press-and-hold mechanic:**
 - Participant presses and holds anywhere on the Recipe tab to view the recipe
@@ -137,11 +139,11 @@ The recipe lives in the **Recipe tab** on the phone (bottom tab bar: 💬 Chats 
 - While holding: cannot interact with chat, kitchen, or anything else
 
 **Recipe content when viewed:**
-- Shows all 4 dishes in a vertical list
-- Each dish shows: dish name, current step description, countdown timer for current step
-- Completed steps shown as checked/greyed out
-- Skipped steps shown as crossed out / marked "missed"
-- Steps not yet reached shown as locked/dimmed
+- Shows all 4 dishes in a 2x2 grid
+- Each dish shows the previous step, current step, and next step when available
+- Previous, completed, missed, and wrong-choice steps use the same grey strikethrough treatment
+- Current steps are highlighted; future steps are dimmed
+- The recipe itself does not use red/green correctness coding
 
 **Behavioral data logged:**
 - `recipe_view_start`: timestamp (press)
@@ -168,6 +170,9 @@ The recipe lives in the **Recipe tab** on the phone (bottom tab bar: 💬 Chats 
 **On click:** popup appears with 3-4 options. Only 1 is correct for the current step. Options are context-appropriate distractors (wrong ingredients, wrong actions, wrong settings).
 
 **Popup rules:**
+- Correct choices briefly flash the popup border green, then close and advance.
+- Wrong choices briefly flash the popup border red, then close and advance.
+- Missed steps flash the Kitchen Timer banner red with "Missed!" before the next step appears.
 - Only appears if the clicked object is relevant to a currently active step
 - If clicked object has no active step: brief "nothing to do here" feedback, no popup
 - After correct selection: popup closes, step marked complete, brief green feedback

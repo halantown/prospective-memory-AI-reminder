@@ -91,8 +91,16 @@
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `BANNER_DURATION` | `3,000 ms` | Phone banner auto-dismiss time |
-| `AUTO_LOCK_TIMEOUT` | `30,000 ms` | Phone auto-lock after inactivity |
+| `SYSTEM_BANNER_DURATION` | `3,000 ms` | Low-key system notification banner auto-dismiss time |
+| `CHAT_BANNER_DURATION` | `5,000 ms` | Chat preview banner auto-dismiss time |
+| Phone lock | Disabled | Phone remains accessible throughout gameplay |
+
+### Kitchen Timer (`frontend/src/components/game/phone/KitchenTimerBanner.tsx`)
+
+| Behavior | Value | Description |
+|----------|-------|-------------|
+| Urgency threshold | Final 25% of active step window | Timer banner pulses to signal imminent timeout |
+| Missed feedback | `2,000 ms` | Timer banner flashes red and shows "Missed!" |
 
 ### PM Interaction (`frontend/src/components/game/PMTargetItems.tsx`)
 
