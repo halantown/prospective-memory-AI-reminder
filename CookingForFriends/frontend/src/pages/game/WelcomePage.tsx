@@ -5,15 +5,6 @@ import { useGameStore } from '../../stores/gameStore'
 import { advancePhase, getPublicExperimentConfig, getSessionStatus, startSession } from '../../services/api'
 import { frontendPhaseForBackend, renderPhaseFor } from '../../utils/phase'
 
-const DEV_PHASES = [
-  { value: 'CONSENT',          label: 'Consent' },
-  { value: 'DEMOGRAPHICS',     label: 'Demographics' },
-  { value: 'MSE_PRE',          label: 'MSE Pre' },
-  { value: 'STORY_INTRO',      label: 'Story Intro' },
-  { value: 'MAIN_EXPERIMENT',  label: '🎮 Game (playing)' },
-  { value: 'POST_MANIP_CHECK', label: 'Post-test' },
-  { value: 'DEBRIEF',          label: 'Debrief' },
-] as const
 
 const DEFAULT_WELCOME_TEXT = {
   cover_story: 'This study investigates how people manage multiple household tasks simultaneously in a simulated home environment. You will be asked to prepare dinner for friends while handling various everyday interruptions.',
@@ -30,15 +21,13 @@ export default function WelcomePage() {
     duration?: string
     training_notice?: string
   }>(DEFAULT_WELCOME_TEXT)
-  const [devOpen, setDevOpen] = useState(false)
-  const [jumpPhase, setJumpPhase] = useState<string>('MAIN_EXPERIMENT')
   const autoStartedRef = useRef(false)
 
   const setSession = useGameStore((s) => s.setSession)
   const setPhase = useGameStore((s) => s.setPhase)
 
-  /** Start session and optionally jump to a specific phase. */
-  const startAndNavigate = async (tokenOverride?: string, targetPhase?: string) => {
+  /** Start session and navigate to the current phase. */
+  const startAndNavigate = async (tokenOverride?: string) => {
     const t = (tokenOverride ?? token).trim().toUpperCase()
     if (t.length !== 6) {
       setError('Please enter the 6-character session token')
@@ -72,13 +61,6 @@ export default function WelcomePage() {
         cooking_definitions: data.cooking_definitions,
       }))
 
-      if (targetPhase) {
-        // Dev quick-jump: skip straight to the requested phase
-        const advanced = await advancePhase(data.session_id, targetPhase)
-        setPhase(frontendPhaseForBackend(advanced.current_phase))
-        return
-      }
-
       // Normal flow: resume at current phase or advance past welcome
       try {
         const status = await getSessionStatus(data.session_id)
@@ -105,7 +87,6 @@ export default function WelcomePage() {
   }
 
   const handleStart = (tokenOverride?: string) => startAndNavigate(tokenOverride)
-  const handleDevJump = () => startAndNavigate(undefined, jumpPhase)
 
   useEffect(() => {
     getPublicExperimentConfig('WELCOME')
@@ -188,38 +169,7 @@ export default function WelcomePage() {
             {loading ? 'Starting…' : 'Start Session'}
           </button>
 
-          {/* Dev quick-jump panel */}
-          <div className="border-t border-slate-100 pt-3">
-            <button
-              type="button"
-              onClick={() => setDevOpen((v) => !v)}
-              className="text-xs text-slate-400 hover:text-slate-600 transition-colors w-full text-left"
-            >
-              {devOpen ? '▾' : '▸'} Dev: quick phase jump
-            </button>
-            {devOpen && (
-              <div className="mt-2 flex gap-2">
-                <select
-                  value={jumpPhase}
-                  onChange={(e) => setJumpPhase(e.target.value)}
-                  disabled={loading}
-                  className="flex-1 rounded-lg border border-slate-300 px-2 py-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400"
-                >
-                  {DEV_PHASES.map((p) => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleDevJump}
-                  disabled={loading || token.trim().length !== 6}
-                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold
-                             disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-                >
-                  {loading ? '…' : 'Jump →'}
-                </button>
-              </div>
-            )}
-          </div>
+
         </div>
 
         {/* Footer */}

@@ -113,8 +113,6 @@ export default function PhoneSidebar() {
         .sort((a, b) => a.timestamp - b.timestamp)
       if (unreadMessages.length > 0 && unreadMessages[0].contactId) {
         setActiveContactId(unreadMessages[0].contactId)
-      } else if (contacts.length > 0) {
-        setActiveContactId(contacts[0].id)
       }
     }
   }, [setPhoneLocked, wsSend, activeContactId, phoneMessages, contacts, setActiveContactId])
