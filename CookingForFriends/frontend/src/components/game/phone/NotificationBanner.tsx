@@ -4,7 +4,7 @@
  *  1. System notifications (weather, battery, delivery) — auto-dismiss 3s, no contact nav.
  *  2. Cross-contact chat alerts — shows sender + preview. Tap → navigate to contact.
  *
- *  Floats as a rounded pill below the Dynamic Island. Shows on lock screen too. */
+ *  Renders in phone content flow so it cannot cover the Kitchen Timer. */
 
 import { useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -65,8 +65,7 @@ export default function NotificationBanner() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-          className="absolute top-[52px] left-3 right-3 z-30
-                     rounded-xl shadow-xl shadow-black/40
+          className="mx-4 mt-2 mb-1 rounded-xl shadow-lg shadow-black/30
                      border cursor-pointer overflow-hidden"
           style={{
             backgroundColor: isSystemNotification ? 'rgba(30, 41, 59, 0.96)' : '#ffffff',

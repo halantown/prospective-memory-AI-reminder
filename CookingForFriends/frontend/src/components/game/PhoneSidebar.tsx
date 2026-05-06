@@ -95,11 +95,8 @@ export default function PhoneSidebar() {
                       border-slate-600`}
           onPointerDownCapture={handleInteraction}
         >
-          {/* Notification Banner (z-30, on top of everything including lock screen) */}
-          <NotificationBanner />
-
           {/* Dynamic Island */}
-          <div className="flex justify-center pt-2 pb-1 relative z-10">
+          <div className="flex justify-center pt-2 pb-1 relative z-10 shrink-0">
             <div className="w-[110px] h-[26px] bg-black rounded-full flex items-center justify-center gap-2">
               <div className="w-[8px] h-[8px] rounded-full bg-slate-700 ring-1 ring-slate-600" />
               <div className="w-[6px] h-[6px] rounded-full bg-slate-800" />
@@ -107,7 +104,7 @@ export default function PhoneSidebar() {
           </div>
 
           {/* Status bar */}
-          <div className="flex items-center justify-between px-6 py-2 text-[12px]">
+          <div className="flex items-center justify-between px-6 py-2 text-[12px] shrink-0">
             <span className="text-white font-medium text-[13px]">{gameClock ?? '--:--'}</span>
             <div className="flex items-center gap-1">
               {unreadCount > 0 && (
@@ -121,7 +118,7 @@ export default function PhoneSidebar() {
           </div>
 
           {/* Screen content */}
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 grid grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] overflow-hidden min-h-0">
               {/* App header */}
               <div className="px-4 py-1.5 border-b border-slate-700/50 grid grid-cols-[minmax(76px,auto)_1fr_auto] items-center gap-2 shrink-0">
                 <h3 className="text-white text-sm font-semibold truncate">
@@ -130,11 +127,12 @@ export default function PhoneSidebar() {
                 <HeaderCookingContext />
                 <div className="justify-self-end w-10" aria-hidden="true" />
               </div>
+              <NotificationBanner />
               <KitchenTimerBanner />
 
               {/* Tab content */}
               {activePhoneTab === 'chats' ? (
-                <div className="flex-1 flex overflow-hidden">
+                <div className="flex min-h-0 overflow-hidden">
                   <ContactStrip />
                   <ChatView />
                 </div>
@@ -147,7 +145,7 @@ export default function PhoneSidebar() {
           </div>
 
           {/* Home indicator bar */}
-          <div className="flex justify-center pb-2 pt-1">
+          <div className="flex justify-center pb-2 pt-1 shrink-0">
             <div className="w-[120px] h-[4px] bg-white/20 rounded-full" />
           </div>
         </div>

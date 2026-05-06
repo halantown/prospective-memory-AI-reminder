@@ -82,7 +82,7 @@ export default function KitchenTimerBanner() {
             scale: isUrgent && !banner.missed ? { repeat: Infinity, duration: 0.75 } : undefined,
             borderColor: banner.missed ? { repeat: 2, duration: 0.28 } : undefined,
           }}
-          className="relative z-40 px-4 pb-2"
+          className="relative z-20 px-4 py-2 shrink-0"
         >
           <div
             className={`rounded-lg border-2 px-4 py-3 shadow-2xl ${
