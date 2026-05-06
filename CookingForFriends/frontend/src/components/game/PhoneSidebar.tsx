@@ -118,30 +118,32 @@ export default function PhoneSidebar() {
           </div>
 
           {/* Screen content */}
-          <div className="flex-1 grid grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] overflow-hidden min-h-0">
-              {/* App header */}
-              <div className="px-4 py-1.5 border-b border-slate-700/50 grid grid-cols-[minmax(76px,auto)_1fr_auto] items-center gap-2 shrink-0">
-                <h3 className="text-white text-sm font-semibold truncate">
-                  {activePhoneTab === 'chats' ? '💬 Chats' : '📖 Recipe'}
-                </h3>
-                <HeaderCookingContext />
-                <div className="justify-self-end w-10" aria-hidden="true" />
+          <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+            {/* App header */}
+            <div className="px-4 py-1.5 border-b border-slate-700/50 grid grid-cols-[minmax(76px,auto)_1fr_auto] items-center gap-2 shrink-0">
+              <h3 className="text-white text-sm font-semibold truncate">
+                {activePhoneTab === 'chats' ? '💬 Chats' : '📖 Recipe'}
+              </h3>
+              <HeaderCookingContext />
+              <div className="justify-self-end w-10" aria-hidden="true" />
+            </div>
+            <NotificationBanner />
+            <KitchenTimerBanner />
+
+            {/* Tab content */}
+            {activePhoneTab === 'chats' ? (
+              <div className="flex-1 flex min-h-0 overflow-hidden">
+                <ContactStrip />
+                <ChatView />
               </div>
-              <NotificationBanner />
-              <KitchenTimerBanner />
-
-              {/* Tab content */}
-              {activePhoneTab === 'chats' ? (
-                <div className="flex min-h-0 overflow-hidden">
-                  <ContactStrip />
-                  <ChatView />
-                </div>
-              ) : (
+            ) : (
+              <div className="flex-1 flex min-h-0 overflow-hidden">
                 <RecipeTab />
-              )}
+              </div>
+            )}
 
-              {/* Bottom tab bar */}
-              <PhoneTabBar />
+            {/* Bottom tab bar */}
+            <PhoneTabBar />
           </div>
 
           {/* Home indicator bar */}
