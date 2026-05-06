@@ -4,7 +4,6 @@
  *  Contact strip on the left, chat view on the right, bottom tab bar.
  *
  *  Components composed inside the iPhone shell:
- *    - LockScreen (per-contact notification summaries)
  *    - ContactStrip (left avatar list)
  *    - ChatView (right chat thread)
  *    - PhoneTabBar (Chats / Recipe tabs)
@@ -21,10 +20,7 @@ import ChatView from './phone/ChatView'
 import PhoneTabBar from './phone/PhoneTabBar'
 import RecipeTab from './phone/RecipeTab'
 import NotificationBanner from './phone/NotificationBanner'
-import LockScreen from './phone/LockScreen'
 import type { ActiveCookingStep } from '../../types'
-
-const LOCK_TIMEOUT = 15_000
 
 function buildHeaderTimerText(step: ActiveCookingStep) {
   const label = step.stepLabel.trim()
@@ -62,16 +58,10 @@ function HeaderKitchenTimer() {
 }
 
 export default function PhoneSidebar() {
-  const locked = useGameStore((s) => s.phoneLocked)
-  const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
   const gameClock = useGameStore((s) => s.gameClock)
-  const wsSend = useGameStore((s) => s.wsSend)
   const banner = useGameStore((s) => s.phoneBanner)
   const activePhoneTab = useGameStore((s) => s.activePhoneTab)
   const phoneMessages = useGameStore((s) => s.phoneMessages)
-  const contacts = useGameStore((s) => s.contacts)
-  const activeContactId = useGameStore((s) => s.activeContactId)
-  const setActiveContactId = useGameStore((s) => s.setActiveContactId)
 
   const lastActivityRef = useRef(Date.now())
   const play = useSoundEffects()
@@ -81,41 +71,12 @@ export default function PhoneSidebar() {
     [phoneMessages],
   )
 
-  // Auto-lock after timeout
-  useEffect(() => {
-    if (locked) return
-    const interval = setInterval(() => {
-      if (Date.now() - lastActivityRef.current > LOCK_TIMEOUT) {
-        setPhoneLocked(true)
-      }
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [locked, setPhoneLocked])
-
   // Play chime on new banner (visual pulse removed)
   useEffect(() => {
     if (banner) {
       play('phoneMessage')
     }
   }, [banner, play])
-
-  const handleUnlock = useCallback(() => {
-    setPhoneLocked(false)
-    lastActivityRef.current = Date.now()
-    if (wsSend) {
-      wsSend({ type: 'phone_unlock', data: { timestamp: Date.now() / 1000 } })
-    }
-
-    // Auto-navigate to contact with oldest unread
-    if (!activeContactId) {
-      const unreadMessages = phoneMessages
-        .filter((m) => m.channel === 'chat' && !m.read)
-        .sort((a, b) => a.timestamp - b.timestamp)
-      if (unreadMessages.length > 0 && unreadMessages[0].contactId) {
-        setActiveContactId(unreadMessages[0].contactId)
-      }
-    }
-  }, [setPhoneLocked, wsSend, activeContactId, phoneMessages, contacts, setActiveContactId])
 
   const handleInteraction = useCallback(() => {
     lastActivityRef.current = Date.now()
@@ -146,7 +107,7 @@ export default function PhoneSidebar() {
 
           {/* Status bar */}
           <div className="flex items-center justify-between px-6 py-2 text-[12px]">
-            <span className={`text-white font-medium text-[13px] ${locked ? 'invisible' : ''}`}>{gameClock ?? '--:--'}</span>
+            <span className="text-white font-medium text-[13px]">{gameClock ?? '--:--'}</span>
             <div className="flex items-center gap-1">
               {unreadCount > 0 && (
                 <span className="bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
@@ -159,22 +120,14 @@ export default function PhoneSidebar() {
           </div>
 
           {/* Screen content */}
-          {locked ? (
-            <LockScreen gameClock={gameClock ?? '--:--'} onUnlock={handleUnlock} />
-          ) : (
-            <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
               {/* App header */}
               <div className="px-4 py-1.5 border-b border-slate-700/50 grid grid-cols-[minmax(76px,auto)_1fr_auto] items-center gap-2 shrink-0">
                 <h3 className="text-white text-sm font-semibold truncate">
                   {activePhoneTab === 'chats' ? '💬 Chats' : '📖 Recipe'}
                 </h3>
                 <HeaderKitchenTimer />
-                <button
-                  onClick={() => setPhoneLocked(true)}
-                  className="text-[10px] text-slate-400 hover:text-white transition-colors px-2 py-1 rounded justify-self-end"
-                >
-                  🔒 Lock
-                </button>
+                <div className="justify-self-end w-10" aria-hidden="true" />
               </div>
 
               {/* Tab content */}
@@ -189,8 +142,7 @@ export default function PhoneSidebar() {
 
               {/* Bottom tab bar */}
               <PhoneTabBar />
-            </div>
-          )}
+          </div>
 
           {/* Home indicator bar */}
           <div className="flex justify-center pb-2 pt-1">

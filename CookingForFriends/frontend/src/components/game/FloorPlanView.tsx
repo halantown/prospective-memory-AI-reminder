@@ -26,7 +26,7 @@ import KitchenRoom, { KitchenStationOverlay } from './rooms/KitchenRoom'
 import KitchenFurniture from './rooms/KitchenFurniture'
 import WaypointEditor from './debug/WaypointEditor'
 import PlayerAvatar from './PlayerAvatar'
-import { subscribeCharacterPosition, useCharacterStore } from '../../stores/characterStore'
+import { useCharacterStore } from '../../stores/characterStore'
 import waypointData from '../../data/waypoints.json'
 import type { WaypointData } from '../../utils/waypointGraph'
 import { resolveRoomPoint } from '../../utils/waypointGraph'
@@ -276,13 +276,6 @@ export default function FloorPlanView({
       }, 800)
     }, ROBOT_FOLLOW_DELAY_MS)
   }, [disableNavigation, doorbellActive])
-
-  // Back to overview
-  const exitToOverview = useCallback(() => {
-    if (disableNavigation) return
-    setCurrentRoom(null)
-    setIsMoving(false)
-  }, [disableNavigation])
 
   // Cleanup timers
   useEffect(() => () => { if (robotTimer.current) clearTimeout(robotTimer.current) }, [])
@@ -557,49 +550,28 @@ export default function FloorPlanView({
         )}
       </AnimatePresence>
 
-      {/* ── Navigation edge buttons (zoomed mode) ── */}
-      {isZoomed && !disableNavigation && !isMoving && !isCharMoving && currentRoom && (
+      {/* ── Doorbell navigation prompt (only visible during PM trigger) ── */}
+      {doorbellActive && currentRoom === 'kitchen' && !disableNavigation && !isMoving && !isCharMoving && (
         ADJACENCY[currentRoom].map((nav) => {
           const isDoorbellTarget = doorbellActive && nav.target === 'living_room'
-          const isHighlightedTarget = highlightedRoom === nav.target
+          if (!isDoorbellTarget) return null
           return (
             <button
               key={nav.target}
-              className={`absolute z-40 flex items-center gap-1.5 px-4 py-2.5
-                         bg-slate-800/90 hover:bg-slate-700/95 backdrop-blur-sm
-                         rounded-xl shadow-lg whitespace-nowrap
+              className="absolute z-40 flex items-center gap-2 px-5 py-3
+                         bg-amber-500 text-slate-950 border-2 border-amber-100
+                         rounded-lg shadow-2xl shadow-amber-950/40 whitespace-nowrap
                          transition-all duration-200 hover:scale-105 active:scale-95
-                         cursor-pointer
-                         ${isDoorbellTarget || isHighlightedTarget
-                           ? 'border-2 border-amber-400 text-amber-200 hover:text-amber-100 animate-pulse ring-2 ring-amber-400/50'
-                           : 'border border-slate-600/50 hover:border-amber-400/60 text-slate-200 hover:text-amber-200'
-                         }`}
+                         cursor-pointer animate-pulse ring-4 ring-amber-400/35"
               style={edgeStyle(nav.direction)}
               onClick={() => navigateToRoom(nav.target)}
             >
               <span className="text-base font-bold">{ARROWS[nav.direction]}</span>
-              <span className="text-sm font-medium">{nav.label}</span>
-              {isDoorbellTarget && <span className="text-base">🔔</span>}
-              {isHighlightedTarget && !isDoorbellTarget && <span className="text-base">●</span>}
+              <span className="text-sm font-bold">Front Door</span>
+              <span className="text-base">🔔</span>
             </button>
           )
         })
-      )}
-
-      {/* ── Overview / Zoom-out button ── */}
-      {isZoomed && !disableNavigation && !isMoving && !isCharMoving && (
-        <button
-          className="absolute top-5 right-5 z-40 flex items-center gap-2 px-4 py-2.5
-                     bg-slate-800/90 hover:bg-slate-700/95 backdrop-blur-sm
-                     border border-slate-500/50 hover:border-slate-400/70
-                     rounded-xl shadow-lg text-slate-200 hover:text-white whitespace-nowrap
-                     transition-all duration-200 hover:scale-105 active:scale-95
-                     cursor-pointer"
-          onClick={exitToOverview}
-        >
-          <span className="text-base">🗺️</span>
-          <span className="text-sm font-medium">Overview</span>
-        </button>
       )}
 
       {/* ── Room label badge (zoomed mode) ── */}
@@ -620,41 +592,6 @@ export default function FloorPlanView({
         </div>
       )}
 
-      {/* ── Minimap (zoomed mode) — small overview in corner ── */}
-      {isZoomed && (
-        <div className="absolute bottom-5 left-5 z-40 w-48 rounded-lg overflow-hidden border border-slate-600/60 shadow-xl opacity-80 hover:opacity-100 transition-opacity">
-          <div className="relative">
-            <img
-              src="/assets/floorplan.png"
-              alt="Minimap"
-              className="w-full h-auto"
-              draggable={false}
-            />
-            {/* Current room highlight on minimap */}
-            {currentRoom && (
-              <div
-                className="absolute border-2 border-amber-400 rounded-sm bg-amber-400/20"
-                style={{
-                  left: `${ROOM_DEFS[currentRoom].x}%`,
-                  top: `${ROOM_DEFS[currentRoom].y}%`,
-                  width: `${ROOM_DEFS[currentRoom].w}%`,
-                  height: `${ROOM_DEFS[currentRoom].h}%`,
-                }}
-              />
-            )}
-            <MinimapAvatarDot />
-            {/* Robot dot on minimap */}
-            <div
-              className="absolute w-2 h-2 bg-cyan-400 rounded-full border border-white shadow-sm"
-              style={{
-                left: `${robotDef.cx - 5}%`,
-                top: `${robotDef.cy - 2}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* ── DEV: Waypoint editor toggle ── */}
       {import.meta.env.DEV && (
@@ -670,48 +607,6 @@ export default function FloorPlanView({
         </button>
       )}
     </div>
-  )
-}
-
-function MinimapAvatarDot() {
-  const dotRef = useRef<HTMLDivElement>(null)
-
-  const updateDotTransform = useCallback((position: { x: number; y: number }) => {
-    const el = dotRef.current
-    const parent = el?.parentElement
-    if (!el || !parent) return
-
-    const xPx = (position.x / 100) * parent.clientWidth
-    const yPx = (position.y / 100) * parent.clientHeight
-    el.style.transform = `translate3d(${xPx}px, ${yPx}px, 0) translate(-50%, -50%)`
-  }, [])
-
-  useEffect(() => {
-    const unsubscribe = subscribeCharacterPosition(updateDotTransform)
-
-    const parent = dotRef.current?.parentElement
-    const resizeObserver = parent && typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(() => updateDotTransform(useCharacterStore.getState().position))
-      : null
-    if (parent && resizeObserver) resizeObserver.observe(parent)
-
-    return () => {
-      unsubscribe()
-      resizeObserver?.disconnect()
-    }
-  }, [updateDotTransform])
-
-  return (
-    <div
-      ref={dotRef}
-      className="absolute w-2.5 h-2.5 bg-green-400 rounded-full border border-white shadow-sm"
-      style={{
-        left: 0,
-        top: 0,
-        transform: 'translate3d(0, 0, 0) translate(-50%, -50%)',
-        willChange: 'transform',
-      }}
-    />
   )
 }
 

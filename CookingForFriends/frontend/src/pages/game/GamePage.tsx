@@ -32,7 +32,7 @@ export default function GamePage() {
     setGameClock('17:00')
     setElapsedSeconds(0)
     setActivePhoneTab('chats')
-    setPhoneLocked(true)
+    setPhoneLocked(false)
   }, [setActivePhoneTab, setElapsedSeconds, setGameClock, setPhoneLocked])
 
   useWebSocket(sessionId)
@@ -45,7 +45,7 @@ export default function GamePage() {
       {/* World area — FloorPlanView replaces old WorldView tile layout.
            RobotAvatar is suppressed here; Pepper is rendered inside FloorPlanView. */}
       <div className={`relative flex-1 min-w-0 ${pmBlocksOngoingTask ? 'pointer-events-none' : ''}`}>
-        <FloorPlanView />
+        <FloorPlanView initialRoom="kitchen" initialCharRoom="kitchen" initialRobotRoom="kitchen" />
         <HUD />
         {/* RobotAvatar hidden — robot sprite lives inside FloorPlanView on the map */}
         {/* <RobotAvatar /> */}

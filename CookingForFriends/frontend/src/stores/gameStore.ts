@@ -285,7 +285,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   // ── Phone ──
   phoneMessages: [],
   phoneNotifications: [],
-  phoneLocked: true,
+  phoneLocked: false,
   phoneLastActivity: Date.now(),
   phoneBanner: null,
   contacts: [],
@@ -660,7 +660,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   addPhoneNotification: (notif) => set((s) => ({
     phoneNotifications: [...s.phoneNotifications, notif],
   })),
-  setPhoneLocked: (locked) => set({ phoneLocked: locked, phoneLastActivity: Date.now() }),
+  setPhoneLocked: (_locked) => set({ phoneLocked: false, phoneLastActivity: Date.now() }),
   markNotificationRead: (id) => set((s) => ({
     phoneNotifications: s.phoneNotifications.map((n) =>
       n.id === id ? { ...n, read: true } : n

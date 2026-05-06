@@ -208,7 +208,7 @@ export function useWebSocket(sessionId: string | null) {
         break
 
       case 'phone_lock':
-        store.setPhoneLocked(true)
+        store.setPhoneLocked(false)
         break
 
       case 'block_end':
