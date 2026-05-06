@@ -167,6 +167,7 @@ export default function FloorPlanView({
 }: FloorPlanViewProps = {}) {
   const viewRef = useRef<HTMLDivElement>(null)
   const pointerInsideGameAreaRef = useRef(true)
+  const doorbellSequenceWasActiveRef = useRef(false)
   const [viewSize, setViewSize] = useState({ width: 0, height: 0 })
   const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(initialRoom)
   const [charRoom, setCharRoom] = useState<FloorRoom>(initialCharRoom)
@@ -198,6 +199,20 @@ export default function FloorPlanView({
   const isCharMoving    = useCharacterStore((s) => s.isMoving)
 
   const isZoomed = currentRoom !== null
+
+  useEffect(() => {
+    if (pmPipelineState?.triggerType === 'doorbell') {
+      doorbellSequenceWasActiveRef.current = true
+      return
+    }
+    if (!doorbellSequenceWasActiveRef.current) return
+    doorbellSequenceWasActiveRef.current = false
+    setCurrentRoom('kitchen')
+    setCharRoom('kitchen')
+    setRobotRoom('kitchen')
+    const entryId = resolveRoomPoint(wpData.room_meta?.kitchen?.entry, 'kitchen')
+    if (entryId) teleportTo(entryId)
+  }, [pmPipelineState, teleportTo])
 
   useEffect(() => {
     setCurrentRoom(initialRoom)

@@ -44,9 +44,9 @@ function PhoneCallScreen({
   onAnswer: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/95 p-4">
-      <div className="w-full max-w-sm rounded-[2rem] border border-slate-700 bg-slate-900 p-8 text-center shadow-2xl">
-        <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-400 text-5xl shadow-lg">
+    <div className="fixed right-0 top-0 bottom-0 z-[210] flex w-[440px] items-center justify-center bg-slate-950/70 p-6">
+      <div className="w-full rounded-[2rem] border border-emerald-300/40 bg-slate-900 p-8 text-center shadow-2xl shadow-emerald-950/40">
+        <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-400 text-5xl shadow-lg animate-pulse">
           📞
         </div>
         <p className="text-sm uppercase tracking-[0.35em] text-emerald-200">Incoming Call</p>
@@ -65,7 +65,7 @@ function PhoneCallScreen({
 function DoorbellHint() {
   return (
     <div className="fixed left-1/2 top-5 z-[210] -translate-x-1/2 rounded-full border border-amber-300/60 bg-slate-950/80 px-5 py-3 text-sm font-semibold text-amber-100 shadow-xl backdrop-blur pointer-events-none">
-      🔔 Someone is at the door. Go to the Living Room to answer.
+      🔔 Someone is at the door.
     </div>
   )
 }

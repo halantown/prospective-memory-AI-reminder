@@ -122,7 +122,10 @@ function DishRecipeCard({
   const isStarted = dish.phase !== 'idle' && dish.phase !== 'served'
   const isDone = dish.phase === 'served'
   const hasLiveStep = Boolean(activeStep || waitStep)
-  const currentIndex = activeStep?.stepIndex ?? waitStep?.stepIndex ?? dish.currentStepIndex
+  const currentIndex = Math.min(
+    activeStep?.stepIndex ?? waitStep?.stepIndex ?? dish.currentStepIndex,
+    Math.max(dish.steps.length - 1, 0),
+  )
   const currentResult = dish.stepResults.find(r => r.stepIndex === currentIndex)
   const previousStep = currentIndex > 0 ? dish.steps[currentIndex - 1] : undefined
   const currentStep = activeStep
@@ -147,16 +150,11 @@ function DishRecipeCard({
         <span className={`text-[11px] font-semibold truncate ${hasActiveAction ? 'text-slate-100' : 'text-slate-400'}`}>
           {dish.label}
         </span>
-        {isDone && <span className="text-[9px] text-green-400 ml-auto shrink-0">✓</span>}
+        {isDone && <span className="text-[9px] text-slate-500 ml-auto shrink-0">✓</span>}
         {dish.phase === 'idle' && <span className="text-[9px] text-slate-500 ml-auto shrink-0">…</span>}
       </div>
 
-      {isDone ? (
-        <div className="flex-1 flex items-center justify-center text-green-300 text-xs font-semibold">
-          {dish.emoji} Complete
-        </div>
-      ) : (
-        <div className="flex flex-col gap-1 min-h-0">
+      <div className="flex flex-col gap-1 min-h-0">
           {previousStep && (
             <StepRow
               label={previousStep.label}
@@ -188,8 +186,7 @@ function DishRecipeCard({
               isCompleted={false}
             />
           )}
-        </div>
-      )}
+      </div>
     </div>
   )
 }

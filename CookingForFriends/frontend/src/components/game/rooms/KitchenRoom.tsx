@@ -86,6 +86,8 @@ export default function KitchenRoom({
   const activeStation = useGameStore((s) => s.activeStation)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
+  const cookingStepFeedback = useGameStore((s) => s.cookingStepFeedback)
+  const clearCookingStepFeedback = useGameStore((s) => s.clearCookingStepFeedback)
 
   const isCharMoving    = useCharacterStore((s) => s.isMoving)
   const moveToStation   = useCharacterStore((s) => s.moveToStation)
@@ -103,9 +105,19 @@ export default function KitchenRoom({
   // Clear feedback after short delay
   useEffect(() => {
     if (!feedback.type) return
-    const timer = setTimeout(() => setFeedback(f => ({ ...f, type: null })), 1200)
+    const timer = setTimeout(() => setFeedback(f => ({ ...f, type: null })), 300)
     return () => clearTimeout(timer)
   }, [feedback.type])
+
+  useEffect(() => {
+    if (!cookingStepFeedback) return
+    const visibleStation = cookingStepFeedback.station === 'burner2' || cookingStepFeedback.station === 'burner3'
+      ? 'burner1'
+      : cookingStepFeedback.station
+    setFeedback({ station: visibleStation, type: cookingStepFeedback.result })
+    const timer = setTimeout(clearCookingStepFeedback, 300)
+    return () => clearTimeout(timer)
+  }, [clearCookingStepFeedback, cookingStepFeedback])
 
   const handleStationClick = useCallback((station: KitchenStationId, event: React.MouseEvent<HTMLElement>) => {
     if (!isActive || isCharMoving) return
@@ -154,21 +166,25 @@ export default function KitchenRoom({
           return (
             <motion.button
               key={stationId}
-              className={`absolute z-10 rounded-lg border-2 transition-all duration-200
-                ${hasActiveStep ? 'bg-orange-500/35 border-orange-300 shadow-[0_0_18px_rgba(251,146,60,0.45)]' : 'bg-blue-500/30 border-blue-400'}
+              className={`group absolute z-10 rounded-lg border-2 transition-all duration-200
+                ${hasActiveStep ? 'bg-orange-500/20 border-orange-300/80 shadow-[0_0_14px_rgba(251,146,60,0.35)]' : 'bg-slate-950/5 border-white/10 hover:bg-white/10 hover:border-white/30'}
+                ${showFeedback === 'correct' ? 'border-emerald-300 bg-emerald-400/30' : ''}
+                ${showFeedback === 'wrong' ? 'border-red-300 bg-red-500/30' : ''}
                 ${isActive && !isCharMoving ? 'cursor-pointer' : 'cursor-default pointer-events-none'}
               `}
               style={pos}
               onClick={(event) => handleStationClick(stationId, event)}
             >
-              <div className="absolute bottom-0.5 left-1 text-[9px] text-white font-bold whitespace-nowrap drop-shadow">
+              <div className={`absolute bottom-0.5 left-1 text-[9px] font-semibold whitespace-nowrap drop-shadow transition-opacity ${
+                hasActiveStep ? 'text-white opacity-95' : 'text-white/55 opacity-55 group-hover:opacity-90'
+              }`}>
                 {info.emoji} {info.label}
               </div>
               {/* Feedback flash icon */}
               <AnimatePresence>
                 {showFeedback && (
                   <motion.div
-                    className="absolute inset-0 flex items-center justify-center text-2xl"
+                  className="absolute inset-0 flex items-center justify-center text-2xl"
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1.2, opacity: 1 }}
                     exit={{ scale: 0, opacity: 0 }}
@@ -176,7 +192,6 @@ export default function KitchenRoom({
                   >
                     {showFeedback === 'correct' && '✅'}
                     {showFeedback === 'wrong' && '❌'}
-                    {showFeedback === 'missed' && '⏭️'}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -211,8 +226,11 @@ export function KitchenStationOverlay({
   const activeStation = useGameStore((s) => s.activeStation)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
+  const cookingStepFeedback = useGameStore((s) => s.cookingStepFeedback)
+  const clearCookingStepFeedback = useGameStore((s) => s.clearCookingStepFeedback)
   const wsSend = useGameStore((s) => s.wsSend)
   const [submittedStepKeys, setSubmittedStepKeys] = useState<Set<string>>(() => new Set())
+  const [pendingStep, setPendingStep] = useState<ActiveCookingStep | null>(null)
 
   useEffect(() => {
     setSubmittedStepKeys((prev) => {
@@ -222,10 +240,25 @@ export function KitchenStationOverlay({
     })
   }, [activeCookingSteps])
 
+  useEffect(() => {
+    if (!pendingStep || !cookingStepFeedback) return
+    if (
+      pendingStep.dishId !== cookingStepFeedback.dishId ||
+      pendingStep.stepIndex !== cookingStepFeedback.stepIndex
+    ) return
+    const timer = setTimeout(() => {
+      setPendingStep(null)
+      setActiveStation(null)
+      clearCookingStepFeedback()
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [clearCookingStepFeedback, cookingStepFeedback, pendingStep, setActiveStation])
+
   const handleOptionClick = useCallback((step: ActiveCookingStep, option: CookingStepOption) => {
     if (!wsSend) return
     const key = cookingStepKey(step)
     if (submittedStepKeys.has(key)) return
+    setPendingStep(step)
     setSubmittedStepKeys(prev => new Set(prev).add(key))
     wsSend({
       type: 'cooking_action',
@@ -238,7 +271,6 @@ export function KitchenStationOverlay({
         timestamp: Date.now() / 1000,
       },
     })
-    setActiveStation(null)
   }, [wsSend, submittedStepKeys, setActiveStation])
 
   const activeStepForStation = useMemo(() => {
@@ -248,13 +280,22 @@ export function KitchenStationOverlay({
     )
   }, [activeStation, activeCookingSteps, submittedStepKeys])
 
+  const popupStep = activeStepForStation ?? pendingStep ?? undefined
+  const popupFeedback = pendingStep && cookingStepFeedback
+    && pendingStep.dishId === cookingStepFeedback.dishId
+    && pendingStep.stepIndex === cookingStepFeedback.stepIndex
+    ? cookingStepFeedback.result
+    : null
+
   return (
     <AnimatePresence>
       {activeStation && (
         <StationPopup
           station={activeStation}
           anchor={anchor}
-          activeStep={activeStepForStation}
+          activeStep={popupStep}
+          pending={Boolean(pendingStep)}
+          feedback={popupFeedback}
           onOptionClick={handleOptionClick}
           onClose={() => setActiveStation(null)}
         />
@@ -268,12 +309,16 @@ function StationPopup({
   station,
   anchor,
   activeStep,
+  pending,
+  feedback,
   onOptionClick,
   onClose,
 }: {
   station: KitchenStationId
   anchor: { x: number; y: number } | null
   activeStep: ActiveCookingStep | undefined
+  pending: boolean
+  feedback: 'correct' | 'wrong' | null
   onOptionClick: (step: ActiveCookingStep, option: CookingStepOption) => void
   onClose: () => void
 }) {
@@ -291,7 +336,13 @@ function StationPopup({
     >
       {/* Popup card */}
       <motion.div
-        className="absolute pointer-events-auto bg-slate-800 border border-slate-600 rounded-xl shadow-2xl p-4 min-w-[220px] max-w-[300px]"
+        className={`absolute pointer-events-auto bg-slate-800 border-2 rounded-xl shadow-2xl p-4 min-w-[220px] max-w-[300px] transition-colors duration-100 ${
+          feedback === 'correct'
+            ? 'border-emerald-300 shadow-emerald-950/40'
+            : feedback === 'wrong'
+              ? 'border-red-300 shadow-red-950/40'
+              : 'border-slate-600'
+        }`}
         style={{
           left: `clamp(12px, ${x + 14}px, calc(100% - 316px))`,
           top: `clamp(12px, ${y - 24}px, calc(100% - 280px))`,
@@ -320,8 +371,9 @@ function StationPopup({
                 <button
                   key={option.id}
                   className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-700/50 hover:bg-cooking-900/40 
-                    border border-slate-600/50 hover:border-cooking-400/50 transition-colors text-left"
+                    border border-slate-600/50 hover:border-cooking-400/50 transition-colors text-left disabled:opacity-60 disabled:cursor-wait"
                   onClick={() => onOptionClick(activeStep, option)}
+                  disabled={pending}
                 >
                   <span className="text-sm text-slate-100">{option.text}</span>
                 </button>

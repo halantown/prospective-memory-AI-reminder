@@ -20,6 +20,7 @@ import ChatView from './phone/ChatView'
 import PhoneTabBar from './phone/PhoneTabBar'
 import RecipeTab from './phone/RecipeTab'
 import NotificationBanner from './phone/NotificationBanner'
+import KitchenTimerBanner from './phone/KitchenTimerBanner'
 import type { ActiveCookingStep } from '../../types'
 
 function buildHeaderTimerText(step: ActiveCookingStep) {
@@ -28,7 +29,7 @@ function buildHeaderTimerText(step: ActiveCookingStep) {
   return `${label.charAt(0).toUpperCase()}${label.slice(1)}!`
 }
 
-function HeaderKitchenTimer() {
+function HeaderCookingContext() {
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
   const dishes = useGameStore((s) => s.dishes)
   const step = activeCookingSteps[0]
@@ -43,8 +44,8 @@ function HeaderKitchenTimer() {
     <div className="min-w-0 flex-1 flex justify-center px-2">
       <div
         className="max-w-full inline-flex items-center gap-1.5 rounded-full
-                   bg-orange-500/15 border border-orange-400/35 px-2.5 py-1
-                   text-orange-200"
+                   bg-slate-700/45 border border-slate-600/45 px-2.5 py-1
+                   text-slate-300"
       >
         <span className="text-[13px] leading-none flex-shrink-0">
           {dish?.emoji ?? '🍳'}
@@ -126,9 +127,10 @@ export default function PhoneSidebar() {
                 <h3 className="text-white text-sm font-semibold truncate">
                   {activePhoneTab === 'chats' ? '💬 Chats' : '📖 Recipe'}
                 </h3>
-                <HeaderKitchenTimer />
+                <HeaderCookingContext />
                 <div className="justify-self-end w-10" aria-hidden="true" />
               </div>
+              <KitchenTimerBanner />
 
               {/* Tab content */}
               {activePhoneTab === 'chats' ? (

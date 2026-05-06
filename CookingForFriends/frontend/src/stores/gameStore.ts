@@ -49,6 +49,8 @@ interface GameState {
   activeCookingSteps: ActiveCookingStep[]
   /** Steps currently showing "missed" flash before disappearing */
   missedStepFlashes: { dishId: string; stepIndex: number; stepLabel: string; emoji: string }[]
+  /** Latest active-step choice feedback for popup/station flash */
+  cookingStepFeedback: { dishId: DishId; stepIndex: number; result: 'correct' | 'wrong'; station: KitchenStationId; timestamp: number } | null
   /** Currently running wait steps (auto-progressing) */
   cookingWaitSteps: CookingWaitStep[]
   /** Accumulated results for scoring display */
@@ -128,6 +130,7 @@ interface GameState {
   handleCookingStepTimeout: (data: Record<string, unknown>) => void
   handleCookingWaitStart: (data: Record<string, unknown>) => void
   handleCookingWaitEnd: (data: Record<string, unknown>) => void
+  clearCookingStepFeedback: () => void
   getActiveStepForStation: (station: KitchenStationId) => ActiveCookingStep | undefined
 
   // Dining actions
@@ -269,6 +272,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   activeStation: null,
   activeCookingSteps: [],
   missedStepFlashes: [],
+  cookingStepFeedback: null,
   cookingWaitSteps: [],
   cookingScore: { correct: 0, wrong: 0, missed: 0 },
 
@@ -374,6 +378,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     dishes: createInitialDishes(definitions),
     activeCookingSteps: [],
     missedStepFlashes: [],
+    cookingStepFeedback: null,
     cookingWaitSteps: [],
     cookingScore: { correct: 0, wrong: 0, missed: 0 },
     activeStation: null,
@@ -487,6 +492,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       const dish = s.dishes[dishId]
       const score = { ...s.cookingScore }
       const alreadyRecorded = dish.stepResults.some(r => r.stepIndex === stepIndex)
+      const completedStep = s.activeCookingSteps.find(
+        st => st.dishId === dishId && st.stepIndex === stepIndex
+      )
       if (!alreadyRecorded) {
         if (result === 'correct') score.correct++
         else score.wrong++
@@ -497,6 +505,15 @@ export const useGameStore = create<GameState>((set, get) => ({
         activeCookingSteps: s.activeCookingSteps.filter(
           st => !(st.dishId === dishId && st.stepIndex === stepIndex)
         ),
+        cookingStepFeedback: completedStep
+          ? {
+              dishId,
+              stepIndex,
+              result,
+              station: completedStep.station,
+              timestamp: Date.now(),
+            }
+          : s.cookingStepFeedback,
         // Add result to dish
         dishes: {
           ...s.dishes,
@@ -549,7 +566,7 @@ export const useGameStore = create<GameState>((set, get) => ({
               f => !(f.dishId === dishId && f.stepIndex === stepIndex)
             ),
           }))
-        }, 1500)
+        }, 2000)
       }
 
       return {
@@ -617,6 +634,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       },
     }))
   },
+
+  clearCookingStepFeedback: () => set({ cookingStepFeedback: null }),
 
   getActiveStepForStation: (station) => {
     return get().activeCookingSteps.find(s => s.station === station)
