@@ -13,6 +13,7 @@ import { GREETING_PLACEHOLDERS, REMINDER_PLACEHOLDERS } from '../../constants/pl
 import type { DecoyOption, PMPipelineStep } from '../../types'
 import BubbleDialogue from './dialogue/BubbleDialogue'
 import ClickDialogueFlow from './dialogue/ClickDialogueFlow'
+import CharacterSpriteSheet, { type CharacterSpriteId } from './CharacterSpriteSheet'
 import {
   getActiveTriggerEncounterConfig,
   getEncounterReminder,
@@ -44,6 +45,11 @@ function fallbackDialogueLines(lines: string[], speaker: string, triggerType: 'd
     text,
     bubblePosition: triggerType === 'phone_call' ? 'phone' : index % 2 === 0 ? 'right' : 'left',
   }))
+}
+
+function spriteIdForNpc(npcId: string | undefined): CharacterSpriteId {
+  if (npcId === 'mei' || npcId === 'sophia' || npcId === 'benjamin' || npcId === 'courier' || npcId === 'sam_tutorial') return npcId
+  return 'courier'
 }
 
 function PhoneCallScreen({
@@ -104,10 +110,12 @@ function ReminderStep({
 function DirectRequestStep({
   config,
   fallbackDialogue,
+  phoneAvatar,
   onComplete,
 }: {
   config: TriggerEncounterConfig | null
   fallbackDialogue: DialogueLine[]
+  phoneAvatar?: ReactNode
   onComplete: () => void
 }) {
   const [dialogueDone, setDialogueDone] = useState(false)
@@ -117,6 +125,7 @@ function DirectRequestStep({
     return (
       <ClickDialogueFlow
         lines={config?.fakeDialogue ?? fallbackDialogue}
+        phoneAvatar={phoneAvatar}
         onComplete={() => setDialogueDone(true)}
       />
     )
@@ -359,6 +368,9 @@ export default function PMTriggerModal() {
     ?? fallbackDialogueLines(greetingLines, guestName, triggerType)
   const fakeDialogue = encounterConfig?.fakeDialogue
     ?? fallbackDialogueLines(fakeLines, guestName, triggerType)
+  const phoneAvatar = triggerType === 'phone_call' && encounterConfig
+    ? <CharacterSpriteSheet character={spriteIdForNpc(encounterConfig.npcId)} animation="phone" facing="left" scale={1.25} />
+    : undefined
 
   const handleGreetingComplete = () => {
     if (isFake) {
@@ -427,7 +439,7 @@ export default function PMTriggerModal() {
 
   if (step === 'greeting') {
     return (
-      <ClickDialogueFlow lines={greetingDialogue} onComplete={handleGreetingComplete} />
+      <ClickDialogueFlow lines={greetingDialogue} phoneAvatar={phoneAvatar} onComplete={handleGreetingComplete} />
     )
   }
 
@@ -436,6 +448,7 @@ export default function PMTriggerModal() {
       <DirectRequestStep
         config={encounterConfig}
         fallbackDialogue={fakeDialogue}
+        phoneAvatar={phoneAvatar}
         onComplete={handleFakeComplete}
       />
     )

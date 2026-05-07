@@ -207,9 +207,8 @@ export default function FloorPlanView({
   })
   const encounterFocusActive = Boolean(
     encounterConfig
-    && pmPipelineState?.triggerType === 'doorbell'
-    && pmPipelineState.step !== 'trigger_event'
-    && pmPipelineState.step !== 'completed'
+    && pmPipelineState?.step !== 'trigger_event'
+    && pmPipelineState?.step !== 'completed'
   )
   const visitorVisible = pmPipelineState?.triggerType === 'doorbell'
     && (pmPipelineState.step === 'greeting'
@@ -380,8 +379,10 @@ export default function FloorPlanView({
   // This ensures the image always fills the container with no black borders.
   const floorTransform = useMemo(() => {
     if (!isZoomed) return 'translate3d(0px, 0px, 0) scale(1)'
-    const room = encounterFocusActive
+    const room = encounterFocusActive && pmPipelineState?.triggerType === 'doorbell'
       ? { ...ROOM_DEFS.living_room, cx: 66, cy: 58 }
+      : encounterFocusActive && currentRoom
+        ? ROOM_DEFS[currentRoom]
       : ROOM_DEFS[currentRoom!]
     const isKitchen = currentRoom === 'kitchen'
     const S = encounterFocusActive ? ENCOUNTER_ZOOM_SCALE : isKitchen ? ZOOM_SCALE_KITCHEN : ZOOM_SCALE

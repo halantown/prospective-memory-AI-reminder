@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import type { ReactNode } from 'react'
 import type { DialogueLine } from '../../../data/triggerEncounters'
 
 const TYPE_MS = 30
@@ -10,6 +11,7 @@ const AUTO_ADVANCE_MS = 45_000
 
 interface ClickDialogueFlowProps {
   lines: DialogueLine[]
+  phoneAvatar?: ReactNode
   onComplete: () => void
 }
 
@@ -17,7 +19,7 @@ function speakerLabel(speaker: string) {
   return speaker === 'Avatar' ? 'You' : speaker
 }
 
-export default function ClickDialogueFlow({ lines, onComplete }: ClickDialogueFlowProps) {
+export default function ClickDialogueFlow({ lines, phoneAvatar, onComplete }: ClickDialogueFlowProps) {
   const [lineIndex, setLineIndex] = useState(0)
   const [visibleChars, setVisibleChars] = useState(0)
   const [showHint, setShowHint] = useState(false)
@@ -88,6 +90,7 @@ export default function ClickDialogueFlow({ lines, onComplete }: ClickDialogueFl
     return () => window.removeEventListener('keydown', onKey)
   }, [advance])
 
+  const isPhoneLine = line?.bubblePosition === 'phone'
   const align = line?.bubblePosition === 'right' || line?.bubblePosition === 'robot' ? 'right' : 'left'
   const text = useMemo(() => fullText.slice(0, visibleChars), [fullText, visibleChars])
 
@@ -105,13 +108,24 @@ export default function ClickDialogueFlow({ lines, onComplete }: ClickDialogueFl
       <AnimatePresence mode="wait">
         <motion.div
           key={`${lineIndex}-${line.speaker}`}
-          className={`flex w-full max-w-3xl ${align === 'right' ? 'justify-end' : 'justify-start'}`}
+          className={`flex w-full max-w-3xl ${isPhoneLine ? 'mb-36 justify-end' : align === 'right' ? 'justify-end' : 'justify-start'}`}
           initial={{ opacity: 0, y: 16, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 8, scale: 0.98 }}
           transition={{ duration: 0.18 }}
         >
-          <div className={`relative max-w-[300px] border-2 border-slate-900 bg-amber-50 px-4 py-3 text-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.45)] ${align === 'right' ? 'mr-10' : 'ml-10'}`}>
+          <div className={`relative max-w-[300px] border-2 border-slate-900 px-4 py-3 text-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.45)] ${
+            isPhoneLine
+              ? 'mr-6 rounded-[28px] bg-white'
+              : align === 'right'
+                ? 'mr-10 bg-amber-50'
+                : 'ml-10 bg-amber-50'
+          }`}>
+            {isPhoneLine && phoneAvatar && (
+              <div className="absolute -top-24 right-5 flex h-24 w-24 items-end justify-center overflow-hidden rounded-full border-2 border-slate-900 bg-sky-100 shadow-[3px_3px_0_rgba(15,23,42,0.35)]">
+                {phoneAvatar}
+              </div>
+            )}
             <div className="mb-1 text-[11px] font-black uppercase tracking-wide text-slate-600">
               {speakerLabel(line.speaker)}
             </div>
@@ -124,10 +138,12 @@ export default function ClickDialogueFlow({ lines, onComplete }: ClickDialogueFl
               </div>
             )}
             <div
-              className={`absolute bottom-3 h-4 w-4 rotate-45 border-b-2 border-slate-900 bg-amber-50 ${
-                align === 'right'
-                  ? '-right-[9px] border-r-2'
-                  : '-left-[9px] border-l-2'
+              className={`absolute bottom-3 h-4 w-4 rotate-45 border-b-2 border-slate-900 ${
+                isPhoneLine
+                  ? '-right-[9px] border-r-2 bg-white'
+                  : align === 'right'
+                    ? '-right-[9px] border-r-2 bg-amber-50'
+                    : '-left-[9px] border-l-2 bg-amber-50'
               }`}
             />
           </div>
