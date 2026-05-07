@@ -19,13 +19,18 @@ Entry 5: fake  phone call                —  60 s after entry 4 pipeline ends
 Entry 6: real  trigger (T at position 4) —  60 s after entry 5 pipeline ends
 Session ends                             —  60 s after entry 6 pipeline ends
 ```
-Game time is **frozen** during each pipeline (ongoing tasks pause). Pipeline duration does not count toward the next delay.
+Gameplay trigger encounters are in-world interaction flows, not encoding cutscenes. Cooking timers continue during these encounters; PM pressure is intentional. The scheduler delay for the next trigger starts after the current trigger flow resolves.
 
 ### PM Pipeline (real trigger — 6 steps)
-`trigger_affordance → greeting → reminder (robot avatar) → decoy selection → confidence rating → avatar auto-action`
+`trigger_affordance → trigger_encounter_dialogue → reminder (robot avatar) → item selection → confidence rating → avatar auto-action`
 
 ### PM Pipeline (fake trigger — 4 steps)
-`trigger_affordance → greeting → fake_reminder (robot avatar, neutral) → completed`
+`trigger_affordance → trigger_encounter_dialogue → direct request → single action → completed`
+
+### Terminology
+
+- **Cutscene**: fixed encoding/tutorial video sequence before gameplay, implemented by `CutsceneEncodingPage` and logged through `cutscene_events`.
+- **Trigger encounter / PM trigger flow**: doorbell or phone-call interaction during gameplay. Do not call this a cutscene in new code or docs.
 
 ## Architecture
 
@@ -40,11 +45,11 @@ CookingForFriends/
 │   ├── models/
 │   │   ├── experiment.py     # Experiment, Participant (condition, task_order, game_time fields)
 │   │   ├── block.py          # Block (schema shim — do not drop)
-│   │   ├── pm_module.py      # CutsceneEvent, PMTaskEvent, FakeTriggerEvent, IntentionCheckEvent, PhaseEvent
+│   │   ├── pm_module.py      # Encoding CutsceneEvent, PMTaskEvent, FakeTriggerEvent, IntentionCheckEvent, PhaseEvent
 │   │   ├── logging.py        # InteractionLog, MouseTrack, OngoingTaskScore, GameStateSnapshot
 │   │   └── schemas.py        # Pydantic request/response schemas
 │   ├── routers/
-│   │   ├── session.py        # Token login, phase transitions, cutscene/intention-check logging, state endpoint
+│   │   ├── session.py        # Token login, phase transitions, encoding cutscene/intention-check logging, state endpoint
 │   │   └── admin.py          # Participant CRUD, test-session, assignment counts, live monitor, CSV export
 │   ├── websocket/
 │   │   ├── connection_manager.py  # WS pub/sub manager

@@ -77,6 +77,7 @@ export type PMPipelineStep =
   | 'confidence_rating'
   | 'auto_execute'
   | 'fake_resolution'
+  | 'direct_request'
   | 'completed'
 
 export interface PMPipelineState {

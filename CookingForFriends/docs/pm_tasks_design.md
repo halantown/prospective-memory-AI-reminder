@@ -1,6 +1,6 @@
 # PM Task Design Summary
 
-> Personal reference document. Includes cutscene storyboards, decoy structure, EC± wording directions, and implementation notes.
+> Personal reference document. Includes encoding cutscene storyboards, decoy structure, EC± wording directions, and implementation notes.
 
 ---
 
@@ -10,7 +10,11 @@
 - **Setting**: Saturday evening, player at home preparing dinner, 4 friends arriving
 - **Each task**: Encoding cutscene (past episode) → delay (cooking ongoing task) → trigger → reminder (EE1 or EE0) → "Got it" button → 3-option item selection → confidence rating
 - **Trigger types**: 2 doorbell + 2 phone call
-- **Cutscene timing**: ~4 segments × ~15s each ≈ 1 min per task, keep consistent across tasks
+- **Encoding cutscene timing**: ~4 segments × ~15s each ≈ 1 min per task, keep consistent across tasks
+
+Terminology note:
+- **Cutscene** means the fixed encoding/tutorial video sequence.
+- **Trigger encounter** means the in-game doorbell or phone-call PM interaction flow. Do not call PM trigger encounters "cutscenes" in new implementation work.
 
 ## Counterbalance
 
@@ -201,14 +205,16 @@ This is retained as a design note only; the current PM module implements the 3-o
 - After each segment: detail-check question (确认被试处理了material)
 - After all 4 cutscenes: explicit PM intention check
 
-### Trigger Flow
+### Trigger Encounter Flow
 1. Trigger event (doorbell / phone call)
-2. Open door / answer phone → automatic greeting playback
-3. Reminder displayed (EE1 or EE0)
-4. "Got it" button
-5. 3-option item selection
-6. Confidence rating (7-point Likert)
+2. Open door / answer phone → click-to-advance greeting dialogue
+3. Reminder displayed by robot (EE1 or EE0) for real PM triggers
+4. "Got it" button for real PM triggers
+5. 3-option item selection for real PM triggers
+6. Confidence rating (7-point Likert) for real PM triggers
 7. Auto-execute fixed avatar action
+
+Fake triggers use the same entry interaction but do not show a robot reminder. The visitor/caller directly asks for one action, then the encounter exits.
 
 Current strict PM state machine:
 
@@ -229,11 +235,13 @@ Fake trigger:
 ```text
 trigger_event
 → greeting
-→ fake_resolution
+→ direct_request
 → completed
 ```
 
 No UI control may skip or rewind states.
+
+See `docs/PM_TRIGGER_FLOW.md` for the current implementation plan, including click-to-advance dialogue, encounter focus zoom, fake variants, and tutorial trigger behavior.
 
 ### Platform Interaction Differences by Task
 | Task | Post-selection execution |

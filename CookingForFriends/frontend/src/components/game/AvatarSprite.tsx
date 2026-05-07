@@ -21,9 +21,9 @@ import type { AnimationState } from '../../stores/characterStore'
 const FRAME_RATE = 8 // fps
 
 const SPRITE_SHEETS: Record<AnimationState, string> = {
-  idle: '/assets/characters/avatar1/test1_idle.png',
-  walk: '/assets/characters/avatar1/test1_walk.png',
-  sit:  '/assets/characters/avatar1/test1_sit.png',
+  idle: '/assets/characters/Avatar_idle.png',
+  walk: '/assets/characters/Avatar_walk.png',
+  sit:  '/assets/characters/Avatar_sit.png',
 }
 
 /** First frame index for each direction × animation combination */

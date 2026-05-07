@@ -91,12 +91,12 @@ export default function PhoneSidebar() {
 
             {/* Tab content */}
             {activePhoneTab === 'chats' ? (
-              <div className={`flex-1 flex min-h-0 overflow-hidden ${hasKitchenCue ? 'pt-[62px]' : ''}`}>
+              <div className={`flex-1 flex min-h-0 overflow-hidden ${hasKitchenCue ? 'pt-[82px]' : ''}`}>
                 <ContactStrip />
                 <ChatView />
               </div>
             ) : (
-              <div className={`flex-1 flex min-h-0 overflow-hidden ${hasKitchenCue ? 'pt-[62px]' : ''}`}>
+              <div className={`flex-1 flex min-h-0 overflow-hidden ${hasKitchenCue ? 'pt-[82px]' : ''}`}>
                 <RecipeTab />
               </div>
             )}

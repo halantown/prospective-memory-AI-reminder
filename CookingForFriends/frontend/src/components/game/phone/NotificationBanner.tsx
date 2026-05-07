@@ -65,7 +65,7 @@ export default function NotificationBanner({ belowKitchenCue = false }: { belowK
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-          className={`absolute left-4 right-4 ${belowKitchenCue ? 'top-[96px]' : 'top-[44px]'} z-30 rounded-xl shadow-lg shadow-black/30
+          className={`absolute ${belowKitchenCue ? 'bottom-[82px] left-14 right-4' : 'left-4 right-4 top-[44px]'} z-30 rounded-xl shadow-lg shadow-black/30
                      border cursor-pointer overflow-hidden`}
           style={{
             backgroundColor: isSystemNotification ? 'rgba(30, 41, 59, 0.96)' : '#ffffff',
@@ -81,9 +81,8 @@ export default function NotificationBanner({ belowKitchenCue = false }: { belowK
             transition={{ duration: duration / 1000, ease: 'linear' }}
             className={`h-[3px] rounded-t-xl ${isSystemNotification ? 'bg-slate-400' : 'bg-blue-500'}`}
           />
-          <div className="flex items-center gap-3 px-3 py-2.5">
-            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center
-                            text-xl flex-shrink-0 shadow-sm">
+          <div className={`flex items-center gap-3 px-3 ${belowKitchenCue ? 'py-2' : 'py-2.5'}`}>
+            <div className={`${belowKitchenCue ? 'h-9 w-9 rounded-lg text-base' : 'h-12 w-12 rounded-xl text-xl'} bg-slate-100 flex flex-shrink-0 items-center justify-center shadow-sm`}>
               {displayAvatar}
             </div>
             <div className="flex-1 min-w-0">
@@ -91,7 +90,7 @@ export default function NotificationBanner({ belowKitchenCue = false }: { belowK
                 <span className={`text-[13px] font-semibold leading-none ${isSystemNotification ? 'text-slate-100' : 'text-slate-900'}`}>{displayName}</span>
                 <span className={`text-[10px] font-medium ${isSystemNotification ? 'text-slate-400' : 'text-slate-400'}`}>now</span>
               </div>
-              <p className={`text-[13px] leading-snug line-clamp-2 ${isSystemNotification ? 'text-slate-300' : 'text-slate-600'}`}>{banner.text}</p>
+              <p className={`${belowKitchenCue ? 'text-[12px] line-clamp-1' : 'text-[13px] line-clamp-2'} leading-snug ${isSystemNotification ? 'text-slate-300' : 'text-slate-600'}`}>{banner.text}</p>
             </div>
           </div>
         </motion.div>

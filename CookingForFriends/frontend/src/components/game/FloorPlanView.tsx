@@ -26,10 +26,12 @@ import KitchenRoom, { KitchenStationOverlay } from './rooms/KitchenRoom'
 import KitchenFurniture from './rooms/KitchenFurniture'
 import WaypointEditor from './debug/WaypointEditor'
 import PlayerAvatar from './PlayerAvatar'
+import CharacterSpriteSheet from './CharacterSpriteSheet'
 import { useCharacterStore } from '../../stores/characterStore'
 import waypointData from '../../data/waypoints.json'
 import type { WaypointData } from '../../utils/waypointGraph'
 import { resolveRoomPoint } from '../../utils/waypointGraph'
+import { getTriggerEncounterConfig } from '../../data/triggerEncounters'
 
 const wpData = waypointData as unknown as WaypointData
 
@@ -144,6 +146,7 @@ function edgeStyle(dir: NavDirection): React.CSSProperties {
 
 const ZOOM_SCALE = 1.6
 const ZOOM_SCALE_KITCHEN = 1.7
+const ENCOUNTER_ZOOM_SCALE = 2.5
 // Max positive translate (%) allowed for kitchen — creates a small controlled gap
 // so kitchen content isn't pinned to top-left corner of the view.
 const KITCHEN_MAX_OFFSET_X = 10
@@ -191,8 +194,21 @@ export default function FloorPlanView({
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
   const doorbellActive = pmPipelineState?.step === 'trigger_event'
     && pmPipelineState.triggerType === 'doorbell'
+  const encounterConfig = getTriggerEncounterConfig(pmPipelineState?.taskId)
+  const encounterFocusActive = Boolean(
+    encounterConfig
+    && pmPipelineState?.triggerType === 'doorbell'
+    && pmPipelineState.step !== 'trigger_event'
+    && pmPipelineState.step !== 'completed'
+  )
   const visitorVisible = pmPipelineState?.triggerType === 'doorbell'
-    && (pmPipelineState.step === 'greeting' || pmPipelineState.step === 'fake_resolution')
+    && (pmPipelineState.step === 'greeting'
+      || pmPipelineState.step === 'reminder'
+      || pmPipelineState.step === 'item_selection'
+      || pmPipelineState.step === 'confidence_rating'
+      || pmPipelineState.step === 'auto_execute'
+      || pmPipelineState.step === 'fake_resolution'
+      || pmPipelineState.step === 'direct_request')
 
   const moveToWaypoint  = useCharacterStore((s) => s.moveToWaypoint)
   const teleportTo      = useCharacterStore((s) => s.teleportTo)
@@ -231,6 +247,8 @@ export default function FloorPlanView({
     if (disableNavigation) return
     if (isMoving) return
     if (target === currentRoom) return
+    setActiveStation(null)
+    setStationPopupAnchor(null)
 
     const currentMeta = currentRoom ? wpData.room_meta?.[currentRoom] : null
     const targetMeta  = wpData.room_meta?.[target] ?? null
@@ -271,11 +289,13 @@ export default function FloorPlanView({
     } else {
       doTransition()
     }
-  }, [currentRoom, disableNavigation, doorbellActive, isMoving, isCharMoving, moveToWaypoint, teleportTo])
+  }, [currentRoom, disableNavigation, doorbellActive, isMoving, isCharMoving, moveToWaypoint, setActiveStation, teleportTo])
 
   // Enter a room from overview — robot follows immediately with delay
   const enterRoom = useCallback((room: FloorRoom) => {
     if (disableNavigation) return
+    setActiveStation(null)
+    setStationPopupAnchor(null)
     setCurrentRoom(room)
     setCharRoom(room)
     if (doorbellActive && room === 'living_room') {
@@ -290,7 +310,7 @@ export default function FloorPlanView({
         setIsRobotMoving(false)
       }, 800)
     }, ROBOT_FOLLOW_DELAY_MS)
-  }, [disableNavigation, doorbellActive])
+  }, [disableNavigation, doorbellActive, setActiveStation])
 
   // Cleanup timers
   useEffect(() => () => { if (robotTimer.current) clearTimeout(robotTimer.current) }, [])
@@ -350,9 +370,11 @@ export default function FloorPlanView({
   // This ensures the image always fills the container with no black borders.
   const floorTransform = useMemo(() => {
     if (!isZoomed) return 'translate3d(0px, 0px, 0) scale(1)'
-    const room = ROOM_DEFS[currentRoom!]
+    const room = encounterFocusActive
+      ? { ...ROOM_DEFS.living_room, cx: 66, cy: 58 }
+      : ROOM_DEFS[currentRoom!]
     const isKitchen = currentRoom === 'kitchen'
-    const S = isKitchen ? ZOOM_SCALE_KITCHEN : ZOOM_SCALE
+    const S = encounterFocusActive ? ENCOUNTER_ZOOM_SCALE : isKitchen ? ZOOM_SCALE_KITCHEN : ZOOM_SCALE
     const minT = (1 - S) * 100
     const rawTx = (0.5 - S * room.cx / 100) * 100
     const rawTy = (0.5 - S * room.cy / 100) * 100
@@ -363,7 +385,7 @@ export default function FloorPlanView({
     const txPx = snapToDevicePixel((tx / 100) * viewSize.width)
     const tyPx = snapToDevicePixel((ty / 100) * viewSize.height)
     return `translate3d(${txPx}px, ${tyPx}px, 0) scale(${S})`
-  }, [isZoomed, currentRoom, viewSize.height, viewSize.width])
+  }, [encounterFocusActive, isZoomed, currentRoom, viewSize.height, viewSize.width])
 
   // Always keep transform-origin at top-left so the clamped math above is exact.
   const transformOrigin = '0% 0%'
@@ -472,16 +494,16 @@ export default function FloorPlanView({
         </AnimatePresence>
 
         <AnimatePresence>
-          {visitorVisible && (
+          {visitorVisible && encounterConfig && (
             <motion.div
               className="absolute z-[31] pointer-events-none"
-              style={{ left: '61%', top: '53%' }}
+              style={{ left: '68%', top: '61%', transform: 'translate(-50%, -100%)' }}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.3 }}
             >
-              <div className="rounded-full bg-white/90 px-3 py-2 text-3xl shadow-xl">🧍</div>
+              <CharacterSpriteSheet character={encounterConfig.npcId === 'mei' ? 'mei' : 'courier'} facing="left" scale={1.05} />
             </motion.div>
           )}
         </AnimatePresence>

@@ -2,21 +2,22 @@
  *
  * Real: trigger_event -> greeting -> reminder -> item_selection
  *       -> confidence_rating -> auto_execute -> completed
- * Fake: trigger_event -> greeting -> fake_resolution -> completed
+ * Fake: trigger_event -> greeting -> direct_request -> completed
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { emitMouseTrackingEvent } from '../../hooks/useMouseTracker'
 import { FAKE_TRIGGER_LINES, ITEM_SELECTION_OPTIONS, PM_TASKS } from '../../constants/pmTasks'
 import { GREETING_PLACEHOLDERS, REMINDER_PLACEHOLDERS } from '../../constants/placeholders'
 import type { DecoyOption, PMPipelineStep } from '../../types'
 import BubbleDialogue from './dialogue/BubbleDialogue'
+import ClickDialogueFlow from './dialogue/ClickDialogueFlow'
+import { getEncounterReminder, getTriggerEncounterConfig, type DialogueLine } from '../../data/triggerEncounters'
 import type { ReactNode } from 'react'
 
 const TRIGGER_NUDGE_MS = 30_000
 const TRIGGER_TIMEOUT_MS = 45_000
-const LINE_INTERVAL_MS = 1_500
 const AUTO_EXECUTE_MS = 3_000
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -32,8 +33,12 @@ function nowSeconds() {
   return Date.now() / 1000
 }
 
-function triggerLabel(triggerType: 'doorbell' | 'phone_call') {
-  return triggerType === 'doorbell' ? 'doorbell' : 'phone'
+function fallbackDialogueLines(lines: string[], speaker: string, triggerType: 'doorbell' | 'phone_call'): DialogueLine[] {
+  return lines.map((text, index) => ({
+    speaker: index % 2 === 0 ? speaker : 'Avatar',
+    text,
+    bubblePosition: triggerType === 'phone_call' ? 'phone' : index % 2 === 0 ? 'right' : 'left',
+  }))
 }
 
 function PhoneCallScreen({
@@ -67,57 +72,6 @@ function DoorbellHint() {
     <div className="fixed left-1/2 top-5 z-[210] -translate-x-1/2 rounded-full border border-amber-300/60 bg-slate-950/80 px-5 py-3 text-sm font-semibold text-amber-100 shadow-xl backdrop-blur pointer-events-none">
       🔔 Someone is at the door.
     </div>
-  )
-}
-
-function DialogueStep({
-  title,
-  speaker,
-  lines,
-  onComplete,
-}: {
-  title: string
-  speaker: string
-  lines: string[]
-  onComplete: () => void
-}) {
-  const [index, setIndex] = useState(0)
-  const completedRef = useRef(false)
-
-  useEffect(() => {
-    setIndex(0)
-    completedRef.current = false
-  }, [lines])
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (index < lines.length - 1) {
-        setIndex(i => i + 1)
-        return
-      }
-      if (!completedRef.current) {
-        completedRef.current = true
-        onComplete()
-      }
-    }, LINE_INTERVAL_MS)
-    return () => clearTimeout(timer)
-  }, [index, lines.length, onComplete])
-
-  return (
-    <InGameShell>
-      <div className="space-y-3">
-        <BubbleDialogue
-          speaker={speaker}
-          text={lines[index] ?? ''}
-          avatar={title === 'Call' ? 'P' : speaker.slice(0, 1).toUpperCase()}
-        />
-        <div className="flex justify-center gap-2">
-          {lines.map((_, i) => (
-            <div key={i} className={`h-2 w-2 rounded-full ${i <= index ? 'bg-amber-500' : 'bg-slate-300'}`} />
-          ))}
-        </div>
-      </div>
-    </InGameShell>
   )
 }
 
@@ -261,11 +215,12 @@ export default function PMTriggerModal() {
   const guestName = pmPipelineState?.guestName
     ?? (taskId ? PM_TASKS[taskId]?.guestName : undefined)
     ?? (triggerType === 'doorbell' ? 'Visitor' : 'Caller')
+  const encounterConfig = getTriggerEncounterConfig(taskId)
 
   const itemOptions = useMemo(() => {
     if (!taskId) return []
-    return shuffleArray(pmPipelineState?.itemOptions ?? ITEM_SELECTION_OPTIONS[taskId] ?? [])
-  }, [pmPipelineState?.itemOptions, taskId])
+    return shuffleArray(pmPipelineState?.itemOptions ?? encounterConfig?.itemOptions ?? ITEM_SELECTION_OPTIONS[taskId] ?? [])
+  }, [encounterConfig?.itemOptions, pmPipelineState?.itemOptions, taskId])
 
   const close = useCallback(() => {
     clearRobotSpeech()
@@ -277,6 +232,17 @@ export default function PMTriggerModal() {
     const wsSend = useGameStore.getState().wsSend
     if (wsSend) wsSend({ type, data })
   }, [])
+
+  useEffect(() => {
+    if (!pmPipelineState || !step) return
+    send('trigger_encounter_state', {
+      task_id: taskId,
+      trigger_type: triggerType,
+      is_fake: isFake,
+      state: step,
+      timestamp: nowSeconds(),
+    })
+  }, [isFake, pmPipelineState, send, step, taskId, triggerType])
 
   const markTriggerResponded = useCallback(() => {
     if (!pmPipelineState) return
@@ -328,10 +294,9 @@ export default function PMTriggerModal() {
   useEffect(() => {
     if (step === 'reminder' && taskId) {
       send('pm_reminder_shown', { task_id: taskId, game_time: nowSeconds() })
-      setRobotSpeaking('Hey, I wanted to remind you...')
     }
     if (step !== 'reminder') clearRobotSpeech()
-  }, [clearRobotSpeech, send, setRobotSpeaking, step, taskId])
+  }, [clearRobotSpeech, send, step, taskId])
 
   if (!pmPipelineState || step === 'completed') return null
 
@@ -342,12 +307,17 @@ export default function PMTriggerModal() {
     ?? FAKE_TRIGGER_LINES[triggerType]
     ?? ['No need to do anything right now.']
   const reminderText = pmPipelineState.reminderText
+    ?? (encounterConfig ? getEncounterReminder(encounterConfig, condition) : undefined)
     ?? (taskId && condition ? REMINDER_PLACEHOLDERS[taskId]?.[condition] : undefined)
     ?? '[Reminder - TBD]'
+  const greetingDialogue = encounterConfig?.greetingDialogue
+    ?? fallbackDialogueLines(greetingLines, guestName, triggerType)
+  const fakeDialogue = encounterConfig?.fakeDialogue
+    ?? fallbackDialogueLines(fakeLines, guestName, triggerType)
 
   const handleGreetingComplete = () => {
     if (isFake) {
-      advancePMPipelineStep('fake_resolution')
+      advancePMPipelineStep('direct_request')
       return
     }
     if (taskId) send('pm_greeting_complete', { task_id: taskId, game_time: nowSeconds() })
@@ -412,23 +382,13 @@ export default function PMTriggerModal() {
 
   if (step === 'greeting') {
     return (
-      <DialogueStep
-        title={triggerLabel(triggerType) === 'phone' ? 'Call' : 'Greeting'}
-        speaker={guestName}
-        lines={greetingLines}
-        onComplete={handleGreetingComplete}
-      />
+      <ClickDialogueFlow lines={greetingDialogue} onComplete={handleGreetingComplete} />
     )
   }
 
-  if (step === 'fake_resolution') {
+  if (step === 'fake_resolution' || step === 'direct_request') {
     return (
-      <DialogueStep
-        title={triggerLabel(triggerType) === 'phone' ? 'Call' : 'Greeting'}
-        speaker={guestName}
-        lines={fakeLines}
-        onComplete={handleFakeComplete}
-      />
+      <ClickDialogueFlow lines={fakeDialogue} onComplete={handleFakeComplete} />
     )
   }
 

@@ -55,6 +55,8 @@ welcome → [block 1..3]:
 3. Multi-question quiz per card (trigger, target, action)
 4. Wrong answers → re-show card with highlight → retry (max 2 fails then auto-pass)
 
+In this repository, **Cutscene** refers to the fixed encoding/tutorial video sequence only. Doorbell and phone-call PM moments during gameplay are **trigger encounters** or **PM trigger flows**, not cutscenes.
+
 ### Playing Phase
 - **Duration**: 900 gameplay seconds; display clock spans 17:00–18:00 via `clock_end_seconds=600`
 - **Time ticks**: emitted every 10 gameplay seconds (= 1 displayed minute)
@@ -64,12 +66,16 @@ welcome → [block 1..3]:
 - **Phone messages**: Chat, ads, social — arrive on schedule from JSON pool
 - **Robot**: Moves between rooms, speaks reminders/neutral utterances
 
-### PM Interaction Flow
+### PM Trigger Encounter Flow
 ```
-Backend fires pm_trigger → Frontend addPMTrial() → User enters target room
-→ Clicks furniture (e.g., bookshelf) → Popup shows 3 items (target + 2 distractors)
-→ Selects item → Confirms → pm_attempt sent → Backend scores (0-6)
+Backend fires pm_trigger/fake_trigger → Frontend enters trigger encounter
+→ Doorbell navigation or phone answer → Click-to-advance dialogue
+→ Real PM: robot reminder → item selection → confidence → auto-action
+→ Fake trigger: direct request → single action
+→ Encounter exits and normal gameplay resumes
 ```
+
+Cooking timers continue during trigger encounters, and phone messages may continue arriving while normal phone interaction is disabled.
 
 ---
 
