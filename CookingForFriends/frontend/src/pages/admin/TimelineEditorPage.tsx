@@ -75,6 +75,19 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+function percentAt(seconds: number, duration: number): number {
+  if (duration <= 0) return 0
+  return Math.max(0, Math.min(100, (seconds / duration) * 100))
+}
+
+function pmAbsoluteTimes(entries: PMEntry[]): number[] {
+  let elapsed = 0
+  return entries.map((entry) => {
+    elapsed += entry.delay_after_previous_s
+    return elapsed
+  })
+}
+
 export default function TimelineEditorPage() {
   const [plan, setPlan] = useState<RuntimePlan | null>(null)
   const [loading, setLoading] = useState(true)
@@ -157,7 +170,7 @@ export default function TimelineEditorPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-4 py-2">
           <div className="flex items-center gap-3">
             <a href="/dashboard" className="text-slate-400 hover:text-slate-700" aria-label="Back to dashboard">
               <ArrowLeft size={20} />
@@ -176,7 +189,7 @@ export default function TimelineEditorPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-5 px-4 py-6">
+      <main className="mx-auto max-w-[1500px] space-y-3 px-4 py-4">
         {error && (
           <Alert kind="error" onClose={() => setError(null)}>
             {error}
@@ -192,7 +205,7 @@ export default function TimelineEditorPage() {
           <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">Runtime plan failed to load.</div>
         ) : (
           <>
-            <section className="rounded-md border border-slate-200 bg-white p-4">
+            <section className="rounded-md border border-slate-200 bg-white p-3">
               <div className="grid gap-3 sm:grid-cols-4">
                 <NumberField
                   label="Duration"
@@ -215,6 +228,8 @@ export default function TimelineEditorPage() {
                 </div>
               </div>
             </section>
+
+            <TimelineOverview plan={sortedPlan} />
 
             <PMScheduleSection
               entries={plan.pm_schedule}
@@ -253,6 +268,107 @@ export default function TimelineEditorPage() {
   )
 }
 
+function TimelineOverview({ plan }: { plan: RuntimePlan }) {
+  const pmTimes = useMemo(() => pmAbsoluteTimes(plan.pm_schedule), [plan.pm_schedule])
+  const ticks = useMemo(() => {
+    const step = plan.duration_seconds <= 600 ? 60 : 150
+    const values: number[] = []
+    for (let t = 0; t < plan.duration_seconds; t += step) values.push(t)
+    if (!values.includes(plan.duration_seconds)) values.push(plan.duration_seconds)
+    return values
+  }, [plan.duration_seconds])
+
+  const lanes = [
+    {
+      key: 'pm',
+      label: 'PM',
+      color: 'bg-indigo-600',
+      events: plan.pm_schedule.map((entry, index) => ({
+        t: pmTimes[index] ?? 0,
+        label: entry.type === 'real' ? `P${entry.task_position}` : entry.trigger_type.replace('_', ' '),
+      })),
+    },
+    {
+      key: 'cook',
+      label: 'Cook',
+      color: 'bg-orange-500',
+      events: plan.cooking_schedule.map((entry) => ({
+        t: entry.t,
+        label: `${entry.dish_id.replace(/_/g, ' ')} ${entry.step_index}`,
+      })),
+    },
+    {
+      key: 'robot',
+      label: 'Robot',
+      color: 'bg-emerald-600',
+      events: plan.robot_idle_comments.map((entry) => ({ t: entry.t, label: entry.comment_id })),
+    },
+    {
+      key: 'phone',
+      label: 'Phone',
+      color: 'bg-sky-600',
+      events: plan.phone_messages.map((entry) => ({ t: entry.t, label: entry.message_id || 'message' })),
+    },
+  ]
+
+  return (
+    <section className="rounded-md border border-slate-200 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <Clock size={16} className="text-slate-500" />
+          <h2 className="text-sm font-semibold text-slate-800">Timeline Overview</h2>
+          <span className="text-xs text-slate-500">0s to {plan.duration_seconds}s</span>
+        </div>
+      </div>
+      <div className="overflow-x-auto px-3 py-3">
+        <div className="min-w-[980px]">
+          <div className="ml-16 h-6 border-b border-slate-200">
+            <div className="relative h-full">
+              {ticks.map((tick) => (
+                <div
+                  key={tick}
+                  className="absolute top-0 h-full border-l border-slate-200 text-[11px] text-slate-500"
+                  style={{ left: `${percentAt(tick, plan.duration_seconds)}%` }}
+                >
+                  <span className="absolute left-1 top-0 whitespace-nowrap">{tick}s</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2 pt-2">
+            {lanes.map((lane) => (
+              <div key={lane.key} className="grid grid-cols-[4rem_1fr] items-center gap-0">
+                <div className="pr-3 text-right text-xs font-medium uppercase text-slate-500">{lane.label}</div>
+                <div className="relative h-9 rounded-sm bg-slate-50 ring-1 ring-inset ring-slate-100">
+                  {ticks.map((tick) => (
+                    <div
+                      key={tick}
+                      className="absolute top-0 h-full border-l border-slate-200/70"
+                      style={{ left: `${percentAt(tick, plan.duration_seconds)}%` }}
+                    />
+                  ))}
+                  {lane.events.map((event, index) => (
+                    <div
+                      key={`${lane.key}-${event.t}-${index}`}
+                      className="group absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+                      style={{ left: `${percentAt(event.t, plan.duration_seconds)}%` }}
+                    >
+                      <div className={`h-3 w-3 rounded-full shadow-sm ring-2 ring-white ${lane.color}`} />
+                      <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-xs text-white shadow group-hover:block">
+                        {event.t}s · {event.label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function Alert({ kind, children, onClose }: { kind: 'error' | 'success'; children: React.ReactNode; onClose?: () => void }) {
   const styles = kind === 'error'
     ? 'border-red-200 bg-red-50 text-red-700'
@@ -275,7 +391,7 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
         type="number"
         value={value}
         onChange={(e) => onChange(numberValue(e.target.value, value))}
-        className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+        className="h-8 w-full rounded-md border border-slate-300 px-2 text-sm"
       />
     </label>
   )
@@ -296,13 +412,13 @@ function LaneSection({
 }) {
   return (
     <section className="overflow-hidden rounded-md border border-slate-200 bg-white">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2">
         <div className="flex items-center gap-2">
           <Icon size={18} className="text-slate-500" />
           <h2 className="font-semibold text-slate-800">{title}</h2>
           <span className="rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-600">{count}</span>
         </div>
-        <button onClick={onAdd} className="inline-flex items-center gap-1 rounded-md bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-700">
+        <button onClick={onAdd} className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-800 px-2.5 text-xs font-medium text-white hover:bg-slate-700">
           <Plus size={14} />
           Add
         </button>
@@ -323,39 +439,42 @@ function PMScheduleSection({
   onDelete: (index: number) => void
   onUpdate: (index: number, patch: Partial<PMEntry>) => void
 }) {
+  const absoluteTimes = useMemo(() => pmAbsoluteTimes(entries), [entries])
+
   return (
     <LaneSection icon={Bot} title="PM Triggers" count={entries.length} onAdd={onAdd}>
-      <table className="w-full text-sm">
+      <table className="w-full text-xs">
         <thead className="text-left text-xs uppercase text-slate-500">
-          <tr><th className="px-3 py-2">#</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Delay</th><th className="px-3 py-2">Target</th><th /></tr>
+          <tr><th className="px-3 py-1.5">#</th><th className="px-3 py-1.5">Time</th><th className="px-3 py-1.5">Type</th><th className="px-3 py-1.5">Delay</th><th className="px-3 py-1.5">Target</th><th /></tr>
         </thead>
         <tbody>
           {entries.map((entry, index) => (
             <tr key={index} className="border-t border-slate-100">
-              <td className="px-3 py-2 text-slate-500">{index + 1}</td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-1.5 text-slate-500">{index + 1}</td>
+              <td className="px-3 py-1.5 font-medium text-slate-700">{absoluteTimes[index]}s</td>
+              <td className="px-3 py-1.5">
                 <select
                   value={entry.type}
                   onChange={(e) => {
                     if (e.target.value === 'real') onUpdate(index, { type: 'real', task_position: 1 })
                     else onUpdate(index, { type: 'fake', trigger_type: 'doorbell' })
                   }}
-                  className="rounded border border-slate-300 px-2 py-1"
+                  className="h-7 rounded border border-slate-300 px-2"
                 >
                   <option value="real">real</option>
                   <option value="fake">fake</option>
                 </select>
               </td>
-              <td className="px-3 py-2">
-                <input type="number" value={entry.delay_after_previous_s} onChange={(e) => onUpdate(index, { delay_after_previous_s: numberValue(e.target.value, entry.delay_after_previous_s) })} className="w-24 rounded border border-slate-300 px-2 py-1" />
+              <td className="px-3 py-1.5">
+                <input type="number" value={entry.delay_after_previous_s} onChange={(e) => onUpdate(index, { delay_after_previous_s: numberValue(e.target.value, entry.delay_after_previous_s) })} className="h-7 w-20 rounded border border-slate-300 px-2" />
               </td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-1.5">
                 {entry.type === 'real' ? (
-                  <select value={entry.task_position} onChange={(e) => onUpdate(index, { task_position: numberValue(e.target.value, entry.task_position) })} className="rounded border border-slate-300 px-2 py-1">
+                  <select value={entry.task_position} onChange={(e) => onUpdate(index, { task_position: numberValue(e.target.value, entry.task_position) })} className="h-7 rounded border border-slate-300 px-2">
                     {[1, 2, 3, 4].map((n) => <option key={n} value={n}>Position {n}</option>)}
                   </select>
                 ) : (
-                  <select value={entry.trigger_type} onChange={(e) => onUpdate(index, { trigger_type: e.target.value as 'doorbell' | 'phone_call' })} className="rounded border border-slate-300 px-2 py-1">
+                  <select value={entry.trigger_type} onChange={(e) => onUpdate(index, { trigger_type: e.target.value as 'doorbell' | 'phone_call' })} className="h-7 rounded border border-slate-300 px-2">
                     <option value="doorbell">doorbell</option>
                     <option value="phone_call">phone_call</option>
                   </select>
@@ -385,20 +504,20 @@ function CookingScheduleSection({
 }) {
   return (
     <LaneSection icon={Flame} title="Cooking Steps" count={entries.length} onAdd={onAdd}>
-      <table className="w-full text-sm">
+      <table className="w-full text-xs">
         <thead className="text-left text-xs uppercase text-slate-500">
-          <tr><th className="px-3 py-2">Time</th><th className="px-3 py-2">Dish</th><th className="px-3 py-2">Step</th><th className="px-3 py-2">Type</th><th /></tr>
+          <tr><th className="px-3 py-1.5">Time</th><th className="px-3 py-1.5">Dish</th><th className="px-3 py-1.5">Step</th><th className="px-3 py-1.5">Type</th><th /></tr>
         </thead>
         <tbody>
           {entries.map((entry) => {
             const index = originalEntries.indexOf(entry)
             return (
               <tr key={`${entry.dish_id}-${entry.step_index}-${index}`} className="border-t border-slate-100">
-                <td className="px-3 py-2"><input type="number" value={entry.t} onChange={(e) => onUpdate(index, { t: numberValue(e.target.value, entry.t) })} className="w-24 rounded border border-slate-300 px-2 py-1" /></td>
-                <td className="px-3 py-2"><input value={entry.dish_id} onChange={(e) => onUpdate(index, { dish_id: e.target.value })} className="w-48 rounded border border-slate-300 px-2 py-1" /></td>
-                <td className="px-3 py-2"><input type="number" value={entry.step_index} onChange={(e) => onUpdate(index, { step_index: numberValue(e.target.value, entry.step_index) })} className="w-20 rounded border border-slate-300 px-2 py-1" /></td>
-                <td className="px-3 py-2">
-                  <select value={entry.step_type} onChange={(e) => onUpdate(index, { step_type: e.target.value as 'active' | 'wait' })} className="rounded border border-slate-300 px-2 py-1">
+                <td className="px-3 py-1.5"><input type="number" value={entry.t} onChange={(e) => onUpdate(index, { t: numberValue(e.target.value, entry.t) })} className="h-7 w-20 rounded border border-slate-300 px-2" /></td>
+                <td className="px-3 py-1.5"><input value={entry.dish_id} onChange={(e) => onUpdate(index, { dish_id: e.target.value })} className="h-7 w-44 rounded border border-slate-300 px-2" /></td>
+                <td className="px-3 py-1.5"><input type="number" value={entry.step_index} onChange={(e) => onUpdate(index, { step_index: numberValue(e.target.value, entry.step_index) })} className="h-7 w-16 rounded border border-slate-300 px-2" /></td>
+                <td className="px-3 py-1.5">
+                  <select value={entry.step_type} onChange={(e) => onUpdate(index, { step_type: e.target.value as 'active' | 'wait' })} className="h-7 rounded border border-slate-300 px-2">
                     <option value="active">active</option>
                     <option value="wait">wait</option>
                   </select>
@@ -428,18 +547,18 @@ function RobotCommentsSection({
 }) {
   return (
     <LaneSection icon={MessageSquare} title="Robot Comments" count={entries.length} onAdd={onAdd}>
-      <table className="w-full text-sm">
+      <table className="w-full text-xs">
         <thead className="text-left text-xs uppercase text-slate-500">
-          <tr><th className="px-3 py-2">Time</th><th className="px-3 py-2">ID</th><th className="px-3 py-2">Text</th><th /></tr>
+          <tr><th className="px-3 py-1.5">Time</th><th className="px-3 py-1.5">ID</th><th className="px-3 py-1.5">Text</th><th /></tr>
         </thead>
         <tbody>
           {entries.map((entry) => {
             const index = originalEntries.indexOf(entry)
             return (
               <tr key={`${entry.comment_id}-${index}`} className="border-t border-slate-100">
-                <td className="px-3 py-2"><input type="number" value={entry.t} onChange={(e) => onUpdate(index, { t: numberValue(e.target.value, entry.t) })} className="w-24 rounded border border-slate-300 px-2 py-1" /></td>
-                <td className="px-3 py-2"><input value={entry.comment_id} onChange={(e) => onUpdate(index, { comment_id: e.target.value })} className="w-48 rounded border border-slate-300 px-2 py-1" /></td>
-                <td className="px-3 py-2"><input value={entry.text} onChange={(e) => onUpdate(index, { text: e.target.value })} className="w-full min-w-96 rounded border border-slate-300 px-2 py-1" /></td>
+                <td className="px-3 py-1.5"><input type="number" value={entry.t} onChange={(e) => onUpdate(index, { t: numberValue(e.target.value, entry.t) })} className="h-7 w-20 rounded border border-slate-300 px-2" /></td>
+                <td className="px-3 py-1.5"><input value={entry.comment_id} onChange={(e) => onUpdate(index, { comment_id: e.target.value })} className="h-7 w-44 rounded border border-slate-300 px-2" /></td>
+                <td className="px-3 py-1.5"><input value={entry.text} onChange={(e) => onUpdate(index, { text: e.target.value })} className="h-7 w-full min-w-96 rounded border border-slate-300 px-2" /></td>
                 <DeleteCell onClick={() => onDelete(index)} />
               </tr>
             )
@@ -465,17 +584,17 @@ function PhoneMessagesSection({
 }) {
   return (
     <LaneSection icon={Phone} title="Phone Messages" count={entries.length} onAdd={onAdd}>
-      <table className="w-full text-sm">
+      <table className="w-full text-xs">
         <thead className="text-left text-xs uppercase text-slate-500">
-          <tr><th className="px-3 py-2">Time</th><th className="px-3 py-2">Message ID</th><th /></tr>
+          <tr><th className="px-3 py-1.5">Time</th><th className="px-3 py-1.5">Message ID</th><th /></tr>
         </thead>
         <tbody>
           {entries.map((entry) => {
             const index = originalEntries.indexOf(entry)
             return (
               <tr key={`${entry.message_id}-${index}`} className="border-t border-slate-100">
-                <td className="px-3 py-2"><input type="number" value={entry.t} onChange={(e) => onUpdate(index, { t: numberValue(e.target.value, entry.t) })} className="w-24 rounded border border-slate-300 px-2 py-1" /></td>
-                <td className="px-3 py-2"><input value={entry.message_id} onChange={(e) => onUpdate(index, { message_id: e.target.value })} className="w-48 rounded border border-slate-300 px-2 py-1" /></td>
+                <td className="px-3 py-1.5"><input type="number" value={entry.t} onChange={(e) => onUpdate(index, { t: numberValue(e.target.value, entry.t) })} className="h-7 w-20 rounded border border-slate-300 px-2" /></td>
+                <td className="px-3 py-1.5"><input value={entry.message_id} onChange={(e) => onUpdate(index, { message_id: e.target.value })} className="h-7 w-44 rounded border border-slate-300 px-2" /></td>
                 <DeleteCell onClick={() => onDelete(index)} />
               </tr>
             )
@@ -488,7 +607,7 @@ function PhoneMessagesSection({
 
 function DeleteCell({ onClick }: { onClick: () => void }) {
   return (
-    <td className="px-3 py-2 text-right">
+    <td className="px-3 py-1 text-right">
       <button onClick={onClick} className="rounded p-1.5 text-red-500 hover:bg-red-50" aria-label="Delete row">
         <Trash2 size={16} />
       </button>
