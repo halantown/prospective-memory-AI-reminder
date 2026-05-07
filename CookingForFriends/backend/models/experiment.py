@@ -49,7 +49,7 @@ class Participant(Base):
     )
     participant_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)  # P001
     token: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
-    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # CONTROL / AF / AFCB
+    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # EC+ / EC-
     status: Mapped[str] = mapped_column(
         Enum(ParticipantStatus), default=ParticipantStatus.REGISTERED, nullable=False,
     )

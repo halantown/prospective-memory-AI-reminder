@@ -26,7 +26,6 @@ from models.schemas import (
 )
 from engine.condition_assigner import assign_condition_and_order, generate_token, next_participant_id
 from engine.phase_state import enter_phase
-from engine.pm_tasks import get_task, BLOCK_TRIGGER_ORDER
 from websocket.connection_manager import manager
 from config import ADMIN_API_KEY, CONDITIONS, TASK_ORDERS
 
@@ -681,68 +680,11 @@ async def get_pm_attempts(session_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/participant/{session_id}/force-trigger")
 async def force_trigger(session_id: str, db: AsyncSession = Depends(get_db)):
-    """Force-fire the next pending PM trigger for a participant."""
-    from engine.execution_window import start_window
-    from engine.timeline import _on_window_expire
-
-    # Find the current playing block
-    result = await db.execute(
-        select(Block)
-        .where(Block.participant_id == session_id, Block.status == BlockStatus.PLAYING)
+    """Legacy PMTrial force trigger endpoint removed with timeline refactor."""
+    raise HTTPException(
+        410,
+        "Legacy PMTrial force-trigger has been removed; PM triggers are driven by the runtime plan.",
     )
-    block = result.scalar_one_or_none()
-    if not block:
-        raise HTTPException(400, "No active (playing) block found")
-
-    # Find the next un-triggered trial
-    trials_result = await db.execute(
-        select(PMTrial)
-        .where(PMTrial.block_id == block.id, PMTrial.trigger_fired_at.is_(None))
-        .order_by(PMTrial.trial_number)
-    )
-    trial = trials_result.scalars().first()
-    if not trial:
-        raise HTTPException(400, "No pending PM trials to trigger")
-
-    cfg = trial.task_config or {}
-    now = time.time()
-
-    # Record trigger fired
-    trial.trigger_fired_at = now
-    trial.exec_window_start = now
-    await db.commit()
-
-    # Start silent execution window so unanswered forced triggers auto-score as 0
-    start_window(
-        participant_id=session_id,
-        trial_id=trial.id,
-        block_id=block.id,
-        trigger_time=now,
-        task_config=cfg,
-        on_expire=_on_window_expire,
-    )
-
-    # Send trigger event to participant via WS
-    trigger_data = {
-        "trigger_id": cfg.get("task_id", f"trial_{trial.id}"),
-        "trigger_event": cfg.get("trigger_event", "Admin forced trigger"),
-        "trigger_type": cfg.get("trigger_type", "visitor"),
-        "task_id": cfg.get("task_id", ""),
-        "signal": cfg.get("signal", {}),
-        "server_trigger_ts": now,
-        "task_config": cfg,
-    }
-    try:
-        await manager.send_to_participant(session_id, "pm_trigger", trigger_data)
-    except Exception as e:
-        logger.warning(f"Failed to send forced trigger via WS: {e}")
-
-    return {
-        "status": "triggered",
-        "trial_id": trial.id,
-        "trial_number": trial.trial_number,
-        "task_id": cfg.get("task_id", ""),
-    }
 
 
 @router.post("/participant/{session_id}/send-message")

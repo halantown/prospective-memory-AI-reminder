@@ -30,7 +30,7 @@ class Block(Base):
         String(36), ForeignKey("participants.id", ondelete="CASCADE"), nullable=False, index=True,
     )
     block_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-3
-    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # CONTROL / AF / AFCB
+    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # EC+ / EC-
     day_story: Mapped[str] = mapped_column(String(200), nullable=False)
     timeline_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(
@@ -160,11 +160,10 @@ class ReminderMessage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     task_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # AF / AFCB
-    context_activity: Mapped[str | None] = mapped_column(String(100), nullable=True)  # AFCB only
+    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # EC+ / EC-
+    context_activity: Mapped[str | None] = mapped_column(String(100), nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     extra_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     is_placeholder: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-

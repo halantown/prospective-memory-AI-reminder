@@ -1,16 +1,4 @@
-"""
-PM Task Registry — T1–T4 prospective memory tasks (EC+/EC- experiment).
-
-Pure data module, no database dependencies. Used by:
-  - database.py     (dev seed)
-  - timeline engine (trigger scheduling)
-  - encoding API    (task info for frontend)
-  - WS handler      (pipeline step logging)
-
-Legacy shim symbols at the bottom preserve module-level import compatibility
-for files not yet migrated (admin.py, timeline_generator.py, timeline_editor.py).
-Remove shims in Phase 2 when those files are rewritten.
-"""
+"""PM Task Registry — T1-T4 prospective memory tasks (EC+/EC- experiment)."""
 
 from dataclasses import dataclass
 from data.materials import (
@@ -101,45 +89,3 @@ FAKE_TRIGGER_LINES: dict[str, tuple[str, ...]] = {
     "doorbell": tuple(get_fake_trigger_lines("doorbell")),
     "phone_call": tuple(get_fake_trigger_lines("phone_call")),
 }
-
-
-# ──────────────────────────────────────────────
-# LEGACY SHIMS
-# These symbols exist solely to satisfy module-level imports in files that
-# have not yet been migrated to the new design (Phase 2/3 work).
-#
-# Remove when:
-#   - engine/timeline_generator.py is rewritten (Phase 2)
-#   - routers/admin.py task-registry endpoint is removed (Phase 3)
-#   - routers/timeline_editor.py is removed or rewritten (Phase 2/3)
-# ──────────────────────────────────────────────
-
-BLOCK_TRIGGER_ORDER: dict[int, list[str]] = {}   # LEGACY_SHIM
-BLOCK_TRIGGER_TIMES: dict[int, dict[str, int]] = {}  # LEGACY_SHIM
-BLOCK_GUESTS: dict[int, str] = {}                # LEGACY_SHIM
-ACTIVITY_WATCH_CONFIG: dict[str, dict] = {}      # LEGACY_SHIM
-NEUTRAL_UTTERANCES: dict[int, list[str]] = {}    # LEGACY_SHIM
-
-
-def get_task_config(task_id: str) -> dict:   # LEGACY_SHIM
-    raise NotImplementedError("get_task_config removed; use get_task() with new PMTaskDef")
-
-
-def get_tasks_for_block(block: int) -> list:  # LEGACY_SHIM
-    raise NotImplementedError("get_tasks_for_block removed; blocks replaced by task_order")
-
-
-def get_all_tasks() -> list:  # LEGACY_SHIM
-    raise NotImplementedError("get_all_tasks removed; use TASK_DEFINITIONS.values()")
-
-
-def get_task_as_dict(task_id: str) -> dict:  # LEGACY_SHIM
-    raise NotImplementedError("get_task_as_dict removed")
-
-
-def task_def_to_config(task_def: PMTaskDef) -> dict:  # LEGACY_SHIM
-    raise NotImplementedError("task_def_to_config removed; PMTrial creation replaced by new schema")
-
-
-def task_def_to_encoding_card(task_def: PMTaskDef) -> dict:  # LEGACY_SHIM
-    raise NotImplementedError("task_def_to_encoding_card removed; encoding uses frontend constants")

@@ -2,8 +2,6 @@
 
 // ── Session & Experiment ──
 
-/** @deprecated Legacy conditions — use Condition ('EC+' | 'EC-') for new code */
-export type ConditionLegacy = 'CONTROL' | 'AF' | 'AFCB'
 export type Condition = 'EC+' | 'EC-'
 
 export type ExperimentPhase =

@@ -1,10 +1,10 @@
 import type { DecoyOption } from '../types'
 
 export const TASK_ORDERS: Record<string, string[]> = {
-  A: ['T1','T2','T3','T4'],
-  B: ['T2','T4','T1','T3'],
-  C: ['T3','T1','T4','T2'],
-  D: ['T4','T3','T2','T1'],
+  A: ['T1','T2','T4','T3'],
+  B: ['T2','T3','T1','T4'],
+  C: ['T3','T4','T2','T1'],
+  D: ['T4','T1','T3','T2'],
 }
 
 export const TRIGGER_SCHEDULE = [

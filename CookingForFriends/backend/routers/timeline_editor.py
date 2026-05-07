@@ -3,16 +3,13 @@
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 
-from config import DATA_DIR, MESSAGE_COOLDOWN_S, ADMIN_API_KEY
+from config import CONDITIONS, DATA_DIR, MESSAGE_COOLDOWN_S, ADMIN_API_KEY
 from engine.game_clock import DEFAULT_CLOCK_END_SECONDS
 from engine.timeline import load_timeline
-from engine.timeline_generator import generate_block_timeline
-from engine.pm_tasks import BLOCK_TRIGGER_ORDER, BLOCK_TRIGGER_TIMES, BLOCK_GUESTS
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +30,7 @@ TIMELINES_DIR = DATA_DIR / "timelines"
 VALID_EVENT_TYPES = [
     "block_start",
     "block_end",
-    "ongoing_task_event",
-    "robot_speak",
     "phone_message",
-    "pm_trigger",
-    "pm_watch_activity",
-    "fake_trigger",
 ]
 
 
@@ -58,9 +50,7 @@ class TimelineSaveRequest(BaseModel):
 
 class TimelinePreviewRequest(BaseModel):
     block_number: int = 1
-    condition: str = "CONTROL"
-    unreminded_task_id: Optional[str] = None
-    af_variant_index: int = 0
+    condition: str = "EC+"
 
 
 # ── Endpoints ──
@@ -93,13 +83,13 @@ async def list_timelines():
 
     # Generatable combinations
     generated = []
-    for block_num in (1, 2, 3):
-        for cond in ("CONTROL", "AF", "AFCB"):
+    for block_num in (1,):
+        for cond in CONDITIONS:
             generated.append({
                 "block_number": block_num,
                 "condition": cond,
-                "source": "generator",
-                "guest": BLOCK_GUESTS.get(block_num, ""),
+                "source": "runtime_plan",
+                "guest": "Cooking for Friends",
             })
 
     return {
@@ -172,12 +162,7 @@ async def save_timeline_file(filename: str, body: TimelineSaveRequest):
 async def preview_timeline(body: TimelinePreviewRequest):
     """Generate and return a preview timeline (does not save)."""
     try:
-        timeline = generate_block_timeline(
-            block_number=body.block_number,
-            condition=body.condition,
-            unreminded_task_id=body.unreminded_task_id,
-            af_variant_index=body.af_variant_index,
-        )
+        timeline = load_timeline(block_number=body.block_number, condition=body.condition)
         return timeline
     except Exception as e:
         raise HTTPException(500, f"Generation failed: {e}")
@@ -196,61 +181,17 @@ async def get_event_schema():
                 "description": "Marks the end of the block",
                 "data_fields": {},
             },
-            "ongoing_task_event": {
-                "description": "Ongoing task action (e.g., place steak on pan)",
-                "data_fields": {
-                    "task": "string — task type (e.g., 'steak', 'dining')",
-                    "event": "string — event name (e.g., 'place_steak', 'table_ready')",
-                    "pan": "int — pan number (1-3, for steak tasks)",
-                    "room": "string — room where event occurs",
-                },
-            },
-            "robot_speak": {
-                "description": "Robot Pepper speaks text",
-                "data_fields": {
-                    "text": "string — text to speak or {{reminder:task_id}} placeholder",
-                    "log_tag": "string — 'neutral' or 'reminder'",
-                    "task_id": "string (optional) — PM task ID for reminders",
-                    "condition": "string (optional) — experiment condition for reminders",
-                },
-            },
             "phone_message": {
                 "description": "Phone notification/message",
                 "data_fields": {
                     "message_id": "string — references messages_dayN.json pool",
                 },
             },
-            "pm_trigger": {
-                "description": "PM task trigger event",
-                "data_fields": {
-                    "trigger_id": "string — PM task ID",
-                    "trigger_event": "string — human-readable trigger description",
-                    "trigger_type": "string — visitor|communication|appliance|activity",
-                    "task_id": "string — PM task ID",
-                    "signal": {"audio": "string", "visual": "string"},
-                },
-            },
-            "pm_watch_activity": {
-                "description": "Register activity watcher for condition-based PM trigger",
-                "data_fields": {
-                    "task_id": "string — PM task ID",
-                    "watch_condition": "string — game state condition to watch for",
-                    "fallback_time": "int — seconds offset for fallback trigger",
-                },
-            },
-            "fake_trigger": {
-                "description": "Fake trigger to set expectations",
-                "data_fields": {
-                    "trigger_type": "string — visitor|appliance",
-                    "content": "string — description of the fake event",
-                    "duration": "int — seconds the event lasts",
-                },
-            },
         },
         "duration_default": 600,
         "message_cooldown_s": MESSAGE_COOLDOWN_S,
         "blocks": [1, 2, 3],
-        "conditions": ["CONTROL", "AF", "AFCB"],
+        "conditions": CONDITIONS,
     }
 
 
@@ -308,10 +249,8 @@ def _infer_block_number(filename: str) -> int | None:
 def _infer_condition(filename: str) -> str:
     """Infer condition from filename."""
     name = filename.replace(".json", "").lower()
-    if "control" in name:
-        return "CONTROL"
-    if "afcb" in name:
-        return "AFCB"
-    if "af" in name:
-        return "AF"
+    if "ec_plus" in name or "ec+" in name:
+        return "EC+"
+    if "ec_minus" in name or "ec-" in name:
+        return "EC-"
     return "default"
