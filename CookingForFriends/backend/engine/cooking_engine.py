@@ -19,7 +19,12 @@ from typing import Any, Callable, Awaitable, Literal
 
 from config import COOKING_STEP_WINDOW_S, COOKING_DISHES
 from data.cooking_recipes import ALL_RECIPES, CookingStepDef, DISH_LABELS, DISH_EMOJIS
-from data.cooking_timeline import COOKING_TIMELINE, ROBOT_IDLE_COMMENTS, TimelineEntry
+from data.cooking_timeline import (
+    COOKING_TIMELINE,
+    ROBOT_IDLE_COMMENTS,
+    RobotIdleComment,
+    TimelineEntry,
+)
 from engine.game_clock import GameClock
 
 logger = logging.getLogger(__name__)
@@ -67,6 +72,8 @@ class CookingEngine:
         send_fn: SendFn,
         db_factory: Any,
         clock: GameClock | None = None,
+        cooking_timeline: list[TimelineEntry] | None = None,
+        robot_idle_comments: list[RobotIdleComment] | None = None,
     ):
         self.participant_id = participant_id
         self.block_id = block_id
@@ -94,6 +101,8 @@ class CookingEngine:
         self._idle_comment_task: asyncio.Task | None = None
         self._running = False
         self._clock = clock or GameClock()
+        self._cooking_timeline = cooking_timeline or COOKING_TIMELINE
+        self._robot_idle_comments = robot_idle_comments or ROBOT_IDLE_COMMENTS
         self._next_timeline_index: int = 0
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -137,10 +146,10 @@ class CookingEngine:
     async def _run_timeline(self):
         """Fire timeline events at their scheduled times."""
         try:
-            while self._next_timeline_index < len(COOKING_TIMELINE):
+            while self._next_timeline_index < len(self._cooking_timeline):
                 if not self._running:
                     break
-                entry = COOKING_TIMELINE[self._next_timeline_index]
+                entry = self._cooking_timeline[self._next_timeline_index]
 
                 # Wait until the scheduled time
                 await self._clock.sleep_until(entry.t)
@@ -159,7 +168,7 @@ class CookingEngine:
     async def _run_idle_comments(self):
         """Emit non-interactive robot comments during lighter cooking gaps."""
         try:
-            for comment in ROBOT_IDLE_COMMENTS:
+            for comment in self._robot_idle_comments:
                 if not self._running:
                     break
                 await self._clock.sleep_until(comment.t)

@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "duration_seconds": 900,
+  "clock_end_seconds": 600,
+  "pm_schedule": [
+    { "type": "real", "delay_after_previous_s": 180, "task_position": 1 },
+    { "type": "fake", "delay_after_previous_s": 120, "trigger_type": "doorbell" },
+    { "type": "real", "delay_after_previous_s": 60, "task_position": 2 },
+    { "type": "real", "delay_after_previous_s": 120, "task_position": 3 },
+    { "type": "fake", "delay_after_previous_s": 60, "trigger_type": "phone_call" },
+    { "type": "real", "delay_after_previous_s": 60, "task_position": 4 }
+  ],
+  "session_end_delay_after_last_trigger_s": 60,
+  "cooking_schedule": [
+    { "t": 0, "dish_id": "roasted_vegetables", "step_index": 0, "step_type": "active" },
+    { "t": 30, "dish_id": "roasted_vegetables", "step_index": 1, "step_type": "active" },
+    { "t": 60, "dish_id": "roasted_vegetables", "step_index": 2, "step_type": "active" },
+    { "t": 90, "dish_id": "roasted_vegetables", "step_index": 3, "step_type": "active" },
+    { "t": 120, "dish_id": "roasted_vegetables", "step_index": 4, "step_type": "wait" },
+    { "t": 120, "dish_id": "tomato_soup", "step_index": 0, "step_type": "active" },
+    { "t": 150, "dish_id": "tomato_soup", "step_index": 1, "step_type": "active" },
+    { "t": 180, "dish_id": "spaghetti", "step_index": 0, "step_type": "active" },
+    { "t": 210, "dish_id": "tomato_soup", "step_index": 2, "step_type": "active" },
+    { "t": 210, "dish_id": "spaghetti", "step_index": 1, "step_type": "wait" },
+    { "t": 240, "dish_id": "tomato_soup", "step_index": 3, "step_type": "active" },
+    { "t": 270, "dish_id": "tomato_soup", "step_index": 4, "step_type": "wait" },
+    { "t": 300, "dish_id": "spaghetti", "step_index": 2, "step_type": "active" },
+    { "t": 330, "dish_id": "tomato_soup", "step_index": 5, "step_type": "active" },
+    { "t": 330, "dish_id": "spaghetti", "step_index": 3, "step_type": "wait" },
+    { "t": 360, "dish_id": "tomato_soup", "step_index": 6, "step_type": "wait" },
+    { "t": 420, "dish_id": "spaghetti", "step_index": 4, "step_type": "active" },
+    { "t": 420, "dish_id": "tomato_soup", "step_index": 7, "step_type": "active" },
+    { "t": 450, "dish_id": "spaghetti", "step_index": 5, "step_type": "active" },
+    { "t": 480, "dish_id": "spaghetti", "step_index": 6, "step_type": "active" },
+    { "t": 480, "dish_id": "tomato_soup", "step_index": 8, "step_type": "active" },
+    { "t": 510, "dish_id": "spaghetti", "step_index": 7, "step_type": "active" },
+    { "t": 540, "dish_id": "steak", "step_index": 0, "step_type": "active" },
+    { "t": 570, "dish_id": "steak", "step_index": 1, "step_type": "active" },
+    { "t": 600, "dish_id": "roasted_vegetables", "step_index": 5, "step_type": "active" },
+    { "t": 600, "dish_id": "steak", "step_index": 2, "step_type": "active" },
+    { "t": 630, "dish_id": "steak", "step_index": 3, "step_type": "active" },
+    { "t": 630, "dish_id": "roasted_vegetables", "step_index": 6, "step_type": "active" },
+    { "t": 660, "dish_id": "steak", "step_index": 4, "step_type": "wait" },
+    { "t": 750, "dish_id": "steak", "step_index": 5, "step_type": "active" },
+    { "t": 780, "dish_id": "steak", "step_index": 6, "step_type": "wait" },
+    { "t": 840, "dish_id": "steak", "step_index": 7, "step_type": "active" }
+  ],
+  "robot_idle_comments": [
+    {
+      "t": 130,
+      "comment_id": "idle_oven_vegetables",
+      "text": "Vegetables are in the oven, smells good already."
+    },
+    {
+      "t": 250,
+      "comment_id": "idle_soup_simmer",
+      "text": "The soup is coming along nicely."
+    },
+    {
+      "t": 710,
+      "comment_id": "idle_almost_there",
+      "text": "Almost there, chef."
+    }
+  ],
+  "phone_messages": [
+    { "t": 30, "message_id": "q_001" },
+    { "t": 75, "message_id": "q_002" },
+    { "t": 100, "message_id": "n_001" },
+    { "t": 130, "message_id": "q_003" },
+    { "t": 200, "message_id": "q_004" },
+    { "t": 260, "message_id": "q_005" },
+    { "t": 280, "message_id": "n_002" },
+    { "t": 330, "message_id": "q_006" },
+    { "t": 400, "message_id": "q_007" },
+    { "t": 420, "message_id": "n_003" },
+    { "t": 460, "message_id": "q_008" },
+    { "t": 530, "message_id": "q_009" },
+    { "t": 550, "message_id": "n_004" },
+    { "t": 580, "message_id": "q_010" },
+    { "t": 630, "message_id": "q_011" },
+    { "t": 670, "message_id": "n_005" },
+    { "t": 680, "message_id": "q_012" },
+    { "t": 720, "message_id": "q_013" },
+    { "t": 760, "message_id": "q_014" },
+    { "t": 800, "message_id": "q_015" },
+    { "t": 840, "message_id": "q_016" },
+    { "t": 850, "message_id": "n_006" },
+    { "t": 880, "message_id": "q_017" }
+  ]
+}

@@ -15,6 +15,11 @@ from engine.cooking_engine import CookingEngine
 from engine.game_clock import GameClock
 from engine.pm_session import run_pm_session
 from engine.timeline import cancel_timeline, run_timeline
+from engine.runtime_plan_loader import (
+    cooking_timeline_from_plan,
+    load_runtime_plan,
+    robot_idle_comments_from_plan,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +62,8 @@ class BlockRuntime:
         if self._stopped:
             raise RuntimeError("Cannot start a stopped BlockRuntime")
 
+        runtime_plan = load_runtime_plan()
+
         self.timeline_task = await run_timeline(
             participant_id=self.participant_id,
             block_number=self.block_number,
@@ -66,6 +73,7 @@ class BlockRuntime:
             db_factory=self.db_factory,
             block_start_time=self.block_start_time,
             clock=self.clock,
+            runtime_plan=runtime_plan,
         )
 
         self.cooking = CookingEngine(
@@ -74,6 +82,8 @@ class BlockRuntime:
             send_fn=self.send_fn,
             db_factory=self.db_factory,
             clock=self.clock,
+            cooking_timeline=cooking_timeline_from_plan(runtime_plan),
+            robot_idle_comments=robot_idle_comments_from_plan(runtime_plan),
         )
         self.cooking.start(self.block_start_time)
 
@@ -85,6 +95,10 @@ class BlockRuntime:
                 self.db_factory,
                 on_pipeline_start=lambda: self.pause("pm"),
                 clock=self.clock,
+                trigger_schedule=runtime_plan["pm_schedule"],
+                session_end_delay_after_last_trigger_s=runtime_plan[
+                    "session_end_delay_after_last_trigger_s"
+                ],
             )
         )
 
@@ -146,4 +160,3 @@ class BlockRuntime:
             self.block_number,
             save_scores,
         )
-

@@ -14,6 +14,7 @@ from engine.game_clock import (
     format_game_clock,
 )
 from engine.message_loader import load_message_pool, build_ws_payload, get_message, get_contacts
+from engine.runtime_plan_loader import load_runtime_plan, timeline_from_plan
 
 logger = logging.getLogger(__name__)
 
@@ -115,48 +116,15 @@ def resume_timeline(participant_id: str, block_number: int) -> bool:
     return False
 
 
-def load_timeline(block_number: int, condition: str, **kwargs) -> dict:
-    """Load timeline JSON template for a block.
-
-    Tries generated timeline first, then falls back to JSON files.
-    """
-    # Try to generate a participant-specific timeline
-    unreminded_task_id = kwargs.get("unreminded_task_id")
-    if unreminded_task_id is not None or condition in ("AF", "AFCB", "CONTROL"):
-        try:
-            from engine.timeline_generator import generate_block_timeline
-            return generate_block_timeline(
-                block_number=block_number,
-                condition=condition,
-                unreminded_task_id=unreminded_task_id,
-                af_variant_index=kwargs.get("af_variant_index", 0),
-            )
-        except Exception as e:
-            logger.warning(f"Timeline generation failed, falling back to JSON: {e}")
-
-    # Fallback to static JSON files
-    path = DATA_DIR / "timelines" / f"block_{block_number}_{condition.lower()}.json"
-    if not path.exists():
-        path = DATA_DIR / "timelines" / f"block_{block_number}.json"
-    if not path.exists():
-        path = DATA_DIR / "timelines" / "block_default.json"
-    if not path.exists():
-        logger.warning(f"No timeline template found for block {block_number}, using empty")
-        return {
-            "events": [],
-            "duration_seconds": 600,
-            "clock_end_seconds": DEFAULT_CLOCK_END_SECONDS,
-        }
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        logger.error(f"Failed to load timeline from {path}: {e}")
-        return {
-            "events": [],
-            "duration_seconds": 600,
-            "clock_end_seconds": DEFAULT_CLOCK_END_SECONDS,
-        }
+def load_timeline(
+    block_number: int,
+    condition: str,
+    *,
+    runtime_plan: dict | None = None,
+) -> dict:
+    """Build the non-PM/non-cooking event timeline from the runtime plan."""
+    plan = runtime_plan or load_runtime_plan()
+    return timeline_from_plan(plan, block_number=block_number, condition=condition)
 
 
 async def run_timeline(
@@ -168,6 +136,7 @@ async def run_timeline(
     db_factory=None,
     block_start_time: float | None = None,
     clock: GameClock | None = None,
+    runtime_plan: dict | None = None,
 ):
     """Start and run a block timeline.
 
@@ -194,16 +163,7 @@ async def run_timeline(
     # Use provided or global db_factory
     factory = db_factory or _db_factory
 
-    # Look up unreminded task_id for correct reminder generation (C2 fix)
-    unreminded_task_id = None
-    if factory and condition != "CONTROL":
-        unreminded_task_id = await _get_unreminded_task_id(
-            participant_id, block_number, factory
-        )
-
-    timeline = load_timeline(
-        block_number, condition, unreminded_task_id=unreminded_task_id
-    )
+    timeline = load_timeline(block_number, condition, runtime_plan=runtime_plan)
     events = timeline.get("events", [])
     duration = timeline.get("duration_seconds", 600)
     clock_end_seconds = timeline.get("clock_end_seconds", DEFAULT_CLOCK_END_SECONDS)

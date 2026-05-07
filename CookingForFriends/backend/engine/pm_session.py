@@ -122,6 +122,8 @@ async def run_pm_session(
     db_factory,
     on_pipeline_start=None,
     clock: GameClock | None = None,
+    trigger_schedule: list[dict] | None = None,
+    session_end_delay_after_last_trigger_s: int | None = None,
 ):
     """Drive the PM trigger schedule for one session as a background task.
 
@@ -159,7 +161,8 @@ async def run_pm_session(
                 fired_count, last_trigger_game_time, session_id,
             )
 
-        for entry_index, entry in enumerate(TRIGGER_SCHEDULE[fired_count:], start=fired_count + 1):
+        schedule = trigger_schedule or TRIGGER_SCHEDULE
+        for entry_index, entry in enumerate(schedule[fired_count:], start=fired_count + 1):
             schedule_index = entry_index
             delay = entry["delay_after_previous_s"]
             current_gt = await _get_current_game_time(session_id, db_factory, clock)
@@ -280,11 +283,16 @@ async def run_pm_session(
         # All 6 triggers done — wait then send session_end
         logger.info(
             "[PM_SESSION] All triggers done. Waiting %ds game time (session=%s)",
-            SESSION_END_DELAY_AFTER_LAST_TRIGGER_S, session_id,
+            session_end_delay_after_last_trigger_s
+            if session_end_delay_after_last_trigger_s is not None
+            else SESSION_END_DELAY_AFTER_LAST_TRIGGER_S,
+            session_id,
         )
         await _wait_game_seconds(
             session_id,
-            SESSION_END_DELAY_AFTER_LAST_TRIGGER_S,
+            session_end_delay_after_last_trigger_s
+            if session_end_delay_after_last_trigger_s is not None
+            else SESSION_END_DELAY_AFTER_LAST_TRIGGER_S,
             db_factory,
             clock,
         )
