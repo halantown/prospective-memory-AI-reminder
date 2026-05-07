@@ -166,7 +166,7 @@ class ParticipantCreateResponse(BaseModel):
 
 
 class TestSessionRequest(BaseModel):
-    condition: str          # "EC+" | "EC-"
+    condition: str          # "EE1" | "EE0"
     order: str              # "A" | "B" | "C" | "D"
     start_phase: str        # "welcome" | "consent" | "introduction" | "encoding" | "playing" | "post_questionnaire"
 

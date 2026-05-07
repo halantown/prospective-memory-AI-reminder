@@ -104,8 +104,8 @@ const STATUS_ORDER: Record<string, number> = {
 }
 
 const conditionColor = (c: string) => {
-  if (c === 'EC+') return 'bg-blue-100 text-blue-700'
-  if (c === 'EC-') return 'bg-amber-100 text-amber-700'
+  if (c === 'EE1') return 'bg-blue-100 text-blue-700'
+  if (c === 'EE0') return 'bg-amber-100 text-amber-700'
   return 'bg-slate-100 text-slate-600'
 }
 
@@ -368,7 +368,7 @@ function TokenManagementTab() {
   const [lastCreated, setLastCreated] = useState<{ participant_id: string; token: string; entry_url?: string; task_order?: string } | null>(null)
   const [participants, setParticipants] = useState<ParticipantRow[]>([])
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
-  const [manualCondition, setManualCondition] = useState<string>('EC+')
+  const [manualCondition, setManualCondition] = useState<string>('EE1')
   const [manualOrder, setManualOrder] = useState<string>('A')
   const [manualCreating, setManualCreating] = useState(false)
   const [manualResult, setManualResult] = useState<{ participant_id: string; token: string; entry_url?: string } | null>(null)
@@ -445,8 +445,8 @@ function TokenManagementTab() {
             <label className="text-xs text-slate-500 mb-1 block">Condition</label>
             <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}
               className="border rounded-lg px-3 py-2 text-sm">
-              <option value="EC+">EC+</option>
-              <option value="EC-">EC-</option>
+              <option value="EE1">EE1</option>
+              <option value="EE0">EE0</option>
             </select>
           </div>
           <div>
@@ -528,7 +528,7 @@ function LatinSquareTab() {
     getAssignmentCounts().then((d) => { setCounts(d); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
-  const conditions = ['EC+', 'EC-']
+  const conditions = ['EE1', 'EE0']
   const orders = ['A', 'B', 'C', 'D']
 
   return (
@@ -715,7 +715,7 @@ function DataExportTab() {
 /* ------------------------------------------------------------------ */
 
 function TestModeTab() {
-  const [condition, setCondition] = useState('EC+')
+  const [condition, setCondition] = useState('EE1')
   const [order, setOrder] = useState('A')
   const [startPhase, setStartPhase] = useState('WELCOME')
   const [creating, setCreating] = useState(false)
@@ -763,8 +763,8 @@ function TestModeTab() {
             <label className="text-xs text-slate-500 mb-1 block">Condition</label>
             <select value={condition} onChange={(e) => setCondition(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="EC+">EC+</option>
-              <option value="EC-">EC-</option>
+              <option value="EE1">EE1</option>
+              <option value="EE0">EE0</option>
             </select>
           </div>
           <div>

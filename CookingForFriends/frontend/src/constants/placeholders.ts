@@ -1,14 +1,14 @@
 /** All placeholder constants — researcher fills these without touching component logic. */
 
 // ── PM Task Reminders (8 total: 4 tasks × 2 conditions) ──
-export const PLACEHOLDER_REMINDER_T1_ECPLUS = "[T1 Mei EC+ reminder - TBD]"
-export const PLACEHOLDER_REMINDER_T1_ECMINUS = "[T1 Mei EC- reminder - TBD]"
-export const PLACEHOLDER_REMINDER_T2_ECPLUS = "[T2 Lina EC+ reminder - TBD]"
-export const PLACEHOLDER_REMINDER_T2_ECMINUS = "[T2 Lina EC- reminder - TBD]"
-export const PLACEHOLDER_REMINDER_T3_ECPLUS = "[T3 Tom EC+ reminder - TBD]"
-export const PLACEHOLDER_REMINDER_T3_ECMINUS = "[T3 Tom EC- reminder - TBD]"
-export const PLACEHOLDER_REMINDER_T4_ECPLUS = "[T4 Delivery EC+ reminder - TBD]"
-export const PLACEHOLDER_REMINDER_T4_ECMINUS = "[T4 Delivery EC- reminder - TBD]"
+export const PLACEHOLDER_REMINDER_T1_EE1 = "[T1 Mei EE1 reminder - TBD]"
+export const PLACEHOLDER_REMINDER_T1_EE0 = "[T1 Mei EE0 reminder - TBD]"
+export const PLACEHOLDER_REMINDER_T2_EE1 = "[T2 Lina EE1 reminder - TBD]"
+export const PLACEHOLDER_REMINDER_T2_EE0 = "[T2 Lina EE0 reminder - TBD]"
+export const PLACEHOLDER_REMINDER_T3_EE1 = "[T3 Tom EE1 reminder - TBD]"
+export const PLACEHOLDER_REMINDER_T3_EE0 = "[T3 Tom EE0 reminder - TBD]"
+export const PLACEHOLDER_REMINDER_T4_EE1 = "[T4 Delivery EE1 reminder - TBD]"
+export const PLACEHOLDER_REMINDER_T4_EE0 = "[T4 Delivery EE0 reminder - TBD]"
 
 // ── Fake reminder pool (neutral, no action implied) ──
 export const PLACEHOLDER_FAKE_REMINDER_POOL: string[] = [
@@ -164,10 +164,10 @@ export const INTENTIONCHECK_PLACEHOLDERS: Record<string, { question: string; opt
 
 /** Map (taskId, condition) → reminder text */
 export const REMINDER_PLACEHOLDERS: Record<string, Record<string, string>> = {
-  T1: { 'EC+': PLACEHOLDER_REMINDER_T1_ECPLUS, 'EC-': PLACEHOLDER_REMINDER_T1_ECMINUS },
-  T2: { 'EC+': PLACEHOLDER_REMINDER_T2_ECPLUS, 'EC-': PLACEHOLDER_REMINDER_T2_ECMINUS },
-  T3: { 'EC+': PLACEHOLDER_REMINDER_T3_ECPLUS, 'EC-': PLACEHOLDER_REMINDER_T3_ECMINUS },
-  T4: { 'EC+': PLACEHOLDER_REMINDER_T4_ECPLUS, 'EC-': PLACEHOLDER_REMINDER_T4_ECMINUS },
+  T1: { 'EE1': PLACEHOLDER_REMINDER_T1_EE1, 'EE0': PLACEHOLDER_REMINDER_T1_EE0 },
+  T2: { 'EE1': PLACEHOLDER_REMINDER_T2_EE1, 'EE0': PLACEHOLDER_REMINDER_T2_EE0 },
+  T3: { 'EE1': PLACEHOLDER_REMINDER_T3_EE1, 'EE0': PLACEHOLDER_REMINDER_T3_EE0 },
+  T4: { 'EE1': PLACEHOLDER_REMINDER_T4_EE1, 'EE0': PLACEHOLDER_REMINDER_T4_EE0 },
 }
 
 /** Map (taskId, triggerType) → greeting text */

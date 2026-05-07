@@ -1,4 +1,4 @@
-"""PM Task Registry — T1-T4 prospective memory tasks (EC+/EC- experiment)."""
+"""PM Task Registry — T1-T4 prospective memory tasks (EE1/EE0 experiment)."""
 
 from dataclasses import dataclass
 from data.materials import (
@@ -18,8 +18,8 @@ class PMTaskDef:
     target_room: str | None  # room where the target item lives (None for T4)
     action_type: str         # "bring_item" | "take_from_fridge" | "reply_in_chat"
     greeting_lines: tuple[str, ...]
-    reminder_ec_plus: str
-    reminder_ec_minus: str
+    reminder_ee1: str
+    reminder_ee0: str
 
 
 @dataclass(frozen=True)
@@ -39,8 +39,8 @@ def _build_task_definitions() -> dict[str, PMTaskDef]:
             target_room=task["target_room"],
             action_type=task["action_type"],
             greeting_lines=tuple(task["greeting_lines"]),
-            reminder_ec_plus=task["reminders"]["EC+"],
-            reminder_ec_minus=task["reminders"]["EC-"],
+            reminder_ee1=task["reminders"]["EE1"],
+            reminder_ee0=task["reminders"]["EE0"],
         )
         for task_id, task in tasks.items()
     }
@@ -81,7 +81,7 @@ def get_item_options(task_id: str) -> list[DecoyOption]:
 
 
 def get_reminder_text(task_id: str, condition: str) -> str:
-    """Return the EC+/EC- reminder text for a task."""
+    """Return the EE1/EE0 reminder text for a task."""
     return _get_material_reminder_text(task_id, condition)
 
 

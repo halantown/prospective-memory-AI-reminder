@@ -74,7 +74,7 @@ T4 (Delivery person / phone call):
 
 Note: Wording deliberately does NOT include episode details or item-discriminating
 features (e.g., no "baking book", just "book"). This prevents assign text from
-functioning as an EC+ or AF cue.
+functioning as an EE1 or AF cue.
 
 ---
 
@@ -330,6 +330,6 @@ h.tang-6@student.tudelft.nl
 - [ ] Trust scale items (literature search needed)
 - [ ] Perceived usefulness scale items (literature search needed)
 - [ ] NASA-TLX version selection (standard 6-item vs. Raw TLX)
-- [ ] EC+ / EC- reminder texts (finalize post-pilot)
+- [ ] EE1 / EE0 reminder texts (finalize post-pilot)
 - [ ] Main experiment phone questions (28 items — already in phone_messages_v3.json)
 - [ ] Real/fake PM trigger dialogue lines (main experiment)

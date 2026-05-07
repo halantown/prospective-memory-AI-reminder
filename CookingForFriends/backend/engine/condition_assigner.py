@@ -1,4 +1,4 @@
-"""Condition and order assignment — round-robin over 8 (EC+/EC-) × (A/B/C/D) combinations."""
+"""Condition and order assignment — round-robin over 8 (EE1/EE0) × (A/B/C/D) combinations."""
 
 import secrets
 from sqlalchemy import select, func

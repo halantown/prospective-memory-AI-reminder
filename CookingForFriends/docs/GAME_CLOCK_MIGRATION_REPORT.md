@@ -54,7 +54,7 @@ Any missed subsystem could still advance and contaminate the experimental flow.
 
 ### 2.2 `taskId=NULL!` and fake/legacy trigger confusion
 
-Static/generated timelines still contained legacy `pm_trigger` events. EC+/EC- sessions now use `pm_session.py` as the authoritative PM scheduler. If timeline legacy PM events were forwarded, the frontend could receive a PM modal without a real `task_id`, producing the observed debug state:
+Static/generated timelines still contained legacy `pm_trigger` events. EE1/EE0 sessions now use `pm_session.py` as the authoritative PM scheduler. If timeline legacy PM events were forwarded, the frontend could receive a PM modal without a real `task_id`, producing the observed debug state:
 
 ```text
 step=decoy | taskId=NULL! | decoys=0

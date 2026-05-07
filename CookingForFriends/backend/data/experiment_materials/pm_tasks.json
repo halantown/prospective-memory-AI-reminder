@@ -15,8 +15,8 @@
         "Good to see you again."
       ],
       "reminders": {
-        "EC+": "Remember what you promised after you and Mei played games and ate pastries last time.",
-        "EC-": "You promised to give Mei something."
+        "EE1": "Remember what you promised after you and Mei played games and ate pastries last time.",
+        "EE0": "You promised to give Mei something."
       },
       "decoy_items": [
         { "id": "target", "label": "Baking book", "is_target": true },
@@ -42,8 +42,8 @@
         "I am excited for dinner."
       ],
       "reminders": {
-        "EC+": "Remember what Anna-Lina asked after she studied with you recently.",
-        "EC-": "You promised to give Anna-Lina something."
+        "EE1": "Remember what Anna-Lina asked after she studied with you recently.",
+        "EE0": "You promised to give Anna-Lina something."
       },
       "decoy_items": [
         { "id": "target", "label": "Chocolate", "is_target": true },
@@ -69,8 +69,8 @@
         "See you soon."
       ],
       "reminders": {
-        "EC+": "Remember what Tom asked after you had a picnic together recently.",
-        "EC-": "You promised to do something for Tom."
+        "EE1": "Remember what Tom asked after you had a picnic together recently.",
+        "EE0": "You promised to do something for Tom."
       },
       "decoy_items": [
         { "id": "target", "label": "Apple juice", "is_target": true },
@@ -96,8 +96,8 @@
         "I can update it now."
       ],
       "reminders": {
-        "EC+": "Remember what you noticed after the delivery person dropped off a package recently.",
-        "EC-": "You wanted to add something to your delivery order."
+        "EE1": "Remember what you noticed after the delivery person dropped off a package recently.",
+        "EE0": "You wanted to add something to your delivery order."
       },
       "decoy_items": [
         { "id": "target", "label": "Trash bags", "is_target": true },

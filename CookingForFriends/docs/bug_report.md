@@ -144,7 +144,7 @@ Codebase review（2026-05-03）：
    - [x] phone message cooldown 使用 game time。
    - [x] `pm_watch_activity` fallback 改为 `clock.sleep_until(fallback_game_time)`，不能再用 wall deadline。
    - [ ] 移除 `TimelineControl` / `_timeline_elapsed()` / `_sleep_timeline()`。
-   - 旧 timeline `pm_trigger` 兼容逻辑保留，但不再作为 EC+/EC- 的 PM scheduler。
+   - 旧 timeline `pm_trigger` 兼容逻辑保留，但不再作为 EE1/EE0 的 PM scheduler。
 6. Phase 5 — cooking engine 迁移
 
    - [x] step activation 使用 `activated_game_time`。

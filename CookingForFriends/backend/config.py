@@ -36,7 +36,7 @@ ADMIN_API_KEY: str | None = os.getenv("ADMIN_API_KEY", None)
 TOKEN_LENGTH = 6
 TOKEN_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # No 0/O/1/I ambiguity
 
-# Experiment — EC+/EC- encoding-context design
+# Experiment — EE1/EE0 encoding-context design
 # Condition levels
 CONDITIONS = get_conditions()
 

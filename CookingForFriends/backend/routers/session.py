@@ -53,7 +53,7 @@ async def get_public_experiment_config(phase: str = Query(default="WELCOME")):
         raise HTTPException(403, "This phase requires a participant session")
     return get_experiment_config_for_phase(
         phase=normalized,
-        condition="EC+",
+        condition="EE1",
         task_order="A",
     )
 

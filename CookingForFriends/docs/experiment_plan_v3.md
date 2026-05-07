@@ -15,7 +15,7 @@
 3. 被试点击 → 开门/接电话 → 进入greeting场景
 4. 简短scripted greeting (与guest/caller对话)
 5. Robot avatar进入场景 + speech bubble渲染reminder
-   (reminder内容来自 PLACEHOLDER_REMINDER_T{n}_{ECPLUS/ECMINUS})
+   (reminder内容来自 PLACEHOLDER_REMINDER_T{n}_{EE1/EE0})
 6. 被试点击"I know" → reminder bubble消失
 7. Decoy modal出现: 6 options, 位置随机
 8. 被试选择 → confidence rating
@@ -275,7 +275,7 @@ Then: → setPhase('playing')
 
 ## 验收标准 (E2E test场景)
 
-通过Test mode创建一个EC+ Order A session, 完整跑通:
+通过Test mode创建一个EE1 Order A session, 完整跑通:
 1. ✅ Welcome → Consent → Introduction → Encoding (4 tasks × 4 segments + detail checks + 4 intention checks)
 2. ✅ 进入Formal phase → 等3分钟 → trigger 1 fires
 3. ✅ 完成trigger 1 pipeline (greeting → robot reminder → "I know" → decoy → confidence → avatar auto-action)

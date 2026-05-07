@@ -72,7 +72,7 @@ Important boundaries:
 - `questionnaires.json`: demographics, MSE, post-test, NASA-TLX, and
   retrospective-check schemas.
 - `pm_tasks.json`: PM task master definitions, including assign text, recap
-  text, EC+ / EC- reminder variants, trigger metadata, and decoy items.
+  text, EE1 / EE0 reminder variants, trigger metadata, and decoy items.
 - `encoding_materials.json`: video asset references and manipulation-check
   questions keyed by `task_id`.
 - `tutorial_materials.json`: phone practice, fried egg practice, and trial

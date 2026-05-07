@@ -49,7 +49,7 @@ class Participant(Base):
     )
     participant_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)  # P001
     token: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
-    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # EC+ / EC-
+    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # EE1 / EE0
     status: Mapped[str] = mapped_column(
         Enum(ParticipantStatus), default=ParticipantStatus.REGISTERED, nullable=False,
     )
@@ -61,7 +61,7 @@ class Participant(Base):
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     last_heartbeat: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    # PM Task Module — EC+/EC- experiment
+    # PM Task Module — EE1/EE0 experiment
     task_order: Mapped[str] = mapped_column(String(2), nullable=False, default="A")
     is_test: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     current_phase: Mapped[str] = mapped_column(String(30), nullable=False, default="welcome")

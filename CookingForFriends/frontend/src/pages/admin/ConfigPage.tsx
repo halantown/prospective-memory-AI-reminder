@@ -84,9 +84,9 @@ function formatMs(ms: number): string {
 
 const conditionBadge = (c: string) => {
   switch (c) {
-    case 'EC+':
+    case 'EE1':
       return 'bg-blue-100 text-blue-700'
-    case 'EC-':
+    case 'EE0':
       return 'bg-amber-100 text-amber-700'
     default:
       return 'bg-slate-100 text-slate-600'

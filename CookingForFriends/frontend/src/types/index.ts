@@ -2,7 +2,7 @@
 
 // ── Session & Experiment ──
 
-export type Condition = 'EC+' | 'EC-'
+export type Condition = 'EE1' | 'EE0'
 
 export type ExperimentPhase =
   | 'TOKEN_INPUT'

@@ -1,5 +1,5 @@
 {
-  "conditions": ["EC+", "EC-"],
+  "conditions": ["EE1", "EE0"],
   "task_orders": {
     "A": ["T1", "T2", "T4", "T3"],
     "B": ["T2", "T3", "T1", "T4"],

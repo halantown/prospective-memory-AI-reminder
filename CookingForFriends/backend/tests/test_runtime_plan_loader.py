@@ -32,7 +32,7 @@ def test_runtime_plan_builds_runtime_objects():
 
     cooking_entries = cooking_timeline_from_plan(plan)
     robot_comments = robot_idle_comments_from_plan(plan)
-    timeline = timeline_from_plan(plan, block_number=1, condition="EC+")
+    timeline = timeline_from_plan(plan, block_number=1, condition="EE1")
 
     assert cooking_entries[0].dish_id == "roasted_vegetables"
     assert cooking_entries[0].step_type == "active"

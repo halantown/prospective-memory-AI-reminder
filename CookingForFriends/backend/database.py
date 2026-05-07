@@ -50,7 +50,7 @@ async def _patch_pm_schema(conn):
 async def seed_dev_participant():
     """Auto-create or reset the dev test participant defined in config.DEV_TOKEN.
 
-    Creates a EC+ / Order A / is_test=True participant plus a bare Block shim
+    Creates a EE1 / Order A / is_test=True participant plus a bare Block shim
     (block_number=1) required as an FK anchor for existing logging tables.
     Set config.DEV_TOKEN = None to disable.
     """
@@ -104,7 +104,7 @@ async def seed_dev_participant():
                 participant_id="DEV_TESTER",
                 token=DEV_TOKEN,
                 status=ParticipantStatus.REGISTERED,
-                condition="EC+",
+                condition="EE1",
                 task_order="A",
                 is_test=True,
                 current_phase="welcome",
@@ -117,14 +117,14 @@ async def seed_dev_participant():
             block = Block(
                 participant_id=pid,
                 block_number=1,
-                condition="EC+",
+                condition="EE1",
                 day_story="DEV seed block",
                 status=BlockStatus.PENDING,
             )
             db.add(block)
             await db.commit()
             logger.warning(
-                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' created (EC+ / Order A / is_test=True) — "
+                f"⚠️  DEV_TOKEN '{DEV_TOKEN}' created (EE1 / Order A / is_test=True) — "
                 "remove DEV_TOKEN before production!"
             )
 

@@ -707,7 +707,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 | Affected area| `backend/engine/timeline.py`, `frontend/src/hooks/useWebSocket.ts`, PM trigger pipeline |
 
 ### Background
-> EC+/EC- sessions use the new event-driven PM scheduler in `engine/pm_session.py`. That scheduler sends `pm_trigger` WebSocket events with `task_id`, `trigger_type`, `position`, and fake/real metadata. The frontend uses `task_id` to load decoy options for the "What will you bring?" step.
+> EE1/EE0 sessions use the new event-driven PM scheduler in `engine/pm_session.py`. That scheduler sends `pm_trigger` WebSocket events with `task_id`, `trigger_type`, `position`, and fake/real metadata. The frontend uses `task_id` to load decoy options for the "What will you bring?" step.
 
 ### Incident Description
 > During a PM trigger, the modal advanced through door/call affordance, greeting, and robot reminder, then reached the decoy step with no options. The debug strip showed `taskId=NULL!` and `decoys=0`. If the overlay DOM was removed via browser devtools, `pmPipelineState` remained non-null, so `GamePage` kept `pointer-events-none` on the game and phone areas and the UI stayed unclickable.
@@ -721,7 +721,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 | 15:08 | Fix applied in backend timeline and frontend WebSocket guard |
 
 ### Root Cause
-> The legacy block timeline still forwarded static JSON `pm_trigger` events for EC+/EC- sessions. Those events predate the new PM module and only contain fields like `trigger_id` and `trigger_event`; they do not include the `task_id` required by `PMTriggerModal`. The frontend treated missing `is_fake` as `false`, so malformed legacy events were interpreted as real PM tasks and replaced the valid pipeline state with `taskId=null`.
+> The legacy block timeline still forwarded static JSON `pm_trigger` events for EE1/EE0 sessions. Those events predate the new PM module and only contain fields like `trigger_id` and `trigger_event`; they do not include the `task_id` required by `PMTriggerModal`. The frontend treated missing `is_fake` as `false`, so malformed legacy events were interpreted as real PM tasks and replaced the valid pipeline state with `taskId=null`.
 
 ### Contributing Factors
 > - Two PM schedulers were active for the same session: legacy `engine/timeline.py` entries and new `engine/pm_session.py`
@@ -729,7 +729,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > - The modal intentionally blocks background interaction while `pmPipelineState` is non-null, making malformed PM state user-blocking
 
 ### Fix
-> `backend/engine/timeline.py`: EC+/EC- sessions now skip legacy static `pm_trigger` events because `engine.pm_session` is authoritative for the new PM pipeline.
+> `backend/engine/timeline.py`: EE1/EE0 sessions now skip legacy static `pm_trigger` events because `engine.pm_session` is authoritative for the new PM pipeline.
 >
 > `frontend/src/hooks/useWebSocket.ts`: malformed real `pm_trigger` events without `task_id` are ignored and logged with `console.warn`, preventing the modal from entering an empty decoy state.
 >
@@ -747,7 +747,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 ### Follow-up Actions
 > - [ ] Remove or migrate legacy `pm_trigger` entries from static timeline JSON once no legacy experiment flow depends on them
 > - [ ] Add a frontend regression test for malformed `pm_trigger` payloads
-> - [ ] Add backend integration test proving EC+/EC- timeline does not emit legacy PM triggers
+> - [ ] Add backend integration test proving EE1/EE0 timeline does not emit legacy PM triggers
 > - [ ] Add backend integration test proving PM scheduler resumes when reconnecting to an already-`PLAYING` block
 
 ---

@@ -30,7 +30,7 @@ class Block(Base):
         String(36), ForeignKey("participants.id", ondelete="CASCADE"), nullable=False, index=True,
     )
     block_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-3
-    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # EC+ / EC-
+    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # EE1 / EE0
     day_story: Mapped[str] = mapped_column(String(200), nullable=False)
     timeline_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(
@@ -160,7 +160,7 @@ class ReminderMessage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     task_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # EC+ / EC-
+    condition: Mapped[str] = mapped_column(String(20), nullable=False)  # EE1 / EE0
     context_activity: Mapped[str | None] = mapped_column(String(100), nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)

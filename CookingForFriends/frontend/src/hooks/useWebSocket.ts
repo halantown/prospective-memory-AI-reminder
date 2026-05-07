@@ -103,7 +103,7 @@ export function useWebSocket(sessionId: string | null) {
           scheduleIndex,
           firedAt: Date.now() / 1000,
           wasInterrupted: false,
-          condition: data.condition as 'EC+' | 'EC-' | undefined,
+          condition: data.condition as 'EE1' | 'EE0' | undefined,
           guestName: data.guest_name as string | undefined,
           reminderText: data.reminder_text as string | undefined,
           greetingLines: data.greeting_lines as string[] | undefined,

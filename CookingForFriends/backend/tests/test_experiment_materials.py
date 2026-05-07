@@ -43,7 +43,7 @@ def test_trigger_schedule_loads_from_materials():
 def test_manip_check_config_does_not_expose_correct_answer():
     config = get_experiment_config_for_phase(
         phase="MANIP_CHECK_1",
-        condition="EC+",
+        condition="EE1",
         task_order="A",
     )
     assert config["task_id"] == "T1"
@@ -56,7 +56,7 @@ def test_manip_check_config_does_not_expose_correct_answer():
 def test_main_experiment_returns_only_selected_condition_reminders():
     config = get_experiment_config_for_phase(
         phase="MAIN_EXPERIMENT",
-        condition="EC-",
+        condition="EE0",
         task_order="A",
     )
     first_task = config["tasks"][0]
@@ -68,7 +68,7 @@ def test_main_experiment_returns_only_selected_condition_reminders():
 def test_recap_follows_latin_square_order():
     config = get_experiment_config_for_phase(
         phase="RECAP",
-        condition="EC+",
+        condition="EE1",
         task_order="B",
     )
     assert [task["task_id"] for task in config["tasks"]] == ["T2", "T3", "T1", "T4"]

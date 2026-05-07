@@ -139,8 +139,8 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const CONDITION_COLORS: Record<string, string> = {
-  'EC+': 'bg-blue-100 text-blue-700',
-  'EC-': 'bg-amber-100 text-amber-700',
+  'EE1': 'bg-blue-100 text-blue-700',
+  'EE0': 'bg-amber-100 text-amber-700',
 }
 
 type TabKey = 'overview' | 'logs' | 'phone' | 'pm' | 'snapshots'

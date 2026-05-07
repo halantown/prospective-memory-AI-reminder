@@ -70,8 +70,8 @@ The endpoint returns only the material needed for that phase. It strips:
 - `correct_index`
 - `correct_answer`
 
-It also returns only the current participant's EC reminder text, not both EC+
-and EC- variants.
+It also returns only the current participant's EC reminder text, not both EE1
+and EE0 variants.
 
 ## Ordering Rules
 

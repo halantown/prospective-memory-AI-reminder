@@ -4,7 +4,7 @@ A browser-based 2D prospective memory (PM) experiment where participants cook st
 
 ## Experiment Design
 
-- **Between-subjects IV**: Encoding Context (EC+ vs EC−) — assigned once per participant for all 4 PM tasks
+- **Between-subjects IV**: Encoding Context (EE1 vs EE0) — assigned once per participant for all 4 PM tasks
 - **4 PM Tasks** (T1–T4): Mei/baking book (doorbell), Lina/chocolate (doorbell), Tom/apple juice (phone), Delivery/trash bags (phone)
 - **4 Latin Square orders** (A–D): T1→T2→T4→T3, T2→T3→T1→T4, T3→T4→T2→T1, T4→T1→T3→T2
 - **8 (condition × order) combinations**, assigned round-robin to real participants
@@ -130,7 +130,7 @@ All admin HTTP endpoints require the header `X-Admin-Key: <key>`.
 
 | Tab | Description |
 |-----|-------------|
-| **Participants** | Create participant tokens (auto round-robin EC+/EC− × A/B/C/D). Shows token, entry URL, status. |
+| **Participants** | Create participant tokens (auto round-robin EE1/EE0 × A/B/C/D). Shows token, entry URL, status. |
 | **Latin Square** | Read-only view of 4 orders + current participant counts per (condition, order) cell. |
 | **Live Sessions** | Real-time monitor of in-progress sessions (token, phase, game time). |
 | **Data Export** | Download CSV exports (see below). |
@@ -143,7 +143,7 @@ All admin HTTP endpoints require the header `X-Admin-Key: <key>`.
 Use Test Mode to run a full or partial session without affecting round-robin assignment counts.
 
 **Via Admin UI** (Test Mode tab):
-1. Select condition (EC+ / EC−) and order (A / B / C / D)
+1. Select condition (EE1 / EE0) and order (A / B / C / D)
 2. Select start phase (welcome / consent / introduction / encoding / playing / post_questionnaire)
 3. Click "Start test session" → opens entry URL in new tab
 4. Test sessions are flagged `is_test=True` and excluded from analysis exports by default
@@ -153,7 +153,7 @@ Use Test Mode to run a full or partial session without affecting round-robin ass
 curl -X POST http://localhost:5000/api/admin/test-session \
   -H "X-Admin-Key: your_key" \
   -H "Content-Type: application/json" \
-  -d '{"condition": "EC+", "task_order": "A", "start_phase": "welcome"}'
+  -d '{"condition": "EE1", "task_order": "A", "start_phase": "welcome"}'
 # → {"token": "ABC123", "entry_url": "/?token=ABC123", "is_test": true, ...}
 ```
 
@@ -249,7 +249,7 @@ DEV_TOKEN=DEVTEST uvicorn main:app --port 5000
 ## Data Models
 
 ### Core tables
-- **Participant** — token, condition (EC+/EC−), task_order (A/B/C/D), is_test, current_phase, game_time_elapsed_s, frozen_since, last_unfreeze_at, disconnected_at, incomplete
+- **Participant** — token, condition (EE1/EE0), task_order (A/B/C/D), is_test, current_phase, game_time_elapsed_s, frozen_since, last_unfreeze_at, disconnected_at, incomplete
 - **Block** — schema shim only (block_number=1 always). **Do not drop**; logging tables FK here.
 
 ### PM module tables (new)

@@ -1,4 +1,4 @@
-"""PM Module models — event log tables for the EC+/EC- encoding-context experiment.
+"""PM Module models — event log tables for the EE1/EE0 encoding-context experiment.
 
 All timing fields store epoch-seconds floats (game time where noted, wall time elsewhere).
 These tables have no block_id; they reference participants.id directly.
@@ -78,7 +78,7 @@ class PMTaskEvent(Base):
     )
     task_id: Mapped[str] = mapped_column(String(4), nullable=False)          # "T1"–"T4"
     position_in_order: Mapped[int] = mapped_column(Integer, nullable=False)  # 1–4
-    condition: Mapped[str] = mapped_column(String(10), nullable=False)       # "EC+" | "EC-"
+    condition: Mapped[str] = mapped_column(String(10), nullable=False)       # "EE1" | "EE0"
 
     # Trigger timing (game time seconds)
     trigger_scheduled_game_time: Mapped[float | None] = mapped_column(Float, nullable=True)
