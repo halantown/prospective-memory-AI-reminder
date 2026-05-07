@@ -213,6 +213,8 @@ async def _ws_receiver(
                     await _handle_fake_trigger_ack(participant_id, block_number, data, db_factory)
                 elif msg_type == "fake_trigger_ack":
                     await _handle_fake_trigger_ack(participant_id, block_number, data, db_factory)
+                elif msg_type == "trigger_encounter_state":
+                    await _handle_interaction(participant_id, block_number, "trigger_encounter_state", data, db_factory)
                 elif msg_type == "phone_unlock":
                     await _handle_interaction(participant_id, block_number, "phone_unlock", data, db_factory)
                 elif msg_type == "phone_action":

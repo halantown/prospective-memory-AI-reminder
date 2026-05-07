@@ -179,7 +179,11 @@ Sprite-sheet rendering note:
 
 - `ClickDialogueFlow` owns click-to-advance dialogue with typewriter, 30s hint, and 45s auto-advance.
 - `BubbleDialogue` is the shared pixel-style action/reminder bubble used by robot reminders, item choice, and PM action controls.
-- The first implemented vertical slice is the Mei/T1 doorbell encounter.
+- Real PM trigger configs now exist for T1-T4.
+- Fake doorbell and fake phone triggers use direct-request dialogue plus a single action button.
+- Phone encounters show caller dialogue as a cloud-style bubble with the caller sprite.
+- Tutorial trigger reuses the same click-to-advance dialogue and pixel bubble components.
+- The frontend emits `trigger_encounter_state` WebSocket messages, persisted as `InteractionLog` rows for monitoring/export.
 
 ## Implementation Priority
 
