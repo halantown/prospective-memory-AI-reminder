@@ -5,7 +5,7 @@
  * Fake: trigger_event -> greeting -> direct_request -> completed
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { emitMouseTrackingEvent } from '../../hooks/useMouseTracker'
 import { FAKE_TRIGGER_LINES, ITEM_SELECTION_OPTIONS, PM_TASKS } from '../../constants/pmTasks'
@@ -13,7 +13,12 @@ import { GREETING_PLACEHOLDERS, REMINDER_PLACEHOLDERS } from '../../constants/pl
 import type { DecoyOption, PMPipelineStep } from '../../types'
 import BubbleDialogue from './dialogue/BubbleDialogue'
 import ClickDialogueFlow from './dialogue/ClickDialogueFlow'
-import { getEncounterReminder, getTriggerEncounterConfig, type DialogueLine } from '../../data/triggerEncounters'
+import {
+  getActiveTriggerEncounterConfig,
+  getEncounterReminder,
+  type DialogueLine,
+  type TriggerEncounterConfig,
+} from '../../data/triggerEncounters'
 import type { ReactNode } from 'react'
 
 const TRIGGER_NUDGE_MS = 30_000
@@ -92,6 +97,46 @@ function ReminderStep({
         continueLabel="Got it"
         onContinue={onAck}
       />
+    </InGameShell>
+  )
+}
+
+function DirectRequestStep({
+  config,
+  fallbackDialogue,
+  onComplete,
+}: {
+  config: TriggerEncounterConfig | null
+  fallbackDialogue: DialogueLine[]
+  onComplete: () => void
+}) {
+  const [dialogueDone, setDialogueDone] = useState(false)
+  const actionLabel = config?.fakeActionLabel ?? 'Done'
+
+  if (!dialogueDone) {
+    return (
+      <ClickDialogueFlow
+        lines={config?.fakeDialogue ?? fallbackDialogue}
+        onComplete={() => setDialogueDone(true)}
+      />
+    )
+  }
+
+  return (
+    <InGameShell>
+      <BubbleDialogue
+        speaker={config?.npcName ?? 'Visitor'}
+        text="Thanks. That is all I needed."
+        avatar={(config?.npcName ?? 'V').slice(0, 1)}
+      >
+        <button
+          type="button"
+          onClick={onComplete}
+          className="border-2 border-slate-950 bg-slate-900 px-4 py-2 text-sm font-black text-white shadow-[3px_3px_0_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5 hover:bg-slate-700"
+        >
+          {actionLabel}
+        </button>
+      </BubbleDialogue>
     </InGameShell>
   )
 }
@@ -215,7 +260,7 @@ export default function PMTriggerModal() {
   const guestName = pmPipelineState?.guestName
     ?? (taskId ? PM_TASKS[taskId]?.guestName : undefined)
     ?? (triggerType === 'doorbell' ? 'Visitor' : 'Caller')
-  const encounterConfig = getTriggerEncounterConfig(taskId)
+  const encounterConfig = getActiveTriggerEncounterConfig({ taskId, triggerType, isFake })
 
   const itemOptions = useMemo(() => {
     if (!taskId) return []
@@ -388,7 +433,11 @@ export default function PMTriggerModal() {
 
   if (step === 'fake_resolution' || step === 'direct_request') {
     return (
-      <ClickDialogueFlow lines={fakeDialogue} onComplete={handleFakeComplete} />
+      <DirectRequestStep
+        config={encounterConfig}
+        fallbackDialogue={fakeDialogue}
+        onComplete={handleFakeComplete}
+      />
     )
   }
 

@@ -26,12 +26,12 @@ import KitchenRoom, { KitchenStationOverlay } from './rooms/KitchenRoom'
 import KitchenFurniture from './rooms/KitchenFurniture'
 import WaypointEditor from './debug/WaypointEditor'
 import PlayerAvatar from './PlayerAvatar'
-import CharacterSpriteSheet from './CharacterSpriteSheet'
+import CharacterSpriteSheet, { type CharacterSpriteId } from './CharacterSpriteSheet'
 import { useCharacterStore } from '../../stores/characterStore'
 import waypointData from '../../data/waypoints.json'
 import type { WaypointData } from '../../utils/waypointGraph'
 import { resolveRoomPoint } from '../../utils/waypointGraph'
-import { getTriggerEncounterConfig } from '../../data/triggerEncounters'
+import { getActiveTriggerEncounterConfig } from '../../data/triggerEncounters'
 
 const wpData = waypointData as unknown as WaypointData
 
@@ -95,6 +95,12 @@ const ROOM_DEFS: Record<FloorRoom, RoomDef> = {
 }
 
 const ALL_ROOMS: FloorRoom[] = ['kitchen', 'dining_hall', 'bedroom', 'living_room']
+
+function encounterCharacterId(npcId: string | undefined): CharacterSpriteId {
+  if (npcId === 'mei' || npcId === 'sophia' || npcId === 'courier' || npcId === 'sam_tutorial') return npcId
+  if (npcId === 'benjamin') return 'benjamin'
+  return 'courier'
+}
 
 // ── Adjacency map — buttons reflect the relative position of neighboring rooms ──
 
@@ -194,7 +200,11 @@ export default function FloorPlanView({
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
   const doorbellActive = pmPipelineState?.step === 'trigger_event'
     && pmPipelineState.triggerType === 'doorbell'
-  const encounterConfig = getTriggerEncounterConfig(pmPipelineState?.taskId)
+  const encounterConfig = getActiveTriggerEncounterConfig({
+    taskId: pmPipelineState?.taskId,
+    triggerType: pmPipelineState?.triggerType,
+    isFake: pmPipelineState?.isFake,
+  })
   const encounterFocusActive = Boolean(
     encounterConfig
     && pmPipelineState?.triggerType === 'doorbell'
@@ -503,7 +513,7 @@ export default function FloorPlanView({
               exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.3 }}
             >
-              <CharacterSpriteSheet character={encounterConfig.npcId === 'mei' ? 'mei' : 'courier'} facing="left" scale={1.05} />
+              <CharacterSpriteSheet character={encounterCharacterId(encounterConfig.npcId)} facing="left" scale={1.05} />
             </motion.div>
           )}
         </AnimatePresence>
