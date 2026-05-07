@@ -3,9 +3,10 @@ import { useGameStore } from '../../stores/gameStore'
 import { advancePhase, getExperimentConfig, submitExperimentResponses } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
 import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
+import ClickDialogueFlow from '../../components/game/dialogue/ClickDialogueFlow'
 import TrainingHomeShell from '../../components/game/TrainingHomeShell'
-import SpriteSheet from '../../components/game/_archive/sprites/SpriteSheet'
-import { CHAR_ANIMATIONS, CHAR_SHEET } from '../../components/game/_archive/sprites/characterAnimations'
+import CharacterSpriteSheet from '../../components/game/CharacterSpriteSheet'
+import { getTriggerEncounterConfig } from '../../data/triggerEncounters'
 import type { CookingDefinitions, CookingStepOption } from '../../types'
 
 interface Option {
@@ -44,6 +45,7 @@ export default function TutorialFlowPage() {
   const [timerReady, setTimerReady] = useState(false)
   const [tabPromptTimedOut, setTabPromptTimedOut] = useState(false)
   const [triggerResting, setTriggerResting] = useState(false)
+  const [triggerDialogueDone, setTriggerDialogueDone] = useState(false)
   const startedAtRef = useRef(Date.now())
   const phoneAdvancedRef = useRef(false)
   const cookingSetupRef = useRef(false)
@@ -57,6 +59,7 @@ export default function TutorialFlowPage() {
     setTimerReady(false)
     setTabPromptTimedOut(false)
     setTriggerResting(false)
+    setTriggerDialogueDone(false)
     phoneAdvancedRef.current = false
     cookingSetupRef.current = false
     startedAtRef.current = Date.now()
@@ -396,21 +399,18 @@ export default function TutorialFlowPage() {
     robot_line: string
     action_label: string
   }
+  const triggerEncounter = getTriggerEncounterConfig('tutorial_sam')
+  const tutorialGreeting = triggerEncounter?.greetingDialogue ?? [
+    { speaker: trigger.visitor, text: trigger.visitor_line, bubblePosition: 'right' as const },
+  ]
+
   return (
     <TrainingHomeShell phase={phase}>
       <div className="w-full max-w-3xl space-y-3 pb-8">
-        <div className="flex justify-start">
-          <div className="rounded-lg border border-white/20 bg-slate-950/70 px-4 py-3 shadow-lg">
-            <SpriteSheet
-              src={CHAR_SHEET.src}
-              sheetCols={CHAR_SHEET.sheetCols}
-              frameW={CHAR_SHEET.frameW}
-              frameH={CHAR_SHEET.frameH}
-              animation={CHAR_ANIMATIONS.idle_down}
-              scale={2}
-              className="drop-shadow-lg"
-            />
-            <div className="mt-1 text-center text-xs font-semibold text-white/80">{trigger.visitor}</div>
+        <div className="flex justify-start pl-8">
+          <div className="border-2 border-slate-900 bg-slate-950/70 px-4 py-3 shadow-[4px_4px_0_rgba(15,23,42,0.45)]">
+            <CharacterSpriteSheet character="sam_tutorial" facing="left" scale={1.5} />
+            <div className="mt-1 text-center text-xs font-black text-white/80">{triggerEncounter?.npcName ?? trigger.visitor}</div>
           </div>
         </div>
         {triggerResting ? (
@@ -419,16 +419,25 @@ export default function TutorialFlowPage() {
             text="OK, I can rest now and wait until tonight to start cooking."
             avatar="A"
           />
+        ) : !triggerDialogueDone ? (
+          <ClickDialogueFlow
+            lines={tutorialGreeting}
+            onComplete={() => setTriggerDialogueDone(true)}
+          />
         ) : (
           <>
-            <BubbleDialogue speaker={trigger.visitor} text={trigger.visitor_line} avatar="S" />
-            <BubbleDialogue speaker="ROBOT" text={trigger.robot_line} avatar="R" align="right" />
+            <BubbleDialogue
+              speaker="Pepper"
+              text={triggerEncounter?.tutorialRobotLine ?? trigger.robot_line}
+              avatar="R"
+              align="right"
+            />
             <button
-              onClick={() => finishTriggerTutorial(trigger.action_label)}
+              onClick={() => finishTriggerTutorial(triggerEncounter?.tutorialActionLabel ?? trigger.action_label)}
               disabled={loading}
-              className="w-full rounded-lg bg-white py-3 text-sm font-semibold text-slate-900 shadow-lg disabled:bg-slate-300"
+              className="w-full border-2 border-slate-950 bg-white py-3 text-sm font-black text-slate-900 shadow-[4px_4px_0_rgba(15,23,42,0.45)] transition hover:-translate-y-0.5 disabled:bg-slate-300"
             >
-              {loading ? 'Saving...' : trigger.action_label}
+              {loading ? 'Saving...' : triggerEncounter?.tutorialActionLabel ?? trigger.action_label}
             </button>
           </>
         )}
