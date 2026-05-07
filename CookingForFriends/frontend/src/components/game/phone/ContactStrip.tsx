@@ -55,7 +55,7 @@ export default function ContactStrip() {
   )
 
   return (
-    <div className="flex flex-col items-center gap-1.5 py-2 px-1 w-[54px] border-r border-slate-700/40 shrink-0 overflow-y-auto">
+    <div className="flex flex-col items-center gap-1.5 py-2 px-1 w-[54px] shrink-0 overflow-y-auto">
       {visibleContacts.map((contact) => {
         const isActive = contact.id === activeContactId
         const badge = badgeByContact[contact.id] || { type: 'none' }

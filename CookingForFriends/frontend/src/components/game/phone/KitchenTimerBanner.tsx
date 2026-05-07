@@ -11,10 +11,13 @@ function formatRemaining(seconds: number) {
 }
 
 function remainingSeconds(step: ActiveCookingStep, elapsedSeconds: number, now: number) {
+  const elapsedWallSeconds = (now - step.activatedAt) / 1000
   if (step.deadlineGameTime != null) {
+    if (step.activatedGameTime != null) {
+      return step.deadlineGameTime - (step.activatedGameTime + elapsedWallSeconds)
+    }
     return step.deadlineGameTime - elapsedSeconds
   }
-  const elapsedWallSeconds = (now - step.activatedAt) / 1000
   return step.windowSeconds - elapsedWallSeconds
 }
 
@@ -55,7 +58,7 @@ export default function KitchenTimerBanner() {
         missed: false,
         emoji: activeDish?.emoji || '🍳',
         title: activeStep.stepLabel,
-        detail: activeStep.stepDescription || activeDish?.label || 'Kitchen step',
+        detail: '',
         remainingLabel: formatRemaining(remaining),
       }
     }
@@ -82,10 +85,10 @@ export default function KitchenTimerBanner() {
             scale: isUrgent && !banner.missed ? { repeat: Infinity, duration: 0.75 } : undefined,
             borderColor: banner.missed ? { repeat: 2, duration: 0.28 } : undefined,
           }}
-          className="relative z-20 px-4 py-2 shrink-0"
+          className="relative z-20 px-4 py-1.5 shrink-0"
         >
           <div
-            className={`rounded-lg border-2 px-4 py-3 shadow-2xl ${
+            className={`rounded-lg border-2 px-3.5 py-2 shadow-xl ${
               banner.missed
                 ? 'bg-red-600 text-white border-red-200 shadow-red-950/50'
                 : isUrgent
@@ -93,15 +96,15 @@ export default function KitchenTimerBanner() {
                   : 'bg-orange-500 text-white border-orange-200 shadow-orange-950/40'
             }`}
           >
-            <div className="flex items-center gap-3">
-              <span className="text-3xl leading-none">{banner.emoji}</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl leading-none">{banner.emoji}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[17px] font-black leading-tight truncate">
+                  <span className="text-[16px] font-black leading-tight truncate">
                     {banner.title}
                   </span>
                   {banner.remainingLabel && (
-                    <span className="ml-auto shrink-0 rounded bg-black/20 px-2 py-0.5 text-[15px] font-black tabular-nums">
+                    <span className="ml-auto shrink-0 rounded bg-black/20 px-2 py-0.5 text-[14px] font-black tabular-nums">
                       {banner.remainingLabel}
                     </span>
                   )}
