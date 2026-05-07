@@ -155,6 +155,7 @@ if FRONTEND_DIST.exists():
 
     @app.get("/dashboard{rest:path}")
     @app.get("/config{rest:path}")
+    @app.get("/admin/timeline-editor{rest:path}")
     @app.get("/admin{rest:path}")
     @app.get("/timeline-editor{rest:path}")
     async def spa_fallback(rest: str = ""):

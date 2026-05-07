@@ -31,14 +31,14 @@ export default function App() {
     const participantId = path.split('/admin/participant/')[1]?.split('/')[0]
     if (participantId) return <ParticipantControlPage participantId={participantId} />
   }
+  if (path.startsWith('/timeline-editor') || path.startsWith('/admin/timeline-editor')) {
+    return <TimelineEditorPage />
+  }
   if (path.startsWith('/dashboard') || path.startsWith('/admin')) {
     return <AdminDashboard />
   }
   if (path.startsWith('/config')) {
     return <ConfigPage />
-  }
-  if (path.startsWith('/timeline-editor')) {
-    return <TimelineEditorPage />
   }
 
   // Game routes — phase-based rendering

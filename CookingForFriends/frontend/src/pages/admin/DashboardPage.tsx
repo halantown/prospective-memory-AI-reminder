@@ -21,6 +21,7 @@ import {
   FlaskConical,
   BarChart2,
   RadioTower,
+  CalendarClock,
 } from 'lucide-react'
 import {
   createParticipant,
@@ -987,6 +988,15 @@ export default function AdminDashboard() {
                 className="px-3 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 Config
+              </button>
+              <button
+                onClick={() => (window.location.href = '/admin/timeline-editor')}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarClock className="w-3.5 h-3.5" />
+                  Runtime Plan
+                </span>
               </button>
             </nav>
           </div>
