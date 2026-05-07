@@ -48,10 +48,10 @@ export default function PhoneSidebar() {
   return (
     <div className="h-full flex items-center justify-center bg-slate-900 p-3">
       {/* iPhone shell */}
-      <div className="relative flex flex-col w-[440px] h-[820px] items-center justify-center">
+      <div className="relative flex flex-col w-[440px] h-[860px] items-center justify-center">
         {/* Outer bezel — pulse glow on new message */}
         <div
-          className={`relative flex flex-col w-[380px] h-[800px] rounded-[40px] border-[3px]
+          className={`relative flex flex-col w-[380px] h-[840px] rounded-[40px] border-[3px]
                       bg-gradient-to-b from-slate-800 to-slate-900 shadow-2xl shadow-black/50
                       overflow-hidden transition-all duration-150
                       border-slate-600`}
