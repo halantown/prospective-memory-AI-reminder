@@ -43,6 +43,9 @@ export function useWebSocket(sessionId: string | null) {
       case 'time_tick':
         if (data.game_clock) store.setGameClock(data.game_clock as string)
         if (data.elapsed != null) store.setElapsedSeconds(data.elapsed as number)
+        if (data.frozen !== undefined && data.frozen !== store.gameTimeFrozen) {
+          store.setGameTimeFrozen(Boolean(data.frozen))
+        }
         break
 
       case 'robot_speak':

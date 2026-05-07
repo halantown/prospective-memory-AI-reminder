@@ -8,7 +8,7 @@ const BOUNCE_DURATION_MS = 2000
 const CHATS_BOUNCE_COOLDOWN_MS = 60_000
 const CHATS_UNREAD_THRESHOLD = 3
 
-const BOUNCE_KEYFRAMES = { y: [0, -8, 0, -5, 0, -2, 0] }
+const BOUNCE_KEYFRAMES = { y: [0, -16, 0, -10, 0, -4, 0] }
 const BOUNCE_TRANSITION = { duration: BOUNCE_DURATION_MS / 1000, ease: 'easeInOut' as const }
 
 export default function PhoneTabBar() {

@@ -4,7 +4,7 @@
  *  1. System notifications (weather, battery, delivery) — auto-dismiss 3s, no contact nav.
  *  2. Cross-contact chat alerts — shows sender + preview. Tap → navigate to contact.
  *
- *  Renders in phone content flow so it cannot cover the Kitchen Timer. */
+ *  Renders as an overlay so it cannot push the Kitchen Timer or chats down. */
 
 import { useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,7 +13,7 @@ import { useGameStore } from '../../../stores/gameStore'
 const CHAT_BANNER_DURATION = 5_000
 const SYSTEM_BANNER_DURATION = 3_000
 
-export default function NotificationBanner() {
+export default function NotificationBanner({ belowKitchenCue = false }: { belowKitchenCue?: boolean }) {
   const banner = useGameStore((s) => s.phoneBanner)
   const contacts = useGameStore((s) => s.contacts)
   const setBanner = useGameStore((s) => s.setPhoneBanner)
@@ -65,8 +65,8 @@ export default function NotificationBanner() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-          className="mx-4 mt-2 mb-1 rounded-xl shadow-lg shadow-black/30
-                     border cursor-pointer overflow-hidden"
+          className={`absolute left-4 right-4 ${belowKitchenCue ? 'top-[96px]' : 'top-[44px]'} z-30 rounded-xl shadow-lg shadow-black/30
+                     border cursor-pointer overflow-hidden`}
           style={{
             backgroundColor: isSystemNotification ? 'rgba(30, 41, 59, 0.96)' : '#ffffff',
             borderColor: isSystemNotification ? 'rgba(148, 163, 184, 0.35)' : 'rgba(255, 255, 255, 0.2)',

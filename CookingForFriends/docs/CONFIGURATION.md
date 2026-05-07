@@ -44,7 +44,7 @@
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `PHONE_LOCK_TIMEOUT_S` | `30` | Auto-lock phone after inactivity |
+| `PHONE_LOCK_TIMEOUT_S` | Deprecated / unused | Phone lock is temporarily disabled; current runtime keeps the phone accessible |
 
 ### Data Capture
 
@@ -93,14 +93,14 @@
 |----------|-------|-------------|
 | `SYSTEM_BANNER_DURATION` | `3,000 ms` | Low-key system notification banner auto-dismiss time |
 | `CHAT_BANNER_DURATION` | `5,000 ms` | Chat preview banner auto-dismiss time |
-| Phone lock | Disabled | Phone remains accessible throughout gameplay |
+| Phone lock | Temporarily disabled | `LockScreen.tsx` and `phoneLocked` are legacy placeholders; phone remains accessible throughout gameplay |
 
-### Kitchen Timer (`frontend/src/components/game/phone/KitchenTimerBanner.tsx`)
+### Cooking Indicator (`frontend/src/components/game/phone/KitchenTimerBanner.tsx`)
 
 | Behavior | Value | Description |
 |----------|-------|-------------|
-| Urgency threshold | Final 25% of active step window | Timer banner pulses to signal imminent timeout |
-| Missed feedback | `2,000 ms` | Timer banner flashes red and shows "Missed!" |
+| Urgency threshold | Final 25% of active step window | Cooking Indicator pulses to signal imminent timeout |
+| Missed feedback | `2,000 ms` | Cooking Indicator flashes red and shows "Missed!" |
 
 ### PM Interaction (`frontend/src/components/game/PMTargetItems.tsx`)
 

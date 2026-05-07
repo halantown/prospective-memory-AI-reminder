@@ -10,14 +10,11 @@ function formatRemaining(seconds: number) {
   return `${safe}s`
 }
 
-function remainingSeconds(step: ActiveCookingStep, elapsedSeconds: number, now: number) {
-  const elapsedWallSeconds = (now - step.activatedAt) / 1000
+function remainingSeconds(step: ActiveCookingStep, estimatedGameSeconds: number, now: number) {
   if (step.deadlineGameTime != null) {
-    if (step.activatedGameTime != null) {
-      return step.deadlineGameTime - (step.activatedGameTime + elapsedWallSeconds)
-    }
-    return step.deadlineGameTime - elapsedSeconds
+    return step.deadlineGameTime - estimatedGameSeconds
   }
+  const elapsedWallSeconds = (now - step.activatedAt) / 1000
   return step.windowSeconds - elapsedWallSeconds
 }
 
@@ -26,20 +23,32 @@ export default function KitchenTimerBanner() {
   const missedStepFlashes = useGameStore((s) => s.missedStepFlashes)
   const dishes = useGameStore((s) => s.dishes)
   const elapsedSeconds = useGameStore((s) => s.elapsedSeconds)
+  const gameTimeFrozen = useGameStore((s) => s.gameTimeFrozen)
   const [now, setNow] = useState(Date.now())
+  const [elapsedSnapshot, setElapsedSnapshot] = useState(() => ({
+    value: elapsedSeconds,
+    capturedAt: Date.now(),
+  }))
+
+  useEffect(() => {
+    setElapsedSnapshot({ value: elapsedSeconds, capturedAt: Date.now() })
+  }, [elapsedSeconds, gameTimeFrozen])
 
   useEffect(() => {
     if (activeCookingSteps.length === 0) return
     const timer = setInterval(() => setNow(Date.now()), 250)
     return () => clearInterval(timer)
-  }, [activeCookingSteps.length])
+  }, [activeCookingSteps.length, gameTimeFrozen])
 
   const missedItem = missedStepFlashes[missedStepFlashes.length - 1]
   const activeStep = activeCookingSteps[0]
   const activeDish = activeStep ? dishes[activeStep.dishId] : null
-  const remaining = activeStep ? remainingSeconds(activeStep, elapsedSeconds, now) : 0
+  const estimatedGameSeconds = gameTimeFrozen
+    ? elapsedSnapshot.value
+    : elapsedSnapshot.value + (now - elapsedSnapshot.capturedAt) / 1000
+  const remaining = activeStep ? remainingSeconds(activeStep, estimatedGameSeconds, now) : 0
   const urgencyThreshold = activeStep ? activeStep.windowSeconds * 0.25 : 0
-  const isUrgent = Boolean(activeStep && remaining <= urgencyThreshold)
+  const isUrgent = Boolean(activeStep && remaining > 0 && remaining <= urgencyThreshold)
 
   const banner = useMemo(() => {
     if (missedItem) {
@@ -85,7 +94,7 @@ export default function KitchenTimerBanner() {
             scale: isUrgent && !banner.missed ? { repeat: Infinity, duration: 0.75 } : undefined,
             borderColor: banner.missed ? { repeat: 2, duration: 0.28 } : undefined,
           }}
-          className="relative z-20 px-4 py-1.5 shrink-0"
+          className="absolute left-0 right-0 top-[38px] z-20 px-4 py-1.5"
         >
           <div
             className={`rounded-lg border-2 px-3.5 py-2 shadow-xl ${

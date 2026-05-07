@@ -307,9 +307,13 @@ Prepare the following asset outputs first:
 
 ### Kitchen Interaction Points
 
-Each kitchen object is a **clickable area** in the SVG furniture layer. Clicking opens a **popup** showing available actions for that object in its current state.
+Terminology: use **Kitchen Utensils** for all clickable kitchen interaction
+points in design/user-facing docs. The code and backend payloads may still use
+`station` as the internal identifier.
 
-| Object        | Location in viewBox   | Function                 | Popup Actions (vary by state)                        |
+Each Kitchen Utensil is a **clickable area** in the SVG furniture layer. Clicking opens a **popup** showing available actions for that utensil in its current state.
+
+| Kitchen Utensil | Location in viewBox   | Function                 | Popup Actions (vary by state)                        |
 | ------------- | --------------------- | ------------------------ | ---------------------------------------------------- |
 | Fridge        | Top-right             | Select ingredients       | List of ingredients needed for current dish          |
 | Cutting Board | Upper-left of counter | Prepare/chop ingredients | "Chop [ingredient]", "Season [ingredient]"           |
@@ -547,10 +551,9 @@ New structure:
 ### Phone UI Architecture
 
 ```
-PhoneSidebar.tsx          (iPhone shell + Dynamic Island + status bar + lock screen logic)
-├── LockScreen.tsx         (three sections: Kitchen (orange, top) > Messages > System; Kitchen derives timers from activeCookingSteps)
-├── NotificationBanner.tsx (floating pill at top, 5s auto-dismiss, countdown bar)
-├── KitchenTimerBanner.tsx (legacy non-blocking helper; derives from activeCookingSteps if rendered)
+PhoneSidebar.tsx          (iPhone shell + Dynamic Island + status bar; always-unlocked runtime UI)
+├── NotificationBanner.tsx (top overlay, 3-5s auto-dismiss, countdown bar; does not push layout)
+├── KitchenTimerBanner.tsx (Cooking Indicator; persistent non-blocking cooking cue; derives from activeCookingSteps)
 ├── KitchenTimerModal.tsx  (legacy no-op; do not reintroduce blocking timer queue)
 ├── PhoneTabBar.tsx        (bottom tabs: Chats / Recipe)
 ├── ContactStrip.tsx       (left 48px vertical avatar list — hidden until contact sends first msg)
@@ -559,6 +562,10 @@ PhoneSidebar.tsx          (iPhone shell + Dynamic Island + status bar + lock scr
 │   └── ChoiceButtons.tsx  (vertical stacked, full-width buttons)
 └── RecipeTab.tsx          (recipe viewer placeholder)
 ```
+
+`LockScreen.tsx`, `phoneLocked`, and `phoneLastActivity` are temporarily deprecated. They may
+remain in the codebase for reference, but the active experiment should not auto-lock the phone
+or rely on lock/unlock remount behavior unless that feature is deliberately restored.
 
 ### Contact Badge System (3-state)
 
@@ -574,7 +581,7 @@ State flow per message: `unread` → (switch to contact) → `read` → (tap cho
 
 ### Friend Reply Persistence
 
-Friend reply bubbles are shown with a 2.5-second delay after the participant answers. The `feedbackVisible` flag is stored on the `PhoneMessage` object in Zustand (not in component local state). This ensures feedback survives phone lock/unlock cycles which unmount/remount `ChatView`.
+Friend reply bubbles are shown with a 2.5-second delay after the participant answers. The `feedbackVisible` flag is stored on the `PhoneMessage` object in Zustand (not in component local state). This keeps feedback stable across contact/tab changes and preserves compatibility if lock-screen remount behavior is restored later.
 
 ### Question Message Design
 
@@ -597,13 +604,9 @@ Friend reply bubbles are shown with a 2.5-second delay after the participant ans
 
 ### Phone Lock Screen
 
-- Auto-locks after 15s of no phone interaction
-- **Two sections** (Messages above System), separated by a plain divider line
-- Messages section: shows per-contact summary (contact name + unread count + truncated latest text)
-- System section: shows accumulated system notifications (persist until session reset)
-- Sections only visible when they have content
-- Fixed-height layout — inner scroll if too many notifications; "Tap to unlock" always pinned at bottom
-- Lock screen does **not** show the status bar clock
+- Temporarily disabled in the active runtime.
+- Do not assume `phoneLocked=true` will render `LockScreen.tsx`; `PhoneSidebar.tsx` currently renders the unlocked tab UI.
+- If restored, re-check notification stacking, kitchen timer layout, friend-reply persistence, and any WebSocket read/unlock telemetry before enabling auto-lock.
 
 ---
 
@@ -671,7 +674,7 @@ Familiarize participants with all interaction types so experimental performance 
 #### Frontend — Kitchen (`KitchenRoom.tsx` rewrite)
 
 - Replace steak-flipping mechanic with multi-dish state machine
-- Each kitchen object (fridge, burners, oven, cutting board, spice rack, plating) is a clickable area
+- Each Kitchen Utensil (fridge, burners, oven, cutting board, spice rack, plating area) is a clickable area
 - Clicking opens a popup with context-sensitive action list
 - Dish state tracked in Zustand store, updated by backend events + participant actions
 

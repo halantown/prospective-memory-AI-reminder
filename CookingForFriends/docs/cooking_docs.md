@@ -6,12 +6,14 @@ listed path is all that's needed to swap it in.
 
 ---
 
-## 1. Kitchen Station Furniture
+## 1. Kitchen Utensils
 
-Eight interactive hotspots in KitchenRoom. Each maps 1-to-1 to a station in the
-backend (`cooking_recipes.py` / `cooking_timeline.py`).
+Eight interactive Kitchen Utensils in KitchenRoom. Each maps 1-to-1 to a
+`station` ID in the backend (`cooking_recipes.py` / `cooking_timeline.py`).
+Use **Kitchen Utensils** in user-facing and design docs; keep `station` for
+internal identifiers.
 
-| File path (public/) | Station ID | Used by dish(es) | Description |
+| File path (public/) | Internal station ID | Used by dish(es) | Kitchen Utensil description |
 |---|---|---|---|
 | `assets/kitchen/fridge.png` | `fridge` | Roasted Vegetables, Tomato Soup, Steak | Kitchen fridge — top-down view |
 | `assets/kitchen/cutting_board.png` | `cutting_board` | Roasted Vegetables, Tomato Soup, Steak | Wooden cutting board on counter |
@@ -22,7 +24,7 @@ backend (`cooking_recipes.py` / `cooking_timeline.py`).
 | `assets/kitchen/oven.png` | `oven` | Roasted Vegetables (place / wait / remove) | Oven with baking tray |
 | `assets/kitchen/plating_area.png` | `plating_area` | All 4 dishes (final plating step) | Counter with serving plates |
 
-### Station positions in the kitchen room
+### Kitchen Utensil positions in the kitchen room
 (% of kitchen room div — same values as `STATION_POSITIONS` in `KitchenRoom.tsx`)
 
 | Station ID | left | top | width | height |

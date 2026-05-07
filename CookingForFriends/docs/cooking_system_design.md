@@ -8,6 +8,10 @@ The cooking system exists to create **sustained, predictable cognitive load** th
 
 ## 2. Interaction Flow
 
+**Terminology**
+- **Cooking Indicator**: the persistent orange cooking cue shown above the phone tabs. It displays the current cooking step and countdown. The component is currently `KitchenTimerBanner.tsx`, but user-facing docs should call it the Cooking Indicator.
+- **Kitchen Utensils**: all clickable kitchen interaction points, including the fridge, cutting board, burners, oven, spice rack, and plating area. These may still be named `station` internally in backend/frontend code.
+
 ```
 Timeline triggers a new cooking step
     ↓
@@ -17,7 +21,7 @@ Participant press-holds phone → sees recipe with current step & remaining time
     ↓
 Participant releases phone → goes to kitchen
     ↓
-Participant clicks the correct kitchen object (e.g., burner, fridge, cutting board)
+Participant clicks the correct Kitchen Utensil (e.g., burner, fridge, cutting board)
     ↓
 Popup appears with 3-4 options (1 correct + 2-3 distractors)
     ↓
@@ -131,7 +135,11 @@ Time    Event                                           Active dishes
 
 The recipe lives in the **Recipe tab** on the phone (bottom tab bar: 💬 Chats | 📖 Recipe).
 The phone no longer locks during the active experiment; chats, recipe, and system banners remain immediately accessible.
-The Kitchen Timer banner is the primary recurring pressure cue and stays visible above both phone tabs.
+The Cooking Indicator is the primary recurring pressure cue and stays visible above both phone tabs.
+
+**Phone lock status:** lock-screen behavior is intentionally disabled for now. `LockScreen.tsx`,
+`phoneLocked`, and `phoneLastActivity` may still exist as legacy code, but the runtime phone UI
+should be treated as always unlocked unless the lock-screen feature is explicitly reintroduced.
 
 **Press-and-hold mechanic:**
 - Participant presses and holds anywhere on the Recipe tab to view the recipe
@@ -154,9 +162,9 @@ The Kitchen Timer banner is the primary recurring pressure cue and stays visible
 
 ## 6. Kitchen Interaction
 
-**Kitchen objects** are clickable areas in the kitchen room:
+**Kitchen Utensils** are clickable areas in the kitchen room:
 
-| Object       | Function                        |
+| Kitchen Utensil | Function                        |
 |-------------|--------------------------------|
 | Fridge       | Select raw ingredients          |
 | Cutting Board| Prep actions (chop, season)     |
@@ -172,9 +180,9 @@ The Kitchen Timer banner is the primary recurring pressure cue and stays visible
 **Popup rules:**
 - Correct choices briefly flash the popup border green, then close and advance.
 - Wrong choices briefly flash the popup border red, then close and advance.
-- Missed steps flash the Kitchen Timer banner red with "Missed!" before the next step appears.
-- Only appears if the clicked object is relevant to a currently active step
-- If clicked object has no active step: brief "nothing to do here" feedback, no popup
+- Missed steps flash the Cooking Indicator red with "Missed!" before the next step appears.
+- Only appears if the clicked Kitchen Utensil is relevant to a currently active step
+- If clicked Kitchen Utensil has no active step: brief "nothing to do here" feedback, no popup
 - After correct selection: popup closes, step marked complete, brief green feedback
 - After wrong selection: popup closes, step marked failed, brief red feedback, auto-advance to next step
 - Popup auto-dismisses after step timeout
@@ -208,7 +216,7 @@ IDLE → ACTIVE (step N) → COMPLETED / SKIPPED → ACTIVE (step N+1) → ... �
 ```
 
 - Backend pushes step activations at fixed timeline timestamps
-- Frontend displays current step in recipe, enables corresponding kitchen object
+- Frontend displays current step in recipe, enables corresponding Kitchen Utensil
 - On correct action: state → next step (or DONE if last)
 - On wrong action: state → next step (marked as failed)
 - On timeout: state → next step (marked as missed)
