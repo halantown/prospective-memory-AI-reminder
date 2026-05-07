@@ -6,7 +6,7 @@ A browser-based 2D prospective memory (PM) experiment where participants cook st
 
 - **Between-subjects IV**: Encoding Context (EC+ vs EC−) — assigned once per participant for all 4 PM tasks
 - **4 PM Tasks** (T1–T4): Mei/baking book (doorbell), Lina/chocolate (doorbell), Tom/apple juice (phone), Delivery/trash bags (phone)
-- **4 Latin Square orders** (A–D): T1→T2→T3→T4, T2→T4→T1→T3, T3→T1→T4→T2, T4→T3→T2→T1
+- **4 Latin Square orders** (A–D): T1→T2→T4→T3, T2→T3→T1→T4, T3→T4→T2→T1, T4→T1→T3→T2
 - **8 (condition × order) combinations**, assigned round-robin to real participants
 
 ### Trigger Schedule (event-driven, in game time)
@@ -35,7 +35,7 @@ CookingForFriends/
 ├── .env.example              # Environment variable template
 ├── backend/                  # FastAPI + SQLAlchemy + PostgreSQL
 │   ├── main.py               # App entry point (port 5000)
-│   ├── config.py             # All configuration constants (TRIGGER_SCHEDULE, TASK_ORDERS, etc.)
+│   ├── config.py             # Loads conditions/task orders from experiment material files
 │   ├── database.py           # Async SQLAlchemy engine; seed_dev_participant()
 │   ├── models/
 │   │   ├── experiment.py     # Experiment, Participant (condition, task_order, game_time fields)
@@ -50,6 +50,7 @@ CookingForFriends/
 │   │   ├── connection_manager.py  # WS pub/sub manager
 │   │   └── game_handler.py        # Game WS handler (PM pipeline: 6 real + fake message types)
 │   └── engine/
+│       ├── runtime_plan_loader.py # Loads/validates the editable gameplay runtime plan
 │       ├── pm_session.py     # Event-driven PM trigger scheduler (fires triggers, sends session_end)
 │       ├── pm_tasks.py       # T1–T4 task definitions + decoy structures
 │       ├── game_time.py      # freeze_game_time / unfreeze_game_time / get_current_game_time
@@ -64,7 +65,7 @@ CookingForFriends/
 │       │                       PhoneSidebar, KitchenTimerBanner, HUD
 │       ├── constants/
 │       │   ├── placeholders.ts  # All PLACEHOLDER_* constants (researcher fills later)
-│       │   └── pmTasks.ts       # TASK_ORDERS, TRIGGER_SCHEDULE, PM_TASKS, DECOY_OPTIONS (Chinese labels)
+│       │   └── pmTasks.ts       # Frontend PM display constants mirrored from backend materials
 │       ├── stores/           # Zustand gameStore (condition, taskOrder, pmPipelineState, gameTimeFrozen)
 │       ├── hooks/            # useWebSocket (pm_trigger, avatar_action, session_end, heartbeat)
 │       └── services/         # API client (logCutsceneEvent, logIntentionCheck, getSessionState, updatePhase)
@@ -135,6 +136,7 @@ All admin HTTP endpoints require the header `X-Admin-Key: <key>`.
 | **Data Export** | Download CSV exports (see below). |
 | **Test Mode** | Create one-off test sessions (see below). |
 | **Config** | Current trigger schedule, conditions, task definitions. |
+| **Runtime Plan** | Editable PM, cooking, robot-comment, and phone-message schedule lanes. |
 
 ## Test Mode
 
