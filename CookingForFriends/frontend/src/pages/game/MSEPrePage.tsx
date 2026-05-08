@@ -9,6 +9,7 @@ export default function MSEPrePage() {
   const [note, setNote] = useState('Memory Self-Efficacy scale items to be confirmed.')
   const [acknowledged, setAcknowledged] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!sessionId) return
@@ -23,6 +24,7 @@ export default function MSEPrePage() {
   const handleContinue = async () => {
     if (!sessionId || loading || !acknowledged) return
     setLoading(true)
+    setError(null)
     try {
       await submitExperimentResponses(sessionId, [{
         phase: 'MSE_PRE',
@@ -35,6 +37,7 @@ export default function MSEPrePage() {
       setPhase(frontendPhaseForBackend(advanced.current_phase))
     } catch (e) {
       console.error('[MSEPre] submit failed', e)
+      setError('Failed to submit. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -56,12 +59,15 @@ export default function MSEPrePage() {
           />
           Continue with placeholder MSE item set.
         </label>
+        {error && (
+          <div className="mt-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
         <button
           onClick={handleContinue}
           disabled={!acknowledged || loading}
           className="mt-8 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
-          {loading ? 'Saving...' : 'Continue'}
+          {loading ? <><span className="btn-spinner" />Saving...</> : 'Continue'}
         </button>
       </div>
     </div>

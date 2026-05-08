@@ -2,6 +2,7 @@
 
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useGameStore } from './stores/gameStore'
 import { getCookingDefinitions, getSessionStatus, setSessionToken } from './services/api'
 import type { Phase } from './types'
@@ -158,8 +159,10 @@ function GameShell() {
     return <ConnectionIssuePage participantId={participantId} />
   }
 
+  const renderPhase = renderPhaseFor(phase)
+
   const page = (() => {
-    switch (renderPhaseFor(phase)) {
+    switch (renderPhase) {
       case 'welcome':        return <WelcomePage />
       case 'consent':        return <ConsentPage />
       case 'demographics':   return <DemographicsPage />
@@ -178,7 +181,23 @@ function GameShell() {
     }
   })()
 
-  return <ErrorBoundary participantId={participantId}><Suspense fallback={<LoadingFallback />}>{page}</Suspense></ErrorBoundary>
+  return (
+    <ErrorBoundary participantId={participantId}>
+      <Suspense fallback={<LoadingFallback />}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={renderPhase}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            {page}
+          </motion.div>
+        </AnimatePresence>
+      </Suspense>
+    </ErrorBoundary>
+  )
 }
 
 function ConnectionIssuePage({ participantId }: { participantId: string | null }) {

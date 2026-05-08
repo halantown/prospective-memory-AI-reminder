@@ -20,6 +20,7 @@ export default function PostTestFlowPage() {
   const [text, setText] = useState('')
   const [ratings, setRatings] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!sessionId) return
@@ -34,6 +35,7 @@ export default function PostTestFlowPage() {
   const submit = async () => {
     if (!sessionId || loading) return
     setLoading(true)
+    setError(null)
     try {
       if (phase === 'POST_MANIP_CHECK') {
         await submitExperimentResponses(sessionId, [{
@@ -62,6 +64,7 @@ export default function PostTestFlowPage() {
       setPhase(frontendPhaseForBackend(advanced.current_phase))
     } catch (e) {
       console.error('[PostTest] submit failed', e)
+      setError('Failed to submit. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -141,12 +144,15 @@ export default function PostTestFlowPage() {
           </div>
         )}
 
+        {error && (
+          <div className="mt-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
         <button
           onClick={submit}
           disabled={!canSubmit || loading}
           className="mt-8 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
-          {loading ? 'Saving...' : 'Continue'}
+          {loading ? <><span className="btn-spinner" />Saving...</> : 'Continue'}
         </button>
       </div>
     </div>

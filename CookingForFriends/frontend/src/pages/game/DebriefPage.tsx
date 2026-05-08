@@ -8,6 +8,7 @@ export default function DebriefPage() {
   const setPhase = useGameStore((s) => s.setPhase)
   const [text, setText] = useState('Thank you for completing the study.')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!sessionId) return
@@ -22,6 +23,7 @@ export default function DebriefPage() {
   const handleComplete = async () => {
     if (!sessionId || loading) return
     setLoading(true)
+    setError(null)
     try {
       await submitExperimentResponses(sessionId, [{
         phase: 'DEBRIEF',
@@ -33,6 +35,7 @@ export default function DebriefPage() {
       setPhase(frontendPhaseForBackend(advanced.current_phase))
     } catch (e) {
       console.error('[Debrief] complete failed', e)
+      setError('Failed to submit. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -45,12 +48,15 @@ export default function DebriefPage() {
         <div className="mt-5 whitespace-pre-wrap rounded-lg bg-slate-50 p-5 text-sm leading-relaxed text-slate-700">
           {text}
         </div>
+        {error && (
+          <div className="mt-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
         <button
           onClick={handleComplete}
           disabled={loading}
           className="mt-8 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
-          {loading ? 'Completing...' : 'Complete Experiment'}
+          {loading ? <><span className="btn-spinner" />Completing...</> : 'Complete Experiment'}
         </button>
       </div>
     </div>

@@ -9,6 +9,7 @@ export default function ConsentPage() {
   const sessionId = useGameStore((s) => s.sessionId)
   const setPhase = useGameStore((s) => s.setPhase)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
   const [consent, setConsent] = useState<{
     pdf_path?: string
@@ -26,6 +27,7 @@ export default function ConsentPage() {
   const handleAgree = async () => {
     if (!sessionId || loading || !checked) return
     setLoading(true)
+    setError(null)
     try {
       await submitExperimentResponses(sessionId, [{
         phase: 'CONSENT',
@@ -39,6 +41,7 @@ export default function ConsentPage() {
       setPhase(frontendPhaseForBackend(advanced.current_phase))
     } catch (e) {
       console.error('[Consent] submit failed', e)
+      setError('Failed to submit. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -73,13 +76,16 @@ export default function ConsentPage() {
               ?? 'I have read and understood the information above and voluntarily agree to participate.'}
           </span>
         </label>
+        {error && (
+          <div className="mb-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
         <button
           onClick={handleAgree}
           disabled={loading || !checked}
           className="w-full py-3 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300
                      text-white font-semibold rounded-xl transition-colors text-base"
         >
-          {loading ? 'Please wait...' : consent?.continue_button ?? 'I Agree & Continue'}
+          {loading ? <><span className="btn-spinner" />Please wait...</> : consent?.continue_button ?? 'I Agree & Continue'}
         </button>
       </div>
     </div>

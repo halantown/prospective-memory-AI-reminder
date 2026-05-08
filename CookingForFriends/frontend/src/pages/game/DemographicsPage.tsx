@@ -14,6 +14,7 @@ export default function DemographicsPage() {
   const [genderOther, setGenderOther] = useState('')
   const [proficiency, setProficiency] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const effectiveGender = gender === 'Other' ? genderOther.trim() : gender
 
@@ -28,6 +29,7 @@ export default function DemographicsPage() {
   const handleSubmit = async () => {
     if (!sessionId || loading || !isComplete) return
     setLoading(true)
+    setError(null)
     try {
       await submitExperimentResponses(sessionId, [
         {
@@ -53,6 +55,7 @@ export default function DemographicsPage() {
       setPhase(frontendPhaseForBackend(advanced.current_phase))
     } catch (e) {
       console.error('[Demographics] submit failed', e)
+      setError('Failed to submit. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -140,12 +143,15 @@ export default function DemographicsPage() {
           </div>
         </form>
 
+        {error && (
+          <div className="mt-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
         <button
           onClick={handleSubmit}
           disabled={!isComplete || loading}
           className="mt-8 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
-          {loading ? 'Saving...' : 'Continue'}
+          {loading ? <><span className="btn-spinner" />Saving...</> : 'Continue'}
         </button>
       </div>
     </div>

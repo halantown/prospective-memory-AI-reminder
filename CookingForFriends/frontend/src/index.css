@@ -7,6 +7,21 @@
   --kitchen-banner-height: 82px;
 }
 
+@keyframes spin-fast {
+  to { transform: rotate(360deg); }
+}
+.btn-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin-fast 0.5s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
 /* Utility: hide scrollbars (works for webkit and Firefox) */
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }

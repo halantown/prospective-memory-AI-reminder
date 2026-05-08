@@ -167,7 +167,7 @@ export default function WelcomePage() {
                        disabled:bg-slate-300 text-white font-bold text-lg
                        rounded-xl transition-colors cursor-pointer disabled:cursor-not-allowed"
           >
-            {loading ? 'Starting…' : 'Start Session'}
+            {loading ? <><span className="btn-spinner" />Starting...</> : 'Start Session'}
           </button>
 
 
