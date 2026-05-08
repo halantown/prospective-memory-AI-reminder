@@ -9,7 +9,7 @@ import logging
 import zipfile
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -753,15 +753,28 @@ async def advance_block(session_id: str, db: AsyncSession = Depends(get_db)):
     }
 
 
+def _apply_participant_filters(
+    query, *, include_test: bool, participant_ids: str | None,
+):
+    """Apply common filters: exclude test participants and optional ID list."""
+    if not include_test:
+        query = query.where(Participant.is_test == False)  # noqa: E712
+    if participant_ids:
+        ids = [pid.strip() for pid in participant_ids.split(",") if pid.strip()]
+        if ids:
+            query = query.where(Participant.id.in_(ids))
+    return query
+
+
 @router.get("/export/full")
 async def export_full_zip(
     include_test: bool = False,
+    participant_ids: str | None = Query(None, description="Comma-separated session IDs to include"),
     db: AsyncSession = Depends(get_db),
 ):
     """Unified experiment export: one zip with CSV tables and mouse JSON files."""
     p_query = select(Participant).order_by(Participant.created_at)
-    if not include_test:
-        p_query = p_query.where(Participant.is_test == False)  # noqa: E712
+    p_query = _apply_participant_filters(p_query, include_test=include_test, participant_ids=participant_ids)
     p_result = await db.execute(p_query)
     participants = p_result.scalars().all()
     participant_by_session = {p.id: p for p in participants}
@@ -1010,6 +1023,7 @@ async def export_full_zip(
 @router.get("/export/per-participant")
 async def export_per_participant(
     include_test: bool = False,
+    participant_ids: str | None = Query(None, description="Comma-separated session IDs to include"),
     db: AsyncSession = Depends(get_db),
 ):
     """CSV export — one row per real or fake PM trigger."""
@@ -1023,9 +1037,8 @@ async def export_per_participant(
         .join(Participant, Participant.id == FakeTriggerEvent.session_id)
         .order_by(FakeTriggerEvent.id)
     )
-    if not include_test:
-        real_query = real_query.where(Participant.is_test == False)  # noqa: E712
-        fake_query = fake_query.where(Participant.is_test == False)  # noqa: E712
+    real_query = _apply_participant_filters(real_query, include_test=include_test, participant_ids=participant_ids)
+    fake_query = _apply_participant_filters(fake_query, include_test=include_test, participant_ids=participant_ids)
     real_result = await db.execute(real_query)
     fake_result = await db.execute(fake_query)
     real_rows = real_result.all()
@@ -1073,12 +1086,12 @@ async def export_per_participant(
 @router.get("/export/aggregated")
 async def export_aggregated(
     include_test: bool = False,
+    participant_ids: str | None = Query(None, description="Comma-separated session IDs to include"),
     db: AsyncSession = Depends(get_db),
 ):
     """CSV export — one row per participant with aggregated PM metrics."""
     p_query = select(Participant).order_by(Participant.created_at)
-    if not include_test:
-        p_query = p_query.where(Participant.is_test == False)  # noqa: E712
+    p_query = _apply_participant_filters(p_query, include_test=include_test, participant_ids=participant_ids)
     p_result = await db.execute(p_query)
     participants = p_result.scalars().all()
 
