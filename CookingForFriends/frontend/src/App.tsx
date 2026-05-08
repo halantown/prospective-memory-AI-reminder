@@ -22,6 +22,7 @@ import AdminDashboard from './pages/admin/DashboardPage'
 import ConfigPage from './pages/admin/ConfigPage'
 import TimelineEditorPage from './pages/admin/TimelineEditorPage'
 import ParticipantControlPage from './pages/admin/ParticipantControlPage'
+import ErrorBoundary from './components/ErrorBoundary'
 
 export default function App() {
   const path = window.location.pathname
@@ -29,16 +30,16 @@ export default function App() {
   // Admin routes — specific routes before generic /admin catch-all
   if (path.startsWith('/admin/participant/')) {
     const participantId = path.split('/admin/participant/')[1]?.split('/')[0]
-    if (participantId) return <ParticipantControlPage participantId={participantId} />
+    if (participantId) return <ErrorBoundary><ParticipantControlPage participantId={participantId} /></ErrorBoundary>
   }
   if (path.startsWith('/timeline-editor') || path.startsWith('/admin/timeline-editor')) {
-    return <TimelineEditorPage />
+    return <ErrorBoundary><TimelineEditorPage /></ErrorBoundary>
   }
   if (path.startsWith('/dashboard') || path.startsWith('/admin')) {
-    return <AdminDashboard />
+    return <ErrorBoundary><AdminDashboard /></ErrorBoundary>
   }
   if (path.startsWith('/config')) {
-    return <ConfigPage />
+    return <ErrorBoundary><ConfigPage /></ErrorBoundary>
   }
 
   // Game routes — phase-based rendering
@@ -48,6 +49,7 @@ export default function App() {
 function GameShell() {
   const phase = useGameStore((s) => s.phase)
   const sessionId = useGameStore((s) => s.sessionId)
+  const participantId = useGameStore((s) => s.participantId)
   const setSession = useGameStore((s) => s.setSession)
   const setPhase = useGameStore((s) => s.setPhase)
   const initializeCookingDefinitions = useGameStore((s) => s.initializeCookingDefinitions)
@@ -136,41 +138,30 @@ function GameShell() {
   }, [])
 
   if (recoveryBlocked) {
-    return <ConnectionIssuePage participantId={useGameStore.getState().participantId} />
+    return <ConnectionIssuePage participantId={participantId} />
   }
 
-  switch (renderPhaseFor(phase)) {
-    case 'welcome':
-      return <WelcomePage />
-    case 'consent':
-      return <ConsentPage />
-    case 'demographics':
-      return <DemographicsPage />
-    case 'mse_pre':
-      return <MSEPrePage />
-    case 'story_intro':
-      return <StoryIntroPage />
-    case 'encoding_flow':
-      return <EncodingFlowPage />
-    case 'tutorial_flow':
-      return <TutorialFlowPage />
-    case 'evening_transition':
-      return <EveningTransitionPage />
-    case 'introduction':
-      return <IntroductionPage />
-    case 'playing':
-      return <GamePage />
-    case 'post_test':
-      return <PostTestFlowPage />
-    case 'post_questionnaire':
-      return <PostQuestionnairePage />
-    case 'debrief':
-      return <DebriefPage />
-    case 'complete':
-      return <CompletePage />
-    default:
-      return <WelcomePage />
-  }
+  const page = (() => {
+    switch (renderPhaseFor(phase)) {
+      case 'welcome':        return <WelcomePage />
+      case 'consent':        return <ConsentPage />
+      case 'demographics':   return <DemographicsPage />
+      case 'mse_pre':        return <MSEPrePage />
+      case 'story_intro':    return <StoryIntroPage />
+      case 'encoding_flow':  return <EncodingFlowPage />
+      case 'tutorial_flow':  return <TutorialFlowPage />
+      case 'evening_transition': return <EveningTransitionPage />
+      case 'introduction':   return <IntroductionPage />
+      case 'playing':        return <GamePage />
+      case 'post_test':      return <PostTestFlowPage />
+      case 'post_questionnaire': return <PostQuestionnairePage />
+      case 'debrief':        return <DebriefPage />
+      case 'complete':       return <CompletePage />
+      default:               return <WelcomePage />
+    }
+  })()
+
+  return <ErrorBoundary participantId={participantId}>{page}</ErrorBoundary>
 }
 
 function ConnectionIssuePage({ participantId }: { participantId: string | null }) {
