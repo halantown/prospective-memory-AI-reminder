@@ -79,6 +79,9 @@ function GameShell() {
   useEffect(() => {
     if (sessionId) return
     const urlToken = new URLSearchParams(window.location.search).get('token')?.trim().toUpperCase()
+    if (urlToken) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
     const saved = sessionStorage.getItem('cff_session')
     if (urlToken && saved) {
       try {
