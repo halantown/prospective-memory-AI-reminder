@@ -82,8 +82,8 @@ export default function GamePage() {
         )}
       </div>
 
-      {/* Phone sidebar (fixed 440px) */}
-      <div style={{ width: '440px' }} className={`flex-shrink-0 ${pmBlocksPhone ? 'pointer-events-none' : ''}`}>
+      {/* Phone sidebar */}
+      <div style={{ width: 'var(--phone-sidebar-width)' }} className={`flex-shrink-0 ${pmBlocksPhone ? 'pointer-events-none' : ''}`}>
         <PhoneSidebar />
       </div>
 

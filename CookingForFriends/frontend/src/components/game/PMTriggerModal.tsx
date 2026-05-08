@@ -60,7 +60,7 @@ function PhoneCallScreen({
   onAnswer: () => void
 }) {
   return (
-    <div className="fixed right-0 top-0 bottom-0 z-[210] flex w-[440px] items-center justify-center bg-slate-950/70 p-6">
+    <div className="fixed right-0 top-0 bottom-0 z-[210] flex items-center justify-center bg-slate-950/70 p-6" style={{ width: 'var(--phone-sidebar-width)' }}>
       <div className="w-full rounded-[2rem] border border-emerald-300/40 bg-slate-900 p-8 text-center shadow-2xl shadow-emerald-950/40">
         <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-400 text-5xl shadow-lg animate-pulse">
           📞

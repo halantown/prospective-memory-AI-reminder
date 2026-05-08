@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --phone-sidebar-width: 440px;
+  --kitchen-banner-height: 82px;
+}
+
 /* Utility: hide scrollbars (works for webkit and Firefox) */
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
