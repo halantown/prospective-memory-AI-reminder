@@ -110,7 +110,7 @@ export default function WelcomePage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cooking-50 to-orange-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-[480px] overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-cooking-500 to-orange-500 px-8 py-6 text-white">

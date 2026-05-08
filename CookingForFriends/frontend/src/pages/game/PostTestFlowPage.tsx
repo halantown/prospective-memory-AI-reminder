@@ -78,14 +78,14 @@ export default function PostTestFlowPage() {
 
   if (!config) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center text-sm text-slate-500">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-sm text-slate-500">
         Loading...
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
       <div className="w-full max-w-2xl rounded-2xl bg-white p-8 shadow-xl">
         <h1 className="text-2xl font-bold text-slate-900">{titleForPhase(phase)}</h1>
 

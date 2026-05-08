@@ -322,7 +322,7 @@ export default function EncodingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-slate-400 text-lg">Loading task cards...</div>
       </div>
     )
@@ -332,7 +332,7 @@ export default function EncodingPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-xl p-6 text-center space-y-4">
           <p className="text-red-600 font-medium">{error}</p>
           <button
@@ -350,7 +350,7 @@ export default function EncodingPage() {
 
   if (!cards.length || !card || !ec) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-xl p-6 text-center space-y-4">
           <p className="text-slate-600">No task cards available. Please refresh.</p>
           <button
@@ -368,7 +368,7 @@ export default function EncodingPage() {
 
   if (allDone) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-8 space-y-6">
           <div className="text-center">
             <div className="text-4xl mb-3">🎉</div>
@@ -411,7 +411,7 @@ export default function EncodingPage() {
 
   if (autoPassMessage) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center space-y-3">
           <div className="text-3xl">💪</div>
           <p className="text-lg font-medium text-slate-700">Let's move on</p>
@@ -424,15 +424,15 @@ export default function EncodingPage() {
   // ── Render: card + quiz ──
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center overflow-hidden">
+    <div className="h-screen bg-slate-950 flex flex-col justify-center overflow-hidden">
       {/* Compact Header */}
       <div className="shrink-0 px-6 pt-4 pb-2 text-center">
         <div className="flex items-center justify-center gap-3 mb-1">
-          <h1 className="text-xl font-bold text-slate-800">Today's Tasks</h1>
-          <span className="text-slate-400">·</span>
-          <p className="text-slate-600 text-sm">{dayStory}</p>
+          <h1 className="text-xl font-bold text-slate-100">Today's Tasks</h1>
+          <span className="text-slate-500">·</span>
+          <p className="text-slate-300 text-sm">{dayStory}</p>
         </div>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-500">
           Please remember the following tasks. You will need to do them during the game.
         </p>
         {/* Progress dots */}

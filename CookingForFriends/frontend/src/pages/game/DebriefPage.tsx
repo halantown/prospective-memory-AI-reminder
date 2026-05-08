@@ -42,7 +42,7 @@ export default function DebriefPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
       <div className="w-full max-w-2xl rounded-2xl bg-white p-8 shadow-xl">
         <h1 className="text-2xl font-bold text-slate-900">Debrief</h1>
         <div className="mt-5 whitespace-pre-wrap rounded-lg bg-slate-50 p-5 text-sm leading-relaxed text-slate-700">
