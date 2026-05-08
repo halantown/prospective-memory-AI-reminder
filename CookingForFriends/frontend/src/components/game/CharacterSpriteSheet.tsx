@@ -16,35 +16,35 @@ const FRAME_RATE = 8
 
 const SPRITE_FILES: Record<CharacterSpriteId, Partial<Record<AnimationState | 'phone', string>>> = {
   avatar: {
-    idle: '/assets/characters/Avatar_idle.png',
-    walk: '/assets/characters/Avatar_walk.png',
-    sit: '/assets/characters/Avatar_sit.png',
-    phone: '/assets/characters/Avatar_phone.png',
+    idle: '/assets/characters/avatar/Avatar_idle.png',
+    walk: '/assets/characters/avatar/Avatar_walk.png',
+    sit: '/assets/characters/avatar/Avatar_sit.png',
+    phone: '/assets/characters/avatar/Avatar_phone.png',
   },
   mei: {
-    idle: '/assets/characters/Mei_idle.png',
-    walk: '/assets/characters/Mei_walk.png',
-    sit: '/assets/characters/Mei_sit.png',
+    idle: '/assets/characters/mei/Mei_idle.png',
+    walk: '/assets/characters/mei/Mei_walk.png',
+    sit: '/assets/characters/mei/Mei_sit.png',
   },
   sophia: {
-    idle: '/assets/characters/Sophia_idle.png',
-    walk: '/assets/characters/Sophia_walk.png',
-    sit: '/assets/characters/Sophia_sit.png',
+    idle: '/assets/characters/sophia/Sophia_idle.png',
+    walk: '/assets/characters/sophia/Sophia_walk.png',
+    sit: '/assets/characters/sophia/Sophia_sit.png',
   },
   benjamin: {
-    idle: '/assets/characters/Benjamin_idle.png',
-    walk: '/assets/characters/Benjamin_walk.png',
-    sit: '/assets/characters/Benjamin_sit.png',
-    phone: '/assets/characters/Benjamin_phone.png',
+    idle: '/assets/characters/benjamin/Benjamin_idle.png',
+    walk: '/assets/characters/benjamin/Benjamin_walk.png',
+    sit: '/assets/characters/benjamin/Benjamin_sit.png',
+    phone: '/assets/characters/benjamin/Benjamin_phone.png',
   },
   courier: {
-    idle: '/assets/characters/courier_idle.png',
-    walk: '/assets/characters/courier_walk.png',
-    phone: '/assets/characters/courier_phone.png',
+    idle: '/assets/characters/courier/courier_idle.png',
+    walk: '/assets/characters/courier/courier_walk.png',
+    phone: '/assets/characters/courier/courier_phone.png',
   },
   sam_tutorial: {
-    idle: '/assets/characters/Sam_tutorial_idle.png',
-    walk: '/assets/characters/Sam_tutorial_walk.png',
+    idle: '/assets/characters/sam_tutorial/Sam_tutorial_idle.png',
+    walk: '/assets/characters/sam_tutorial/Sam_tutorial_walk.png',
   },
 }
 
