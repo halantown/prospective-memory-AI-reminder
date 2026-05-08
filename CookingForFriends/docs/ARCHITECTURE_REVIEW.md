@@ -1,14 +1,14 @@
 # Architecture Review — CookingForFriends
 
-> Date: 2026-05-08  
-> Scope: Full-stack architecture review (backend, frontend, infrastructure)  
+> Date: 2026-05-08
+> Scope: Full-stack architecture review (backend, frontend, infrastructure)
 > Stack: FastAPI + SQLAlchemy async / React 18 + Zustand + Vite / PostgreSQL 16 / WebSocket
 
 ---
 
 ## Issue #1 — No Database Migration Tool
 
-**Severity**: Critical  
+**Severity**: Critical
 **Category**: Infrastructure / Data integrity
 
 ### Problem
@@ -44,7 +44,7 @@ Introduce Alembic with async support.
 
 ## Issue #2 — No Frontend Router Library
 
-**Severity**: High  
+**Severity**: High
 **Category**: Frontend architecture
 
 ### Problem
@@ -87,7 +87,7 @@ Adopt React Router v6 with lazy-loaded route groups.
 
 ## Issue #3 — BlockRuntime Parallel Tasks Have No Joint Error Propagation
 
-**Severity**: High  
+**Severity**: High
 **Category**: Backend reliability
 
 ### Problem
@@ -129,7 +129,7 @@ Use `asyncio.TaskGroup` (Python 3.11+) to supervise all runtime tasks. When any 
 
 ## Issue #4 — gameStore Is Too Large (900+ Lines, 100+ Actions)
 
-**Severity**: High  
+**Severity**: High
 **Category**: Frontend architecture / Maintainability
 
 ### Problem
@@ -167,7 +167,7 @@ Split into domain-specific stores.
 
 ## Issue #5 — Session Endpoints Lack Ownership Verification
 
-**Severity**: High  
+**Severity**: High
 **Category**: Security / Data integrity
 
 ### Problem
@@ -200,7 +200,7 @@ Introduce a lightweight session cookie or a per-request token validation.
 
 ## Issue #6 — Admin Auth Silently Disabled Without ADMIN_API_KEY
 
-**Severity**: High  
+**Severity**: High
 **Category**: Security
 
 ### Problem
@@ -245,7 +245,7 @@ Fail fast in production if the key is missing.
 
 ## Issue #7 — WebSocket Monitor Auth via Query Parameter
 
-**Severity**: Medium  
+**Severity**: Medium
 **Category**: Security
 
 ### Problem
@@ -283,14 +283,14 @@ Authenticate via the first WebSocket message after connection, not the URL.
 
 ## Issue #8 — Cooking Step Events Silently Dropped on Queue Full
 
-**Severity**: High  
+**Severity**: High
 **Category**: Data integrity / Reliability
 
 ### Problem
 
 `connection_manager.py:76-88` — only `pm_trigger`, `block_end`, `pm_received`, and `ongoing_task_event` are treated as critical. All other events (including `cooking_step_active`) use `put_nowait` and are silently dropped if the queue (maxsize=256) is full.
 
-### Root Cause
+### #
 
 The critical event list was defined for PM-related events and not updated when the cooking engine was added.
 
@@ -315,7 +315,7 @@ Expand the critical event list and add drop-event logging.
 
 ## Issue #9 — All Runtime State Is In-Memory
 
-**Severity**: Medium  
+**Severity**: Medium
 **Category**: Reliability
 
 ### Problem
@@ -350,7 +350,7 @@ Accept the single-instance constraint but add safeguards.
 
 ## Issue #10 — No React Error Boundary
 
-**Severity**: High  
+**Severity**: High
 **Category**: Frontend reliability
 
 ### Problem
@@ -386,7 +386,7 @@ Add error boundaries at strategic points and report errors.
 
 ## Issue #11 — No Code Splitting / Lazy Loading
 
-**Severity**: Medium  
+**Severity**: Medium
 **Category**: Frontend performance
 
 ### Problem
@@ -422,7 +422,7 @@ Lazy-load route groups.
 
 ## Issue #12 — No Frontend Tests
 
-**Severity**: Medium  
+**Severity**: Medium
 **Category**: Quality assurance
 
 ### Problem
@@ -457,7 +457,7 @@ Add targeted tests for the most critical logic.
 
 ## Issue #13 — Pydantic Schemas Accept Free-Form Strings for Enums
 
-**Severity**: Low  
+**Severity**: Low
 **Category**: Backend data validation
 
 ### Problem
@@ -488,7 +488,7 @@ Use `Literal` types or Enums in Pydantic schemas.
 
 ## Issue #14 — Admin Export Endpoints Load All Data Into Memory
 
-**Severity**: Medium  
+**Severity**: Medium
 **Category**: Backend performance
 
 ### Problem
@@ -519,7 +519,7 @@ Stream the response and add optional filters.
 
 ## Issue #15 — Docker Compose Only Has Database — No Backend/Frontend Containers
 
-**Severity**: Low  
+**Severity**: Low
 **Category**: Infrastructure / Deployment
 
 ### Problem
@@ -560,7 +560,7 @@ Add backend and frontend services to docker-compose.
 
 ## Issue #16 — No Dependency Lock File (Backend)
 
-**Severity**: Low  
+**Severity**: Low
 **Category**: Reproducibility
 
 ### Problem
@@ -592,7 +592,7 @@ Pin exact versions.
 
 ## Issue #17 — Token Exposed in URL Query Parameter
 
-**Severity**: Low  
+**Severity**: Low
 **Category**: Security
 
 ### Problem
@@ -631,7 +631,7 @@ Clear the token from the URL after reading it.
 
 ## Issue #18 — No Global Request Timeout Middleware
 
-**Severity**: Low  
+**Severity**: Low
 **Category**: Backend reliability
 
 ### Problem
@@ -662,12 +662,12 @@ Add a timeout middleware.
 
 ## Priority Matrix
 
-| Priority | Issues | Timing |
-|----------|--------|--------|
-| **P0 — Before data collection** | #1 (Alembic), #5 (session auth), #6 (admin auth guard), #8 (cooking events critical) | This week |
-| **P1 — Before pilot study** | #3 (TaskGroup), #10 (Error Boundary), #9 (state persistence), #17 (clear token from URL) | Next week |
-| **P2 — Before scaling** | #4 (split gameStore), #2 (React Router), #11 (code splitting), #14 (streaming export) | Before full study |
-| **P3 — Nice to have** | #7 (WS auth), #12 (frontend tests), #13 (enum validation), #15 (Docker), #16 (lock file), #18 (timeout) | Ongoing |
+| Priority                               | Issues                                                                                                  | Timing            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------- |
+| **P0 — Before data collection** | #1 (Alembic), #5 (session auth), #6 (admin auth guard), #8 (cooking events critical)                    | This week         |
+| **P1 — Before pilot study**     | #3 (TaskGroup), #10 (Error Boundary), #9 (state persistence), #17 (clear token from URL)                | Next week         |
+| **P2 — Before scaling**         | #4 (split gameStore), #2 (React Router), #11 (code splitting), #14 (streaming export)                   | Before full study |
+| **P3 — Nice to have**           | #7 (WS auth), #12 (frontend tests), #13 (enum validation), #15 (Docker), #16 (lock file), #18 (timeout) | Ongoing           |
 
 ---
 
@@ -676,18 +676,42 @@ Add a timeout middleware.
 ### 2026-05-08 — P0 fixes completed
 
 **Issue #6 — Admin auth guard** `DONE`
+
 - `config.py:99-103` already had the production guard (raises RuntimeError). Pre-existing.
 - Added: warning log in `admin.py:verify_admin()` when auth is skipped in dev mode.
 - Commit: `126b419`
 
 **Issue #8 — Cooking step events critical** `DONE`
+
 - Cooking steps already go through `ongoing_task_event` which was already in the critical set.
 - Added `phone_message` and `phone_contacts` to the critical event set — these were the actually missing ones.
 - Commit: `fbaada3`
 
 **Issue #5 — Session ownership verification** `DONE`
+
 - Backend: added `verify_session_owner` dependency in `session.py` — checks `X-Session-Token` header matches the session's participant token. Applied to all 14 `/session/{session_id}/*` endpoints.
 - Frontend: `api.ts` stores the token and sends it as `X-Session-Token` header on every request. Set on login (`WelcomePage.tsx`) and restored on session recovery (`App.tsx`).
 - Commit: `a992d64`
 
 **Issue #1 — Alembic**: Deferred. Current `create_all` + `_patch_pm_schema` approach is adequate if schema is frozen before data collection. See discussion in review conversation.
+
+### 2026-05-08 — P1 fixes completed
+
+**Issue #17 — Clear token from URL** `DONE`
+
+- `App.tsx`: after reading `?token=XXX`, immediately call `window.history.replaceState` to remove it from URL/history.
+- Commit: `49b5feb`
+
+**Issue #10 — React Error Boundary** `DONE`
+
+- Created `components/ErrorBoundary.tsx` — class component that catches render errors, shows participant ID, error message, and reload button.
+- Wrapped all admin pages and `GameShell` in `ErrorBoundary`.
+- Commit: `fcbd31b`
+
+**Issue #3 — BlockRuntime supervisor** `DONE`
+
+- Backend: added `_supervise()` coroutine to `BlockRuntime` — uses `asyncio.wait(FIRST_EXCEPTION)` to monitor timeline, cooking, and PM tasks. On crash: logs error, sends `block_error` WS event, stops remaining subsystems.
+- Frontend: added `blockError` state to gameStore, `block_error` handler in useWebSocket, error screen in GamePage.
+- Commit: `b249898`
+
+**Issue #9 — State persistence**: Deferred. Single-instance constraint documented; GameStateSnapshot periodic writes already partially cover this.
