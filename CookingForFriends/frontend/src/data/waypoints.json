@@ -71,7 +71,7 @@
     },
     "living_room": {
       "exit": "living_room_idle",
-      "entry": "door_avatar"
+      "entry": "living_room_idle"
     },
     "bedroom": {
       "exit": "bed_bath_idle",

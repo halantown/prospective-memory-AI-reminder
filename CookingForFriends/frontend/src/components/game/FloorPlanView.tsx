@@ -274,18 +274,23 @@ export default function FloorPlanView({
 
   const isZoomed = currentRoom !== null
 
+  const answerDoorbellAtDoor = useCallback(() => {
+    if (doorbellAlreadyAnsweredRef.current) return
+    doorbellAlreadyAnsweredRef.current = true
+    moveToWaypoint('door_avatar', () => {
+      window.dispatchEvent(new CustomEvent('pm:doorbell_answered'))
+    })
+  }, [moveToWaypoint])
+
   useEffect(() => {
     if (doorbellActive) return
     doorbellAlreadyAnsweredRef.current = false
   }, [doorbellActive])
 
   useEffect(() => {
-    if (!doorbellActive || currentRoom !== 'living_room' || doorbellAlreadyAnsweredRef.current) return
-    doorbellAlreadyAnsweredRef.current = true
-    moveToWaypoint('door_avatar', () => {
-      window.dispatchEvent(new CustomEvent('pm:doorbell_answered'))
-    })
-  }, [currentRoom, doorbellActive, moveToWaypoint])
+    if (!doorbellActive || currentRoom !== 'living_room' || isMoving || isCharMoving) return
+    answerDoorbellAtDoor()
+  }, [answerDoorbellAtDoor, currentRoom, doorbellActive, isCharMoving, isMoving])
 
   useEffect(() => {
     if (pmPipelineState?.triggerType === 'doorbell') {
@@ -338,8 +343,7 @@ export default function FloorPlanView({
         setCharRoom(target)
         setIsMoving(false)
         if (doorbellActive && target === 'living_room') {
-          doorbellAlreadyAnsweredRef.current = true
-          window.dispatchEvent(new CustomEvent('pm:doorbell_answered'))
+          answerDoorbellAtDoor()
         }
       }, TRANSIT_DELAY_MS)
 
@@ -352,7 +356,7 @@ export default function FloorPlanView({
     } else {
       doTransition()
     }
-  }, [currentRoom, disableNavigation, doorbellActive, isMoving, isCharMoving, moveToWaypoint, scheduleRobotFollow, setActiveStation, teleportTo])
+  }, [answerDoorbellAtDoor, currentRoom, disableNavigation, doorbellActive, isMoving, isCharMoving, moveToWaypoint, scheduleRobotFollow, setActiveStation, teleportTo])
 
   // Enter a room from overview — robot follows immediately with delay
   const enterRoom = useCallback((room: FloorRoom) => {
@@ -362,12 +366,12 @@ export default function FloorPlanView({
     setCurrentRoom(room)
     setCharRoom(room)
     if (doorbellActive && room === 'living_room') {
-      doorbellAlreadyAnsweredRef.current = true
-      window.dispatchEvent(new CustomEvent('pm:doorbell_answered'))
+      teleportTo('living_room_idle')
+      answerDoorbellAtDoor()
     }
 
     scheduleRobotFollow(room, ROBOT_FOLLOW_DELAY_MS)
-  }, [disableNavigation, doorbellActive, setActiveStation, scheduleRobotFollow])
+  }, [answerDoorbellAtDoor, disableNavigation, doorbellActive, setActiveStation, scheduleRobotFollow, teleportTo])
 
   useEffect(() => clearRobotTimers, [clearRobotTimers])
 

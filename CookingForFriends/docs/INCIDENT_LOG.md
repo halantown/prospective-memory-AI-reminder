@@ -1041,6 +1041,7 @@ any significant timeline refactor, consider:
 > - Positioned `Bedroom / Bathroom` navigation at the lower-left edge to avoid blocking the central room view.
 > - Added a bedroom/bathroom-specific bottom-edge over-pan allowance so the camera frames the rooms higher and exposes a small bottom edge.
 > - Added `door_visitor` and `door_avatar` waypoints and reused them for formal PM visitors and tutorial Sam.
+> - Kept normal living room entry at `living_room_idle`; `door_avatar` is used only after a doorbell trigger is being answered.
 > - Added scripted door encounter support to `TrainingHomeShell`/`ExperimentHomeShell` so tutorial trigger actor rendering shares the `FloorPlanView` system.
 > - Increased door encounter camera zoom and centered it on the door avatar/visitor area with Pepper kept in frame.
 
