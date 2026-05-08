@@ -15,6 +15,8 @@
 
     "living_room_idle": { "x": 64.7, "y": 60.0, "room": "living_room" },
     "front_door":       { "x": 64.7, "y": 82.0, "room": "living_room", "station": true, "facing": "right" },
+    "door_visitor":     { "x": 69.8, "y": 81.8, "room": "living_room", "station": true, "facing": "left" },
+    "door_avatar":      { "x": 64.7, "y": 81.9, "room": "living_room", "station": true, "facing": "right" },
 
     "bed_bath_idle":    { "x": 53.6, "y": 50.5, "room": "bedroom" },
     "beth_door":        { "x": 47.9, "y": 50.5, "room": "bedroom" },
@@ -39,6 +41,8 @@
     ["dining_idle",    "dining_out_down"],
 
     ["living_room_idle", "front_door"],
+    ["front_door", "door_avatar"],
+    ["front_door", "door_visitor"],
 
     ["bed_bath_idle",  "beth_door"],
     ["beth_door",      "bed_door"],
@@ -67,7 +71,7 @@
     },
     "living_room": {
       "exit": "living_room_idle",
-      "entry": "living_room_idle"
+      "entry": "door_avatar"
     },
     "bedroom": {
       "exit": "bed_bath_idle",

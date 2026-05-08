@@ -1013,7 +1013,7 @@ any significant timeline refactor, consider:
 > `TUTORIAL_COOKING` starts the participant in the bedroom/bathroom area and highlights the kitchen as the next target. Participants should be able to navigate to the kitchen from the zoomed room view before using the recipe and station UI.
 
 ### Incident Description
-> During the cooking tutorial, no navigation button appeared from the bedroom/bathroom view to the kitchen. The same bedroom/bathroom zoom framing also placed both rooms too low in the viewport, making the area feel cramped against the bottom edge.
+> During the cooking tutorial, no navigation button appeared from the bedroom/bathroom view to the kitchen. The same bedroom/bathroom zoom framing also placed both rooms too low in the viewport, making the area feel cramped against the bottom edge. After restoring general room navigation, the Living Room button was also visible outside PM trigger context, which could let participants reach the door scene before the trigger pipeline was ready.
 
 ### Timeline
 | Time (local) | Event |
@@ -1022,21 +1022,27 @@ any significant timeline refactor, consider:
 | 21:50 | `TrainingHomeShell` and `FloorPlanView` inspected |
 | 21:55 | Root cause identified in zoomed-mode navigation rendering and camera clamp |
 | 21:59 | Frontend fix implemented and incident record added |
+| 22:25 | Living Room button gating and shared door encounter waypoint rendering added |
 
 ### Root Cause
-> `FloorPlanView` only rendered zoomed room navigation controls for the doorbell PM trigger path. Normal zoomed room navigation data existed in `ADJACENCY`, and `TUTORIAL_COOKING` correctly passed `highlightedRoom: 'kitchen'`, but there was no general zoomed-mode button renderer to expose it. Bedroom/bathroom framing also used the global no-border vertical clamp, preventing a small downward camera over-pan.
+> `FloorPlanView` only rendered zoomed room navigation controls for the doorbell PM trigger path. Normal zoomed room navigation data existed in `ADJACENCY`, and `TUTORIAL_COOKING` correctly passed `highlightedRoom: 'kitchen'`, but there was no general zoomed-mode button renderer to expose it. Bedroom/bathroom framing also used the global no-border vertical clamp, preventing a small downward camera over-pan. Door encounter actors were split across systems: formal PM visitors used hard-coded map percentages while tutorial Sam used a separate page-level sprite overlay.
 
 ### Contributing Factors
 > - Training scene setup correctly allowed navigation, so the missing UI was not obvious from `TrainingHomeShell`.
 > - Doorbell-specific navigation masked that ordinary zoomed room navigation had no shared renderer.
 > - The bedroom and bathroom are combined into one bottom-of-map room definition, making global no-border camera math too restrictive for that scene.
+> - Tutorial trigger presentation duplicated formal PM trigger presentation instead of sharing map waypoints and camera focus logic.
 
 ### Fix
 > **Frontend** (`components/game/FloorPlanView.tsx`):
 > - Added general zoomed-mode room navigation buttons for non-doorbell states, using the existing `ADJACENCY` map.
 > - Reused `highlightedRoom` so the cooking tutorial's kitchen target appears as the emphasized navigation button.
+> - Hid normal `Living Room` navigation outside active doorbell PM trigger context; if the trigger fires while already in the living room, the avatar now moves to the door waypoint and answers the trigger.
 > - Positioned `Bedroom / Bathroom` navigation at the lower-left edge to avoid blocking the central room view.
 > - Added a bedroom/bathroom-specific bottom-edge over-pan allowance so the camera frames the rooms higher and exposes a small bottom edge.
+> - Added `door_visitor` and `door_avatar` waypoints and reused them for formal PM visitors and tutorial Sam.
+> - Added scripted door encounter support to `TrainingHomeShell`/`ExperimentHomeShell` so tutorial trigger actor rendering shares the `FloorPlanView` system.
+> - Increased door encounter camera zoom and centered it on the door avatar/visitor area with Pepper kept in frame.
 
 ### Verification
 > `npm run build` passed (`tsc -b && vite build`).

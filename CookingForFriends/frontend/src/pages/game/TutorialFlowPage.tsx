@@ -5,7 +5,6 @@ import { frontendPhaseForBackend } from '../../utils/phase'
 import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
 import ClickDialogueFlow from '../../components/game/dialogue/ClickDialogueFlow'
 import TrainingHomeShell from '../../components/game/TrainingHomeShell'
-import CharacterSpriteSheet from '../../components/game/CharacterSpriteSheet'
 import { getTriggerEncounterConfig } from '../../data/triggerEncounters'
 import type { CookingDefinitions, CookingStepOption } from '../../types'
 
@@ -407,12 +406,6 @@ export default function TutorialFlowPage() {
   return (
     <TrainingHomeShell phase={phase}>
       <div className="w-full max-w-3xl space-y-3 pb-8">
-        <div className="flex justify-start pl-8">
-          <div className="border-2 border-slate-900 bg-slate-950/70 px-4 py-3 shadow-[4px_4px_0_rgba(15,23,42,0.45)]">
-            <CharacterSpriteSheet character="sam_tutorial" facing="left" scale={1.5} />
-            <div className="mt-1 text-center text-xs font-black text-white/80">{triggerEncounter?.npcName ?? trigger.visitor}</div>
-          </div>
-        </div>
         {triggerResting ? (
           <BubbleDialogue
             speaker="AVATAR"

@@ -13,6 +13,7 @@ interface ExperimentHomeShellProps {
   morningMode?: boolean
   disableNavigation?: boolean
   highlightedRoom?: FloorRoom | null
+  scriptedDoorEncounterId?: string | null
 }
 
 export default function ExperimentHomeShell({
@@ -22,6 +23,7 @@ export default function ExperimentHomeShell({
   morningMode = false,
   disableNavigation = false,
   highlightedRoom = null,
+  scriptedDoorEncounterId = null,
 }: ExperimentHomeShellProps) {
   const setGameClock = useGameStore((s) => s.setGameClock)
   const roomForActors = initialRoom ?? 'living_room'
@@ -41,6 +43,7 @@ export default function ExperimentHomeShell({
           initialRobotRoom={roomForActors}
           disableNavigation={disableNavigation}
           highlightedRoom={highlightedRoom}
+          scriptedDoorEncounterId={scriptedDoorEncounterId}
         />
         <HUD />
         <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-overlay-shell bg-gradient-to-t from-black/65 via-black/25 to-transparent p-4">

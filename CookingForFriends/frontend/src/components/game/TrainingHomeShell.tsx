@@ -15,6 +15,7 @@ interface TrainingSceneConfig {
   phoneDisabled: boolean
   disableNavigation: boolean
   highlightedRoom?: FloorRoom | null
+  scriptedDoorEncounterId?: string | null
 }
 
 const TRAINING_SCENES: Record<string, TrainingSceneConfig> = {
@@ -40,7 +41,13 @@ const TRAINING_SCENES: Record<string, TrainingSceneConfig> = {
     disableNavigation: false,
     highlightedRoom: 'kitchen',
   },
-  TUTORIAL_TRIGGER: { room: 'living_room', startMinute: 8 * 60 + 55, phoneDisabled: true, disableNavigation: true },
+  TUTORIAL_TRIGGER: {
+    room: 'living_room',
+    startMinute: 8 * 60 + 55,
+    phoneDisabled: true,
+    disableNavigation: true,
+    scriptedDoorEncounterId: 'tutorial_sam',
+  },
 }
 
 function formatClock(totalMinutes: number) {
@@ -81,6 +88,7 @@ export default function TrainingHomeShell({ children, phase }: TrainingHomeShell
       phoneDisabled={scene.phoneDisabled}
       disableNavigation={scene.disableNavigation}
       highlightedRoom={scene.highlightedRoom ?? null}
+      scriptedDoorEncounterId={scene.scriptedDoorEncounterId ?? null}
     >
       {children}
     </ExperimentHomeShell>

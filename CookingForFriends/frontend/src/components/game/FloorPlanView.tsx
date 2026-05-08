@@ -31,7 +31,7 @@ import { useCharacterStore } from '../../stores/characterStore'
 import waypointData from '../../data/waypoints.json'
 import type { WaypointData } from '../../utils/waypointGraph'
 import { resolveRoomPoint } from '../../utils/waypointGraph'
-import { getActiveTriggerEncounterConfig } from '../../data/triggerEncounters'
+import { getActiveTriggerEncounterConfig, getTriggerEncounterConfig } from '../../data/triggerEncounters'
 
 const wpData = waypointData as unknown as WaypointData
 
@@ -45,6 +45,7 @@ interface FloorPlanViewProps {
   initialRobotRoom?: FloorRoom
   disableNavigation?: boolean
   highlightedRoom?: FloorRoom | null
+  scriptedDoorEncounterId?: string | null
 }
 
 interface RoomDef {
@@ -159,7 +160,8 @@ function navButtonStyle(nav: NavLink): React.CSSProperties {
 
 const ZOOM_SCALE = 1.6
 const ZOOM_SCALE_KITCHEN = 1.7
-const ENCOUNTER_ZOOM_SCALE = 2.5
+const ENCOUNTER_ZOOM_SCALE = 2.75
+const DOOR_ENCOUNTER_FOCUS = { cx: 67.2, cy: 80.4 }
 // Max positive translate (%) allowed for kitchen — creates a small controlled gap
 // so kitchen content isn't pinned to top-left corner of the view.
 const KITCHEN_MAX_OFFSET_X = 10
@@ -175,6 +177,15 @@ function snapToDevicePixel(value: number) {
   return Math.round(value * dpr) / dpr
 }
 
+function waypointStyle(id: string, fallback: { x: number; y: number }): React.CSSProperties {
+  const point = wpData.waypoints[id] ?? fallback
+  return {
+    left: `${point.x}%`,
+    top: `${point.y}%`,
+    transform: 'translate(-50%, -100%)',
+  }
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function FloorPlanView({
@@ -183,10 +194,12 @@ export default function FloorPlanView({
   initialRobotRoom = 'living_room',
   disableNavigation = false,
   highlightedRoom = null,
+  scriptedDoorEncounterId = null,
 }: FloorPlanViewProps = {}) {
   const viewRef = useRef<HTMLDivElement>(null)
   const pointerInsideGameAreaRef = useRef(true)
   const doorbellSequenceWasActiveRef = useRef(false)
+  const doorbellAlreadyAnsweredRef = useRef(false)
   const [viewSize, setViewSize] = useState({ width: 0, height: 0 })
   const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(initialRoom)
   const [charRoom, setCharRoom] = useState<FloorRoom>(initialCharRoom)
@@ -234,25 +247,45 @@ export default function FloorPlanView({
     triggerType: pmPipelineState?.triggerType,
     isFake: pmPipelineState?.isFake,
   })
+  const scriptedDoorEncounterConfig = scriptedDoorEncounterId
+    ? getTriggerEncounterConfig(scriptedDoorEncounterId)
+    : null
+  const activeDoorEncounterConfig = scriptedDoorEncounterConfig
+    ?? (pmPipelineState?.triggerType === 'doorbell' ? encounterConfig : null)
   const encounterFocusActive = Boolean(
-    encounterConfig
-    && pmPipelineState?.step !== 'trigger_event'
-    && pmPipelineState?.step !== 'completed'
+    scriptedDoorEncounterConfig
+    || (encounterConfig
+      && pmPipelineState?.step !== 'trigger_event'
+      && pmPipelineState?.step !== 'completed')
   )
-  const visitorVisible = pmPipelineState?.triggerType === 'doorbell'
+  const visitorVisible = Boolean(scriptedDoorEncounterConfig)
+    || (pmPipelineState?.triggerType === 'doorbell'
     && (pmPipelineState.step === 'greeting'
       || pmPipelineState.step === 'reminder'
       || pmPipelineState.step === 'item_selection'
       || pmPipelineState.step === 'confidence_rating'
       || pmPipelineState.step === 'auto_execute'
       || pmPipelineState.step === 'fake_resolution'
-      || pmPipelineState.step === 'direct_request')
+      || pmPipelineState.step === 'direct_request'))
 
   const moveToWaypoint  = useCharacterStore((s) => s.moveToWaypoint)
   const teleportTo      = useCharacterStore((s) => s.teleportTo)
   const isCharMoving    = useCharacterStore((s) => s.isMoving)
 
   const isZoomed = currentRoom !== null
+
+  useEffect(() => {
+    if (doorbellActive) return
+    doorbellAlreadyAnsweredRef.current = false
+  }, [doorbellActive])
+
+  useEffect(() => {
+    if (!doorbellActive || currentRoom !== 'living_room' || doorbellAlreadyAnsweredRef.current) return
+    doorbellAlreadyAnsweredRef.current = true
+    moveToWaypoint('door_avatar', () => {
+      window.dispatchEvent(new CustomEvent('pm:doorbell_answered'))
+    })
+  }, [currentRoom, doorbellActive, moveToWaypoint])
 
   useEffect(() => {
     if (pmPipelineState?.triggerType === 'doorbell') {
@@ -305,6 +338,7 @@ export default function FloorPlanView({
         setCharRoom(target)
         setIsMoving(false)
         if (doorbellActive && target === 'living_room') {
+          doorbellAlreadyAnsweredRef.current = true
           window.dispatchEvent(new CustomEvent('pm:doorbell_answered'))
         }
       }, TRANSIT_DELAY_MS)
@@ -328,6 +362,7 @@ export default function FloorPlanView({
     setCurrentRoom(room)
     setCharRoom(room)
     if (doorbellActive && room === 'living_room') {
+      doorbellAlreadyAnsweredRef.current = true
       window.dispatchEvent(new CustomEvent('pm:doorbell_answered'))
     }
 
@@ -391,8 +426,8 @@ export default function FloorPlanView({
   // This ensures the image always fills the container with no black borders.
   const floorTransform = useMemo(() => {
     if (!isZoomed) return 'translate3d(0px, 0px, 0) scale(1)'
-    const room = encounterFocusActive && pmPipelineState?.triggerType === 'doorbell'
-      ? { ...ROOM_DEFS.living_room, cx: 66, cy: 58 }
+    const room = encounterFocusActive && activeDoorEncounterConfig
+      ? { ...ROOM_DEFS.living_room, ...DOOR_ENCOUNTER_FOCUS }
       : encounterFocusActive && currentRoom
         ? ROOM_DEFS[currentRoom]
       : ROOM_DEFS[currentRoom!]
@@ -409,7 +444,7 @@ export default function FloorPlanView({
     const txPx = snapToDevicePixel((tx / 100) * viewSize.width)
     const tyPx = snapToDevicePixel((ty / 100) * viewSize.height)
     return `translate3d(${txPx}px, ${tyPx}px, 0) scale(${S})`
-  }, [encounterFocusActive, isZoomed, currentRoom, viewSize.height, viewSize.width])
+  }, [activeDoorEncounterConfig, encounterFocusActive, isZoomed, currentRoom, viewSize.height, viewSize.width])
 
   // Always keep transform-origin at top-left so the clamped math above is exact.
   const transformOrigin = '0% 0%'
@@ -417,6 +452,9 @@ export default function FloorPlanView({
   // Character position
   const charDef = ROOM_DEFS[charRoom]
   const robotDef = ROOM_DEFS[robotRoom]
+  const robotMapPosition = encounterFocusActive && activeDoorEncounterConfig
+    ? { cx: 60.5, cy: 81.8 }
+    : robotDef
 
   return (
     <div
@@ -518,16 +556,16 @@ export default function FloorPlanView({
         </AnimatePresence>
 
         <AnimatePresence>
-          {visitorVisible && encounterConfig && (
+          {visitorVisible && activeDoorEncounterConfig && (
             <motion.div
               className="absolute z-sprite-player pointer-events-none"
-              style={{ left: '68%', top: '61%', transform: 'translate(-50%, -100%)' }}
+              style={waypointStyle('door_visitor', { x: 69.8, y: 81.8 })}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.3 }}
             >
-              <CharacterSpriteSheet character={encounterCharacterId(encounterConfig.npcId)} facing="left" scale={1.05} />
+              <CharacterSpriteSheet character={encounterCharacterId(activeDoorEncounterConfig.npcId)} facing="left" scale={1} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -542,8 +580,8 @@ export default function FloorPlanView({
               key={`robot-${robotRoom}`}
               className="absolute z-sprite-robot pointer-events-none"
               style={{
-                left: `${robotDef.cx - 5}%`,
-                top: `${robotDef.cy - 2}%`,
+                left: `${robotMapPosition.cx}%`,
+                top: `${robotMapPosition.cy}%`,
                 transform: 'translate(-50%, -50%)',
               }}
               initial={{ opacity: 0, scale: 0.3 }}
@@ -562,8 +600,8 @@ export default function FloorPlanView({
             <motion.div
               className="absolute z-sprite-robot pointer-events-none"
               style={{
-                left: `${robotDef.cx - 5}%`,
-                top: `${robotDef.cy - 2}%`,
+                left: `${robotMapPosition.cx}%`,
+                top: `${robotMapPosition.cy}%`,
                 transform: 'translate(-50%, -50%)',
               }}
               initial={{ opacity: 1 }}
@@ -612,7 +650,7 @@ export default function FloorPlanView({
       </AnimatePresence>
 
       {/* ── Doorbell navigation prompt (only visible during PM trigger) ── */}
-      {doorbellActive && currentRoom === 'kitchen' && !disableNavigation && !isMoving && !isCharMoving && (
+      {doorbellActive && currentRoom && currentRoom !== 'living_room' && !disableNavigation && !isMoving && !isCharMoving && (
         ADJACENCY[currentRoom].map((nav) => {
           const isDoorbellTarget = doorbellActive && nav.target === 'living_room'
           if (!isDoorbellTarget) return null
@@ -637,7 +675,7 @@ export default function FloorPlanView({
 
       {/* ── Room navigation buttons (zoomed mode) ── */}
       {isZoomed && currentRoom && !doorbellActive && !disableNavigation && !isMoving && !isCharMoving && (
-        ADJACENCY[currentRoom].map((nav) => {
+        ADJACENCY[currentRoom].filter((nav) => nav.target !== 'living_room').map((nav) => {
           const isHighlightedTarget = highlightedRoom === nav.target
           return (
             <button
