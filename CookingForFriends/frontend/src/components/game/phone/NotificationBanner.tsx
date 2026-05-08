@@ -65,7 +65,7 @@ export default function NotificationBanner({ belowKitchenCue = false }: { belowK
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-          className={`absolute ${belowKitchenCue ? 'bottom-[var(--kitchen-banner-height)] left-14 right-4' : 'left-4 right-4 top-[44px]'} z-30 rounded-xl shadow-lg shadow-black/30
+          className={`absolute ${belowKitchenCue ? 'bottom-[var(--kitchen-banner-height)] left-4 right-4' : 'left-4 right-4 top-[44px]'} z-30 rounded-xl shadow-lg shadow-black/30
                      border cursor-pointer overflow-hidden`}
           style={{
             backgroundColor: isSystemNotification ? 'rgba(30, 41, 59, 0.96)' : '#ffffff',
