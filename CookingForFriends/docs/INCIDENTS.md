@@ -999,3 +999,96 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 > - [x] Move PM scheduler off DB polling and onto `BlockRuntime` / `GameClock`
 > - [x] Replace `game_handler.py` glue pause/resume calls with a single `BlockRuntime.pause()` / `resume()`
 > - [ ] Add timeline integration test proving PM pause blocks `time_tick`, phone messages, and block end
+
+---
+
+## INC-019 — Non-atomic double commit in PM action complete / fake trigger ack
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-08 |
+| Severity     | P2 Medium |
+| Status       | Open |
+| Reported by  | Code review |
+| Affected area| `backend/websocket/game_handler.py` — `_handle_pm_action_complete`, `_handle_fake_trigger_ack` |
+
+### Background
+> When a PM action completes or a fake trigger is acknowledged, the handler must (1) update the event record and (2) unfreeze game time on the Participant row. Both writes happen within the same `async with db_factory() as db:` block (same session).
+
+### Incident Description
+> Each handler calls `await db.commit()` twice within a single session context: once after updating the event row and again after unfreezing game time. If the process crashes between the two commits, the event is recorded as complete but game time remains frozen — the participant's clock never resumes and the experiment stalls.
+
+### Root Cause
+> The two logical writes were committed separately instead of being batched into one atomic transaction. There is no technical reason to split them.
+
+### Contributing Factors
+> - No transactional test covering the commit boundary
+> - The pattern likely arose from incremental development (event tracking added first, unfreeze added later)
+
+### Fix
+> Merge the two `db.commit()` calls into one in both `_handle_pm_action_complete` and `_handle_fake_trigger_ack`. Move the `unfreeze_game_time` call before the single remaining commit.
+
+### Follow-up Actions
+> - [ ] Add integration test asserting event update + game time unfreeze are atomic
+
+---
+
+## INC-020 — NoneType crash in admin condition assignment export
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-08 |
+| Severity     | P2 Medium |
+| Status       | Open |
+| Reported by  | Code review |
+| Affected area| `backend/routers/admin.py` — `get_condition_assignments` (~line 327) |
+
+### Background
+> The admin condition-assignment endpoint iterates PM trials to find the filler trial without a reminder, then reads `filler.task_config.get("task_id")` to report which task was unreminded.
+
+### Incident Description
+> `PMTrial.task_config` is a nullable JSON column. When it is `None`, calling `.get("task_id")` raises `AttributeError: 'NoneType' object has no attribute 'get'`, crashing the admin export endpoint.
+
+### Root Cause
+> Missing None guard on `filler.task_config` before calling `.get()`.
+
+### Contributing Factors
+> - `task_config` is not a `NOT NULL` column — older rows or edge cases may have `None`
+> - No test exercises this path with `task_config=None`
+
+### Fix
+> Change `filler.task_config.get("task_id")` to `(filler.task_config or {}).get("task_id")`.
+
+### Follow-up Actions
+> - [ ] Add test for condition assignment endpoint with a filler trial where `task_config` is None
+
+---
+
+## INC-021 — GameClock timing gap at PM trigger fire
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-08 |
+| Severity     | P2 Medium |
+| Status       | Open |
+| Reported by  | Code review |
+| Affected area| `backend/engine/pm_session.py` — trigger fire sequence (~lines 180-205) |
+
+### Background
+> When a PM trigger fires, the system must record the exact game time at which the trigger appeared and then pause the GameClock. The recorded `game_time_fired` is the dependent variable in the psychology experiment — accuracy to the millisecond matters.
+
+### Incident Description
+> The current sequence is: (A) `game_time_fired = clock.now()`, (B) write to DB + commit, (C) `on_pipeline_start()` → `clock.pause("pm")`. Between step A and step C, the GameClock continues running. The DB commit alone adds ~1-5 ms of drift, meaning `game_time_fired` does not match the actual moment the clock pauses. In a psychology experiment, even millisecond-level inaccuracy in the dependent variable is unacceptable.
+
+### Root Cause
+> `clock.pause()` is called after `clock.now()` is captured and after the DB commit, leaving a window where game time advances beyond the recorded value.
+
+### Contributing Factors
+> - `on_pipeline_start` is a callback passed from BlockRuntime — easy to overlook that it must execute before the time snapshot
+> - No assertion or test verifying that `game_time_fired == clock.now()` at the moment the clock actually pauses
+
+### Fix
+> Reorder so `on_pipeline_start()` (which calls `clock.pause("pm")`) executes before `game_time_fired = clock.now()`. Once the clock is paused, `clock.now()` returns a stable value and the DB commit latency no longer matters.
+
+### Follow-up Actions
+> - [ ] Add test asserting `clock.now()` is stable between pause and DB write

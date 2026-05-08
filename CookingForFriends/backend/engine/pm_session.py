@@ -177,6 +177,18 @@ async def run_pm_session(
             )
             await _wait_game_seconds(session_id, delay_remaining, db_factory, clock)
 
+            # Pause the clock FIRST so clock.now() returns a stable value
+            if on_pipeline_start:
+                try:
+                    maybe_awaitable = on_pipeline_start()
+                    if asyncio.iscoroutine(maybe_awaitable):
+                        await maybe_awaitable
+                except Exception:
+                    logger.exception(
+                        "[PM_SESSION] on_pipeline_start failed (session=%s)",
+                        session_id,
+                    )
+
             # Freeze game time and snapshot the fired game time
             async with db_factory() as db:
                 result = await db.execute(select(Participant).where(Participant.id == session_id))
@@ -191,17 +203,6 @@ async def run_pm_session(
                     freeze_game_time(participant)
                     game_time_fired = participant.game_time_elapsed_s
                 await db.commit()
-
-            if on_pipeline_start:
-                try:
-                    maybe_awaitable = on_pipeline_start()
-                    if asyncio.iscoroutine(maybe_awaitable):
-                        await maybe_awaitable
-                except Exception:
-                    logger.exception(
-                        "[PM_SESSION] on_pipeline_start failed (session=%s)",
-                        session_id,
-                    )
 
             ev.clear()
 

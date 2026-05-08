@@ -324,7 +324,7 @@ async def list_assignments(db: AsyncSession = Depends(get_db)):
             )
             trials = trials_result.scalars().all()
             filler = next((t for t in trials if not t.has_reminder and t.is_filler), None)
-            unreminded = filler.task_config.get("task_id") if filler else None
+            unreminded = (filler.task_config or {}).get("task_id") if filler else None
         assignments.append({
             "participant_id": p.participant_id,
             "condition": p.condition,

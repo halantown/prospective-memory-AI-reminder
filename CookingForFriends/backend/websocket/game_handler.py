@@ -667,14 +667,14 @@ async def _handle_pm_action_complete(participant_id: str, block_number: int, dat
         if evt:
             evt.action_animation_start_time = data.get("action_animation_start_time", now)
             evt.action_animation_complete_time = data.get("action_animation_complete_time", now)
-            await db.commit()
 
         # Unfreeze game time
         p_result = await db.execute(select(Participant).where(Participant.id == participant_id))
         p = p_result.scalar_one_or_none()
         if p:
             unfreeze_game_time(p)
-            await db.commit()
+
+        await db.commit()
 
     runtime = _block_runtimes.get(participant_id)
     if runtime:
@@ -707,7 +707,6 @@ async def _handle_fake_trigger_ack(participant_id: str, block_number: int, data:
             if evt.trigger_responded_at is None:
                 evt.trigger_responded_at = data.get("game_time", now)
             evt.resolved_at = data.get("resolved_at", now)
-            await db.commit()
 
         # Unfreeze game time
         p_result = await db.execute(
@@ -716,7 +715,8 @@ async def _handle_fake_trigger_ack(participant_id: str, block_number: int, data:
         p = p_result.scalar_one_or_none()
         if p:
             unfreeze_game_time(p)
-            await db.commit()
+
+        await db.commit()
 
     runtime = _block_runtimes.get(participant_id)
     if runtime:
