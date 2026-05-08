@@ -328,7 +328,7 @@ function StationPopup({
 
   return (
     <motion.div
-      className="absolute inset-0 z-[80] pointer-events-none"
+      className="absolute inset-0 z-kitchen-fx pointer-events-none"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}

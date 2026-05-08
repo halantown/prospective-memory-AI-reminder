@@ -98,7 +98,7 @@ export default function ClickDialogueFlow({ lines, phoneAvatar, onComplete }: Cl
 
   return (
     <div
-      className="fixed bottom-0 left-0 top-0 z-[230] flex items-end justify-center bg-gradient-to-t from-black/45 via-transparent to-transparent p-5"
+      className="fixed bottom-0 left-0 top-0 z-overlay-dialogue flex items-end justify-center bg-gradient-to-t from-black/45 via-transparent to-transparent p-5"
       style={{ right: 'var(--phone-sidebar-width)', pointerEvents: 'auto' }}
       onClick={advance}
       role="button"

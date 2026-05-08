@@ -328,7 +328,7 @@ export default function PMTargetItems({ room }: PMTargetItemsProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 10 }}
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            className="absolute bottom-full left-0 mb-2 z-[60]"
+            className="absolute bottom-full left-0 mb-2 z-pm-tooltip"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-slate-900/95 backdrop-blur-md border border-slate-600/80 rounded-xl shadow-2xl

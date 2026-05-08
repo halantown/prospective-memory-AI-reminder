@@ -457,7 +457,7 @@ function tutorialStationForStep(stepId: string) {
 function PhoneTabPromptOverlay({ visible, target }: { visible: boolean; target: string }) {
   if (!visible) return null
   return (
-    <div className="pointer-events-none fixed inset-0 z-[500] flex items-center justify-center bg-black/55">
+    <div className="pointer-events-none fixed inset-0 z-overlay-tutorial flex items-center justify-center bg-black/55">
       <div className="rounded-lg border border-white/20 bg-slate-950/80 px-6 py-4 text-center shadow-2xl">
         <p className="text-base font-semibold text-white">Click the highlighted {target} tab on the phone.</p>
       </div>

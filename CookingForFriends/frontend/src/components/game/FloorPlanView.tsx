@@ -507,7 +507,7 @@ export default function FloorPlanView({
         <AnimatePresence>
           {visitorVisible && encounterConfig && (
             <motion.div
-              className="absolute z-[31] pointer-events-none"
+              className="absolute z-sprite-player pointer-events-none"
               style={{ left: '68%', top: '61%', transform: 'translate(-50%, -100%)' }}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -527,7 +527,7 @@ export default function FloorPlanView({
           {!isRobotMoving && (
             <motion.div
               key={`robot-${robotRoom}`}
-              className="absolute z-[29] pointer-events-none"
+              className="absolute z-sprite-robot pointer-events-none"
               style={{
                 left: `${robotDef.cx - 5}%`,
                 top: `${robotDef.cy - 2}%`,
@@ -547,7 +547,7 @@ export default function FloorPlanView({
         <AnimatePresence>
           {isRobotMoving && (
             <motion.div
-              className="absolute z-[29] pointer-events-none"
+              className="absolute z-sprite-robot pointer-events-none"
               style={{
                 left: `${robotDef.cx - 5}%`,
                 top: `${robotDef.cy - 2}%`,

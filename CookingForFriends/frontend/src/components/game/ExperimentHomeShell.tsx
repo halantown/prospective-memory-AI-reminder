@@ -43,7 +43,7 @@ export default function ExperimentHomeShell({
           highlightedRoom={highlightedRoom}
         />
         <HUD />
-        <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-[220] bg-gradient-to-t from-black/65 via-black/25 to-transparent p-4">
+        <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-overlay-shell bg-gradient-to-t from-black/65 via-black/25 to-transparent p-4">
           <div className="mx-auto w-full max-w-4xl">
             {children}
           </div>

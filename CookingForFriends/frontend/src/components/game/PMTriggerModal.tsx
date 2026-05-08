@@ -60,7 +60,7 @@ function PhoneCallScreen({
   onAnswer: () => void
 }) {
   return (
-    <div className="fixed right-0 top-0 bottom-0 z-[210] flex items-center justify-center bg-slate-950/70 p-6" style={{ width: 'var(--phone-sidebar-width)' }}>
+    <div className="fixed right-0 top-0 bottom-0 z-overlay-pm flex items-center justify-center bg-slate-950/70 p-6" style={{ width: 'var(--phone-sidebar-width)' }}>
       <div className="w-full rounded-[2rem] border border-emerald-300/40 bg-slate-900 p-8 text-center shadow-2xl shadow-emerald-950/40">
         <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-400 text-5xl shadow-lg animate-pulse">
           📞
@@ -80,7 +80,7 @@ function PhoneCallScreen({
 
 function DoorbellHint() {
   return (
-    <div className="fixed left-1/2 top-5 z-[210] -translate-x-1/2 rounded-full border border-amber-300/60 bg-slate-950/80 px-5 py-3 text-sm font-semibold text-amber-100 shadow-xl backdrop-blur pointer-events-none">
+    <div className="fixed left-1/2 top-5 z-overlay-pm -translate-x-1/2 rounded-full border border-amber-300/60 bg-slate-950/80 px-5 py-3 text-sm font-semibold text-amber-100 shadow-xl backdrop-blur pointer-events-none">
       🔔 Someone is at the door.
     </div>
   )
@@ -245,7 +245,7 @@ function AutoExecuteStep({ onDone }: { onDone: (startedAt: number, finishedAt: n
 
 function InGameShell({ children }: { children: ReactNode }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[220] flex justify-center bg-gradient-to-t from-black/55 to-transparent p-4" style={{ pointerEvents: 'auto' }}>
+    <div className="fixed inset-x-0 bottom-0 z-overlay-shell flex justify-center bg-gradient-to-t from-black/55 to-transparent p-4" style={{ pointerEvents: 'auto' }}>
       <div className="w-full max-w-3xl">
         {children}
       </div>
