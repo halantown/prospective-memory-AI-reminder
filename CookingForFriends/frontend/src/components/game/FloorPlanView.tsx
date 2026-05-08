@@ -561,16 +561,19 @@ export default function FloorPlanView({
 
         <AnimatePresence>
           {visitorVisible && activeDoorEncounterConfig && (
-            <motion.div
+            <div
               className="absolute z-sprite-player pointer-events-none"
-              style={waypointStyle('door_visitor', { x: 69.8, y: 81.8 })}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.3 }}
+              style={waypointStyle('door_visitor', { x: 69.5, y: 82.0 })}
             >
-              <CharacterSpriteSheet character={encounterCharacterId(activeDoorEncounterConfig.npcId)} facing="left" scale={1} />
-            </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.3 }}
+              >
+                <CharacterSpriteSheet character={encounterCharacterId(activeDoorEncounterConfig.npcId)} facing="left" scale={1} />
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
 
