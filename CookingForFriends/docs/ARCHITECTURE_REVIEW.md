@@ -715,3 +715,17 @@ Add a timeout middleware.
 - Commit: `b249898`
 
 **Issue #9 — State persistence**: Deferred. Single-instance constraint documented; GameStateSnapshot periodic writes already partially cover this.
+
+---
+
+## TODO: Edge Case Testing (Pre-Pilot)
+
+The BlockRuntime supervisor (#3) now catches subsystem crashes, but the underlying edge cases that could cause crashes have not been stress-tested. Priority scenarios to test before pilot:
+
+1. **DB connection pool exhaustion** — Multiple participants online simultaneously; `db.execute()` may fail if the pool (size=20, overflow=30) is full.
+2. **WebSocket disconnect during PM pipeline** — Participant disconnects mid-trigger; `send_fn` writes to a closed connection.
+3. **Reconnect timing** — Participant disconnects and reconnects at the exact moment a PM trigger fires or a cooking step expires.
+4. **Runtime plan edge cases** — Missing or malformed fields in runtime plan JSON causing mid-session `KeyError`/`None` access.
+5. **Game clock pause/resume race** — `CancelledError` not propagated correctly when freezing/unfreezing game time during PM pipeline.
+
+These are low-probability but data-destroying scenarios. The supervisor ensures they are surfaced rather than silently corrupting experiment data.
