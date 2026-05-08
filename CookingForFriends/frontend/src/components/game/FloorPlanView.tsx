@@ -148,6 +148,13 @@ function edgeStyle(dir: NavDirection): React.CSSProperties {
   }
 }
 
+function navButtonStyle(nav: NavLink): React.CSSProperties {
+  if (nav.target === 'bedroom') {
+    return { position: 'absolute', bottom: 18, left: 18 }
+  }
+  return edgeStyle(nav.direction)
+}
+
 // ── Zoom constants ────────────────────────────────────────────────────────────
 
 const ZOOM_SCALE = 1.6
@@ -157,6 +164,9 @@ const ENCOUNTER_ZOOM_SCALE = 2.5
 // so kitchen content isn't pinned to top-left corner of the view.
 const KITCHEN_MAX_OFFSET_X = 10
 const KITCHEN_MAX_OFFSET_Y = 25
+// Bedroom/bathroom sit at the bottom of the source image. Allow a small
+// over-pan so the camera can frame them higher with a visible bottom edge.
+const BEDROOM_BOTTOM_EDGE_GAP = 8
 const TRANSIT_DELAY_MS = 1500
 const ROBOT_FOLLOW_DELAY_MS = 2200
 
@@ -389,12 +399,13 @@ export default function FloorPlanView({
     const isKitchen = currentRoom === 'kitchen'
     const S = encounterFocusActive ? ENCOUNTER_ZOOM_SCALE : isKitchen ? ZOOM_SCALE_KITCHEN : ZOOM_SCALE
     const minT = (1 - S) * 100
+    const minTy = currentRoom === 'bedroom' && !encounterFocusActive ? minT - BEDROOM_BOTTOM_EDGE_GAP : minT
     const rawTx = (0.5 - S * room.cx / 100) * 100
     const rawTy = (0.5 - S * room.cy / 100) * 100
     const maxTx = isKitchen ? KITCHEN_MAX_OFFSET_X : 0
     const maxTy = isKitchen ? KITCHEN_MAX_OFFSET_Y : 0
     const tx = Math.min(maxTx, Math.max(minT, rawTx))
-    const ty = Math.min(maxTy, Math.max(minT, rawTy))
+    const ty = Math.min(maxTy, Math.max(minTy, rawTy))
     const txPx = snapToDevicePixel((tx / 100) * viewSize.width)
     const tyPx = snapToDevicePixel((ty / 100) * viewSize.height)
     return `translate3d(${txPx}px, ${tyPx}px, 0) scale(${S})`
@@ -613,12 +624,37 @@ export default function FloorPlanView({
                          rounded-lg shadow-2xl shadow-amber-950/40 whitespace-nowrap
                          transition-all duration-200 hover:scale-105 active:scale-95
                          cursor-pointer animate-pulse ring-4 ring-amber-400/35"
-              style={edgeStyle(nav.direction)}
+              style={navButtonStyle(nav)}
               onClick={() => navigateToRoom(nav.target)}
             >
               <span className="text-base font-bold">{ARROWS[nav.direction]}</span>
               <span className="text-sm font-bold">Front Door</span>
               <span className="text-base">🔔</span>
+            </button>
+          )
+        })
+      )}
+
+      {/* ── Room navigation buttons (zoomed mode) ── */}
+      {isZoomed && currentRoom && !doorbellActive && !disableNavigation && !isMoving && !isCharMoving && (
+        ADJACENCY[currentRoom].map((nav) => {
+          const isHighlightedTarget = highlightedRoom === nav.target
+          return (
+            <button
+              key={nav.target}
+              className={`absolute z-40 flex items-center gap-2 px-4 py-2.5
+                         rounded-lg border shadow-xl whitespace-nowrap
+                         transition-all duration-200 hover:scale-105 active:scale-95
+                         cursor-pointer ${
+                           isHighlightedTarget
+                             ? 'bg-amber-500 text-slate-950 border-amber-100 shadow-amber-950/40 animate-pulse ring-4 ring-amber-400/35'
+                             : 'bg-slate-900/85 text-amber-100 border-amber-500/35 shadow-slate-950/40 hover:bg-slate-800/90 hover:border-amber-300/60'
+                         }`}
+              style={navButtonStyle(nav)}
+              onClick={() => navigateToRoom(nav.target)}
+            >
+              <span className="text-base font-bold">{ARROWS[nav.direction]}</span>
+              <span className="text-sm font-bold">{nav.label}</span>
             </button>
           )
         })

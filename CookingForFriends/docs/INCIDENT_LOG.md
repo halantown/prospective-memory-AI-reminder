@@ -996,3 +996,51 @@ any significant timeline refactor, consider:
 > - [ ] Add a frontend regression test for backend phase preservation.
 > - [ ] Add an admin Test Mode integration test verifying the opened URL does not include `?token=`.
 > - [ ] Replace encoding video placeholders with approved media assets when available.
+
+---
+
+## INC-018 — Cooking tutorial lacked kitchen navigation and bedroom camera framing was too low
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-08 |
+| Severity     | P3 Low |
+| Status       | Resolved |
+| Reported by  | Developer — manual tutorial playthrough |
+| Affected area| Frontend tutorial cooking scene; floor-plan room navigation and camera framing |
+
+### Background
+> `TUTORIAL_COOKING` starts the participant in the bedroom/bathroom area and highlights the kitchen as the next target. Participants should be able to navigate to the kitchen from the zoomed room view before using the recipe and station UI.
+
+### Incident Description
+> During the cooking tutorial, no navigation button appeared from the bedroom/bathroom view to the kitchen. The same bedroom/bathroom zoom framing also placed both rooms too low in the viewport, making the area feel cramped against the bottom edge.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 21:45 | Missing cooking tutorial navigation and low bedroom/bathroom camera reported |
+| 21:50 | `TrainingHomeShell` and `FloorPlanView` inspected |
+| 21:55 | Root cause identified in zoomed-mode navigation rendering and camera clamp |
+| 21:59 | Frontend fix implemented and incident record added |
+
+### Root Cause
+> `FloorPlanView` only rendered zoomed room navigation controls for the doorbell PM trigger path. Normal zoomed room navigation data existed in `ADJACENCY`, and `TUTORIAL_COOKING` correctly passed `highlightedRoom: 'kitchen'`, but there was no general zoomed-mode button renderer to expose it. Bedroom/bathroom framing also used the global no-border vertical clamp, preventing a small downward camera over-pan.
+
+### Contributing Factors
+> - Training scene setup correctly allowed navigation, so the missing UI was not obvious from `TrainingHomeShell`.
+> - Doorbell-specific navigation masked that ordinary zoomed room navigation had no shared renderer.
+> - The bedroom and bathroom are combined into one bottom-of-map room definition, making global no-border camera math too restrictive for that scene.
+
+### Fix
+> **Frontend** (`components/game/FloorPlanView.tsx`):
+> - Added general zoomed-mode room navigation buttons for non-doorbell states, using the existing `ADJACENCY` map.
+> - Reused `highlightedRoom` so the cooking tutorial's kitchen target appears as the emphasized navigation button.
+> - Positioned `Bedroom / Bathroom` navigation at the lower-left edge to avoid blocking the central room view.
+> - Added a bedroom/bathroom-specific bottom-edge over-pan allowance so the camera frames the rooms higher and exposes a small bottom edge.
+
+### Verification
+> `npm run build` passed (`tsc -b && vite build`).
+
+### Follow-up Actions
+> - [ ] Add visual/manual QA coverage for each tutorial phase's starting room and required navigation target.
+> - [ ] Consider extracting shared room navigation controls from `FloorPlanView` once more training scenes rely on them.
