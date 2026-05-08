@@ -1037,7 +1037,7 @@ any significant timeline refactor, consider:
 > **Frontend** (`components/game/FloorPlanView.tsx`):
 > - Added general zoomed-mode room navigation buttons for non-doorbell states, using the existing `ADJACENCY` map.
 > - Reused `highlightedRoom` so the cooking tutorial's kitchen target appears as the emphasized navigation button.
-> - Hid normal `Living Room` navigation outside active doorbell PM trigger context; if the trigger fires while already in the living room, the avatar now moves to the door waypoint and answers the trigger.
+> - Added a guard for the case where a doorbell trigger fires while the participant is already in the living room: the avatar moves to the door waypoint and answers the trigger.
 > - Positioned `Bedroom / Bathroom` navigation at the lower-left edge to avoid blocking the central room view.
 > - Added a bedroom/bathroom-specific bottom-edge over-pan allowance so the camera frames the rooms higher and exposes a small bottom edge.
 > - Added `door_visitor` and `door_avatar` waypoints and reused them for formal PM visitors and tutorial Sam.

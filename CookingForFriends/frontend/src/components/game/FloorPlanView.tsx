@@ -675,7 +675,7 @@ export default function FloorPlanView({
 
       {/* ── Room navigation buttons (zoomed mode) ── */}
       {isZoomed && currentRoom && !doorbellActive && !disableNavigation && !isMoving && !isCharMoving && (
-        ADJACENCY[currentRoom].filter((nav) => nav.target !== 'living_room').map((nav) => {
+        ADJACENCY[currentRoom].map((nav) => {
           const isHighlightedTarget = highlightedRoom === nav.target
           return (
             <button
