@@ -1,6 +1,7 @@
 /** Runtime plan editor — edits the active gameplay schedule lanes. */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -172,9 +173,9 @@ export default function TimelineEditorPage() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between px-4 py-2">
           <div className="flex items-center gap-3">
-            <a href="/dashboard" className="text-slate-400 hover:text-slate-700" aria-label="Back to dashboard">
+            <Link to="/dashboard" className="text-slate-400 hover:text-slate-700" aria-label="Back to dashboard">
               <ArrowLeft size={20} />
-            </a>
+            </Link>
             <h1 className="text-xl font-bold text-slate-800">Runtime Plan</h1>
             {dirty && <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Unsaved</span>}
           </div>

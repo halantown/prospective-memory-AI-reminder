@@ -1,6 +1,7 @@
 /** App root — path-based routing with session recovery. */
 
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { useGameStore } from './stores/gameStore'
 import { getCookingDefinitions, getSessionStatus, setSessionToken } from './services/api'
 import type { Phase } from './types'
@@ -38,26 +39,28 @@ function LoadingFallback() {
   )
 }
 
+function ParticipantControlWrapper() {
+  const { participantId } = useParams()
+  if (!participantId) return null
+  return <ParticipantControlPage participantId={participantId} />
+}
+
 export default function App() {
-  const path = window.location.pathname
-
-  // Admin routes — lazy loaded, separate user flow
-  if (path.startsWith('/admin/participant/')) {
-    const participantId = path.split('/admin/participant/')[1]?.split('/')[0]
-    if (participantId) return <ErrorBoundary><Suspense fallback={<LoadingFallback />}><ParticipantControlPage participantId={participantId} /></Suspense></ErrorBoundary>
-  }
-  if (path.startsWith('/timeline-editor') || path.startsWith('/admin/timeline-editor')) {
-    return <ErrorBoundary><Suspense fallback={<LoadingFallback />}><TimelineEditorPage /></Suspense></ErrorBoundary>
-  }
-  if (path.startsWith('/dashboard') || path.startsWith('/admin')) {
-    return <ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>
-  }
-  if (path.startsWith('/config')) {
-    return <ErrorBoundary><Suspense fallback={<LoadingFallback />}><ConfigPage /></Suspense></ErrorBoundary>
-  }
-
-  // Game routes — phase-based rendering
-  return <GameShell />
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Admin routes — lazy loaded, SPA navigation */}
+        <Route path="/admin/participant/:participantId" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ParticipantControlWrapper /></Suspense></ErrorBoundary>} />
+        <Route path="/admin/timeline-editor" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><TimelineEditorPage /></Suspense></ErrorBoundary>} />
+        <Route path="/timeline-editor" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><TimelineEditorPage /></Suspense></ErrorBoundary>} />
+        <Route path="/dashboard" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>} />
+        <Route path="/admin" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>} />
+        <Route path="/config" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ConfigPage /></Suspense></ErrorBoundary>} />
+        {/* Game routes — phase-based rendering (not URL-driven) */}
+        <Route path="*" element={<GameShell />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
 
 function GameShell() {

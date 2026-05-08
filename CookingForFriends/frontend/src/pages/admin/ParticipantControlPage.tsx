@@ -1,6 +1,7 @@
 /** Participant Control Page — full detail view with logs, attempts, and admin controls. */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
 /* ── Types ────────────────────────────────────────────── */
@@ -237,7 +238,7 @@ export default function ParticipantControlPage({ participantId }: { participantI
         <div className="bg-white rounded-xl shadow p-6 max-w-md text-center">
           <p className="text-red-500 font-medium mb-2">Error loading participant</p>
           <p className="text-slate-500 text-sm">{error || 'Unknown error'}</p>
-          <a href="/admin" className="inline-block mt-4 text-blue-600 hover:underline text-sm">← Back to Dashboard</a>
+          <Link to="/admin" className="inline-block mt-4 text-blue-600 hover:underline text-sm">← Back to Dashboard</Link>
         </div>
       </div>
     )
@@ -258,9 +259,9 @@ export default function ParticipantControlPage({ participantId }: { participantI
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <a href="/admin" className="text-slate-400 hover:text-slate-600 transition-colors">
+              <Link to="/admin" className="text-slate-400 hover:text-slate-600 transition-colors">
                 ← Dashboard
-              </a>
+              </Link>
               <div>
                 <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                   {detail.participant_id}

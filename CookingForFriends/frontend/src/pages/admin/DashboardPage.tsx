@@ -1,6 +1,7 @@
 /** Feature-rich admin dashboard — overview, sortable table, expandable rows, actions. */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown,
@@ -811,6 +812,7 @@ function TestModeTab() {
 /* ------------------------------------------------------------------ */
 
 export default function AdminDashboard() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<AdminTab>('participants')
   const [participants, setParticipants] = useState<ParticipantRow[]>([])
   const [overview, setOverview] = useState<Overview | null>(null)
@@ -984,13 +986,13 @@ export default function AdminDashboard() {
                 Dashboard
               </button>
               <button
-                onClick={() => (window.location.href = '/config')}
+                onClick={() => (navigate('/config'))}
                 className="px-3 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 Config
               </button>
               <button
-                onClick={() => (window.location.href = '/admin/timeline-editor')}
+                onClick={() => navigate('/admin/timeline-editor')}
                 className="px-3 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <span className="inline-flex items-center gap-1.5">
@@ -1209,7 +1211,7 @@ export default function AdminDashboard() {
                             </button>
                             <button
                               title="Open Detail Page"
-                              onClick={() => (window.location.href = `/admin/participant/${p.session_id}`)}
+                              onClick={() => navigate(`/admin/participant/${p.session_id}`)}
                               className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition-colors"
                             >
                               <ExternalLink className="w-4 h-4" />

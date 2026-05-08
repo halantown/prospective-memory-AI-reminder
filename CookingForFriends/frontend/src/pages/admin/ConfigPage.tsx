@@ -1,6 +1,7 @@
 /** Experiment configuration viewer — read-only display of all config, tasks, reminders, assignments. */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings,
@@ -160,6 +161,7 @@ function Section({
 // ── Main Component ──
 
 export default function ConfigPage() {
+  const navigate = useNavigate()
   const [config, setConfig] = useState<ExperimentConfig | null>(null)
   const [tasks, setTasks] = useState<Record<string, PMTask[]> | null>(null)
   const [reminders, setReminders] = useState<Reminder[] | null>(null)
@@ -266,7 +268,7 @@ export default function ConfigPage() {
         {/* Navigation tabs */}
         <div className="flex gap-1 bg-white rounded-xl shadow border border-slate-200 p-1 w-fit">
           <button
-            onClick={() => (window.location.href = '/dashboard')}
+            onClick={() => navigate('/dashboard')}
             className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700
                        rounded-lg hover:bg-slate-50 transition-colors"
           >
