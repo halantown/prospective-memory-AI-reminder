@@ -59,8 +59,8 @@ export default function DemographicsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-xl">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl">
         <h1 className="text-xl font-bold text-slate-900 mb-6">Background Questions</h1>
         <form
           autoComplete="off"
@@ -143,7 +143,7 @@ export default function DemographicsPage() {
         <button
           onClick={handleSubmit}
           disabled={!isComplete || loading}
-          className="mt-8 w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="mt-8 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           {loading ? 'Saving...' : 'Continue'}
         </button>

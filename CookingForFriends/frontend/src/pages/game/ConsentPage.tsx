@@ -76,7 +76,7 @@ export default function ConsentPage() {
         <button
           onClick={handleAgree}
           disabled={loading || !checked}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300
+          className="w-full py-3 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300
                      text-white font-semibold rounded-xl transition-colors text-base"
         >
           {loading ? 'Please wait...' : consent?.continue_button ?? 'I Agree & Continue'}

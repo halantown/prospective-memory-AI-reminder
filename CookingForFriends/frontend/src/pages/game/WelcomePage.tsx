@@ -163,8 +163,8 @@ export default function WelcomePage() {
           <button
             onClick={() => handleStart()}
             disabled={loading || token.trim().length !== 6}
-            className="w-full py-3 bg-cooking-500 hover:bg-cooking-600
-                       disabled:bg-cooking-200 text-white font-bold text-lg
+            className="w-full py-3 bg-slate-900 hover:bg-slate-800
+                       disabled:bg-slate-300 text-white font-bold text-lg
                        rounded-xl transition-colors cursor-pointer disabled:cursor-not-allowed"
           >
             {loading ? 'Starting…' : 'Start Session'}

@@ -24,7 +24,7 @@ export default function PostQuestionnairePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-8 space-y-6">
         <div className="text-4xl text-center">📝</div>
         <h1 className="text-2xl font-bold text-slate-800 text-center">
@@ -52,7 +52,7 @@ export default function PostQuestionnairePage() {
         <button
           onClick={handleSubmit}
           disabled={loading}
-          className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300
+          className="w-full py-3 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300
                      text-white font-semibold rounded-xl transition-colors text-base"
         >
           {loading ? 'Submitting…' : 'Submit'}
