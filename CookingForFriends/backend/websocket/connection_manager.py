@@ -73,7 +73,10 @@ class ConnectionManager:
             logger.warning(f"[CM] No connections for participant {participant_id}, dropping {event_type}")
             return
         # Critical events must not be silently dropped
-        critical = event_type in ('pm_trigger', 'block_end', 'pm_received', 'ongoing_task_event')
+        critical = event_type in (
+            'pm_trigger', 'block_end', 'pm_received', 'ongoing_task_event',
+            'phone_message', 'phone_contacts',
+        )
         conn_count = len(self._connections[participant_id])
         logger.debug(f"[CM] Sending {event_type} to {participant_id} ({conn_count} connections)")
         for ws, queue in self._connections[participant_id]:
