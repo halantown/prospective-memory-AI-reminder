@@ -189,7 +189,26 @@ export default function FloorPlanView({
   // Robot state: follows user with a delay
   const [robotRoom, setRobotRoom] = useState<FloorRoom>(initialRobotRoom)
   const [isRobotMoving, setIsRobotMoving] = useState(false)
-  const robotTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const robotTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  const clearRobotTimers = useCallback(() => {
+    robotTimers.current.forEach(clearTimeout)
+    robotTimers.current = []
+  }, [])
+
+  const scheduleRobotFollow = useCallback((target: FloorRoom, initialDelay: number) => {
+    clearRobotTimers()
+    setIsRobotMoving(false)
+    const t1 = setTimeout(() => {
+      setIsRobotMoving(true)
+      const t2 = setTimeout(() => {
+        setRobotRoom(target)
+        setIsRobotMoving(false)
+      }, 800)
+      robotTimers.current.push(t2)
+    }, initialDelay)
+    robotTimers.current.push(t1)
+  }, [clearRobotTimers])
 
   // Robot speech from game store
   const robotState = useGameStore((s) => s.robot)
@@ -280,16 +299,7 @@ export default function FloorPlanView({
         }
       }, TRANSIT_DELAY_MS)
 
-      // Robot follows with delay
-      if (robotTimer.current) clearTimeout(robotTimer.current)
-      setIsRobotMoving(false)
-      robotTimer.current = setTimeout(() => {
-        setIsRobotMoving(true)
-        setTimeout(() => {
-          setRobotRoom(target)
-          setIsRobotMoving(false)
-        }, 800)
-      }, TRANSIT_DELAY_MS + 600)
+      scheduleRobotFollow(target, TRANSIT_DELAY_MS + 600)
     }
 
     if (exitId && !isCharMoving) {
@@ -298,7 +308,7 @@ export default function FloorPlanView({
     } else {
       doTransition()
     }
-  }, [currentRoom, disableNavigation, doorbellActive, isMoving, isCharMoving, moveToWaypoint, setActiveStation, teleportTo])
+  }, [currentRoom, disableNavigation, doorbellActive, isMoving, isCharMoving, moveToWaypoint, scheduleRobotFollow, setActiveStation, teleportTo])
 
   // Enter a room from overview — robot follows immediately with delay
   const enterRoom = useCallback((room: FloorRoom) => {
@@ -311,18 +321,10 @@ export default function FloorPlanView({
       window.dispatchEvent(new CustomEvent('pm:doorbell_answered'))
     }
 
-    if (robotTimer.current) clearTimeout(robotTimer.current)
-    robotTimer.current = setTimeout(() => {
-      setIsRobotMoving(true)
-      setTimeout(() => {
-        setRobotRoom(room)
-        setIsRobotMoving(false)
-      }, 800)
-    }, ROBOT_FOLLOW_DELAY_MS)
-  }, [disableNavigation, doorbellActive, setActiveStation])
+    scheduleRobotFollow(room, ROBOT_FOLLOW_DELAY_MS)
+  }, [disableNavigation, doorbellActive, setActiveStation, scheduleRobotFollow])
 
-  // Cleanup timers
-  useEffect(() => () => { if (robotTimer.current) clearTimeout(robotTimer.current) }, [])
+  useEffect(() => clearRobotTimers, [clearRobotTimers])
 
   useEffect(() => {
     const el = viewRef.current
