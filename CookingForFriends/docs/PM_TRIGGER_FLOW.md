@@ -108,6 +108,7 @@ Do not name this state machine `CutsceneState`.
 5. Camera enters `encounterFocus`.
 6. Greeting dialogue runs via click-to-advance bubbles.
 7. Real PM/tutorial:
+   - visitor walks from the door to the assigned living-room pose (seated for friends, standing for courier/tutorial)
    - robot appears near the encounter
    - robot delivers reminder
    - real PM continues to reminder card, item selection, confidence, auto-action

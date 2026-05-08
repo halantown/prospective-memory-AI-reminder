@@ -46,6 +46,7 @@ interface FloorPlanViewProps {
   disableNavigation?: boolean
   highlightedRoom?: FloorRoom | null
   scriptedDoorEncounterId?: string | null
+  scriptedDoorEncounterResting?: boolean
 }
 
 interface RoomDef {
@@ -101,6 +102,15 @@ function encounterCharacterId(npcId: string | undefined): CharacterSpriteId {
   if (npcId === 'mei' || npcId === 'sophia' || npcId === 'courier' || npcId === 'sam_tutorial') return npcId
   if (npcId === 'benjamin') return 'benjamin'
   return 'courier'
+}
+
+type VisitorAnimation = 'idle' | 'walk' | 'sit'
+
+const DOOR_VISITOR_REST_POSES: Record<string, { waypointId: string; animation: VisitorAnimation; facing: 'up' | 'down' | 'left' | 'right' }> = {
+  mei: { waypointId: 'sit_1', animation: 'sit', facing: 'right' },
+  sophia: { waypointId: 'sit_2', animation: 'sit', facing: 'right' },
+  courier: { waypointId: 'stand_3', animation: 'idle', facing: 'up' },
+  sam_tutorial: { waypointId: 'stand_3', animation: 'idle', facing: 'up' },
 }
 
 // ── Adjacency map — buttons reflect the relative position of neighboring rooms ──
@@ -177,13 +187,9 @@ function snapToDevicePixel(value: number) {
   return Math.round(value * dpr) / dpr
 }
 
-function waypointStyle(id: string, fallback: { x: number; y: number }): React.CSSProperties {
+function waypointPosition(id: string, fallback: { x: number; y: number }) {
   const point = wpData.waypoints[id] ?? fallback
-  return {
-    left: `${point.x}%`,
-    top: `${point.y}%`,
-    transform: 'translate(-50%, -100%)',
-  }
+  return { x: point.x, y: point.y }
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -195,15 +201,18 @@ export default function FloorPlanView({
   disableNavigation = false,
   highlightedRoom = null,
   scriptedDoorEncounterId = null,
+  scriptedDoorEncounterResting = false,
 }: FloorPlanViewProps = {}) {
   const viewRef = useRef<HTMLDivElement>(null)
   const pointerInsideGameAreaRef = useRef(true)
   const doorbellSequenceWasActiveRef = useRef(false)
   const doorbellAlreadyAnsweredRef = useRef(false)
+  const previousVisitorWaypointRef = useRef<string | null>(null)
   const [viewSize, setViewSize] = useState({ width: 0, height: 0 })
   const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(initialRoom)
   const [charRoom, setCharRoom] = useState<FloorRoom>(initialCharRoom)
   const [isMoving, setIsMoving] = useState(false)
+  const [visitorWalking, setVisitorWalking] = useState(false)
   const [stationPopupAnchor, setStationPopupAnchor] = useState<{ x: number; y: number } | null>(null)
 
   // DEV-only: waypoint annotation tool
@@ -267,6 +276,11 @@ export default function FloorPlanView({
       || pmPipelineState.step === 'auto_execute'
       || pmPipelineState.step === 'fake_resolution'
       || pmPipelineState.step === 'direct_request'))
+  const visitorShouldRest = Boolean(scriptedDoorEncounterConfig && scriptedDoorEncounterResting)
+    || Boolean(pmPipelineState?.triggerType === 'doorbell'
+      && pmPipelineState.step !== 'trigger_event'
+      && pmPipelineState.step !== 'greeting'
+      && pmPipelineState.step !== 'completed')
 
   const moveToWaypoint  = useCharacterStore((s) => s.moveToWaypoint)
   const teleportTo      = useCharacterStore((s) => s.teleportTo)
@@ -459,6 +473,31 @@ export default function FloorPlanView({
   const robotMapPosition = encounterFocusActive && activeDoorEncounterConfig
     ? { cx: 60.5, cy: 81.8 }
     : robotDef
+  const visitorRestPose = activeDoorEncounterConfig
+    ? DOOR_VISITOR_REST_POSES[activeDoorEncounterConfig.npcId] ?? DOOR_VISITOR_REST_POSES.courier
+    : null
+  const visitorWaypointId = visitorShouldRest && visitorRestPose ? visitorRestPose.waypointId : 'door_visitor'
+  const visitorPosition = waypointPosition(visitorWaypointId, visitorShouldRest ? { x: 86.6, y: 71.6 } : { x: 69.5, y: 82.0 })
+  const visitorAnimation = visitorWalking ? 'walk' : visitorShouldRest && visitorRestPose ? visitorRestPose.animation : 'idle'
+  const visitorFacing = visitorShouldRest && visitorRestPose ? visitorRestPose.facing : 'left'
+
+  useEffect(() => {
+    if (!visitorVisible) {
+      previousVisitorWaypointRef.current = null
+      setVisitorWalking(false)
+      return
+    }
+    if (previousVisitorWaypointRef.current === null) {
+      previousVisitorWaypointRef.current = visitorWaypointId
+      setVisitorWalking(false)
+      return
+    }
+    if (previousVisitorWaypointRef.current === visitorWaypointId) return
+    previousVisitorWaypointRef.current = visitorWaypointId
+    setVisitorWalking(true)
+    const timer = window.setTimeout(() => setVisitorWalking(false), 850)
+    return () => window.clearTimeout(timer)
+  }, [visitorVisible, visitorWaypointId])
 
   return (
     <div
@@ -561,9 +600,13 @@ export default function FloorPlanView({
 
         <AnimatePresence>
           {visitorVisible && activeDoorEncounterConfig && (
-            <div
+            <motion.div
               className="absolute z-sprite-player pointer-events-none"
-              style={waypointStyle('door_visitor', { x: 69.5, y: 82.0 })}
+              style={{ transform: 'translate(-50%, -100%)' }}
+              initial={false}
+              animate={{ left: `${visitorPosition.x}%`, top: `${visitorPosition.y}%` }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.85, ease: 'easeInOut' }}
             >
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
@@ -571,9 +614,14 @@ export default function FloorPlanView({
                 exit={{ opacity: 0, y: 8 }}
                 transition={{ duration: 0.3 }}
               >
-                <CharacterSpriteSheet character={encounterCharacterId(activeDoorEncounterConfig.npcId)} facing="left" scale={1} />
+                <CharacterSpriteSheet
+                  character={encounterCharacterId(activeDoorEncounterConfig.npcId)}
+                  animation={visitorAnimation}
+                  facing={visitorFacing}
+                  scale={1}
+                />
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>
 

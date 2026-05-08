@@ -404,7 +404,7 @@ export default function TutorialFlowPage() {
   ]
 
   return (
-    <TrainingHomeShell phase={phase}>
+    <TrainingHomeShell phase={phase} scriptedDoorEncounterResting={triggerDialogueDone || triggerResting}>
       <div className="w-full max-w-3xl space-y-3 pb-8">
         {triggerResting ? (
           <BubbleDialogue

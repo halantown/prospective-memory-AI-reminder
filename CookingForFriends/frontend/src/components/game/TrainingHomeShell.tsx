@@ -7,6 +7,7 @@ import type { FloorRoom } from './FloorPlanView'
 interface TrainingHomeShellProps {
   children: ReactNode
   phase: string
+  scriptedDoorEncounterResting?: boolean
 }
 
 interface TrainingSceneConfig {
@@ -61,7 +62,7 @@ export function trainingSceneForPhase(phase: string): TrainingSceneConfig {
   return TRAINING_SCENES[phase] ?? TRAINING_SCENES.STORY_INTRO
 }
 
-export default function TrainingHomeShell({ children, phase }: TrainingHomeShellProps) {
+export default function TrainingHomeShell({ children, phase, scriptedDoorEncounterResting = false }: TrainingHomeShellProps) {
   const setGameClock = useGameStore((s) => s.setGameClock)
   const setElapsedSeconds = useGameStore((s) => s.setElapsedSeconds)
   const scene = useMemo(() => trainingSceneForPhase(phase), [phase])
@@ -89,6 +90,7 @@ export default function TrainingHomeShell({ children, phase }: TrainingHomeShell
       disableNavigation={scene.disableNavigation}
       highlightedRoom={scene.highlightedRoom ?? null}
       scriptedDoorEncounterId={scene.scriptedDoorEncounterId ?? null}
+      scriptedDoorEncounterResting={scriptedDoorEncounterResting}
     >
       {children}
     </ExperimentHomeShell>
