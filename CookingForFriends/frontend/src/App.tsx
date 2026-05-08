@@ -1,45 +1,59 @@
 /** App root — path-based routing with session recovery. */
 
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useGameStore } from './stores/gameStore'
 import { getCookingDefinitions, getSessionStatus, setSessionToken } from './services/api'
 import type { Phase } from './types'
 import { frontendPhaseForBackend, isMainExperimentPhase, renderPhaseFor } from './utils/phase'
+import ErrorBoundary from './components/ErrorBoundary'
+
+// Early phase pages — static imports (lightweight, loaded sequentially)
 import WelcomePage from './pages/game/WelcomePage'
 import ConsentPage from './pages/game/ConsentPage'
 import DemographicsPage from './pages/game/DemographicsPage'
 import IntroductionPage from './pages/game/IntroductionPage'
 import MSEPrePage from './pages/game/MSEPrePage'
 import StoryIntroPage from './pages/game/StoryIntroPage'
-import EncodingFlowPage from './pages/game/EncodingFlowPage'
-import TutorialFlowPage from './pages/game/TutorialFlowPage'
-import EveningTransitionPage from './pages/game/EveningTransitionPage'
-import GamePage from './pages/game/GamePage'
-import PostQuestionnairePage from './pages/game/PostQuestionnairePage'
-import PostTestFlowPage from './pages/game/PostTestFlowPage'
-import DebriefPage from './pages/game/DebriefPage'
-import AdminDashboard from './pages/admin/DashboardPage'
-import ConfigPage from './pages/admin/ConfigPage'
-import TimelineEditorPage from './pages/admin/TimelineEditorPage'
-import ParticipantControlPage from './pages/admin/ParticipantControlPage'
-import ErrorBoundary from './components/ErrorBoundary'
+
+// Heavy game pages — lazy loaded
+const EncodingFlowPage = lazy(() => import('./pages/game/EncodingFlowPage'))
+const TutorialFlowPage = lazy(() => import('./pages/game/TutorialFlowPage'))
+const EveningTransitionPage = lazy(() => import('./pages/game/EveningTransitionPage'))
+const GamePage = lazy(() => import('./pages/game/GamePage'))
+const PostQuestionnairePage = lazy(() => import('./pages/game/PostQuestionnairePage'))
+const PostTestFlowPage = lazy(() => import('./pages/game/PostTestFlowPage'))
+const DebriefPage = lazy(() => import('./pages/game/DebriefPage'))
+
+// Admin pages — lazy loaded (separate user flow)
+const AdminDashboard = lazy(() => import('./pages/admin/DashboardPage'))
+const ConfigPage = lazy(() => import('./pages/admin/ConfigPage'))
+const TimelineEditorPage = lazy(() => import('./pages/admin/TimelineEditorPage'))
+const ParticipantControlPage = lazy(() => import('./pages/admin/ParticipantControlPage'))
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="text-slate-400 text-sm">Loading...</div>
+    </div>
+  )
+}
 
 export default function App() {
   const path = window.location.pathname
 
-  // Admin routes — specific routes before generic /admin catch-all
+  // Admin routes — lazy loaded, separate user flow
   if (path.startsWith('/admin/participant/')) {
     const participantId = path.split('/admin/participant/')[1]?.split('/')[0]
-    if (participantId) return <ErrorBoundary><ParticipantControlPage participantId={participantId} /></ErrorBoundary>
+    if (participantId) return <ErrorBoundary><Suspense fallback={<LoadingFallback />}><ParticipantControlPage participantId={participantId} /></Suspense></ErrorBoundary>
   }
   if (path.startsWith('/timeline-editor') || path.startsWith('/admin/timeline-editor')) {
-    return <ErrorBoundary><TimelineEditorPage /></ErrorBoundary>
+    return <ErrorBoundary><Suspense fallback={<LoadingFallback />}><TimelineEditorPage /></Suspense></ErrorBoundary>
   }
   if (path.startsWith('/dashboard') || path.startsWith('/admin')) {
-    return <ErrorBoundary><AdminDashboard /></ErrorBoundary>
+    return <ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>
   }
   if (path.startsWith('/config')) {
-    return <ErrorBoundary><ConfigPage /></ErrorBoundary>
+    return <ErrorBoundary><Suspense fallback={<LoadingFallback />}><ConfigPage /></Suspense></ErrorBoundary>
   }
 
   // Game routes — phase-based rendering
@@ -161,7 +175,7 @@ function GameShell() {
     }
   })()
 
-  return <ErrorBoundary participantId={participantId}>{page}</ErrorBoundary>
+  return <ErrorBoundary participantId={participantId}><Suspense fallback={<LoadingFallback />}>{page}</Suspense></ErrorBoundary>
 }
 
 function ConnectionIssuePage({ participantId }: { participantId: string | null }) {
