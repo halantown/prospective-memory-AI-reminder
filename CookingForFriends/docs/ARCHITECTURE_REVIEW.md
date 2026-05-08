@@ -666,7 +666,7 @@ Add a timeout middleware.
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------- |
 | **P0 — Before data collection** | #1 (Alembic), #5 (session auth), #6 (admin auth guard), #8 (cooking events critical)                    | This week         |
 | **P1 — Before pilot study**     | #3 (TaskGroup), #10 (Error Boundary), #9 (state persistence), #17 (clear token from URL)                | Next week         |
-| **P2 — Before scaling**         | #4 (split gameStore), #2 (React Router), #11 (code splitting), #14 (streaming export)                   | Before full study |
+| **P2 — Before scaling**         | ~~#2 (React Router)~~, ~~#11 (code splitting)~~, ~~#14 (export filter)~~, #4 (split gameStore — deferred) | Before full study |
 | **P3 — Nice to have**           | #7 (WS auth), #12 (frontend tests), #13 (enum validation), #15 (Docker), #16 (lock file), #18 (timeout) | Ongoing           |
 
 ---
@@ -715,6 +715,28 @@ Add a timeout middleware.
 - Commit: `b249898`
 
 **Issue #9 — State persistence**: Deferred. Single-instance constraint documented; GameStateSnapshot periodic writes already partially cover this.
+
+### 2026-05-08 — P2 fixes completed
+
+**Issue #11 — Code splitting (React.lazy)** `DONE`
+
+- Converted all admin pages (`DashboardPage`, `ConfigPage`, `TimelineEditorPage`, `ParticipantControlPage`) and heavy game pages (`EncodingFlowPage`, `TutorialFlowPage`, `EveningTransitionPage`, `GamePage`, `PostQuestionnairePage`, `PostTestFlowPage`, `DebriefPage`) to `React.lazy` imports with `Suspense` fallback.
+- Early-phase pages remain statically imported (lightweight, needed immediately).
+- Commit: `8e202ae`
+
+**Issue #14 — Export participant filter** `DONE`
+
+- Added `participant_ids` query parameter to all three export endpoints (`/export/full`, `/export/per-participant`, `/export/aggregated`).
+- Extracted `_apply_participant_filters` helper to deduplicate filtering logic.
+- Commit: `e623fb8`
+
+**Issue #2 — React Router v6** `DONE`
+
+- Installed `react-router-dom`. Rewrote `App.tsx` to use `BrowserRouter` / `Routes` / `Route` with dedicated admin routes and a catch-all `GameShell` for the experiment flow.
+- Replaced all `window.location.href` and raw `<a href>` in admin pages with `useNavigate()` / `<Link>` for client-side SPA navigation.
+- Commit: `3e080ce`
+
+**Issue #4 — Split gameStore**: Deferred. Too large/risky for thesis timeline; current monolithic store works correctly.
 
 ---
 
