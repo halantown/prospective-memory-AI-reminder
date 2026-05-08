@@ -258,6 +258,7 @@ export function useWebSocket(sessionId: string | null) {
 
     ws.onopen = () => {
       console.log('[WS] Connected')
+      const isReconnect = retryCount.current > 0
       retryCount.current = 0
       useGameStore.getState().setWsConnected(true)
 
@@ -273,7 +274,7 @@ export function useWebSocket(sessionId: string | null) {
       }
 
       // On reconnect: restore PM pipeline state if server reports active pipeline
-      if (retryCount.current > 0 && sessionId) {
+      if (isReconnect && sessionId) {
         getSessionState(sessionId).then((state) => {
           if (state?.pipeline_step && state.pipeline_step !== 'idle') {
             useGameStore.getState().setPMPipelineState({

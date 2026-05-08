@@ -274,22 +274,24 @@ export async function getLiveSessions() {
   }>>('/admin/live-sessions')
 }
 
-export async function exportPerParticipant(includeTest = false): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/admin/export/per-participant?include_test=${includeTest}`)
+async function requestBlob(url: string): Promise<Blob> {
+  const headers: Record<string, string> = {}
+  if (_sessionToken) headers['X-Session-Token'] = _sessionToken
+  const res = await fetch(`${API_BASE}${url}`, { headers })
   if (!res.ok) throw new Error(`Export failed: ${res.status}`)
   return res.blob()
+}
+
+export async function exportPerParticipant(includeTest = false): Promise<Blob> {
+  return requestBlob(`/admin/export/per-participant?include_test=${includeTest}`)
 }
 
 export async function exportAggregated(includeTest = false): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/admin/export/aggregated?include_test=${includeTest}`)
-  if (!res.ok) throw new Error(`Export failed: ${res.status}`)
-  return res.blob()
+  return requestBlob(`/admin/export/aggregated?include_test=${includeTest}`)
 }
 
 export async function exportFull(includeTest = false): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/admin/export/full?include_test=${includeTest}`)
-  if (!res.ok) throw new Error(`Export failed: ${res.status}`)
-  return res.blob()
+  return requestBlob(`/admin/export/full?include_test=${includeTest}`)
 }
 
 export async function createTestSession(data: { condition: string; order: string; start_phase: string }) {

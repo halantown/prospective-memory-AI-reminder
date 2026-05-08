@@ -527,7 +527,7 @@ export default function FloorPlanView({
           {!isRobotMoving && (
             <motion.div
               key={`robot-${robotRoom}`}
-              className="absolute z-29 pointer-events-none"
+              className="absolute z-[29] pointer-events-none"
               style={{
                 left: `${robotDef.cx - 5}%`,
                 top: `${robotDef.cy - 2}%`,
@@ -547,7 +547,7 @@ export default function FloorPlanView({
         <AnimatePresence>
           {isRobotMoving && (
             <motion.div
-              className="absolute z-29 pointer-events-none"
+              className="absolute z-[29] pointer-events-none"
               style={{
                 left: `${robotDef.cx - 5}%`,
                 top: `${robotDef.cy - 2}%`,

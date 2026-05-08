@@ -72,7 +72,7 @@ export default function KitchenTimerBanner() {
       }
     }
     return null
-  }, [activeDish?.emoji, activeDish?.label, activeStep, missedItem, remaining])
+  }, [activeDish?.emoji, activeStep, missedItem, remaining])
 
   return (
     <AnimatePresence initial={false}>
