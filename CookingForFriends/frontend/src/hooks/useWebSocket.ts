@@ -4,7 +4,8 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import { getSessionState } from '../services/api'
 import { isMainExperimentPhase } from '../utils/phase'
-import type { ActivePMTrial, PMPipelineStep, PMTaskConfig, RoomId } from '../types'
+import type { PMPipelineStep, RoomId } from '../types'
+import type { WSServerEvent } from '../types/wsEvents'
 
 const HEARTBEAT_INTERVAL = 30_000
 const RECONNECT_BASE_MS = 500
@@ -21,47 +22,48 @@ export function useWebSocket(sessionId: string | null) {
   // an extra connection.
   const connIdRef = useRef(0)
 
-  const handleMessage = useCallback((event: MessageEvent) => {
-    let msg: { event: string; data: Record<string, unknown>; server_ts?: number }
+  const handleMessage = useCallback((rawEvent: MessageEvent) => {
+    let msg: WSServerEvent
     try {
-      msg = JSON.parse(event.data)
+      msg = JSON.parse(rawEvent.data)
     } catch (e) {
-      console.error('[WS] Failed to parse message:', e, event.data?.slice?.(0, 200))
+      console.error('[WS] Failed to parse message:', e, rawEvent.data?.slice?.(0, 200))
       return
     }
 
-    const { event: eventType, data } = msg
     const store = useGameStore.getState()
 
-    console.log('[WS RECEIVED]', eventType, data)
+    console.log('[WS RECEIVED]', msg.event, msg.data)
 
-    switch (eventType) {
+    switch (msg.event) {
       case 'block_start':
-        console.log('[WS] Block started:', data)
+        console.log('[WS] Block started:', msg.data)
         break
 
-      case 'time_tick':
-        if (data.game_clock) store.setGameClock(data.game_clock as string)
-        if (data.elapsed != null) store.setElapsedSeconds(data.elapsed as number)
-        if (data.frozen !== undefined && data.frozen !== store.gameTimeFrozen) {
-          store.setGameTimeFrozen(Boolean(data.frozen))
+      case 'time_tick': {
+        const { game_clock, elapsed, frozen } = msg.data
+        if (game_clock) store.setGameClock(game_clock)
+        if (elapsed != null) store.setElapsedSeconds(elapsed)
+        if (frozen !== undefined && frozen !== store.gameTimeFrozen) {
+          store.setGameTimeFrozen(frozen)
         }
         break
+      }
 
       case 'robot_speak':
-        store.setRobotSpeaking(data.text as string)
+        store.setRobotSpeaking(msg.data.text)
         if (robotSpeechTimerRef.current) clearTimeout(robotSpeechTimerRef.current)
         robotSpeechTimerRef.current = setTimeout(() => store.clearRobotSpeech(), 5000)
         break
 
       case 'robot_idle_comment':
-        store.setRobotSpeaking(data.text as string)
+        store.setRobotSpeaking(msg.data.text)
         if (store.wsSend) {
           store.wsSend({
             type: 'robot_idle_comment_shown',
             data: {
-              comment_id: data.comment_id,
-              text: data.text,
+              comment_id: msg.data.comment_id,
+              text: msg.data.text,
               shown_at: Date.now() / 1000,
             },
           })
@@ -72,7 +74,7 @@ export function useWebSocket(sessionId: string | null) {
 
       case 'robot_move': {
         const VALID_ROOMS = ['kitchen', 'dining_room', 'living_room', 'study', 'bathroom', 'hallway']
-        const toRoom = data.to_room as string
+        const toRoom = msg.data.to_room
         if (VALID_ROOMS.includes(toRoom)) {
           store.setRobotRoom(toRoom as RoomId)
         } else {
@@ -82,15 +84,15 @@ export function useWebSocket(sessionId: string | null) {
       }
 
       case 'pm_trigger': {
-        // New format: is_fake, task_id, trigger_type, position, schedule_index, game_time_fired
-        const isFake = Boolean(data.is_fake)
-        const taskId = (data.task_id as string) || null
-        const triggerType = (data.trigger_type as 'doorbell' | 'phone_call') || 'doorbell'
-        const taskPosition = data.position != null ? (data.position as number) : null
-        const scheduleIndex = (data.schedule_index as number) || 0
+        const d = msg.data
+        const isFake = Boolean(d.is_fake)
+        const taskId = d.task_id || null
+        const triggerType = d.trigger_type || 'doorbell'
+        const taskPosition = d.position ?? null
+        const scheduleIndex = d.schedule_index || 0
 
         if (!isFake && !taskId) {
-          console.warn('[WS] Ignoring malformed real pm_trigger without task_id:', data)
+          console.warn('[WS] Ignoring malformed real pm_trigger without task_id:', d)
           break
         }
 
@@ -103,88 +105,77 @@ export function useWebSocket(sessionId: string | null) {
           scheduleIndex,
           firedAt: Date.now() / 1000,
           wasInterrupted: false,
-          condition: data.condition as 'EE1' | 'EE0' | undefined,
-          guestName: data.guest_name as string | undefined,
-          reminderText: data.reminder_text as string | undefined,
-          greetingLines: data.greeting_lines as string[] | undefined,
-          fakeResolutionLines: data.fake_resolution_lines as string[] | undefined,
-          itemOptions: data.item_options as Array<{ id: string; label: string; isTarget: boolean }> | undefined,
+          condition: d.condition,
+          guestName: d.guest_name,
+          reminderText: d.reminder_text,
+          greetingLines: d.greeting_lines,
+          fakeResolutionLines: d.fake_resolution_lines,
+          itemOptions: d.item_options,
           triggerRespondedAt: null,
           triggerTimedOut: false,
           triggerTimeoutStage: 0,
         })
         store.setGameTimeFrozen(true)
 
-        // Also add legacy trigger effect for visual feedback
         store.addTriggerEffect(triggerType === 'doorbell' ? 'visitor_arrival' : 'phone_message_banner')
         break
       }
 
-      case 'avatar_action': {
-        // Signal PMTriggerModal via custom DOM event
-        window.dispatchEvent(new CustomEvent('pm:avatar_action', { detail: data }))
+      case 'avatar_action':
+        window.dispatchEvent(new CustomEvent('pm:avatar_action', { detail: msg.data }))
         break
-      }
 
-      case 'session_end': {
+      case 'session_end':
         store.setPhase('post_questionnaire')
         break
-      }
 
-      case 'heartbeat_ack': {
-        if (data.frozen !== undefined && data.frozen !== store.gameTimeFrozen) {
-          store.setGameTimeFrozen(Boolean(data.frozen))
+      case 'heartbeat_ack':
+        if (msg.data.frozen !== undefined && msg.data.frozen !== store.gameTimeFrozen) {
+          store.setGameTimeFrozen(msg.data.frozen)
         }
         break
-      }
 
-      case 'phone_contacts': {
-        const contacts = (data.contacts as Array<{ id: string; name: string; avatar: string }>) || []
-        store.setContacts(contacts)
+      case 'phone_contacts':
+        store.setContacts(msg.data.contacts || [])
         break
-      }
 
       case 'phone_message': {
         const now = Date.now()
-        const channel = (data.channel as string) || 'notification'
-        const contactId = (data.contact_id as string) || undefined
+        const d = msg.data
+        const channel = d.channel || 'notification'
+        const contactId = d.contact_id || undefined
 
-        // Notification messages → banner only + persist to lock screen list
         if (channel === 'notification') {
-          const sender = data.sender as string
-          const text = data.text as string
           const bannerMsg = {
-            id: data.id as string,
-            text,
+            id: d.id,
+            text: d.text,
             channel: 'notification' as const,
-            sender,
+            sender: d.sender,
             timestamp: now,
             read: false,
             answered: false,
           }
           store.setPhoneBanner(bannerMsg)
-          store.addLockSystemNotification({ id: data.id as string, sender, text, timestamp: now })
+          store.addLockSystemNotification({ id: d.id, sender: d.sender || '', text: d.text, timestamp: now })
           break
         }
 
-        // Chat message → store and conditionally show banner
         const phoneMsg = {
-          id: data.id as string,
-          text: data.text as string,
+          id: d.id,
+          text: d.text,
           channel: 'chat' as const,
           contactId,
-          correctChoice: data.correct_choice as string | undefined,
-          wrongChoice: data.wrong_choice as string | undefined,
-          correctPosition: (data.correct_position as number | null) ?? null,
-          feedbackCorrect: data.feedback_correct as string | undefined,
-          feedbackIncorrect: data.feedback_incorrect as string | undefined,
+          correctChoice: d.correct_choice,
+          wrongChoice: d.wrong_choice,
+          correctPosition: d.correct_position ?? null,
+          feedbackCorrect: d.feedback_correct,
+          feedbackIncorrect: d.feedback_incorrect,
           timestamp: now,
           read: false,
           answered: false,
         }
         store.addPhoneMessage(phoneMsg)
 
-        // Show banner when not viewing this contact's chat
         const isActiveChat = !store.phoneLocked
           && store.activePhoneTab === 'chats'
           && contactId === store.activeContactId
@@ -194,17 +185,16 @@ export function useWebSocket(sessionId: string | null) {
         break
       }
 
-      case 'kitchen_timer': {
-        console.warn('[WS] Ignoring legacy kitchen_timer event; cooking timers are derived from step_activate:', data)
+      case 'kitchen_timer':
+        console.warn('[WS] Ignoring legacy kitchen_timer event; cooking timers are derived from step_activate:', msg.data)
         break
-      }
 
       case 'phone_notification':
         store.addPhoneNotification({
           id: `notif_${Date.now()}`,
-          sender: data.sender as string,
-          preview: data.preview as string,
-          is_ad: data.is_ad as boolean,
+          sender: msg.data.sender,
+          preview: msg.data.preview,
+          is_ad: msg.data.is_ad,
           timestamp: Date.now(),
           read: false,
         })
@@ -219,26 +209,26 @@ export function useWebSocket(sessionId: string | null) {
         break
 
       case 'block_error':
-        console.error('[WS] Block runtime error:', data)
-        store.setBlockError(String((data as Record<string, unknown>).message || 'Internal server error'))
+        console.error('[WS] Block runtime error:', msg.data)
+        store.setBlockError(msg.data.message || 'Internal server error')
         break
 
       case 'pm_received':
         break
 
       case 'ongoing_task_event':
-        store.handleOngoingTaskEvent(data)
+        store.handleOngoingTaskEvent(msg.data)
         break
 
       case 'force_sync':
-        console.log('[WS] Force sync:', data)
+        console.log('[WS] Force sync:', msg.data)
         break
 
       case 'keepalive':
         break
 
       default:
-        console.log('[WS] Unknown event:', eventType, data)
+        console.log('[WS] Unknown event:', (msg as { event: string }).event, (msg as { data: unknown }).data)
     }
   }, [])   // no deps — reads from getState() so always stable
 
