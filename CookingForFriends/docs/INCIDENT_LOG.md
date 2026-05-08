@@ -1051,3 +1051,57 @@ any significant timeline refactor, consider:
 ### Follow-up Actions
 > - [ ] Add visual/manual QA coverage for each tutorial phase's starting room and required navigation target.
 > - [ ] Consider extracting shared room navigation controls from `FloorPlanView` once more training scenes rely on them.
+
+---
+
+## INC-019 — Refresh during post-test restored the main experiment
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-08 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | Developer — manual post-experiment questionnaire refresh |
+| Affected area| Backend PM session completion; frontend phase recovery/reconnect |
+
+### Background
+> After the final PM trigger completes, the experiment should transition from `MAIN_EXPERIMENT` to the first post-test phase, `POST_MANIP_CHECK`. Browser refresh and WebSocket reconnect should recover from the backend's persisted participant phase.
+
+### Incident Description
+> Refreshing during the post-test page briefly restored the game page. About one minute later, the frontend jumped back to the Post-Experiment Questionnaire. During that window, the participant could see the wrong stage because `/session/{id}/status` still reported `MAIN_EXPERIMENT`.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 22:34 | Refresh/regression reported from the post-test page |
+| 22:36 | Investigation started in WebSocket and session recovery code |
+| 22:40 | Root cause identified: `session_end` changed frontend-only phase |
+| 22:46 | Backend lifecycle guard and frontend canonical phase fix implemented |
+| 22:50 | Backend tests and frontend build run |
+
+### Root Cause
+> `run_pm_session()` sent the WebSocket `session_end` event after the PM schedule finished, but did not persist the participant phase transition. The frontend locally rendered `post_questionnaire`, while `Participant.current_phase` remained `MAIN_EXPERIMENT`. A refresh therefore recovered the stale backend phase and reopened the game. The resumed PM scheduler could later emit another `session_end`, causing the delayed jump back to the post-test page.
+
+### Contributing Factors
+> - The WebSocket event was treated as the phase transition owner even though refresh recovery depends on backend state.
+> - The frontend handler used the legacy render alias `post_questionnaire` instead of canonical `POST_MANIP_CHECK`.
+> - The PM scheduler did not check whether the participant was still in `MAIN_EXPERIMENT` before resuming or before sending the final session-end event.
+
+### Fix
+> **Backend** (`backend/engine/pm_session.py`):
+> - Added a phase guard so PM scheduling starts and continues only while the participant is in `MAIN_EXPERIMENT`.
+> - Before emitting `session_end`, `run_pm_session()` now calls `enter_phase(..., POST_MANIP_CHECK)` and commits it to the database.
+> - If a reconnect/resume finds the participant already in a post-test phase, it exits without emitting another PM trigger or `session_end`.
+>
+> **Frontend** (`frontend/src/hooks/useWebSocket.ts`):
+> - The `session_end` handler now sets `POST_MANIP_CHECK` instead of the legacy `post_questionnaire` alias.
+>
+> **Tests** (`backend/tests/test_pm_session.py`):
+> - Added coverage for the PM-session phase guard, including legacy `playing` compatibility and post-test rejection.
+
+### Verification
+> `conda run -n thesis_server pytest tests -v` passed (47 tests). `npm run build` passed (`tsc -b && vite build`).
+
+### Follow-up Actions
+> - [ ] Add an integration test that completes the PM schedule, refreshes via `/session/{id}/status`, and verifies recovery stays in `POST_MANIP_CHECK`.
+> - [ ] Consider making all frontend phase changes flow through canonical phase names only.

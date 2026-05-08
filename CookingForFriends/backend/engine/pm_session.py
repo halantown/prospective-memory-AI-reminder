@@ -6,12 +6,44 @@ import time
 from config import TRIGGER_SCHEDULE, TASK_ORDERS, SESSION_END_DELAY_AFTER_LAST_TRIGGER_S
 from engine.game_time import freeze_game_time, get_current_game_time
 from engine.game_clock import GameClock
+from engine.phase_state import ExperimentPhase, enter_phase, normalize_phase
 from engine.pm_tasks import FAKE_TRIGGER_LINES, get_item_options, get_reminder_text, get_task
 
 logger = logging.getLogger(__name__)
 
 # Per-session asyncio.Event signaling current pipeline is done
 _pipeline_complete_events: dict[str, asyncio.Event] = {}
+
+
+def _is_main_experiment_phase(phase: str | None) -> bool:
+    try:
+        return normalize_phase(phase) == ExperimentPhase.MAIN_EXPERIMENT
+    except ValueError:
+        return False
+
+
+async def _enter_post_manip_check_if_active(session_id: str, db_factory) -> bool:
+    """Advance an active main-experiment session to the first post-test phase."""
+    from sqlalchemy import select
+    from models.experiment import Participant
+
+    async with db_factory() as db:
+        result = await db.execute(select(Participant).where(Participant.id == session_id))
+        participant = result.scalar_one_or_none()
+        if not participant:
+            logger.error("run_pm_session: participant not found before session_end: %s", session_id)
+            return False
+        if not _is_main_experiment_phase(participant.current_phase):
+            logger.info(
+                "[PM_SESSION] session_end skipped; participant already in phase=%s (session=%s)",
+                participant.current_phase,
+                session_id,
+            )
+            return False
+
+        await enter_phase(db, participant, ExperimentPhase.POST_MANIP_CHECK)
+        await db.commit()
+        return True
 
 
 def signal_pipeline_complete(session_id: str):
@@ -152,6 +184,13 @@ async def run_pm_session(
             if not participant:
                 logger.error("run_pm_session: participant not found: %s", session_id)
                 return
+            if not _is_main_experiment_phase(participant.current_phase):
+                logger.info(
+                    "[PM_SESSION] Not starting; participant phase=%s (session=%s)",
+                    participant.current_phase,
+                    session_id,
+                )
+                return
             condition = participant.condition
 
         fired_count, last_trigger_game_time = await _get_resume_state(session_id, db_factory)
@@ -194,6 +233,14 @@ async def run_pm_session(
                 result = await db.execute(select(Participant).where(Participant.id == session_id))
                 participant = result.scalar_one_or_none()
                 if not participant:
+                    return
+                if not _is_main_experiment_phase(participant.current_phase):
+                    logger.info(
+                        "[PM_SESSION] Stopping before trigger %d; participant phase=%s (session=%s)",
+                        schedule_index,
+                        participant.current_phase,
+                        session_id,
+                    )
                     return
                 if clock is not None:
                     game_time_fired = clock.now()
@@ -297,6 +344,9 @@ async def run_pm_session(
             db_factory,
             clock,
         )
+
+        if not await _enter_post_manip_check_if_active(session_id, db_factory):
+            return
 
         await send_fn("session_end", {"reason": "pm_schedule_complete"})
         logger.info("[PM_SESSION] session_end sent (session=%s)", session_id)

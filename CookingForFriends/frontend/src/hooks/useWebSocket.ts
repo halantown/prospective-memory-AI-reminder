@@ -126,7 +126,7 @@ export function useWebSocket(sessionId: string | null) {
         break
 
       case 'session_end':
-        store.setPhase('post_questionnaire')
+        store.setPhase('POST_MANIP_CHECK')
         break
 
       case 'heartbeat_ack':
