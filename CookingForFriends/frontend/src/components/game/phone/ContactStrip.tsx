@@ -57,9 +57,10 @@ export default function ContactStrip() {
   return (
     <div className="flex flex-col items-center gap-1.5 py-2 px-1 w-[54px] shrink-0 overflow-y-auto">
       {visibleContacts.length === 0 && (
-        <div className="flex flex-col items-center mt-4 text-slate-600">
-          <span className="text-lg">💬</span>
-          <span className="text-[8px] text-center leading-tight mt-1">No chats yet</span>
+        <div className="mt-2 flex flex-col items-center gap-2 opacity-45">
+          <div className="h-9 w-9 rounded-full border border-slate-700/60 bg-slate-800/35" />
+          <div className="h-9 w-9 rounded-full border border-slate-700/45 bg-slate-800/25" />
+          <div className="h-9 w-9 rounded-full border border-slate-700/30 bg-slate-800/15" />
         </div>
       )}
       {visibleContacts.map((contact) => {

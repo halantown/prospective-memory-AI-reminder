@@ -98,10 +98,7 @@ export default function ChatView() {
 
   if (!activeContactId || !activeContact) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-slate-500 px-4">
-        <span className="text-2xl mb-2">💬</span>
-        <p className="text-[14px] text-center">Select a contact to view messages</p>
-      </div>
+      <EmptyChatState />
     )
   }
 
@@ -121,9 +118,7 @@ export default function ChatView() {
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {contactMessages.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-slate-500 text-[14px]">
-            No messages yet
-          </div>
+          <EmptyChatState contactName={activeContact.name} />
         ) : (
           <AnimatePresence mode="popLayout">
             {contactMessages.map((msg) => (
@@ -142,6 +137,25 @@ export default function ChatView() {
   )
 }
 
+function EmptyChatState({ contactName }: { contactName?: string }) {
+  return (
+    <div className="flex-1 flex items-center justify-center px-5">
+      <div className="flex max-w-[220px] flex-col items-center text-center">
+        <div className="relative mb-4 h-16 w-16">
+          <div className="absolute inset-0 rounded-2xl bg-slate-800/80 shadow-inner shadow-black/20" />
+          <div className="absolute left-3 top-3 h-5 w-9 rounded-xl rounded-bl-sm bg-slate-600/80" />
+          <div className="absolute bottom-3 right-3 h-5 w-8 rounded-xl rounded-br-sm bg-blue-500/70" />
+        </div>
+        <p className="text-[15px] font-semibold text-slate-200">
+          {contactName ? `No messages from ${contactName}` : 'No messages'}
+        </p>
+        <p className="mt-1 text-[12px] leading-snug text-slate-500">
+          New chats will appear here.
+        </p>
+      </div>
+    </div>
+  )
+}
 
 /** A single message group: bubble + optional choice buttons + participant reply + optional feedback. */
 function MessageGroup({
