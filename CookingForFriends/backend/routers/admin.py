@@ -35,7 +35,8 @@ logger = logging.getLogger(__name__)
 async def verify_admin(x_admin_key: str | None = Header(None, alias="X-Admin-Key")):
     """Verify admin API key if configured."""
     if not ADMIN_API_KEY:
-        return  # No key configured — skip auth (development mode)
+        logger.warning("ADMIN_API_KEY not set — admin auth disabled (dev mode)")
+        return
     if x_admin_key != ADMIN_API_KEY:
         raise HTTPException(401, "Invalid or missing admin API key")
 
