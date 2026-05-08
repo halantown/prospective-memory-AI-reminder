@@ -55,6 +55,7 @@ class BlockRuntime:
         self.timeline_task: asyncio.Task | None = None
         self.cooking: CookingEngine | None = None
         self.pm_task: asyncio.Task | None = None
+        self._supervisor_task: asyncio.Task | None = None
         self._stopped = False
 
     async def start(self, on_complete=None) -> None:
@@ -102,6 +103,8 @@ class BlockRuntime:
             )
         )
 
+        self._supervisor_task = asyncio.create_task(self._supervise())
+
         logger.info(
             "[BLOCK_RUNTIME] Started participant=%s block=%s condition=%s order=%s",
             self.participant_id,
@@ -109,6 +112,46 @@ class BlockRuntime:
             self.condition,
             self.task_order,
         )
+
+    async def _supervise(self) -> None:
+        """Watch runtime tasks; if any crashes, log and notify."""
+        tasks: dict[str, asyncio.Task] = {}
+        if self.timeline_task:
+            tasks["timeline"] = self.timeline_task
+        if self.pm_task:
+            tasks["pm_session"] = self.pm_task
+        if self.cooking and self.cooking._timeline_task:
+            tasks["cooking"] = self.cooking._timeline_task
+
+        if not tasks:
+            return
+
+        try:
+            done, _ = await asyncio.wait(
+                tasks.values(), return_when=asyncio.FIRST_EXCEPTION,
+            )
+            for t in done:
+                if t.cancelled():
+                    continue
+                exc = t.exception()
+                if exc:
+                    name = next(n for n, task in tasks.items() if task is t)
+                    logger.error(
+                        "[BLOCK_RUNTIME] Subsystem %s crashed for participant=%s block=%s: %s",
+                        name, self.participant_id, self.block_number, exc,
+                        exc_info=exc,
+                    )
+                    try:
+                        await self.send_fn("block_error", {
+                            "message": f"Internal error in {name}",
+                            "participant_id": self.participant_id,
+                        })
+                    except Exception:
+                        pass
+                    await self.stop(save_scores=True)
+                    return
+        except asyncio.CancelledError:
+            return
 
     def pause(self, reason: str = "pm") -> bool:
         """Pause shared gameplay time."""
@@ -153,6 +196,10 @@ class BlockRuntime:
         if self.pm_task and self.pm_task is not current and not self.pm_task.done():
             self.pm_task.cancel()
         self.pm_task = None
+
+        if self._supervisor_task and self._supervisor_task is not current and not self._supervisor_task.done():
+            self._supervisor_task.cancel()
+        self._supervisor_task = None
 
         logger.info(
             "[BLOCK_RUNTIME] Stopped participant=%s block=%s save_scores=%s",

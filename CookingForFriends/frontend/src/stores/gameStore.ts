@@ -104,6 +104,9 @@ interface GameState {
   gameClock: string
   elapsedSeconds: number
 
+  // ── Errors ──
+  blockError: string | null
+
   // ── WebSocket ──
   wsConnected: boolean
   wsSend: ((msg: Record<string, unknown>) => void) | null
@@ -192,6 +195,9 @@ interface GameState {
 
   // Ongoing task events from backend
   handleOngoingTaskEvent: (data: Record<string, unknown>) => void
+
+  // Errors
+  setBlockError: (msg: string) => void
 
   // WS
   setWsConnected: (connected: boolean) => void
@@ -323,6 +329,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   // ── Game Clock ──
   gameClock: '17:00',
   elapsedSeconds: 0,
+
+  // ── Errors ──
+  blockError: null,
 
   // ── WebSocket ──
   wsConnected: false,
@@ -846,6 +855,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   // WS
+  setBlockError: (msg) => set({ blockError: msg }),
   setWsConnected: (connected) => set({ wsConnected: connected }),
   setWsSend: (fn) => set({ wsSend: fn }),
 

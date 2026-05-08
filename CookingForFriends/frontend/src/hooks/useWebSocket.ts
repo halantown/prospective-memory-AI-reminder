@@ -218,6 +218,11 @@ export function useWebSocket(sessionId: string | null) {
         store.setPhase('debrief')
         break
 
+      case 'block_error':
+        console.error('[WS] Block runtime error:', data)
+        store.setBlockError(String((data as Record<string, unknown>).message || 'Internal server error'))
+        break
+
       case 'pm_received':
         break
 

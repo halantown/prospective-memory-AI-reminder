@@ -14,7 +14,9 @@ import PMTriggerModal from '../../components/game/PMTriggerModal'
 
 export default function GamePage() {
   const sessionId = useGameStore((s) => s.sessionId)
+  const participantId = useGameStore((s) => s.participantId)
   const wsConnected = useGameStore((s) => s.wsConnected)
+  const blockError = useGameStore((s) => s.blockError)
   const setPhase = useGameStore((s) => s.setPhase)
   const setGameClock = useGameStore((s) => s.setGameClock)
   const setElapsedSeconds = useGameStore((s) => s.setElapsedSeconds)
@@ -39,6 +41,27 @@ export default function GamePage() {
   useMouseTracker()
 
   if (!sessionId) return null
+
+  if (blockError) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-lg border border-red-300 bg-white p-6 text-center shadow-xl">
+          <h1 className="text-xl font-bold text-slate-900">Game Error</h1>
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            A server error occurred during gameplay. Please contact the experimenter.
+          </p>
+          {participantId && (
+            <p className="mt-4 rounded bg-slate-100 px-3 py-2 font-mono text-xs text-slate-600">
+              Participant: {participantId}
+            </p>
+          )}
+          <p className="mt-3 rounded bg-red-50 px-3 py-2 font-mono text-xs text-red-600">
+            {blockError}
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-screen w-screen flex overflow-hidden bg-slate-900 select-none">
