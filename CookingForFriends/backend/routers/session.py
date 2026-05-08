@@ -6,7 +6,7 @@ import logging
 import collections
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, Request, Query, Header
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +38,26 @@ router = APIRouter(prefix="/api")
 _token_attempts: dict[str, list[float]] = collections.defaultdict(list)
 _RATE_LIMIT_WINDOW = 60  # seconds
 _RATE_LIMIT_MAX = 10     # max attempts per window
+
+
+async def verify_session_owner(
+    session_id: str,
+    x_session_token: str | None = Header(None, alias="X-Session-Token"),
+    db: AsyncSession = Depends(get_db),
+) -> Participant:
+    """Verify the caller owns this session by matching their token."""
+    if not x_session_token:
+        raise HTTPException(401, "Missing X-Session-Token header")
+    result = await db.execute(
+        select(Participant).where(
+            Participant.id == session_id,
+            Participant.token == x_session_token.strip().upper(),
+        )
+    )
+    participant = result.scalar_one_or_none()
+    if not participant:
+        raise HTTPException(403, "Session token does not match session")
+    return participant
 
 
 @router.get("/experiment-config")
@@ -111,20 +131,17 @@ async def start_session(req: TokenStartRequest, request: Request, db: AsyncSessi
 
 
 @router.get("/session/{session_id}/cooking-definitions")
-async def get_cooking_definitions(session_id: str, db: AsyncSession = Depends(get_db)):
+async def get_cooking_definitions(
+    participant: Participant = Depends(verify_session_owner),
+):
     """Return server-authoritative cooking definitions for session bootstrap."""
-    result = await db.execute(select(Participant).where(Participant.id == session_id))
-    participant = result.scalar_one_or_none()
-    if not participant:
-        raise HTTPException(404, "Session not found")
     return serialize_cooking_definitions()
 
 
 @router.get("/session/{session_id}/experiment-config")
 async def get_session_experiment_config(
-    session_id: str,
     phase: str | None = Query(default=None),
-    db: AsyncSession = Depends(get_db),
+    participant: Participant = Depends(verify_session_owner),
 ):
     """Return participant-safe experiment material for one phase.
 
@@ -133,11 +150,6 @@ async def get_session_experiment_config(
     manipulation-check answers, retrospective answers, or the other EC
     condition's reminder text.
     """
-    result = await db.execute(select(Participant).where(Participant.id == session_id))
-    participant = result.scalar_one_or_none()
-    if not participant:
-        raise HTTPException(404, "Session not found")
-
     phase_name = phase or participant.current_phase or "WELCOME"
     try:
         return get_experiment_config_for_phase(
@@ -180,36 +192,21 @@ async def post_mouse_tracking_batch(
 
 
 @router.get("/session/{session_id}/status", response_model=StatusResponse)
-async def get_session_status(session_id: str, db: AsyncSession = Depends(get_db)):
+async def get_session_status(
+    session_id: str,
+    participant: Participant = Depends(verify_session_owner),
+):
     """Get current session status for reconnection."""
-    result = await db.execute(
-        select(Participant).where(Participant.id == session_id)
-    )
-    p = result.scalar_one_or_none()
-    if not p:
-        raise HTTPException(404, "Session not found")
-
-    # Find the single block's phase
-    phase = "welcome"
-    result = await db.execute(
-        select(Block).where(
-            Block.participant_id == session_id,
-            Block.block_number == 1,
-        )
-    )
-    block = result.scalar_one_or_none()
-    if block:
-        phase = block.status.value if isinstance(block.status, BlockStatus) else block.status
-
     return StatusResponse(
-        status=p.status.value if isinstance(p.status, ParticipantStatus) else p.status,
-        phase=p.current_phase or "welcome",
+        status=participant.status.value if isinstance(participant.status, ParticipantStatus) else participant.status,
+        phase=participant.current_phase or "welcome",
     )
 
 
 @router.post("/session/{session_id}/phase")
 async def update_phase(
-    session_id: str, req: PhaseUpdateRequest,
+    req: PhaseUpdateRequest,
+    participant: Participant = Depends(verify_session_owner),
     db: AsyncSession = Depends(get_db),
 ):
     """Backward-compatible phase logging endpoint.
@@ -217,16 +214,11 @@ async def update_phase(
     New flow code should prefer `/phase/advance`.  This endpoint now uses the
     same phase service so old frontend calls still produce coherent history.
     """
-    result = await db.execute(select(Participant).where(Participant.id == session_id))
-    p = result.scalar_one_or_none()
-    if not p:
-        raise HTTPException(404, "Session not found")
-
     try:
         if req.event_type == "start":
-            await enter_phase(db, p, req.phase_name)
+            await enter_phase(db, participant, req.phase_name)
         elif req.event_type == "end":
-            await close_phase(db, p, req.phase_name)
+            await close_phase(db, participant, req.phase_name)
         else:
             raise HTTPException(400, "event_type must be 'start' or 'end'")
     except ValueError as exc:
@@ -238,15 +230,11 @@ async def update_phase(
 
 @router.post("/session/{session_id}/phase/advance", response_model=PhaseAdvanceResponse)
 async def advance_phase(
-    session_id: str,
     req: PhaseAdvanceRequest,
+    participant: Participant = Depends(verify_session_owner),
     db: AsyncSession = Depends(get_db),
 ):
     """Advance to the next canonical phase, or to an explicit phase."""
-    result = await db.execute(select(Participant).where(Participant.id == session_id))
-    participant = result.scalar_one_or_none()
-    if not participant:
-        raise HTTPException(404, "Session not found")
 
     try:
         target = req.next_phase
@@ -270,14 +258,10 @@ async def advance_phase(
 async def submit_experiment_responses(
     session_id: str,
     req: ExperimentResponsesSubmitRequest,
+    participant: Participant = Depends(verify_session_owner),
     db: AsyncSession = Depends(get_db),
 ):
     """Store normalized participant responses for questionnaires and phase tasks."""
-    result = await db.execute(select(Participant).where(Participant.id == session_id))
-    participant = result.scalar_one_or_none()
-    if not participant:
-        raise HTTPException(404, "Session not found")
-
     now = time.time()
     rows = []
     try:
@@ -305,13 +289,10 @@ async def submit_experiment_responses(
 async def submit_manipulation_check_response(
     session_id: str,
     req: ManipulationCheckSubmitRequest,
+    participant: Participant = Depends(verify_session_owner),
     db: AsyncSession = Depends(get_db),
 ):
     """Store an encoding manipulation check and evaluate correctness server-side."""
-    result = await db.execute(select(Participant).where(Participant.id == session_id))
-    participant = result.scalar_one_or_none()
-    if not participant:
-        raise HTTPException(404, "Session not found")
 
     try:
         phase_name = normalize_phase(req.phase).value
@@ -340,6 +321,7 @@ async def submit_manipulation_check_response(
 @router.post("/session/{session_id}/cutscene-event")
 async def log_cutscene_event(
     session_id: str, req: CutsceneEventRequest,
+    participant: Participant = Depends(verify_session_owner),
     db: AsyncSession = Depends(get_db),
 ):
     """Log a cutscene playback event (view + optional detail-check)."""
@@ -366,6 +348,7 @@ async def log_cutscene_event(
 @router.post("/session/{session_id}/intention-check")
 async def log_intention_check(
     session_id: str, req: IntentionCheckRequest,
+    participant: Participant = Depends(verify_session_owner),
     db: AsyncSession = Depends(get_db),
 ):
     """Log a post-encoding intention check response."""
@@ -427,7 +410,7 @@ async def get_session_state(token: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/session/{session_id}/encoding", response_model=BlockEncodingResponse)
-async def get_encoding_data(session_id: str, db: AsyncSession = Depends(get_db)):
+async def get_encoding_data(session_id: str, participant: Participant = Depends(verify_session_owner), db: AsyncSession = Depends(get_db)):
     """Get encoding card data for the session block."""
     result = await db.execute(
         select(Block).where(
@@ -488,6 +471,7 @@ async def get_encoding_data(session_id: str, db: AsyncSession = Depends(get_db))
 @router.post("/session/{session_id}/encoding/quiz")
 async def submit_encoding_quiz_attempt(
     session_id: str, req: EncodingQuizAttemptRequest,
+    participant: Participant = Depends(verify_session_owner),
     db: AsyncSession = Depends(get_db),
 ):
     """Record a single encoding quiz attempt (fire-and-forget from frontend)."""
@@ -530,6 +514,7 @@ async def submit_encoding_quiz_attempt(
 @router.post("/session/{session_id}/quiz", response_model=QuizSubmitResponse)
 async def submit_quiz(
     session_id: str, req: QuizSubmitRequest,
+    participant: Participant = Depends(verify_session_owner),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit encoding quiz answers — validates and records attempts."""
@@ -627,14 +612,11 @@ def _get_correct_answer(question_type: str, task_config: dict, encoding_card: di
 
 @router.post("/session/{session_id}/debrief")
 async def submit_debrief(
-    session_id: str, req: DebriefRequest,
+    req: DebriefRequest,
+    participant: Participant = Depends(verify_session_owner),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit debrief questionnaire."""
-    result = await db.execute(select(Participant).where(Participant.id == session_id))
-    participant = result.scalar_one_or_none()
-    if not participant:
-        raise HTTPException(404, "Session not found")
 
     # Idempotency: prevent double submission
     if participant.status == ParticipantStatus.COMPLETED:

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useGameStore } from './stores/gameStore'
-import { getCookingDefinitions, getSessionStatus } from './services/api'
+import { getCookingDefinitions, getSessionStatus, setSessionToken } from './services/api'
 import type { Phase } from './types'
 import { frontendPhaseForBackend, isMainExperimentPhase, renderPhaseFor } from './utils/phase'
 import WelcomePage from './pages/game/WelcomePage'
@@ -98,7 +98,8 @@ function GameShell() {
       const data = JSON.parse(saved)
       if (!data.session_id || !data.participant_id || !data.condition) return
 
-      // Restore session and fetch current status
+      // Restore session token for API auth and fetch current status
+      if (data.token) setSessionToken(data.token)
       setSession(data)
       if (!data.cooking_definitions) {
         getCookingDefinitions(data.session_id)

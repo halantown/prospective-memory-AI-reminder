@@ -4,9 +4,19 @@ import type { BlockEncoding, CookingDefinitions, ExperimentConfig, ExperimentRes
 
 const API_BASE = '/api'
 
+let _sessionToken: string | null = null
+
+export function setSessionToken(token: string | null) {
+  _sessionToken = token
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (_sessionToken) {
+    headers['X-Session-Token'] = _sessionToken
+  }
   const res = await fetch(`${API_BASE}${url}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...options,
   })
   if (!res.ok) {
@@ -58,9 +68,11 @@ export async function postMouseTrackingBatch(
   records: Array<Record<string, unknown>>,
   options?: { keepalive?: boolean },
 ) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (_sessionToken) headers['X-Session-Token'] = _sessionToken
   return fetch(`${API_BASE}/mouse-tracking`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ session_id: sessionId, records }),
     keepalive: options?.keepalive,
   })

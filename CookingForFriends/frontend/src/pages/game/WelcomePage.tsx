@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
-import { advancePhase, getPublicExperimentConfig, getSessionStatus, startSession } from '../../services/api'
+import { advancePhase, getPublicExperimentConfig, getSessionStatus, setSessionToken, startSession } from '../../services/api'
 import { frontendPhaseForBackend, renderPhaseFor } from '../../utils/phase'
 
 
@@ -39,6 +39,7 @@ export default function WelcomePage() {
 
     try {
       const data = await startSession(t)
+      setSessionToken(t)
       console.log('[Welcome] Session started:', data)
 
       setSession({
