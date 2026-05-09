@@ -5,7 +5,7 @@ A browser-based 2D prospective memory (PM) experiment where participants cook st
 ## Experiment Design
 
 - **Between-subjects IV**: Encoding Context (EE1 vs EE0) — assigned once per participant for all 4 PM tasks
-- **4 PM Tasks** (T1–T4): Mei/baking book (doorbell), Lina/chocolate (doorbell), Tom/apple juice (phone), Delivery/trash bags (phone)
+- **4 PM Tasks** (T1–T4): Mei/baking book (doorbell), Sophia/chocolate via Anna transfer (doorbell), Benjamin/apple juice (phone), Delivery/front-door instruction (phone)
 - **4 Latin Square orders** (A–D): T1→T2→T4→T3, T2→T3→T1→T4, T3→T4→T2→T1, T4→T1→T3→T2
 - **8 (condition × order) combinations**, assigned round-robin to real participants
 
