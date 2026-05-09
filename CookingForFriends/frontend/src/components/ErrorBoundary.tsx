@@ -27,8 +27,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.props.fallback) return this.props.fallback
 
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-lg border border-red-300 bg-white p-6 text-center shadow-xl">
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-lg border border-red-200 bg-white p-6 text-center shadow-lg">
           <h1 className="text-xl font-bold text-slate-900">Something went wrong</h1>
           <p className="mt-3 text-sm leading-relaxed text-slate-600">
             An unexpected error occurred. Please contact the experimenter.

@@ -171,7 +171,7 @@ export default function TimelineEditorPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-4 py-2">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2">
           <div className="flex items-center gap-3">
             <Link to="/dashboard" className="text-slate-400 hover:text-slate-700" aria-label="Back to dashboard">
               <ArrowLeft size={20} />
@@ -190,7 +190,7 @@ export default function TimelineEditorPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1500px] space-y-3 px-4 py-4">
+      <main className="mx-auto max-w-6xl space-y-3 px-4 py-4">
         {error && (
           <Alert kind="error" onClose={() => setError(null)}>
             {error}
@@ -206,8 +206,8 @@ export default function TimelineEditorPage() {
           <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">Runtime plan failed to load.</div>
         ) : (
           <>
-            <section className="rounded-md border border-slate-200 bg-white p-3">
-              <div className="grid gap-3 sm:grid-cols-4">
+            <section className="rounded-md border border-slate-200 bg-white px-3 py-2">
+              <div className="flex flex-wrap items-end gap-3">
                 <NumberField
                   label="Duration"
                   value={plan.duration_seconds}
@@ -386,7 +386,7 @@ function Alert({ kind, children, onClose }: { kind: 'error' | 'success'; childre
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   return (
-    <label className="block text-sm">
+    <label className="block w-44 text-sm">
       <span className="mb-1 block font-medium text-slate-600">{label}</span>
       <input
         type="number"
@@ -444,9 +444,9 @@ function PMScheduleSection({
 
   return (
     <LaneSection icon={Bot} title="PM Triggers" count={entries.length} onAdd={onAdd}>
-      <table className="w-full text-xs">
+      <table className="w-auto min-w-[760px] text-xs">
         <thead className="text-left text-xs uppercase text-slate-500">
-          <tr><th className="px-3 py-1.5">#</th><th className="px-3 py-1.5">Time</th><th className="px-3 py-1.5">Type</th><th className="px-3 py-1.5">Delay</th><th className="px-3 py-1.5">Target</th><th /></tr>
+          <tr><th className="w-12 px-3 py-1.5">#</th><th className="w-24 px-3 py-1.5">Time</th><th className="w-28 px-3 py-1.5">Type</th><th className="w-28 px-3 py-1.5">Delay</th><th className="w-48 px-3 py-1.5">Target</th><th className="w-12" /></tr>
         </thead>
         <tbody>
           {entries.map((entry, index) => (
@@ -505,9 +505,9 @@ function CookingScheduleSection({
 }) {
   return (
     <LaneSection icon={Flame} title="Cooking Steps" count={entries.length} onAdd={onAdd}>
-      <table className="w-full text-xs">
+      <table className="w-auto min-w-[760px] text-xs">
         <thead className="text-left text-xs uppercase text-slate-500">
-          <tr><th className="px-3 py-1.5">Time</th><th className="px-3 py-1.5">Dish</th><th className="px-3 py-1.5">Step</th><th className="px-3 py-1.5">Type</th><th /></tr>
+          <tr><th className="w-24 px-3 py-1.5">Time</th><th className="w-64 px-3 py-1.5">Dish</th><th className="w-24 px-3 py-1.5">Step</th><th className="w-32 px-3 py-1.5">Type</th><th className="w-12" /></tr>
         </thead>
         <tbody>
           {entries.map((entry) => {
@@ -548,9 +548,9 @@ function RobotCommentsSection({
 }) {
   return (
     <LaneSection icon={MessageSquare} title="Robot Comments" count={entries.length} onAdd={onAdd}>
-      <table className="w-full text-xs">
+      <table className="w-auto min-w-[920px] text-xs">
         <thead className="text-left text-xs uppercase text-slate-500">
-          <tr><th className="px-3 py-1.5">Time</th><th className="px-3 py-1.5">ID</th><th className="px-3 py-1.5">Text</th><th /></tr>
+          <tr><th className="w-24 px-3 py-1.5">Time</th><th className="w-56 px-3 py-1.5">ID</th><th className="w-[560px] px-3 py-1.5">Text</th><th className="w-12" /></tr>
         </thead>
         <tbody>
           {entries.map((entry) => {
@@ -585,9 +585,9 @@ function PhoneMessagesSection({
 }) {
   return (
     <LaneSection icon={Phone} title="Phone Messages" count={entries.length} onAdd={onAdd}>
-      <table className="w-full text-xs">
+      <table className="w-auto min-w-[420px] text-xs">
         <thead className="text-left text-xs uppercase text-slate-500">
-          <tr><th className="px-3 py-1.5">Time</th><th className="px-3 py-1.5">Message ID</th><th /></tr>
+          <tr><th className="w-24 px-3 py-1.5">Time</th><th className="w-64 px-3 py-1.5">Message ID</th><th className="w-12" /></tr>
         </thead>
         <tbody>
           {entries.map((entry) => {

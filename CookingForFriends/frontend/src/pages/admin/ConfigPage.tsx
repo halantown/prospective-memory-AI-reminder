@@ -40,18 +40,20 @@ interface ExperimentConfig {
 
 interface PMTask {
   task_id: string
+  guest_name?: string
   trigger_type: string
-  trigger_event: string
-  target_room: string
-  target_object: string
-  target_action: string
-  distractor_object: string
-  action_destination: string
-  discriminating_cue: string
-  trigger_time: number | null
-  trigger_audio: string
-  trigger_visual: string
-  encoding_text: string
+  trigger_event?: string
+  target_room?: string | null
+  target_object?: string
+  target_action?: string
+  action_type?: string
+  distractor_object?: string
+  action_destination?: string
+  discriminating_cue?: string
+  trigger_time?: number | null
+  trigger_audio?: string
+  trigger_visual?: string
+  encoding_text?: string
   activity_watch?: { watch_from: string; fallback_s: number }
 }
 
@@ -92,6 +94,24 @@ const conditionBadge = (c: string) => {
     default:
       return 'bg-slate-100 text-slate-600'
   }
+}
+
+function normalizeTaskBlocks(data: unknown): Record<string, PMTask[]> {
+  if (Array.isArray(data)) return { All: data as PMTask[] }
+
+  if (!data || typeof data !== 'object') return {}
+
+  const source = 'tasks' in data && typeof data.tasks === 'object' && data.tasks !== null
+    ? data.tasks
+    : data
+
+  if (Array.isArray(source)) return { All: source as PMTask[] }
+
+  return Object.fromEntries(
+    Object.entries(source as Record<string, unknown>)
+      .filter(([, value]) => Array.isArray(value))
+      .map(([key, value]) => [key, value as PMTask[]]),
+  )
 }
 
 // ── Collapsible Section ──
@@ -184,8 +204,11 @@ export default function ConfigPage() {
       safeFetch('/api/admin/reminders'),
     ])
       .then(([cfg, tsk, rem]) => {
+        const normalizedTasks = normalizeTaskBlocks(tsk)
+        const firstBlock = Object.keys(normalizedTasks).sort()[0]
         setConfig(cfg)
-        setTasks(tsk)
+        setTasks(normalizedTasks)
+        if (firstBlock) setActiveBlock(firstBlock)
         setReminders(rem)
       })
       .catch((err) => setError(err.message))
@@ -310,7 +333,7 @@ export default function ConfigPage() {
         </Section>
 
         {/* Section 3: PM Task Registry */}
-        <Section id="tasks" icon={Layers} title="PM Task Registry" subtitle={`${Object.values(tasks).flat().length} tasks across ${Object.keys(tasks).length} blocks`}>
+        <Section id="tasks" icon={Layers} title="PM Task Registry" subtitle={`${Object.values(tasks).flat().length} tasks across ${Object.keys(tasks).length} ${Object.keys(tasks).length === 1 ? 'group' : 'groups'}`}>
           {/* Block tabs */}
           <div className="flex gap-1 mb-4">
             {Object.keys(tasks).sort().map((blockNum) => (
@@ -323,7 +346,7 @@ export default function ConfigPage() {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                Block {blockNum}
+                {blockNum === 'All' ? 'All Tasks' : `Block ${blockNum}`}
               </button>
             ))}
           </div>
@@ -345,24 +368,36 @@ export default function ConfigPage() {
                       {task.trigger_type}
                     </span>
                   </div>
-                  <span className="text-xs text-slate-400 font-mono">{task.trigger_visual}</span>
-                </div>
+                    {task.trigger_visual && <span className="text-xs text-slate-400 font-mono">{task.trigger_visual}</span>}
+                  </div>
 
-                <p className="text-sm text-slate-600 mb-3 leading-relaxed">
-                  {task.encoding_text}
-                </p>
+                {task.encoding_text ? (
+                  <p className="text-sm text-slate-600 mb-3 leading-relaxed">
+                    {task.encoding_text}
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-600 mb-3 leading-relaxed">
+                    {task.guest_name ? `${task.guest_name} task` : 'PM task'} · {task.action_type || 'task action'}
+                  </p>
+                )}
 
                 <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
-                  <span>
-                    <span className="font-medium text-slate-600">Room:</span> {task.target_room}
-                  </span>
-                  <span>
-                    <span className="font-medium text-slate-600">Object:</span> {task.target_object}
-                  </span>
-                  <span>
-                    <span className="font-medium text-slate-600">Action:</span> {task.target_action}
-                  </span>
-                  {task.trigger_type === 'time' && task.trigger_time !== null && (
+                  {task.target_room && (
+                    <span>
+                      <span className="font-medium text-slate-600">Room:</span> {task.target_room}
+                    </span>
+                  )}
+                  {task.target_object && (
+                    <span>
+                      <span className="font-medium text-slate-600">Object:</span> {task.target_object}
+                    </span>
+                  )}
+                  {(task.target_action || task.action_type) && (
+                    <span>
+                      <span className="font-medium text-slate-600">Action:</span> {task.target_action || task.action_type}
+                    </span>
+                  )}
+                  {task.trigger_type === 'time' && typeof task.trigger_time === 'number' && (
                     <span>
                       <span className="font-medium text-slate-600">Trigger:</span>{' '}
                       {formatSeconds(task.trigger_time)}

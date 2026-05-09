@@ -1,6 +1,7 @@
 /** Welcome page with token login — references SaturdayAtHome pattern. */
 
 import { useEffect, useRef, useState } from 'react'
+import { ChefHat, KeyRound } from 'lucide-react'
 import { useGameStore } from '../../stores/gameStore'
 import { advancePhase, getPublicExperimentConfig, getSessionStatus, setSessionToken, startSession } from '../../services/api'
 import { frontendPhaseForBackend, renderPhaseFor } from '../../utils/phase'
@@ -110,76 +111,103 @@ export default function WelcomePage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-[480px] overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-cooking-500 to-orange-500 px-8 py-6 text-white">
-          <h1 className="text-2xl font-bold">🍳 Cooking for Friends</h1>
-          <p className="text-orange-100 text-sm mt-1">Prospective Memory Session</p>
-        </div>
-
-        {/* Form */}
-        <div className="px-8 py-6 space-y-5">
-          <div>
-            <p className="text-slate-600 text-sm mb-4">
-              {welcomeText.cover_story}
-            </p>
-            {welcomeText?.duration && (
-              <p className="text-slate-500 text-sm mb-2">{welcomeText.duration}</p>
-            )}
-            {welcomeText?.training_notice && (
-              <p className="text-slate-500 text-sm">{welcomeText.training_notice}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Session Token
-            </label>
-            <input
-              type="text"
-              value={token}
-              onChange={(e) => setToken(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === 'Enter' && !loading && handleStart()}
-              placeholder="e.g. AMBER7"
-              maxLength={6}
-              className="w-full px-4 py-3 border border-slate-300 rounded-xl
-                         focus:outline-none focus:ring-2 focus:ring-cooking-400
-                         text-lg tracking-widest font-mono text-center uppercase"
-              autoFocus
-              disabled={loading}
-            />
-            <p className="text-xs text-slate-400 mt-1">
-              Ask the experimenter for your 6-character token
-            </p>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
-              {error}
+    <div className="min-h-screen bg-stone-50 px-4 py-6 text-slate-900 sm:px-6">
+      <main className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-5xl items-center">
+        <div className="grid w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg md:grid-cols-[1.05fr_0.95fr]">
+          <section className="hidden border-r border-slate-200 bg-stone-100 p-8 md:flex md:flex-col md:justify-between">
+            <div>
+              <div className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-cooking-100 text-cooking-700">
+                <ChefHat className="h-6 w-6" aria-hidden="true" />
+              </div>
+              <h1 className="mt-5 text-3xl font-bold text-slate-950">Cooking for Friends</h1>
+              <p className="mt-2 text-sm font-medium text-slate-600">Prospective Memory Session</p>
             </div>
-          )}
+            <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <img
+                src="/assets/floorplan.png"
+                alt=""
+                className="h-64 w-full object-contain"
+              />
+            </div>
+          </section>
 
-          <button
-            onClick={() => handleStart()}
-            disabled={loading || token.trim().length !== 6}
-            className="w-full py-3 bg-slate-900 hover:bg-slate-800
-                       disabled:bg-slate-300 text-white font-bold text-lg
-                       rounded-xl transition-colors cursor-pointer disabled:cursor-not-allowed"
-          >
-            {loading ? <><span className="btn-spinner" />Starting...</> : 'Start Session'}
-          </button>
+          <section className="px-6 py-7 sm:px-8">
+            <div className="mb-6 md:hidden">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-cooking-100 text-cooking-700">
+                <ChefHat className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <h1 className="mt-4 text-2xl font-bold text-slate-950">Cooking for Friends</h1>
+              <p className="mt-1 text-sm font-medium text-slate-600">Prospective Memory Session</p>
+            </div>
 
+            <div className="space-y-5">
+              <div>
+                <p className="text-sm leading-relaxed text-slate-600">
+                  {welcomeText.cover_story}
+                </p>
+                {welcomeText?.duration && (
+                  <p className="mt-3 text-sm text-slate-500">{welcomeText.duration}</p>
+                )}
+                {welcomeText?.training_notice && (
+                  <p className="mt-2 text-sm text-slate-500">{welcomeText.training_notice}</p>
+                )}
+              </div>
 
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  Session Token
+                </label>
+                <input
+                  type="text"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && !loading && handleStart()}
+                  placeholder="e.g. AMBER7"
+                  maxLength={6}
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3
+                             text-center font-mono text-lg uppercase tracking-widest text-slate-900
+                             focus:border-cooking-500 focus:outline-none focus:ring-2 focus:ring-cooking-200"
+                  autoFocus
+                  disabled={loading}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Ask the experimenter for your 6-character token
+                </p>
+              </div>
+
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={() => handleStart()}
+                disabled={loading || token.trim().length !== 6}
+                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-cooking-600 py-3
+                           text-base font-bold text-white transition-colors hover:bg-cooking-700
+                           disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {loading ? (
+                  <>
+                    <span className="btn-spinner" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="h-5 w-5" aria-hidden="true" />
+                    Start Session
+                  </>
+                )}
+              </button>
+            </div>
+
+            <p className="mt-6 border-t border-slate-100 pt-4 text-center text-xs text-slate-400">
+              Session data is anonymized
+            </p>
+          </section>
         </div>
-
-        {/* Footer */}
-        <div className="px-8 py-4 bg-slate-50 border-t border-slate-100">
-          <p className="text-xs text-slate-400 text-center">
-            Session data is anonymized
-          </p>
-        </div>
-      </div>
+      </main>
     </div>
   )
 }

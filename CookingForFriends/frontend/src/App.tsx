@@ -34,8 +34,10 @@ const ParticipantControlPage = lazy(() => import('./pages/admin/ParticipantContr
 
 function LoadingFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900">
-      <div className="text-slate-400 text-sm">Loading...</div>
+    <div className="min-h-screen flex items-center justify-center bg-stone-50">
+      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600 shadow-sm">
+        Loading...
+      </div>
     </div>
   )
 }
@@ -202,8 +204,8 @@ function GameShell() {
 
 function ConnectionIssuePage({ participantId }: { participantId: string | null }) {
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-lg border border-red-300 bg-white p-6 text-center shadow-xl">
+    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-md rounded-lg border border-red-200 bg-white p-6 text-center shadow-lg">
         <h1 className="text-xl font-bold text-slate-900">Connection issue</h1>
         <p className="mt-3 text-sm leading-relaxed text-slate-600">
           Connection issue. Please contact the experimenter.
