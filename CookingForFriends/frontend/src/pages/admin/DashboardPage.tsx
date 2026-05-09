@@ -719,7 +719,7 @@ function DataExportTab() {
 function TestModeTab() {
   const [condition, setCondition] = useState('EE1')
   const [order, setOrder] = useState('A')
-  const [startPhase, setStartPhase] = useState('WELCOME')
+  const [startPhase, setStartPhase] = useState('MAIN_EXPERIMENT')
   const [creating, setCreating] = useState(false)
   const [result, setResult] = useState<{ session_id: string; token: string; entry_url: string } | null>(null)
 
