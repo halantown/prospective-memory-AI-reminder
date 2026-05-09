@@ -47,6 +47,14 @@ interface PhoneMessageEntry {
   message_id: string
 }
 
+interface PhoneMessageCandidate {
+  message_id: string
+  default_t?: number | null
+  channel?: string
+  sender?: string
+  text?: string
+}
+
 interface RuntimePlan {
   version: number
   duration_seconds: number
@@ -56,6 +64,10 @@ interface RuntimePlan {
   cooking_schedule: CookingEntry[]
   robot_idle_comments: RobotCommentEntry[]
   phone_messages: PhoneMessageEntry[]
+}
+
+interface RuntimePlanSchema {
+  phone_message_catalog?: PhoneMessageCandidate[]
 }
 
 type LaneKey = 'pm_schedule' | 'cooking_schedule' | 'robot_idle_comments' | 'phone_messages'
@@ -91,6 +103,11 @@ function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function truncate(value: string | undefined, maxLength: number): string {
+  if (!value) return ''
+  return value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value
 }
 
 function percentAt(seconds: number, duration: number): number {
@@ -276,11 +293,16 @@ export default function TimelineEditorPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [timelineText, setTimelineText] = useState('')
   const [timelineTextOpen, setTimelineTextOpen] = useState(false)
+  const [phoneMessageCatalog, setPhoneMessageCatalog] = useState<PhoneMessageCandidate[]>([])
 
   useEffect(() => {
-    apiFetch<RuntimePlan>(`${API}/runtime-plan`)
-      .then((data) => {
+    Promise.all([
+      apiFetch<RuntimePlan>(`${API}/runtime-plan`),
+      apiFetch<RuntimePlanSchema>(`${API}/schema`).catch(() => ({ phone_message_catalog: [] })),
+    ])
+      .then(([data, schema]) => {
         setPlan(data)
+        setPhoneMessageCatalog(schema.phone_message_catalog ?? [])
         setDirty(false)
       })
       .catch((e: Error) => setError(e.message))
@@ -530,9 +552,23 @@ export default function TimelineEditorPage() {
               <PhoneMessagesSection
                 entries={sortedPlan.phone_messages}
                 originalEntries={plan.phone_messages}
-                onAdd={() => replaceLane('phone_messages', [...plan.phone_messages, { t: 0, message_id: '' }])}
+                candidates={phoneMessageCatalog}
+                durationSeconds={plan.duration_seconds}
                 onDelete={(index) => deleteLaneItem('phone_messages', index)}
                 onUpdate={(index, patch) => updateLaneItem('phone_messages', index, patch)}
+                onSetActive={(candidate, active) => {
+                  const existingIndex = plan.phone_messages.findIndex((entry) => entry.message_id === candidate.message_id)
+                  if (!active) {
+                    if (existingIndex >= 0) deleteLaneItem('phone_messages', existingIndex)
+                    return
+                  }
+                  if (existingIndex >= 0) return
+                  const defaultTime = typeof candidate.default_t === 'number' ? candidate.default_t : 0
+                  replaceLane('phone_messages', [
+                    ...plan.phone_messages,
+                    { t: Math.max(0, Math.min(plan.duration_seconds, defaultTime)), message_id: candidate.message_id },
+                  ])
+                }}
               />
             </div>
           </>
@@ -696,7 +732,7 @@ function LaneSection({
   icon: React.ElementType
   title: string
   count: number
-  onAdd: () => void
+  onAdd?: () => void
   children: React.ReactNode
 }) {
   return (
@@ -707,10 +743,12 @@ function LaneSection({
           <h2 className="font-semibold text-slate-800">{title}</h2>
           <span className="rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-600">{count}</span>
         </div>
-        <button onClick={onAdd} className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-800 px-2.5 text-xs font-medium text-white hover:bg-slate-700">
-          <Plus size={14} />
-          Add
-        </button>
+        {onAdd && (
+          <button onClick={onAdd} className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-800 px-2.5 text-xs font-medium text-white hover:bg-slate-700">
+            <Plus size={14} />
+            Add
+          </button>
+        )}
       </div>
       <div className="overflow-x-auto">{children}</div>
     </section>
@@ -861,30 +899,88 @@ function RobotCommentsSection({
 function PhoneMessagesSection({
   entries,
   originalEntries,
-  onAdd,
+  candidates,
+  durationSeconds,
   onDelete,
   onUpdate,
+  onSetActive,
 }: {
   entries: PhoneMessageEntry[]
   originalEntries: PhoneMessageEntry[]
-  onAdd: () => void
+  candidates: PhoneMessageCandidate[]
+  durationSeconds: number
   onDelete: (index: number) => void
   onUpdate: (index: number, patch: Partial<PhoneMessageEntry>) => void
+  onSetActive: (candidate: PhoneMessageCandidate, active: boolean) => void
 }) {
+  const activeByMessageId = useMemo(() => {
+    return new Map(entries.map((entry) => [entry.message_id, entry]))
+  }, [entries])
+  const catalog = useMemo(() => {
+    const seen = new Set<string>()
+    const merged: PhoneMessageCandidate[] = []
+    candidates.forEach((candidate) => {
+      if (!candidate.message_id || seen.has(candidate.message_id)) return
+      seen.add(candidate.message_id)
+      merged.push(candidate)
+    })
+    entries.forEach((entry) => {
+      if (seen.has(entry.message_id)) return
+      seen.add(entry.message_id)
+      merged.push({ message_id: entry.message_id, default_t: entry.t })
+    })
+    return merged.sort((a, b) => {
+      const at = typeof a.default_t === 'number' ? a.default_t : Number.MAX_SAFE_INTEGER
+      const bt = typeof b.default_t === 'number' ? b.default_t : Number.MAX_SAFE_INTEGER
+      return at - bt || a.message_id.localeCompare(b.message_id)
+    })
+  }, [candidates, entries])
+
   return (
-    <LaneSection icon={Phone} title="Phone Messages" count={entries.length} onAdd={onAdd}>
-      <table className="w-full min-w-[360px] text-xs">
+    <LaneSection icon={Phone} title="Phone Messages" count={entries.length}>
+      <table className="w-full min-w-[620px] text-xs">
         <thead className="text-left text-xs uppercase text-slate-500">
-          <tr><th className="w-20 px-3 py-1.5">Time</th><th className="w-52 px-3 py-1.5">Message ID</th><th className="w-12" /></tr>
+          <tr><th className="w-16 px-3 py-1.5">Active</th><th className="w-20 px-3 py-1.5">Time</th><th className="w-24 px-3 py-1.5">Message ID</th><th className="w-24 px-3 py-1.5">Source</th><th className="px-3 py-1.5">Text</th></tr>
         </thead>
         <tbody>
-          {entries.map((entry) => {
-            const index = originalEntries.indexOf(entry)
+          {catalog.map((candidate) => {
+            const entry = activeByMessageId.get(candidate.message_id)
+            const index = entry ? originalEntries.findIndex((item) => item.message_id === entry.message_id) : -1
+            const active = Boolean(entry && index >= 0)
             return (
-              <tr key={`${entry.message_id}-${index}`} className="border-t border-slate-100">
-                <td className="px-3 py-1.5"><input type="number" value={entry.t} onChange={(e) => onUpdate(index, { t: numberValue(e.target.value, entry.t) })} className="h-7 w-20 rounded border border-slate-300 px-2" /></td>
-                <td className="px-3 py-1.5"><input value={entry.message_id} onChange={(e) => onUpdate(index, { message_id: e.target.value })} className="h-7 w-44 rounded border border-slate-300 px-2" /></td>
-                <DeleteCell onClick={() => onDelete(index)} />
+              <tr key={candidate.message_id} className={`border-t border-slate-100 ${active ? '' : 'bg-slate-50/60 text-slate-400'}`}>
+                <td className="px-3 py-1.5">
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={(e) => onSetActive(candidate, e.target.checked)}
+                    className="h-4 w-4 accent-blue-600"
+                    aria-label={`Set ${candidate.message_id} active`}
+                  />
+                </td>
+                <td className="px-3 py-1.5">
+                  {active && entry ? (
+                    <input
+                      type="number"
+                      value={entry.t}
+                      min={0}
+                      max={durationSeconds}
+                      onChange={(e) => onUpdate(index, { t: numberValue(e.target.value, entry.t) })}
+                      className="h-7 w-20 rounded border border-slate-300 px-2"
+                    />
+                  ) : (
+                    <span className="font-mono">{typeof candidate.default_t === 'number' ? candidate.default_t : '-'}</span>
+                  )}
+                </td>
+                <td className="px-3 py-1.5 font-mono text-slate-700">{candidate.message_id}</td>
+                <td className="px-3 py-1.5">
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">
+                    {candidate.channel || 'message'}{candidate.sender ? ` / ${candidate.sender}` : ''}
+                  </span>
+                </td>
+                <td className="px-3 py-1.5 text-slate-600" title={candidate.text || ''}>
+                  {truncate(candidate.text, 72)}
+                </td>
               </tr>
             )
           })}

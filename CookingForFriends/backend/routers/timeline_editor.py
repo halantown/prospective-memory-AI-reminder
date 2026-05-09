@@ -14,6 +14,7 @@ from engine.runtime_plan_loader import (
     timeline_from_plan,
     validate_runtime_plan,
 )
+from engine.message_loader import load_message_pool
 
 logger = logging.getLogger(__name__)
 
@@ -95,10 +96,25 @@ async def preview_runtime_plan(body: dict[str, Any] | None = None):
 @router.get("/schema")
 async def get_runtime_plan_schema():
     """Return lightweight editor metadata for runtime-plan lanes."""
+    message_pool = load_message_pool(1)
+    phone_message_catalog = [
+        {
+            "message_id": message_id,
+            "default_t": message.get("t"),
+            "channel": message.get("channel", "notification"),
+            "sender": message.get("contact_id") or message.get("sender") or "",
+            "text": message.get("text", ""),
+        }
+        for message_id, message in sorted(
+            message_pool.items(),
+            key=lambda item: (int(item[1].get("t", 0) or 0), item[0]),
+        )
+    ]
     return {
         "duration_default": 900,
         "message_cooldown_s": MESSAGE_COOLDOWN_S,
         "conditions": CONDITIONS,
+        "phone_message_catalog": phone_message_catalog,
         "lanes": {
             "pm_schedule": {
                 "description": "PM trigger schedule; delays are relative game-time seconds after the previous PM pipeline.",
