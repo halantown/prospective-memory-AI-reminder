@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { advancePhase, getExperimentConfig } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
@@ -14,10 +14,13 @@ export default function EveningTransitionPage() {
   const [loading, setLoading] = useState(false)
   const [visible, setVisible] = useState(false)
   const [exiting, setExiting] = useState(false)
+  const advanceTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setVisible(true))
-    return () => window.cancelAnimationFrame(frame)
+    setVisible(true)
+    return () => {
+      if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -43,7 +46,8 @@ export default function EveningTransitionPage() {
     if (!sessionId || loading) return
     setLoading(true)
     setExiting(true)
-    window.setTimeout(async () => {
+    if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current)
+    advanceTimerRef.current = window.setTimeout(async () => {
       setGameClock('17:00')
       setElapsedSeconds(0)
       try {
@@ -54,14 +58,15 @@ export default function EveningTransitionPage() {
         setLoading(false)
         setExiting(false)
       }
+      advanceTimerRef.current = null
     }, 650)
   }
 
   return (
-    <div className={`min-h-screen bg-black flex items-center justify-center p-6 text-center transition-opacity duration-700 ${
-      visible && !exiting ? 'opacity-100' : 'opacity-0'
-    }`}>
-      <div className="relative flex min-h-[220px] w-full max-w-xl flex-col items-center justify-center">
+    <div className="min-h-screen bg-stone-950 flex items-center justify-center p-6 text-center">
+      <div className={`relative flex min-h-[220px] w-full max-w-xl flex-col items-center justify-center transition-opacity duration-700 ${
+        visible && !exiting ? 'opacity-100' : 'opacity-0'
+      }`}>
         <p className="max-w-lg text-2xl font-semibold leading-relaxed text-white">{text}</p>
         {ready && (
           <button

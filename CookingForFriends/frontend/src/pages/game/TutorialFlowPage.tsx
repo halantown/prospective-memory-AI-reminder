@@ -48,8 +48,17 @@ export default function TutorialFlowPage() {
   const startedAtRef = useRef(Date.now())
   const phoneAdvancedRef = useRef(false)
   const cookingSetupRef = useRef(false)
+  const triggerAdvanceTimerRef = useRef<number | null>(null)
   const kind = tutorialKind(phase)
   const targetPhoneTab = kind === 'phone' ? 'chats' : kind === 'cooking' ? 'recipe' : null
+
+  useEffect(() => {
+    return () => {
+      if (triggerAdvanceTimerRef.current !== null) {
+        window.clearTimeout(triggerAdvanceTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!sessionId) return
@@ -323,13 +332,18 @@ export default function TutorialFlowPage() {
         metadata: { action_label: actionLabel },
       }])
       setTriggerResting(true)
-      window.setTimeout(async () => {
+      if (triggerAdvanceTimerRef.current !== null) {
+        window.clearTimeout(triggerAdvanceTimerRef.current)
+      }
+      triggerAdvanceTimerRef.current = window.setTimeout(async () => {
         try {
           const advanced = await advancePhase(sessionId)
           setPhase(frontendPhaseForBackend(advanced.current_phase))
         } catch (e) {
           console.error('[TutorialFlow] trigger advance failed', e)
           setLoading(false)
+        } finally {
+          triggerAdvanceTimerRef.current = null
         }
       }, 2200)
     } catch (e) {
