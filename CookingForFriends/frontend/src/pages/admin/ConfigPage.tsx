@@ -19,12 +19,15 @@ import {
 
 interface ExperimentConfig {
   experiment: {
-    blocks_per_participant: number
-    pm_tasks_per_block: number
-    block_duration_s: number
-    execution_window_s: number
-    late_window_s: number
-    reminder_lead_s: number
+    blocks_per_participant?: number
+    pm_tasks_per_block?: number
+    block_duration_s?: number
+    execution_window_s?: number
+    late_window_s?: number
+    reminder_lead_s?: number
+    conditions?: string[]
+    task_orders?: Record<string, string[]>
+    trigger_schedule?: unknown[]
   }
   phone: { lock_timeout_s: number; message_cooldown_s: number }
   mouse_tracking: { sample_interval_ms: number; batch_interval_s: number }
@@ -69,18 +72,25 @@ interface Reminder {
 interface Assignment {
   participant_id: string
   condition: string
-  blocks: { block_number: number; condition: string; unreminded_task: string }[]
+  unreminded_task?: string | null
+  blocks?: { block_number: number; condition?: string; unreminded_task?: string | null }[]
 }
 
 // ── Helpers ──
 
-function formatSeconds(s: number): string {
+function formatCount(value: number | undefined): string {
+  return typeof value === 'number' ? String(value) : '—'
+}
+
+function formatSeconds(s: number | undefined): string {
+  if (typeof s !== 'number') return '—'
   if (s >= 3600) return `${s}s (${(s / 3600).toFixed(1)} hr)`
   if (s >= 60) return `${s}s (${Math.round(s / 60)} min)`
   return `${s}s`
 }
 
-function formatMs(ms: number): string {
+function formatMs(ms: number | undefined): string {
+  if (typeof ms !== 'number') return '—'
   if (ms >= 1000) return `${ms}ms (${ms / 1000}s)`
   return `${ms}ms`
 }
@@ -112,6 +122,27 @@ function normalizeTaskBlocks(data: unknown): Record<string, PMTask[]> {
       .filter(([, value]) => Array.isArray(value))
       .map(([key, value]) => [key, value as PMTask[]]),
   )
+}
+
+function normalizeAssignments(data: unknown): Assignment[] {
+  if (!Array.isArray(data)) return []
+  return data
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .map((item) => ({
+      participant_id: String(item.participant_id ?? item.id ?? '—'),
+      condition: String(item.condition ?? '—'),
+      unreminded_task: typeof item.unreminded_task === 'string' ? item.unreminded_task : null,
+      blocks: Array.isArray(item.blocks)
+        ? item.blocks.map((block, index) => {
+            const blockRecord = block && typeof block === 'object' ? block as Record<string, unknown> : {}
+            return {
+              block_number: typeof blockRecord.block_number === 'number' ? blockRecord.block_number : index + 1,
+              condition: typeof blockRecord.condition === 'string' ? blockRecord.condition : undefined,
+              unreminded_task: typeof blockRecord.unreminded_task === 'string' ? blockRecord.unreminded_task : null,
+            }
+          })
+        : [],
+    }))
 }
 
 // ── Collapsible Section ──
@@ -223,7 +254,7 @@ export default function ConfigPage() {
         return r.json()
       })
       .then((data) => {
-        setAssignments(data)
+        setAssignments(normalizeAssignments(data))
         setAssignmentsLoaded(true)
       })
       .catch((err) => console.error('Failed to load assignments:', err))
@@ -308,12 +339,15 @@ export default function ConfigPage() {
         <Section id="params" icon={Settings} title="Experiment Parameters" subtitle="Timing, tracking, and system settings" defaultOpen>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <ParamCard title="Experiment" icon={Layers} params={[
-              ['Blocks per Participant', String(experiment.blocks_per_participant)],
-              ['PM Tasks per Block', String(experiment.pm_tasks_per_block)],
+              ['Conditions', experiment.conditions?.join(', ') || '—'],
+              ['Task Orders', experiment.task_orders ? Object.keys(experiment.task_orders).join(', ') : '—'],
+              ['Blocks per Participant', formatCount(experiment.blocks_per_participant)],
+              ['PM Tasks per Block', formatCount(experiment.pm_tasks_per_block)],
               ['Block Duration', formatSeconds(experiment.block_duration_s)],
               ['Execution Window', formatSeconds(experiment.execution_window_s)],
               ['Late Window', formatSeconds(experiment.late_window_s)],
               ['Reminder Lead Time', formatSeconds(experiment.reminder_lead_s)],
+              ['Trigger Events', formatCount(experiment.trigger_schedule?.length)],
             ]} />
             <ParamCard title="Phone" icon={Clock} params={[
               ['Lock Timeout', formatSeconds(phone.lock_timeout_s)],
@@ -489,11 +523,17 @@ export default function ConfigPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
-                          {a.blocks.map((b) => (
-                            <span key={b.block_number} className="text-xs text-slate-500 font-mono">
-                              B{b.block_number}: {b.unreminded_task || '—'}
+                          {a.blocks && a.blocks.length > 0 ? (
+                            a.blocks.map((b) => (
+                              <span key={b.block_number} className="text-xs text-slate-500 font-mono">
+                                B{b.block_number}: {b.unreminded_task || '—'}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-slate-500 font-mono">
+                              {a.unreminded_task || '—'}
                             </span>
-                          ))}
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -484,12 +484,19 @@ async def get_config():
         MOUSE_SAMPLE_INTERVAL_MS, MOUSE_BATCH_INTERVAL_S,
         SNAPSHOT_INTERVAL_S, HEARTBEAT_INTERVAL_S, HEARTBEAT_TIMEOUT_S,
         TOKEN_LENGTH, TRIGGER_SCHEDULE, TASK_ORDERS,
+        EXECUTION_WINDOW_S, LATE_WINDOW_S, REMINDER_LEAD_S,
     )
+    task_order_values = list(TASK_ORDERS.values())
     return {
         "experiment": {
             "conditions": CONDITIONS,
             "task_orders": TASK_ORDERS,
+            "blocks_per_participant": 1,
+            "pm_tasks_per_block": len(task_order_values[0]) if task_order_values else 0,
             "block_duration_s": BLOCK_DURATION_S,
+            "execution_window_s": EXECUTION_WINDOW_S,
+            "late_window_s": LATE_WINDOW_S,
+            "reminder_lead_s": REMINDER_LEAD_S,
             "trigger_schedule": TRIGGER_SCHEDULE,
         },
         "phone": {

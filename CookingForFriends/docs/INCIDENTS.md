@@ -1092,3 +1092,48 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 
 ### Follow-up Actions
 > - [ ] Add test asserting `clock.now()` is stable between pause and DB write
+
+---
+
+## INC-022 — Admin config page contract drift crashed assignments and showed undefined timing fields
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-09 |
+| Severity     | P2 Medium |
+| Status       | Resolved |
+| Reported by  | Manual admin UI check |
+| Affected area| `backend/routers/admin.py` `/api/admin/config`; frontend `ConfigPage` assignments table |
+
+### Background
+> The admin config page should provide a read-only view of experiment timing, task registry, reminders, and condition assignments. The frontend expects stable config keys and should tolerate older assignment payload shapes.
+
+### Incident Description
+> The Experiment Parameters section displayed `undefined` for several fields because `/api/admin/config` no longer returned `blocks_per_participant`, `pm_tasks_per_block`, `execution_window_s`, `late_window_s`, or `reminder_lead_s`. Opening Condition Assignments crashed with `Cannot read properties of undefined (reading 'map')` because the backend returned top-level `unreminded_task` while the frontend assumed `blocks[]`.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 22:36 | Admin config bug reported from UI |
+| 22:36 | Investigation started |
+| 22:37 | Root cause identified as frontend/backend contract drift |
+| 22:39 | Backend config fields and frontend guards implemented |
+| 22:40 | Frontend build and backend tests passed |
+
+### Root Cause
+> The admin page retained assumptions from an older schema while the admin endpoints returned a newer, smaller payload. The frontend also did not guard optional assignment fields before rendering nested block rows.
+
+### Contributing Factors
+> - No shared schema or response type between admin API and frontend config page
+> - No frontend test for `/config` with current `/assignments` payload
+> - Missing fallback formatting for optional admin config values
+
+### Fix
+> `/api/admin/config` now includes the legacy timing/count fields needed by the admin UI. `ConfigPage` now formats missing numbers as `—`, derives assignment rows through a normalizer, and supports both top-level `unreminded_task` and nested `blocks[]`.
+
+### Verification
+> `npm run build` passed in `CookingForFriends/frontend`. `conda run -n thesis_server pytest tests/test_phase_state.py tests/test_experiment_materials.py -q` passed in `CookingForFriends/backend`.
+
+### Follow-up Actions
+> - [ ] Add a focused admin API contract test for `/api/admin/config` and `/api/admin/assignments`
+> - [ ] Add a lightweight frontend regression test or story fixture for `ConfigPage`
