@@ -8,6 +8,9 @@ import {
   Bot,
   CheckCircle,
   Clock,
+  Clipboard,
+  FileDown,
+  FileUp,
   Flame,
   MessageSquare,
   Phone,
@@ -21,6 +24,10 @@ const API = '/api/admin/timelines'
 type PMEntry =
   | { type: 'real'; delay_after_previous_s: number; task_position: number }
   | { type: 'fake'; delay_after_previous_s: number; trigger_type: 'doorbell' | 'phone_call' }
+
+type PMImportEntry =
+  | { type: 'real'; task_position: number }
+  | { type: 'fake'; trigger_type: 'doorbell' | 'phone_call' }
 
 interface CookingEntry {
   t: number
@@ -52,6 +59,16 @@ interface RuntimePlan {
 }
 
 type LaneKey = 'pm_schedule' | 'cooking_schedule' | 'robot_idle_comments' | 'phone_messages'
+
+type TimelineExportRow = {
+  time_s: number
+  lane: 'PM' | 'COOK' | 'ROBOT' | 'PHONE'
+  event_type: string
+  value_1: string
+  value_2: string
+  value_3: string
+  text: string
+}
 
 async function apiFetch<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts })
@@ -89,6 +106,167 @@ function pmAbsoluteTimes(entries: PMEntry[]): number[] {
   })
 }
 
+function encodeCell(value: string | number | null | undefined): string {
+  return String(value ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\t/g, '\\t')
+    .replace(/\n/g, '\\n')
+}
+
+function decodeCell(value: string): string {
+  return value
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\\\/g, '\\')
+}
+
+function timelineRowsForPlan(plan: RuntimePlan): TimelineExportRow[] {
+  const pmTimes = pmAbsoluteTimes(plan.pm_schedule)
+  const rows: TimelineExportRow[] = [
+    ...plan.pm_schedule.map((entry, index): TimelineExportRow => ({
+      time_s: pmTimes[index] ?? 0,
+      lane: 'PM',
+      event_type: entry.type,
+      value_1: entry.type === 'real' ? String(entry.task_position) : entry.trigger_type,
+      value_2: '',
+      value_3: '',
+      text: entry.type === 'real' ? `Position ${entry.task_position}` : entry.trigger_type,
+    })),
+    ...plan.cooking_schedule.map((entry): TimelineExportRow => ({
+      time_s: entry.t,
+      lane: 'COOK',
+      event_type: entry.step_type,
+      value_1: entry.dish_id,
+      value_2: String(entry.step_index),
+      value_3: '',
+      text: `${entry.dish_id} step ${entry.step_index}`,
+    })),
+    ...plan.robot_idle_comments.map((entry): TimelineExportRow => ({
+      time_s: entry.t,
+      lane: 'ROBOT',
+      event_type: 'comment',
+      value_1: entry.comment_id,
+      value_2: '',
+      value_3: '',
+      text: entry.text,
+    })),
+    ...plan.phone_messages.map((entry): TimelineExportRow => ({
+      time_s: entry.t,
+      lane: 'PHONE',
+      event_type: 'message',
+      value_1: entry.message_id,
+      value_2: '',
+      value_3: '',
+      text: entry.message_id,
+    })),
+  ]
+
+  const laneOrder: Record<TimelineExportRow['lane'], number> = { PM: 0, COOK: 1, ROBOT: 2, PHONE: 3 }
+  return rows.sort((a, b) => a.time_s - b.time_s || laneOrder[a.lane] - laneOrder[b.lane] || a.text.localeCompare(b.text))
+}
+
+function generateTimelineText(plan: RuntimePlan): string {
+  const header = ['time_s', 'lane', 'event_type', 'value_1', 'value_2', 'value_3', 'text'].join('\t')
+  const rows = timelineRowsForPlan(plan).map((row) => [
+    row.time_s,
+    row.lane,
+    row.event_type,
+    row.value_1,
+    row.value_2,
+    row.value_3,
+    row.text,
+  ].map(encodeCell).join('\t'))
+  return [header, ...rows].join('\n')
+}
+
+function parseTimelineText(text: string): Pick<RuntimePlan, 'pm_schedule' | 'cooking_schedule' | 'robot_idle_comments' | 'phone_messages'> & { maxTime: number } {
+  const rows = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .filter((line) => !line.toLowerCase().startsWith('time_s\t'))
+
+  const pmAbsolute: Array<{ t: number; entry: PMImportEntry }> = []
+  const cooking_schedule: CookingEntry[] = []
+  const robot_idle_comments: RobotCommentEntry[] = []
+  const phone_messages: PhoneMessageEntry[] = []
+  let maxTime = 0
+
+  rows.forEach((line, index) => {
+    const cells = line.split('\t').map(decodeCell)
+    while (cells.length < 7) cells.push('')
+    const [timeCell, laneCell, eventTypeCell, value1, value2, , textCell] = cells
+    const time = Number(timeCell)
+    if (!Number.isFinite(time) || time < 0) {
+      throw new Error(`Invalid time on timeline row ${index + 1}: ${timeCell}`)
+    }
+
+    const t = Math.round(time)
+    maxTime = Math.max(maxTime, t)
+    const lane = laneCell.trim().toUpperCase()
+    const eventType = eventTypeCell.trim().toLowerCase()
+
+    if (lane === 'PM') {
+      if (eventType === 'real') {
+        const taskPosition = numberValue(value1.replace(/^Position\s+/i, ''), 0)
+        if (!taskPosition) throw new Error(`Invalid PM real task position on row ${index + 1}`)
+        pmAbsolute.push({ t, entry: { type: 'real', task_position: taskPosition } })
+      } else if (eventType === 'fake') {
+        const triggerType = value1.trim() as 'doorbell' | 'phone_call'
+        if (triggerType !== 'doorbell' && triggerType !== 'phone_call') {
+          throw new Error(`Invalid PM fake trigger type on row ${index + 1}`)
+        }
+        pmAbsolute.push({ t, entry: { type: 'fake', trigger_type: triggerType } })
+      } else {
+        throw new Error(`Invalid PM event type on row ${index + 1}: ${eventTypeCell}`)
+      }
+      return
+    }
+
+    if (lane === 'COOK') {
+      if (eventType !== 'active' && eventType !== 'wait') {
+        throw new Error(`Invalid cooking step type on row ${index + 1}: ${eventTypeCell}`)
+      }
+      const stepIndex = numberValue(value2, NaN)
+      if (!value1.trim() || !Number.isFinite(stepIndex)) {
+        throw new Error(`Invalid cooking row ${index + 1}`)
+      }
+      cooking_schedule.push({ t, dish_id: value1.trim(), step_index: stepIndex, step_type: eventType })
+      return
+    }
+
+    if (lane === 'ROBOT') {
+      if (!value1.trim()) throw new Error(`Missing robot comment id on row ${index + 1}`)
+      robot_idle_comments.push({ t, comment_id: value1.trim(), text: textCell })
+      return
+    }
+
+    if (lane === 'PHONE') {
+      if (!value1.trim()) throw new Error(`Missing phone message id on row ${index + 1}`)
+      phone_messages.push({ t, message_id: value1.trim() })
+      return
+    }
+
+    throw new Error(`Invalid lane on row ${index + 1}: ${laneCell}`)
+  })
+
+  pmAbsolute.sort((a, b) => a.t - b.t)
+  let previousPmTime = 0
+  const pm_schedule = pmAbsolute.map(({ t, entry }) => {
+    const delay_after_previous_s = Math.max(0, t - previousPmTime)
+    previousPmTime = t
+    return { ...entry, delay_after_previous_s } as PMEntry
+  })
+
+  return {
+    pm_schedule,
+    cooking_schedule: cooking_schedule.sort((a, b) => a.t - b.t),
+    robot_idle_comments: robot_idle_comments.sort((a, b) => a.t - b.t),
+    phone_messages: phone_messages.sort((a, b) => a.t - b.t),
+    maxTime,
+  }
+}
+
 export default function TimelineEditorPage() {
   const [plan, setPlan] = useState<RuntimePlan | null>(null)
   const [loading, setLoading] = useState(true)
@@ -96,6 +274,8 @@ export default function TimelineEditorPage() {
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [timelineText, setTimelineText] = useState('')
+  const [timelineTextOpen, setTimelineTextOpen] = useState(false)
 
   useEffect(() => {
     apiFetch<RuntimePlan>(`${API}/runtime-plan`)
@@ -164,6 +344,45 @@ export default function TimelineEditorPage() {
     }
   }, [plan])
 
+  const exportTimeline = useCallback(() => {
+    if (!plan) return
+    setTimelineText(generateTimelineText(plan))
+    setTimelineTextOpen(true)
+  }, [plan])
+
+  const copyTimeline = useCallback(async () => {
+    if (!timelineText) return
+    try {
+      await navigator.clipboard?.writeText(timelineText)
+      setSuccess('Timeline text copied.')
+      setTimeout(() => setSuccess(null), 2500)
+    } catch (e) {
+      console.error('[TimelineEditor] copy failed', e)
+      setError('Could not copy timeline text.')
+    }
+  }, [timelineText])
+
+  const adoptTimelineText = useCallback(() => {
+    if (!plan) return
+    setError(null)
+    try {
+      const parsed = parseTimelineText(timelineText)
+      setPlan({
+        ...plan,
+        duration_seconds: Math.max(plan.duration_seconds, parsed.maxTime),
+        pm_schedule: parsed.pm_schedule,
+        cooking_schedule: parsed.cooking_schedule,
+        robot_idle_comments: parsed.robot_idle_comments,
+        phone_messages: parsed.phone_messages,
+      })
+      setDirty(true)
+      setSuccess('Timeline text applied. Review the plan, then Save.')
+      setTimeout(() => setSuccess(null), 3500)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to parse timeline text.')
+    }
+  }, [plan, timelineText])
+
   if (loading) {
     return <div className="min-h-screen bg-slate-50 p-6 text-slate-500">Loading runtime plan...</div>
   }
@@ -227,8 +446,58 @@ export default function TimelineEditorPage() {
                   <Clock size={16} className="mr-2" />
                   {formatTime(plan.duration_seconds)}
                 </div>
+                <div className="ml-auto flex items-end gap-2">
+                  <button
+                    onClick={exportTimeline}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-100 px-3 text-xs font-medium text-slate-700 hover:bg-slate-200"
+                  >
+                    <FileDown size={14} />
+                    Export Events
+                  </button>
+                  <button
+                    onClick={() => setTimelineTextOpen((open) => !open)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-100 px-3 text-xs font-medium text-slate-700 hover:bg-slate-200"
+                  >
+                    <FileUp size={14} />
+                    Import Text
+                  </button>
+                </div>
               </div>
             </section>
+
+            {timelineTextOpen && (
+              <section className="rounded-md border border-slate-200 bg-white p-3">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm font-semibold text-slate-800">Timeline Text</h2>
+                  <span className="text-xs text-slate-500">
+                    TSV format: one row per timeline dot, sorted by time.
+                  </span>
+                  <button
+                    onClick={copyTimeline}
+                    disabled={!timelineText}
+                    className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-100 px-3 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Clipboard size={14} />
+                    Copy
+                  </button>
+                  <button
+                    onClick={adoptTimelineText}
+                    disabled={!timelineText.trim()}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-800 px-3 text-xs font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FileUp size={14} />
+                    Adopt Revised Timeline
+                  </button>
+                </div>
+                <textarea
+                  value={timelineText}
+                  onChange={(e) => setTimelineText(e.target.value)}
+                  spellCheck={false}
+                  className="h-56 w-full resize-y rounded-md border border-slate-300 bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                  placeholder="Paste exported timeline text here, then click Adopt Revised Timeline."
+                />
+              </section>
+            )}
 
             <TimelineOverview plan={sortedPlan} />
 
