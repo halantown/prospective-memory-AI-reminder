@@ -29,43 +29,49 @@
 | `TOKEN_CHARSET` | `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` | Charset (no 0/O/1/I ambiguity) |
 | `DEV_TOKEN` | `None` (env: `DEV_TOKEN`) | Dev participant auto-seed. Set `DEV_TOKEN=ABC123` to enable. |
 
-### Experiment Timing
+### Experiment Design and Timing
 
 | Constant | Value | Used In | Description |
 |----------|-------|---------|-------------|
-| `BLOCKS_PER_PARTICIPANT` | `3` | session.py, admin.py | Number of game blocks per session |
-| `PM_TASKS_PER_BLOCK` | `4` | admin.py, timeline_generator | PM tasks per block (12 total) |
-| `BLOCK_DURATION_S` | `600` | timeline.py | Block length in real seconds (10 min) |
-| `EXECUTION_WINDOW_S` | `30` | pm_scorer.py, execution_window.py | Primary PM response window |
-| `LATE_WINDOW_S` | `60` | pm_scorer.py, execution_window.py | Extended PM window (score=1) |
-| `REMINDER_LEAD_S` | `120` | timeline_generator.py | Reminder fires N seconds before trigger |
+| `CONDITIONS` | Loaded from `counterbalancing.json` | config.py, admin.py | Current condition levels: `EE1`, `EE0` |
+| `TASK_ORDERS` | Loaded from `counterbalancing.json` | condition_assigner.py | Four Latin-square orders over `T1`-`T4` |
+| `TRIGGER_SCHEDULE` | Loaded from `counterbalancing.json` | pm_session.py | Event-driven trigger delays in game-time seconds |
+| `SESSION_END_DELAY_AFTER_LAST_TRIGGER_S` | `60` | pm_session.py | Delay after final real trigger pipeline before post-test |
+| `BLOCK_DURATION_S` | `900` | legacy timeline compatibility | Main experiment duration cap in gameplay seconds |
+| `EXECUTION_WINDOW_S` | `120` | legacy compatibility | Historical PM response window constant |
+| `LATE_WINDOW_S` | `60` | legacy compatibility | Historical late-window constant |
+| `REMINDER_LEAD_S` | `30` | legacy compatibility | Historical reminder lead constant |
+
+The current active design is one main experiment runtime with four real PM tasks,
+plus fake trigger encounters. Older docs may mention 3 blocks / 12 PM tasks; that
+design is archived and should not be used for new implementation work.
 
 ### Phone
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `PHONE_LOCK_TIMEOUT_S` | Deprecated / unused | Phone lock is temporarily disabled; current runtime keeps the phone accessible |
+| `PHONE_LOCK_TIMEOUT_S` | `15` | Must match frontend lock timeout if phone lock is enabled |
+| `MESSAGE_COOLDOWN_S` | `10` default from env | Minimum gap between messages |
+| `PHONE_MESSAGE_EXPIRY_MS` | `20,000` | Per-message expiry, must match frontend |
 
 ### Data Capture
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `MOUSE_SAMPLE_INTERVAL_MS` | `200` | Mouse position sampling rate |
-| `MOUSE_BATCH_INTERVAL_S` | `5` | Mouse batch send interval |
+| `MOUSE_SAMPLE_INTERVAL_MS` | `100` | Mouse position sampling rate |
+| `MOUSE_BATCH_INTERVAL_S` | `60` | Mouse batch send interval |
 | `SNAPSHOT_INTERVAL_S` | `15` | Game state snapshot interval |
-| `HEARTBEAT_INTERVAL_S` | `10` | Client heartbeat interval |
-| `HEARTBEAT_TIMEOUT_S` | `30` | Max time before marking offline |
+| `HEARTBEAT_INTERVAL_S` | `30` | Client heartbeat interval |
+| `HEARTBEAT_TIMEOUT_S` | `60` | Max time before marking offline |
 
 ### Latin Square
 
-| Group | Block 1 | Block 2 | Block 3 |
-|-------|---------|---------|---------|
-| A | CONTROL | AF | AFCB |
-| B | AF | AFCB | CONTROL |
-| C | AFCB | CONTROL | AF |
-| D | CONTROL | AFCB | AF |
-| E | AF | CONTROL | AFCB |
-| F | AFCB | AF | CONTROL |
+| Group | Position 1 | Position 2 | Position 3 | Position 4 |
+|-------|------------|------------|------------|------------|
+| A | T1 | T2 | T4 | T3 |
+| B | T2 | T3 | T1 | T4 |
+| C | T3 | T4 | T2 | T1 |
+| D | T4 | T1 | T3 | T2 |
 
 ---
 
@@ -83,9 +89,9 @@
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `HEARTBEAT_INTERVAL` | `10,000 ms` | Heartbeat send interval |
+| `HEARTBEAT_INTERVAL` | `30,000 ms` | Heartbeat send interval |
 | `RECONNECT_BASE_MS` | `500 ms` | Initial reconnect delay |
-| `RECONNECT_MAX_MS` | `5,000 ms` | Max reconnect delay (exponential backoff) |
+| `RECONNECT_MAX_MS` | `15,000 ms` | Max reconnect delay (exponential backoff) |
 
 ### Phone Sidebar (`frontend/src/components/game/PhoneSidebar.tsx`)
 
@@ -110,38 +116,37 @@
 
 ---
 
-## Timeline Generator (`backend/engine/timeline_generator.py`)
+## Runtime Plan and Trigger Schedule
 
-### Steak Cadence
+The current runtime uses editable material/runtime files rather than the old
+per-block generated timelines.
 
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| `_STEAK_INTERVAL_S` | `20` | New steak every 20 seconds |
-| `_NUM_PANS` | `3` | Cycling through 3 pans |
+| File | Purpose |
+|------|---------|
+| `backend/data/experiment_materials/counterbalancing.json` | Conditions, task orders, trigger schedule, session-end delay |
+| `backend/data/runtime_plans/main_experiment.json` | PM, cooking, robot-comment, and phone-message lanes for the admin runtime plan editor |
+| `backend/engine/runtime_plan_loader.py` | Loads and validates runtime plans |
+| `backend/engine/pm_session.py` | Runs event-driven PM trigger schedule |
 
-### Fake Triggers (per block)
+### Trigger Schedule
 
-| Block | Type | Content | Duration |
-|-------|------|---------|----------|
-| 1 | visitor | Courier drops off a flyer | 5s |
-| 2 | appliance | Microwave beeps briefly | 3s |
-| 3 | visitor | Neighbor waves hello | 4s |
+| Entry | Type | Delay after previous pipeline | Notes |
+|-------|------|-------------------------------|-------|
+| 1 | real | 180s after game start | Task at position 1 in participant order |
+| 2 | fake doorbell | 120s | Doorbell fake trigger |
+| 3 | real | 60s | Task at position 2 |
+| 4 | real | 120s | Task at position 3 |
+| 5 | fake phone call | 60s | Phone fake trigger |
+| 6 | real | 60s | Task at position 4 |
+| end | session end | 60s | Transition to post-test |
 
 ---
 
 ## PM Task Registry (`backend/engine/pm_tasks.py`)
 
-12 PM tasks across 3 blocks (4 per block). Each defines:
-- `task_id` — unique identifier (e.g., `b1_book`)
-- `block` — which block (1–3)
-- `trigger_type` — `visitor`, `communication`, `appliance`, `activity`
-- `trigger_visual` / `trigger_audio` — sensory cue identifiers
-- `target_room` — room where the item is found
-- `target_name` / `target_image` — the correct item
-- `distractor` / `discriminating_cue` — distractor item + how to distinguish
-- `action` / `action_destination` — what to do with the item
-- `encoding_text` — story paragraph shown during encoding
-- `reminder_text` — baseline reminder content
+Four PM tasks (`T1`-`T4`) are defined through experiment material files and
+runtime helpers. Each task includes trigger type, person/contact, target item,
+decoys, assignment text, reminder variants, and encounter metadata.
 
 ---
 
@@ -149,17 +154,23 @@
 
 ```
 data/
+├── experiment_materials/
+│   ├── counterbalancing.json
+│   ├── encoding_materials.json
+│   ├── pm_tasks.json
+│   ├── questionnaires.json
+│   ├── static_text.json
+│   └── tutorial_materials.json
 ├── messages/
-│   ├── messages_day1.json    — Phone messages for block 1
-│   ├── messages_day2.json    — Phone messages for block 2
-│   └── messages_day3.json    — Phone messages for block 3
-├── timelines/                — Fallback static timeline JSONs (optional)
-│   ├── block_1_control.json
-│   └── ...
-└── sounds/                   — Audio assets (trigger sounds)
+│   └── messages_day1.json
+├── runtime_plans/
+│   └── main_experiment.json
+├── cooking_recipes.py
+├── cooking_timeline.py
+└── materials.py
 ```
 
-### Phone Message Format (`messages_dayN.json`)
+### Phone Message Format (`messages_day1.json`)
 ```json
 {
   "messages": [

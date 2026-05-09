@@ -252,7 +252,7 @@ Codebase review（2026-05-03）：
 - 状态：已修复（止血），架构层面仍需改进
 - 严重性：P2 中
 - 观察：游戏时钟在 elapsed=620s 时显示 18:02，block 运行期间可达 18:30。
-- 详见 `INCIDENT_LOG.md` INC-014。
+- 详见 `INCIDENT_LOG_legacy.md` INC-014。
 
 **三套时间系统（codebase review 后的当前状态）**
 

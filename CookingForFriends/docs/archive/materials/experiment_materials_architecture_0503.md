@@ -3,7 +3,7 @@
 See also:
 
 ```text
-CookingForFriends/docs/experiment_flow_implementation_notes_0504.md
+CookingForFriends/docs/archive/materials/experiment_flow_implementation_notes_0504.md
 ```
 
 That note records the current full-flow implementation decisions, including

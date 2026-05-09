@@ -1,4 +1,4 @@
-"""PM Scoring Engine — 0-6 scale per experiment_plan_v3.md.
+"""PM Scoring Engine — 0-6 scale from docs/archive/plans/experiment_plan_v3.md.
 
 Score criteria:
   6 — Perfect: correct room, correct target, correct action, ≤15s
@@ -95,4 +95,3 @@ def score_pm_trial(
         action_performed=first.get("action"),
         task_config=task_config,
     )
-

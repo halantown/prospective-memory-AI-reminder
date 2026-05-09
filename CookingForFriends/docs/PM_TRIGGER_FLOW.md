@@ -6,7 +6,9 @@
 
 **Cutscene** is reserved for the fixed encoding/tutorial video sequence shown before gameplay, implemented by `CutsceneEncodingPage` and logged through `cutscene_events`.
 
-Doorbell and phone-call PM moments during gameplay are **not cutscenes**. They are **trigger encounters**: scripted, in-world interaction flows that temporarily constrain player input while the cooking game clock and background pressure continue.
+Doorbell and phone-call PM moments during gameplay are **not cutscenes**. They are **trigger encounters**: scripted, in-world interaction flows that temporarily constrain player input while the PM pipeline runs.
+
+Current implementation note: the backend pauses the shared `GameClock` during the PM pipeline via `BlockRuntime.pause("pm")`. Cooking, phone delivery, and time ticks therefore resume after the pipeline completes. If the experimental design changes back to "background pressure continues during encounters", update `backend/engine/block_runtime.py`, `backend/engine/pm_session.py`, and this document together.
 
 Use these names in code and docs:
 
@@ -33,8 +35,8 @@ This flow covers:
 - Clicking after the line is complete advances to the next line.
 - Previous dialogue lines disappear.
 - During dialogue, normal world interactions are disabled.
-- Cooking timers continue to count down during trigger encounters.
-- Phone messages continue to arrive during trigger encounters, but phone UI is non-interactive unless the current encounter explicitly needs the phone call UI.
+- Cooking timers are paused with the shared gameplay clock during trigger encounters.
+- Phone-message delivery is paused with the shared gameplay clock during trigger encounters. The phone UI remains non-interactive unless the current encounter explicitly needs the phone call UI.
 - Trigger encounter state transitions should be logged for monitoring and data export.
 
 ## Dialogue Types

@@ -19,7 +19,7 @@ Entry 5: fake  phone call                —  60 s after entry 4 pipeline ends
 Entry 6: real  trigger (T at position 4) —  60 s after entry 5 pipeline ends
 Session ends                             —  60 s after entry 6 pipeline ends
 ```
-Gameplay trigger encounters are in-world interaction flows, not encoding cutscenes. Cooking timers continue during these encounters; PM pressure is intentional. The scheduler delay for the next trigger starts after the current trigger flow resolves.
+Gameplay trigger encounters are in-world interaction flows, not encoding cutscenes. The current backend pauses the shared `GameClock` during the PM pipeline, so cooking, phone delivery, and time ticks resume after the trigger flow resolves. The scheduler delay for the next trigger starts after the current trigger flow resolves.
 
 ### PM Pipeline (real trigger — 6 steps)
 `trigger_affordance → trigger_encounter_dialogue → reminder (robot avatar) → item selection → confidence rating → avatar auto-action`
@@ -74,8 +74,11 @@ CookingForFriends/
 │       ├── stores/           # Zustand gameStore (condition, taskOrder, pmPipelineState, gameTimeFrozen)
 │       ├── hooks/            # useWebSocket (pm_trigger, avatar_action, session_end, heartbeat)
 │       └── services/         # API client (logCutsceneEvent, logIntentionCheck, getSessionState, updatePhase)
-└── docs/                     # Architecture, incident log, game design docs
+└── docs/                     # Wiki-style docs entrypoint, current refs, archive
 ```
+
+Start with `docs/README.md` when looking for project documentation. Dated
+implementation plans and migration reports are kept under `docs/archive/`.
 
 ## Quick Start
 

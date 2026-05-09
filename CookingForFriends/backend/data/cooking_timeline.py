@@ -3,7 +3,7 @@
 This is the single source of truth for WHEN each cooking step becomes active.
 Every participant sees the same sequence at the same times.
 
-Source: cooking_system_design.md Section 4.
+Source: docs/COOKING.md.
 
 Each entry is (time_offset_seconds, dish_id, step_index).
 - Active steps have a 30-second action window (configurable via COOKING_STEP_WINDOW_S).

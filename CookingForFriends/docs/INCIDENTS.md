@@ -950,7 +950,7 @@ UniqueConstraint('participant_id', 'block_id', 'message_id',
 ### Timeline
 | Time (local) | Event |
 |--------------|-------|
-| 01:35 | Three-time-system review started from `bug_report.md` plan |
+| 01:35 | Three-time-system review started from `archive/incidents/bug_report.md` plan |
 | 01:45 | Root cause confirmed in `timeline.py`, `game_time.py`, and `cooking_engine.py` |
 | 01:55 | `GameClock` abstraction added and timeline migrated to it |
 | 02:04 | Backend compile/tests passed |
