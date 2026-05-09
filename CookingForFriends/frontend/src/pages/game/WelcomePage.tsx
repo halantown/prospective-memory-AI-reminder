@@ -114,8 +114,8 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-stone-50 px-4 py-6 text-slate-900 sm:px-6">
       <main className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-5xl items-center">
         <div className="grid w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg md:grid-cols-[1fr_0.95fr]">
-          <section className="hidden border-r border-slate-200 bg-stone-100 p-8 md:flex md:flex-col">
-            <div>
+          <section className="hidden border-r border-slate-200 bg-stone-100 md:flex md:flex-col">
+            <div className="p-8">
               <div className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-cooking-100 text-cooking-700">
                 <ChefHat className="h-6 w-6" aria-hidden="true" />
               </div>
@@ -123,27 +123,27 @@ export default function WelcomePage() {
               <p className="mt-2 text-sm font-medium text-slate-600">Prospective Memory Session</p>
             </div>
 
-            <div className="mt-auto rounded-lg bg-cooking-600 p-5 text-white shadow-sm">
+            <div className="mt-auto border-t border-cooking-200 bg-cooking-100 p-8 text-slate-900">
               <div className="grid gap-3">
-                <div className="flex items-center gap-3 rounded-lg bg-white/10 p-3">
-                  <Clock className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <div className="flex items-center gap-3 rounded-lg border border-cooking-200 bg-white/60 p-3">
+                  <Clock className="h-5 w-5 shrink-0 text-cooking-700" aria-hidden="true" />
                   <div>
                     <p className="text-sm font-semibold">30-35 minutes</p>
-                    <p className="text-xs text-orange-100">Guided study session</p>
+                    <p className="text-xs text-slate-600">Guided study session</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 rounded-lg bg-white/10 p-3">
-                  <ClipboardCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <div className="flex items-center gap-3 rounded-lg border border-cooking-200 bg-white/60 p-3">
+                  <ClipboardCheck className="h-5 w-5 shrink-0 text-cooking-700" aria-hidden="true" />
                   <div>
                     <p className="text-sm font-semibold">Training first</p>
-                    <p className="text-xs text-orange-100">Main task begins afterward</p>
+                    <p className="text-xs text-slate-600">Main task begins afterward</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 rounded-lg bg-white/10 p-3">
-                  <ShieldCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <div className="flex items-center gap-3 rounded-lg border border-cooking-200 bg-white/60 p-3">
+                  <ShieldCheck className="h-5 w-5 shrink-0 text-cooking-700" aria-hidden="true" />
                   <div>
                     <p className="text-sm font-semibold">Experimenter-led</p>
-                    <p className="text-xs text-orange-100">Use the assigned token only</p>
+                    <p className="text-xs text-slate-600">Use the assigned token only</p>
                   </div>
                 </div>
               </div>
