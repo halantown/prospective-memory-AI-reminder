@@ -5,6 +5,7 @@
 /docs
 /.github
 /.idea
+/.vscode
 
 # Python
 *.pyc
