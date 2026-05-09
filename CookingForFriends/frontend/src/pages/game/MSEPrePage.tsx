@@ -44,8 +44,8 @@ export default function MSEPrePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="w-full max-w-xl rounded-2xl bg-white p-8 shadow-xl">
+    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-xl rounded-lg bg-white p-8 shadow-lg">
         <h1 className="text-2xl font-bold text-slate-900">Memory Questions</h1>
         <p className="mt-4 rounded-lg bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
           {note}
@@ -60,12 +60,12 @@ export default function MSEPrePage() {
           Continue with placeholder MSE item set.
         </label>
         {error && (
-          <div className="mt-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="mt-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <button
           onClick={handleContinue}
           disabled={!acknowledged || loading}
-          className="mt-8 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="mt-8 w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           {loading ? <><span className="btn-spinner" />Saving...</> : 'Continue'}
         </button>
@@ -73,4 +73,3 @@ export default function MSEPrePage() {
     </div>
   )
 }
-

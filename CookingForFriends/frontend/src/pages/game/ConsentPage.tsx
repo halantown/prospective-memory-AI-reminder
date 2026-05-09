@@ -50,12 +50,12 @@ export default function ConsentPage() {
   const pdfSrc = consent?.pdf_path ? `/${consent.pdf_path}` : null
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full p-8">
+    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full p-8">
         <h1 className="text-2xl font-bold text-slate-800 mb-6 text-center">
           Informed Consent
         </h1>
-        <div className="h-[60vh] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 mb-5">
+        <div className="h-[60vh] overflow-hidden rounded-lg border border-slate-200 bg-slate-50 mb-5">
           {pdfSrc ? (
             <iframe title="Informed consent" src={pdfSrc} className="h-full w-full" />
           ) : (
@@ -64,7 +64,7 @@ export default function ConsentPage() {
             </div>
           )}
         </div>
-        <label className="mb-6 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+        <label className="mb-6 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
           <input
             type="checkbox"
             checked={checked}
@@ -77,13 +77,13 @@ export default function ConsentPage() {
           </span>
         </label>
         {error && (
-          <div className="mb-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <button
           onClick={handleAgree}
           disabled={loading || !checked}
           className="w-full py-3 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300
-                     text-white font-semibold rounded-xl transition-colors text-base"
+                     text-white font-semibold rounded-lg transition-colors text-base"
         >
           {loading ? <><span className="btn-spinner" />Please wait...</> : consent?.continue_button ?? 'I Agree & Continue'}
         </button>

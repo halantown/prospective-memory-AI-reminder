@@ -62,8 +62,8 @@ export default function DemographicsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl">
+    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow-lg">
         <h1 className="text-xl font-bold text-slate-900 mb-6">Background Questions</h1>
         <form
           autoComplete="off"
@@ -144,12 +144,12 @@ export default function DemographicsPage() {
         </form>
 
         {error && (
-          <div className="mt-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="mt-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <button
           onClick={handleSubmit}
           disabled={!isComplete || loading}
-          className="mt-8 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="mt-8 w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           {loading ? <><span className="btn-spinner" />Saving...</> : 'Continue'}
         </button>

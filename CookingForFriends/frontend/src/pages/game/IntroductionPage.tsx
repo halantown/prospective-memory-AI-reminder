@@ -24,8 +24,8 @@ export default function IntroductionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-8 space-y-6">
+    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-8 space-y-6">
         <div className="text-4xl text-center">🍳</div>
         <h1 className="text-2xl font-bold text-slate-800 text-center">
           Introduction
@@ -35,7 +35,7 @@ export default function IntroductionPage() {
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">
             About the Task
           </h2>
-          <div className="bg-slate-50 rounded-xl p-5 text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">
+          <div className="bg-slate-50 rounded-lg p-5 text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">
             {PLACEHOLDER_INTRODUCTION}
           </div>
         </section>
@@ -44,7 +44,7 @@ export default function IntroductionPage() {
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">
             Trial Session
           </h2>
-          <div className="bg-emerald-50 rounded-xl p-5 text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">
+          <div className="bg-emerald-50 rounded-lg p-5 text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">
             {PLACEHOLDER_TRIAL_SESSION}
           </div>
         </section>
@@ -53,7 +53,7 @@ export default function IntroductionPage() {
           onClick={handleReady}
           disabled={loading}
           className="w-full py-3 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300
-                     text-white font-semibold rounded-xl transition-colors text-base"
+                     text-white font-semibold rounded-lg transition-colors text-base"
         >
           {loading ? 'Please wait…' : 'Ready to begin'}
         </button>

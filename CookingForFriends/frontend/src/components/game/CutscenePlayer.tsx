@@ -11,8 +11,8 @@ export default function CutscenePlayer({ taskId, segmentIndex, placeholder, onNe
   const segmentLabel = `Segment ${segmentIndex + 1} / 4`
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-8">
+    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="text-3xl">🎬</div>
           <div>

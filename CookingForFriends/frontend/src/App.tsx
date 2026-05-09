@@ -222,8 +222,8 @@ function ConnectionIssuePage({ participantId }: { participantId: string | null }
 
 function CompletePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+    <div className="min-h-screen bg-stone-900 flex items-center justify-center p-6">
+      <div className="bg-stone-100 rounded-lg shadow-xl p-8 max-w-md text-center">
         <div className="text-5xl mb-4">🎉</div>
         <h1 className="text-2xl font-bold text-slate-800 mb-2">Thank You!</h1>
         <p className="text-slate-600">

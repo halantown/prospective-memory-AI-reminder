@@ -44,8 +44,8 @@ export default function GamePage() {
 
   if (blockError) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-lg border border-red-300 bg-white p-6 text-center shadow-xl">
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-lg border border-red-200 bg-white p-6 text-center shadow-lg">
           <h1 className="text-xl font-bold text-slate-900">Game Error</h1>
           <p className="mt-3 text-sm leading-relaxed text-slate-600">
             A server error occurred during gameplay. Please contact the experimenter.

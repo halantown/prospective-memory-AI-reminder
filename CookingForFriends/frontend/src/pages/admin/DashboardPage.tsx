@@ -155,7 +155,7 @@ function ConfirmModal({
         onClick={onCancel}
       >
         <motion.div
-          className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4"
+          className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4"
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}

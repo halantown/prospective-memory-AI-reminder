@@ -1,7 +1,7 @@
 /** Welcome page with token login — references SaturdayAtHome pattern. */
 
 import { useEffect, useRef, useState } from 'react'
-import { ChefHat, KeyRound } from 'lucide-react'
+import { ChefHat, Clock, ClipboardCheck, KeyRound, ShieldCheck } from 'lucide-react'
 import { useGameStore } from '../../stores/gameStore'
 import { advancePhase, getPublicExperimentConfig, getSessionStatus, setSessionToken, startSession } from '../../services/api'
 import { frontendPhaseForBackend, renderPhaseFor } from '../../utils/phase'
@@ -113,8 +113,8 @@ export default function WelcomePage() {
   return (
     <div className="min-h-screen bg-stone-50 px-4 py-6 text-slate-900 sm:px-6">
       <main className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-5xl items-center">
-        <div className="grid w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg md:grid-cols-[1.05fr_0.95fr]">
-          <section className="hidden border-r border-slate-200 bg-stone-100 p-8 md:flex md:flex-col md:justify-between">
+        <div className="grid w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg md:grid-cols-[1fr_0.95fr]">
+          <section className="hidden border-r border-slate-200 bg-stone-100 p-8 md:flex md:flex-col">
             <div>
               <div className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-cooking-100 text-cooking-700">
                 <ChefHat className="h-6 w-6" aria-hidden="true" />
@@ -122,16 +122,35 @@ export default function WelcomePage() {
               <h1 className="mt-5 text-3xl font-bold text-slate-950">Cooking for Friends</h1>
               <p className="mt-2 text-sm font-medium text-slate-600">Prospective Memory Session</p>
             </div>
-            <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <img
-                src="/assets/floorplan.png"
-                alt=""
-                className="h-64 w-full object-contain"
-              />
+
+            <div className="mt-auto rounded-lg bg-cooking-600 p-5 text-white shadow-sm">
+              <div className="grid gap-3">
+                <div className="flex items-center gap-3 rounded-lg bg-white/10 p-3">
+                  <Clock className="h-5 w-5 shrink-0" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-semibold">30-35 minutes</p>
+                    <p className="text-xs text-orange-100">Guided study session</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg bg-white/10 p-3">
+                  <ClipboardCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-semibold">Training first</p>
+                    <p className="text-xs text-orange-100">Main task begins afterward</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg bg-white/10 p-3">
+                  <ShieldCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-semibold">Experimenter-led</p>
+                    <p className="text-xs text-orange-100">Use the assigned token only</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
-          <section className="px-6 py-7 sm:px-8">
+          <section className="flex flex-col px-6 py-7 sm:px-8">
             <div className="mb-6 md:hidden">
               <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-cooking-100 text-cooking-700">
                 <ChefHat className="h-5 w-5" aria-hidden="true" />
@@ -202,7 +221,7 @@ export default function WelcomePage() {
               </button>
             </div>
 
-            <p className="mt-6 border-t border-slate-100 pt-4 text-center text-xs text-slate-400">
+            <p className="mt-12 border-t border-slate-100 pt-6 text-center text-xs text-slate-400 md:mt-auto">
               Session data is anonymized
             </p>
           </section>

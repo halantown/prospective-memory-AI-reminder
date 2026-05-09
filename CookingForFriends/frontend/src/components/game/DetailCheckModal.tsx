@@ -32,7 +32,7 @@ export default function DetailCheckModal({ question, options, correctIndex, onCo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8">
+      <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full p-8">
         <div className="text-3xl mb-4 text-center">🧐</div>
         <h2 className="text-lg font-bold text-slate-800 mb-6 text-center">
           Detail Check

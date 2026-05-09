@@ -322,8 +322,8 @@ export default function EncodingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-slate-400 text-lg">Loading task cards...</div>
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="text-slate-500 text-lg">Loading task cards...</div>
       </div>
     )
   }
@@ -332,12 +332,12 @@ export default function EncodingPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-xl p-6 text-center space-y-4">
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-lg p-6 text-center space-y-4">
           <p className="text-red-600 font-medium">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800"
+            className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
           >
             Reload
           </button>
@@ -350,12 +350,12 @@ export default function EncodingPage() {
 
   if (!cards.length || !card || !ec) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-xl p-6 text-center space-y-4">
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-lg p-6 text-center space-y-4">
           <p className="text-slate-600">No task cards available. Please refresh.</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800"
+            className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
           >
             Reload
           </button>
@@ -368,8 +368,8 @@ export default function EncodingPage() {
 
   if (allDone) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-8 space-y-6">
+      <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-6">
+        <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-8 space-y-6">
           <div className="text-center">
             <div className="text-4xl mb-3">🎉</div>
             <h2 className="text-2xl font-bold text-slate-800">
@@ -380,7 +380,7 @@ export default function EncodingPage() {
 
           <div className="space-y-3">
             {cards.map((c, i) => (
-              <div key={i} className="bg-slate-50 rounded-xl p-3 flex items-start gap-3">
+              <div key={i} className="bg-slate-50 rounded-lg p-3 flex items-start gap-3">
                 <span className="text-sm font-bold text-blue-500 shrink-0">{i + 1}.</span>
                 <p className="text-sm text-slate-700">
                   <span className="font-medium text-amber-700">
@@ -398,7 +398,7 @@ export default function EncodingPage() {
           <button
             onClick={handleStartGame}
             className="w-full py-4 bg-slate-900 hover:bg-slate-800
-                       text-white text-lg font-bold rounded-xl transition-colors"
+                       text-white text-lg font-bold rounded-lg transition-colors"
           >
             🍳 Ready to start cooking!
           </button>
@@ -411,8 +411,8 @@ export default function EncodingPage() {
 
   if (autoPassMessage) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow-xl p-8 text-center space-y-3">
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-lg shadow-lg p-8 text-center space-y-3">
           <div className="text-3xl">💪</div>
           <p className="text-lg font-medium text-slate-700">Let's move on</p>
           <p className="text-sm text-slate-400">Don't worry — you'll do great!</p>
@@ -424,7 +424,7 @@ export default function EncodingPage() {
   // ── Render: card + quiz ──
 
   return (
-    <div className="h-screen bg-slate-950 flex flex-col justify-center overflow-hidden">
+    <div className="h-screen bg-stone-900 flex flex-col justify-center overflow-hidden">
       {/* Compact Header */}
       <div className="shrink-0 px-6 pt-4 pb-2 text-center">
         <div className="flex items-center justify-center gap-3 mb-1">
@@ -455,7 +455,7 @@ export default function EncodingPage() {
       {/* Card + Quiz area — vertically centered with header */}
       {card && ec && (
         <div className="min-h-0 px-6 pb-4" style={{ maxHeight: '78vh' }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl mx-auto h-full flex flex-col p-5">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl mx-auto h-full flex flex-col p-5">
             {/* Top bar */}
             <div className="flex items-center justify-between mb-3 shrink-0">
               <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">

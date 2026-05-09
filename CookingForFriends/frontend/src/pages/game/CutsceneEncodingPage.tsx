@@ -199,7 +199,7 @@ export default function CutsceneEncodingPage() {
           <PhoneSidebar />
         </div>
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/70">
-          <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="bg-white rounded-lg shadow-xl p-8 text-center">
             <div className="text-5xl mb-4">✅</div>
             <h2 className="text-xl font-bold text-slate-800">Encoding Complete</h2>
             <p className="text-slate-500 mt-2">Starting the game…</p>

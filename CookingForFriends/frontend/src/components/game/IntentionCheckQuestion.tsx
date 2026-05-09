@@ -20,8 +20,8 @@ export default function IntentionCheckQuestion({ taskId, data, position, onCompl
   }
 
   return (
-    <div className={className ?? 'min-h-screen bg-slate-950 flex items-center justify-center p-6'}>
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-8">
+    <div className={className ?? 'min-h-screen bg-stone-50 flex items-center justify-center p-6'}>
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-8">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="text-3xl">🤔</div>

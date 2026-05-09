@@ -78,15 +78,15 @@ export default function PostTestFlowPage() {
 
   if (!config) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-sm text-slate-500">
+      <div className="min-h-screen bg-stone-900 flex items-center justify-center text-sm text-stone-300">
         Loading...
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl rounded-2xl bg-white p-8 shadow-xl">
+    <div className="min-h-screen bg-stone-900 flex items-center justify-center p-6">
+      <div className="w-full max-w-2xl rounded-lg bg-stone-100 p-8 shadow-xl">
         <h1 className="text-2xl font-bold text-slate-900">{titleForPhase(phase)}</h1>
 
         {phase === 'POST_MANIP_CHECK' && (
@@ -117,7 +117,7 @@ export default function PostTestFlowPage() {
                       key={n}
                       onClick={() => setRatings((prev) => ({ ...prev, [id]: n }))}
                       className={`rounded-md border py-2 text-sm font-semibold ${
-                        ratings[id] === n ? 'border-slate-900 bg-slate-100' : 'border-slate-300 bg-white'
+                        ratings[id] === n ? 'border-slate-900 bg-white' : 'border-slate-300 bg-stone-50'
                       }`}
                     >
                       {n}
@@ -130,7 +130,7 @@ export default function PostTestFlowPage() {
         )}
 
         {phase !== 'POST_MANIP_CHECK' && phase !== 'POST_SUBJECTIVE_DV' && (
-          <div className="mt-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-950">
+          <div className="mt-6 rounded-lg bg-cooking-50 p-4 text-sm text-amber-950">
             {phase === 'POST_RETRO_CHECK'
               ? 'Retrospective memory check options are still pending. Enter any notes for this placeholder step.'
               : 'Scale items are still pending. This placeholder records progression through the phase.'}
@@ -145,12 +145,12 @@ export default function PostTestFlowPage() {
         )}
 
         {error && (
-          <div className="mt-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="mt-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
         <button
           onClick={submit}
           disabled={!canSubmit || loading}
-          className="mt-8 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="mt-8 w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           {loading ? <><span className="btn-spinner" />Saving...</> : 'Continue'}
         </button>
