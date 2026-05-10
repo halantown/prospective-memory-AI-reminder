@@ -300,11 +300,19 @@ export default function PMTriggerModal() {
 
   const markTriggerResponded = useCallback(() => {
     if (!pmPipelineState) return
+    const timestamp = nowSeconds()
+    send('pm_navigation_started', {
+      task_id: taskId,
+      trigger_type: triggerType,
+      is_fake: isFake,
+      timestamp,
+    })
     send('pm_trigger_responded', {
       task_id: taskId,
       trigger_type: triggerType,
       is_fake: isFake,
-      game_time: nowSeconds(),
+      game_time: timestamp,
+      timestamp,
     })
     clearRobotSpeech()
     advancePMPipelineStep('greeting')
@@ -331,6 +339,7 @@ export default function PMTriggerModal() {
         trigger_type: triggerType,
         is_fake: isFake,
         game_time: nowSeconds(),
+        timestamp: nowSeconds(),
       })
       clearRobotSpeech()
       if (isFake) {
@@ -347,7 +356,8 @@ export default function PMTriggerModal() {
 
   useEffect(() => {
     if (step === 'reminder' && taskId) {
-      send('pm_reminder_shown', { task_id: taskId, game_time: nowSeconds() })
+      const timestamp = nowSeconds()
+      send('pm_reminder_shown', { task_id: taskId, game_time: timestamp, timestamp })
     }
     if (step !== 'reminder') clearRobotSpeech()
   }, [clearRobotSpeech, send, step, taskId])
@@ -377,7 +387,10 @@ export default function PMTriggerModal() {
       advancePMPipelineStep('direct_request')
       return
     }
-    if (taskId) send('pm_greeting_complete', { task_id: taskId, game_time: nowSeconds() })
+    if (taskId) {
+      const timestamp = nowSeconds()
+      send('pm_greeting_complete', { task_id: taskId, game_time: timestamp, timestamp })
+    }
     advancePMPipelineStep('reminder')
   }
 
@@ -386,12 +399,16 @@ export default function PMTriggerModal() {
       trigger_type: triggerType,
       scheduled_game_time: pmPipelineState.firedAt,
       resolved_at: nowSeconds(),
+      timestamp: nowSeconds(),
     })
     close()
   }
 
   const handleReminderAck = () => {
-    if (taskId) send('pm_reminder_ack', { task_id: taskId, game_time: nowSeconds() })
+    if (taskId) {
+      const timestamp = nowSeconds()
+      send('pm_reminder_ack', { task_id: taskId, game_time: timestamp, timestamp })
+    }
     clearRobotSpeech()
     advancePMPipelineStep('item_selection')
   }
@@ -404,6 +421,7 @@ export default function PMTriggerModal() {
         item_selected: option.id,
         item_correct: option.isTarget,
         response_time_ms: responseTimeMs,
+        timestamp: nowSeconds(),
       })
     }
     advancePMPipelineStep('confidence_rating')
@@ -415,6 +433,7 @@ export default function PMTriggerModal() {
         task_id: taskId,
         confidence_rating: rating,
         response_time_ms: responseTimeMs,
+        timestamp: nowSeconds(),
       })
     }
     advancePMPipelineStep('auto_execute')
@@ -426,6 +445,7 @@ export default function PMTriggerModal() {
         task_id: taskId,
         action_animation_start_time: startedAt,
         action_animation_complete_time: finishedAt,
+        timestamp: finishedAt,
       })
     }
     close()

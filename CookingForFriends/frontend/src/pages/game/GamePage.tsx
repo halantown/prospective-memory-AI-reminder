@@ -23,7 +23,7 @@ export default function GamePage() {
   const setActivePhoneTab = useGameStore((s) => s.setActivePhoneTab)
   const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
-  const pmBlocksOngoingTask = pmPipelineState && pmPipelineState.step !== 'trigger_event'
+  const pmBlocksOngoingTask = Boolean(pmPipelineState)
   const pmBlocksPhone = Boolean(pmPipelineState)
 
   useEffect(() => {
@@ -80,11 +80,17 @@ export default function GamePage() {
             Reconnecting to server...
           </div>
         )}
+        {pmBlocksOngoingTask && (
+          <div className="absolute inset-0 z-overlay-pm bg-slate-950/45 backdrop-blur-[1px]" />
+        )}
       </div>
 
       {/* Phone sidebar */}
-      <div style={{ width: 'var(--phone-sidebar-width)' }} className={`flex-shrink-0 ${pmBlocksPhone ? 'pointer-events-none' : ''}`}>
+      <div style={{ width: 'var(--phone-sidebar-width)' }} className={`relative flex-shrink-0 ${pmBlocksPhone ? 'pointer-events-none' : ''}`}>
         <PhoneSidebar />
+        {pmBlocksPhone && (
+          <div className="absolute inset-0 z-overlay-pm bg-slate-950/70 backdrop-blur-sm" />
+        )}
       </div>
 
       {/* PM pipeline overlay — blocks all game interaction when active */}

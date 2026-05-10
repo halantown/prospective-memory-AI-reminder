@@ -207,6 +207,7 @@ export default function FloorPlanView({
   const pointerInsideGameAreaRef = useRef(true)
   const doorbellSequenceWasActiveRef = useRef(false)
   const doorbellAlreadyAnsweredRef = useRef(false)
+  const doorbellNavigationLoggedRef = useRef(false)
   const previousVisitorWaypointRef = useRef<string | null>(null)
   const [viewSize, setViewSize] = useState({ width: 0, height: 0 })
   const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(initialRoom)
@@ -246,6 +247,7 @@ export default function FloorPlanView({
   const robotState = useGameStore((s) => s.robot)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeStation = useGameStore((s) => s.activeStation)
+  const wsSend = useGameStore((s) => s.wsSend)
 
   // Doorbell PM trigger → highlight living room navigation and front-door area.
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
@@ -299,6 +301,7 @@ export default function FloorPlanView({
   useEffect(() => {
     if (doorbellActive) return
     doorbellAlreadyAnsweredRef.current = false
+    doorbellNavigationLoggedRef.current = false
   }, [doorbellActive])
 
   useEffect(() => {
@@ -371,6 +374,23 @@ export default function FloorPlanView({
       doTransition()
     }
   }, [answerDoorbellAtDoor, currentRoom, disableNavigation, doorbellActive, isMoving, isCharMoving, moveToWaypoint, scheduleRobotFollow, setActiveStation, teleportTo])
+
+  useEffect(() => {
+    if (!doorbellActive || currentRoom === 'living_room' || isMoving || isCharMoving) return
+    if (!doorbellNavigationLoggedRef.current && wsSend) {
+      doorbellNavigationLoggedRef.current = true
+      wsSend({
+        type: 'pm_navigation_started',
+        data: {
+          task_id: pmPipelineState?.taskId ?? null,
+          trigger_type: 'doorbell',
+          is_fake: Boolean(pmPipelineState?.isFake),
+          timestamp: Date.now() / 1000,
+        },
+      })
+    }
+    navigateToRoom('living_room')
+  }, [currentRoom, doorbellActive, isCharMoving, isMoving, navigateToRoom, pmPipelineState?.isFake, pmPipelineState?.taskId, wsSend])
 
   // Enter a room from overview — robot follows immediately with delay
   const enterRoom = useCallback((room: FloorRoom) => {
