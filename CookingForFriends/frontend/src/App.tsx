@@ -31,6 +31,7 @@ const AdminDashboard = lazy(() => import('./pages/admin/DashboardPage'))
 const ConfigPage = lazy(() => import('./pages/admin/ConfigPage'))
 const TimelineEditorPage = lazy(() => import('./pages/admin/TimelineEditorPage'))
 const ParticipantControlPage = lazy(() => import('./pages/admin/ParticipantControlPage'))
+const EncodingHotspotToolPage = lazy(() => import('./pages/admin/EncodingHotspotToolPage'))
 
 function LoadingFallback() {
   return (
@@ -55,6 +56,7 @@ export default function App() {
         {/* Admin routes — lazy loaded, SPA navigation */}
         <Route path="/admin/participant/:participantId" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ParticipantControlWrapper /></Suspense></ErrorBoundary>} />
         <Route path="/admin/timeline-editor" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><TimelineEditorPage /></Suspense></ErrorBoundary>} />
+        <Route path="/admin/encoding-hotspots" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><EncodingHotspotToolPage /></Suspense></ErrorBoundary>} />
         <Route path="/timeline-editor" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><TimelineEditorPage /></Suspense></ErrorBoundary>} />
         <Route path="/dashboard" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>} />
         <Route path="/admin" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>} />

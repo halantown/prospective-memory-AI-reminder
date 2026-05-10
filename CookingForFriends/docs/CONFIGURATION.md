@@ -114,6 +114,89 @@ design is archived and should not be used for new implementation work.
 |--------|-------|-------------|
 | Room → Furniture mapping | study→Bookshelf, bedroom→Cabinet, living_room→Shelf, bathroom→Supply Shelf, kitchen→Kitchen Shelf | Furniture button per room |
 
+### Encoding Interactive Videos
+
+Encoding video material is configured in:
+
+```text
+backend/data/experiment_materials/encoding_materials.json
+```
+
+Each task uses four separate video segment files under:
+
+```text
+frontend/public/assets/encoding/t1/segment1.mp4
+frontend/public/assets/encoding/t1/segment2.mp4
+frontend/public/assets/encoding/t1/segment3.mp4
+frontend/public/assets/encoding/t1/segment4.mp4
+frontend/public/assets/encoding/t2/segment1.mp4
+...
+frontend/public/assets/encoding/t4/segment4.mp4
+```
+
+Files in `frontend/public/` are served directly by Vite. A material path such as
+`/assets/encoding/t1/segment1.mp4` maps to:
+
+```text
+frontend/public/assets/encoding/t1/segment1.mp4
+```
+
+The frontend component is:
+
+```text
+frontend/src/components/game/InteractiveEncodingVideo.tsx
+```
+
+The formal participant-facing player has no visible video controls. Each
+segment autoplays, stops when the segment video ends, then shows a pulsing
+hotspot. The participant advances only by clicking the highlighted target.
+
+The configured source of truth for each segment is:
+
+```json
+{
+  "id": "segment1",
+  "src": "/assets/encoding/t1/segment1.mp4",
+  "label": "Game controller",
+  "duration_ms": 12000,
+  "click_target": {
+    "id": "game_controller",
+    "label": "Game controller",
+    "hint": "Click the game controller",
+    "x": 311,
+    "y": 600,
+    "width": 222,
+    "height": 133
+  }
+}
+```
+
+Coordinates are stored in original video pixels, not CSS pixels. Current
+encoding assets are expected to be `1112 x 834`, set by `frame_width` and
+`frame_height` in each task material. The rendered window may resize, but the
+hotspot is scaled proportionally over the video frame.
+
+Use the hotspot positioning tool at:
+
+```text
+http://127.0.0.1:3000/admin/encoding-hotspots
+```
+
+Workflow:
+
+1. Place the segment video under `frontend/public/assets/encoding/t*/`.
+2. Open `/admin/encoding-hotspots`.
+3. Enter the public video path, for example `/assets/encoding/t1/segment1.mp4`.
+4. Keep frame size at `1112 x 834` unless the exported video resolution changes.
+5. Drag a rectangle over the click target.
+6. Copy the generated `click_target` JSON into the matching segment in
+   `backend/data/experiment_materials/encoding_materials.json`.
+7. Reload the participant flow and verify the hotspot appears on the final
+   frame after playback ends.
+
+The hotspot tool itself shows video controls for positioning work. Those
+controls are not present in the participant-facing encoding player.
+
 ---
 
 ## Runtime Plan and Trigger Schedule

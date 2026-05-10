@@ -3,12 +3,15 @@ import { useGameStore } from '../../stores/gameStore'
 import {
   advancePhase,
   getExperimentConfig,
+  logCutsceneEvent,
   submitExperimentResponses,
   submitManipulationCheck,
 } from '../../services/api'
 import { frontendPhaseForBackend } from '../../utils/phase'
 import TrainingHomeShell from '../../components/game/TrainingHomeShell'
 import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
+import InteractiveEncodingVideo from '../../components/game/InteractiveEncodingVideo'
+import type { EncodingVideoSegment } from '../../components/game/InteractiveEncodingVideo'
 
 interface Option {
   id: string
@@ -45,7 +48,12 @@ export default function EncodingFlowPage() {
   }, [sessionId, currentPhase])
 
   const manip = config?.manipulation_check as { question: string; options: Option[] } | undefined
-  const encoding = config?.encoding as { video_src?: string; episode_label?: string } | undefined
+  const encoding = config?.encoding as {
+    episode_label?: string
+    frame_width?: number
+    frame_height?: number
+    interactive_segments?: EncodingVideoSegment[]
+  } | undefined
   const assign = config?.assign as { text: string } | undefined
   const recapTasks = (config?.tasks as Array<{ task_id: string; text: string }> | undefined) ?? []
 
@@ -109,6 +117,43 @@ export default function EncodingFlowPage() {
     }
   }
 
+  const handleEncodingSegmentViewed = (
+    segment: EncodingVideoSegment,
+    segmentIndex: number,
+    durationMs: number,
+  ) => {
+    if (!sessionId) return
+    logCutsceneEvent(sessionId, {
+      task_id: String(config?.task_id),
+      segment_index: segmentIndex,
+      placeholder: segment.placeholder ?? segment.label,
+      viewed_at: Date.now() / 1000 - durationMs / 1000,
+      duration_ms: durationMs,
+    }).catch((e) => console.error('[EncodingFlow] segment view log failed', e))
+  }
+
+  const handleEncodingInteractionClick = (
+    segment: EncodingVideoSegment,
+    segmentIndex: number,
+    responseTimeMs: number,
+  ) => {
+    if (!sessionId) return
+    submitExperimentResponses(sessionId, [{
+      phase: currentPhase,
+      question_id: `${String(config?.task_id)}_segment_${segmentIndex + 1}_interaction_click`,
+      response_type: 'object',
+      value: {
+        segment_id: segment.id,
+        click_target_id: segment.click_target.id,
+      },
+      metadata: {
+        task_id: config?.task_id ?? null,
+        segment_index: segmentIndex,
+        response_time_ms: responseTimeMs,
+      },
+    }]).catch((e) => console.error('[EncodingFlow] interaction click log failed', e))
+  }
+
   if (!config) {
     return (
       <TrainingHomeShell phase={currentPhase}>
@@ -121,7 +166,7 @@ export default function EncodingFlowPage() {
 
   return (
     <TrainingHomeShell phase={currentPhase}>
-      <div className="rounded-lg border border-slate-300 bg-white/95 p-5 shadow-xl backdrop-blur">
+      <div className={kind === 'video' ? '' : 'rounded-lg border border-slate-300 bg-white/95 p-5 shadow-xl backdrop-blur'}>
         {kind === 'video' && (
           <div>
             <BubbleDialogue
@@ -129,18 +174,19 @@ export default function EncodingFlowPage() {
               text="Watch carefully. Let me tell you what happened recently."
               avatar="A"
             />
-            <div className="mt-4 flex aspect-video max-h-[34vh] items-center justify-center rounded-lg border border-slate-300 bg-slate-100 text-center text-sm text-slate-500">
-              Video asset placeholder
-              <br />
-              {encoding?.video_src}
+            <div className="mt-4">
+              <InteractiveEncodingVideo
+                taskId={String(config.task_id)}
+                title={title}
+                frameWidth={encoding?.frame_width}
+                frameHeight={encoding?.frame_height}
+                segments={encoding?.interactive_segments ?? []}
+                loading={loading}
+                onSegmentViewed={handleEncodingSegmentViewed}
+                onInteractionClick={handleEncodingInteractionClick}
+                onComplete={advance}
+              />
             </div>
-            <button
-              onClick={advance}
-              disabled={loading}
-              className="mt-6 w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white disabled:bg-slate-300"
-            >
-              {loading ? 'Please wait...' : 'Continue'}
-            </button>
           </div>
         )}
 

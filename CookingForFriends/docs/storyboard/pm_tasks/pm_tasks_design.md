@@ -60,6 +60,39 @@ Terminology:
 - Encoding videos are grounding material only. The explicit assignment screen is
   the authoritative PM task instruction.
 
+### Interactive Encoding Video State Machine
+
+Each `ENCODING_VIDEO_N` phase contains one four-segment interactive episode.
+The backend phase sequence stays unchanged:
+
+```text
+ENCODING_VIDEO_N -> MANIP_CHECK_N -> ASSIGN_N
+```
+
+Inside the frontend video phase, the local state machine is:
+
+```text
+segment1_playing
+-> segment1_wait_interaction1_click
+-> segment2_playing
+-> segment2_wait_interaction2_click
+-> segment3_playing
+-> segment3_wait_interaction3_click
+-> segment4_playing
+-> segment4_wait_continue_click
+-> MANIP_CHECK_N
+```
+
+All four tasks use four separate segment video files. At the end of each
+segment, playback pauses on the final frame, one hotspot is highlighted, and the
+participant must click that hotspot to continue. The task instruction card is
+not part of the video; it remains the existing `ASSIGN_N` screen after the
+video and manipulation check.
+
+Hotspot targets are engagement anchors, not final target-selection distractors.
+They should make the episode visually traceable without turning the video into
+the source of PM-task instruction.
+
 ---
 
 ## Current Task Inventory

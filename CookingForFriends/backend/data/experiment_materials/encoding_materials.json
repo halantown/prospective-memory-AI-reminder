@@ -1,8 +1,75 @@
 {
   "tasks": {
     "T1": {
-      "video_src": "/assets/encoding/t1_mei.mp4",
       "episode_label": "Mei episode",
+      "frame_width": 1112,
+      "frame_height": 834,
+      "interactive_segments": [
+        {
+          "id": "segment1",
+          "src": "/assets/encoding/t1/segment1.mp4",
+          "label": "Game controller",
+          "duration_ms": 12000,
+          "click_target": {
+            "id": "game_controller",
+            "label": "Game controller",
+            "hint": "Click the game controller",
+            "x": 311,
+            "y": 600,
+            "width": 222,
+            "height": 133
+          },
+          "placeholder": "Mei invites you to play one more round. The game controller is on the coffee table."
+        },
+        {
+          "id": "segment2",
+          "src": "/assets/encoding/t1/segment2.mp4",
+          "label": "Snack box",
+          "duration_ms": 14000,
+          "click_target": {
+            "id": "snack_box",
+            "label": "Snack box",
+            "hint": "Click the snack box",
+            "x": 523,
+            "y": 559,
+            "width": 245,
+            "height": 133
+          },
+          "placeholder": "You put the snack box on the table and Mei tries one of the pastries."
+        },
+        {
+          "id": "segment3",
+          "src": "/assets/encoding/t1/segment3.mp4",
+          "label": "Baking book",
+          "duration_ms": 15000,
+          "click_target": {
+            "id": "baking_book_bubble",
+            "label": "Baking book",
+            "hint": "Click the baking book",
+            "x": 645,
+            "y": 259,
+            "width": 222,
+            "height": 150
+          },
+          "placeholder": "Mei asks how you made the snacks. You mention the baking book at home."
+        },
+        {
+          "id": "segment4",
+          "src": "/assets/encoding/t1/segment4.mp4",
+          "label": "Continue",
+          "duration_ms": 11000,
+          "click_target": {
+            "id": "continue",
+            "label": "Continue",
+            "hint": "Continue",
+            "x": 845,
+            "y": 651,
+            "width": 178,
+            "height": 83
+          },
+          "placeholder": "You and Mei continue playing games after you promise to show her the baking book."
+        }
+      ],
       "manipulation_check": {
         "question": "What were you and Mei doing in the video?",
         "options": [
@@ -14,8 +81,75 @@
       }
     },
     "T2": {
-      "video_src": "/assets/encoding/t2_anna_lina.mp4",
       "episode_label": "Anna-Lina episode",
+      "frame_width": 1112,
+      "frame_height": 834,
+      "interactive_segments": [
+        {
+          "id": "segment1",
+          "src": "/assets/encoding/t2/segment1.mp4",
+          "label": "Gift bag",
+          "duration_ms": 12000,
+          "click_target": {
+            "id": "gift_bag",
+            "label": "Gift bag",
+            "hint": "Click the gift bag",
+            "x": 712,
+            "y": 517,
+            "width": 200,
+            "height": 183
+          },
+          "placeholder": "Anna-Lina has a gift bag near the table while you spend time together."
+        },
+        {
+          "id": "segment2",
+          "src": "/assets/encoding/t2/segment2.mp4",
+          "label": "Postcard",
+          "duration_ms": 13000,
+          "click_target": {
+            "id": "postcard",
+            "label": "Postcard",
+            "hint": "Click the postcard",
+            "x": 500,
+            "y": 567,
+            "width": 222,
+            "height": 108
+          },
+          "placeholder": "A postcard on the table becomes part of the conversation."
+        },
+        {
+          "id": "segment3",
+          "src": "/assets/encoding/t2/segment3.mp4",
+          "label": "Chocolate",
+          "duration_ms": 15000,
+          "click_target": {
+            "id": "chocolate",
+            "label": "Chocolate",
+            "hint": "Click the chocolate",
+            "x": 589,
+            "y": 525,
+            "width": 200,
+            "height": 100
+          },
+          "placeholder": "Anna-Lina becomes interested in the chocolate and you agree to give it to her later."
+        },
+        {
+          "id": "segment4",
+          "src": "/assets/encoding/t2/segment4.mp4",
+          "label": "Continue",
+          "duration_ms": 11000,
+          "click_target": {
+            "id": "continue",
+            "label": "Continue",
+            "hint": "Continue",
+            "x": 845,
+            "y": 651,
+            "width": 178,
+            "height": 83
+          },
+          "placeholder": "The episode ends after the promise is established."
+        }
+      ],
       "manipulation_check": {
         "question": "What were you and Anna-Lina doing in the video?",
         "options": [
@@ -27,8 +161,75 @@
       }
     },
     "T3": {
-      "video_src": "/assets/encoding/t3_tom.mp4",
       "episode_label": "Tom episode",
+      "frame_width": 1112,
+      "frame_height": 834,
+      "interactive_segments": [
+        {
+          "id": "segment1",
+          "src": "/assets/encoding/t3/segment1.mp4",
+          "label": "Bluetooth speaker",
+          "duration_ms": 12000,
+          "click_target": {
+            "id": "bluetooth_speaker",
+            "label": "Bluetooth speaker",
+            "hint": "Click the Bluetooth speaker",
+            "x": 334,
+            "y": 550,
+            "width": 200,
+            "height": 117
+          },
+          "placeholder": "Tom sets up music while you spend time together outside."
+        },
+        {
+          "id": "segment2",
+          "src": "/assets/encoding/t3/segment2.mp4",
+          "label": "Apple juice",
+          "duration_ms": 14000,
+          "click_target": {
+            "id": "apple_juice",
+            "label": "Apple juice",
+            "hint": "Click the apple juice",
+            "x": 645,
+            "y": 467,
+            "width": 156,
+            "height": 183
+          },
+          "placeholder": "Tom holds the apple juice and mentions it should not be too cold."
+        },
+        {
+          "id": "segment3",
+          "src": "/assets/encoding/t3/segment3.mp4",
+          "label": "Cooler box",
+          "duration_ms": 15000,
+          "click_target": {
+            "id": "cooler_box",
+            "label": "Cooler box",
+            "hint": "Click the cooler box",
+            "x": 689,
+            "y": 600,
+            "width": 245,
+            "height": 142
+          },
+          "placeholder": "The apple juice is put in a cooler, leading to the later reminder."
+        },
+        {
+          "id": "segment4",
+          "src": "/assets/encoding/t3/segment4.mp4",
+          "label": "Continue",
+          "duration_ms": 11000,
+          "click_target": {
+            "id": "continue",
+            "label": "Continue",
+            "hint": "Continue",
+            "x": 845,
+            "y": 651,
+            "width": 178,
+            "height": 83
+          },
+          "placeholder": "The picnic ends after you agree to help Tom with the apple juice later."
+        }
+      ],
       "manipulation_check": {
         "question": "What were you and Tom doing in the video?",
         "options": [
@@ -40,8 +241,75 @@
       }
     },
     "T4": {
-      "video_src": "/assets/encoding/t4_delivery.mp4",
       "episode_label": "Delivery person episode",
+      "frame_width": 1112,
+      "frame_height": 834,
+      "interactive_segments": [
+        {
+          "id": "segment1",
+          "src": "/assets/encoding/t4/segment1.mp4",
+          "label": "Neighbor",
+          "duration_ms": 12000,
+          "click_target": {
+            "id": "neighbor",
+            "label": "Neighbor",
+            "hint": "Click the neighbor",
+            "x": 423,
+            "y": 400,
+            "width": 200,
+            "height": 284
+          },
+          "placeholder": "A neighbor is near the hallway entrance by the front door."
+        },
+        {
+          "id": "segment2",
+          "src": "/assets/encoding/t4/segment2.mp4",
+          "label": "Delivery boxes",
+          "duration_ms": 14000,
+          "click_target": {
+            "id": "delivery_boxes",
+            "label": "Delivery boxes",
+            "hint": "Click the delivery boxes",
+            "x": 600,
+            "y": 584,
+            "width": 267,
+            "height": 150
+          },
+          "placeholder": "Delivery boxes are moved near the front door."
+        },
+        {
+          "id": "segment3",
+          "src": "/assets/encoding/t4/segment3.mp4",
+          "label": "Front door",
+          "duration_ms": 15000,
+          "click_target": {
+            "id": "front_door",
+            "label": "Front door",
+            "hint": "Click the front door",
+            "x": 778,
+            "y": 292,
+            "width": 200,
+            "height": 367
+          },
+          "placeholder": "You notice the space by the front door where a package could be left."
+        },
+        {
+          "id": "segment4",
+          "src": "/assets/encoding/t4/segment4.mp4",
+          "label": "Continue",
+          "duration_ms": 11000,
+          "click_target": {
+            "id": "continue",
+            "label": "Continue",
+            "hint": "Continue",
+            "x": 845,
+            "y": 651,
+            "width": 178,
+            "height": 83
+          },
+          "placeholder": "The episode ends after the delivery preference has been established."
+        }
+      ],
       "manipulation_check": {
         "question": "What happened with the delivery person in the video?",
         "options": [
