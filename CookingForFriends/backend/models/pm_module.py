@@ -106,6 +106,17 @@ class PMTaskEvent(Base):
     action_animation_start_time: Mapped[float | None] = mapped_column(Float, nullable=True)
     action_animation_complete_time: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    # Time-stop / resumption telemetry (wall time, epoch seconds)
+    pm_trigger_fired_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_freeze_started_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_navigation_started_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_reminder_shown_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_item_selected_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_confidence_rated_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_auto_execute_done_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_resume_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    post_pm_first_action_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     pipeline_was_interrupted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
@@ -125,6 +136,11 @@ class FakeTriggerEvent(Base):
     trigger_timed_out: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     resolved_at: Mapped[float | None] = mapped_column(Float, nullable=True)
     acknowledged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    pm_trigger_fired_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_freeze_started_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_navigation_started_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_resume_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    post_pm_first_action_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
     pipeline_was_interrupted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 

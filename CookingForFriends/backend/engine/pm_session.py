@@ -217,6 +217,7 @@ async def run_pm_session(
             await _wait_game_seconds(session_id, delay_remaining, db_factory, clock)
 
             # Pause the clock FIRST so clock.now() returns a stable value
+            freeze_started_ts = time.time()
             if on_pipeline_start:
                 try:
                     maybe_awaitable = on_pipeline_start()
@@ -252,6 +253,7 @@ async def run_pm_session(
                 await db.commit()
 
             ev.clear()
+            trigger_fired_ts = time.time()
 
             if entry["type"] == "real":
                 task_position = entry["task_position"]  # 1-based
@@ -268,6 +270,8 @@ async def run_pm_session(
                         trigger_scheduled_game_time=game_time_fired,
                         trigger_actual_game_time=game_time_fired,
                         trigger_type=task_def.trigger_type,
+                        pm_trigger_fired_timestamp=trigger_fired_ts,
+                        pm_freeze_started_timestamp=freeze_started_ts,
                     )
                     db.add(event_row)
                     await db.commit()
@@ -303,6 +307,8 @@ async def run_pm_session(
                         scheduled_game_time=game_time_fired,
                         actual_game_time=game_time_fired,
                         trigger_type=trigger_type,
+                        pm_trigger_fired_timestamp=trigger_fired_ts,
+                        pm_freeze_started_timestamp=freeze_started_ts,
                     )
                     db.add(event_row)
                     await db.commit()

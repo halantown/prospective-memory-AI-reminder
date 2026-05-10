@@ -833,6 +833,11 @@ async def export_full_zip(
                 e.reminder_display_time, e.reminder_acknowledge_time,
                 e.decoy_selected_option, e.decoy_correct, e.confidence_rating,
                 e.action_animation_start_time, e.action_animation_complete_time,
+                e.pm_trigger_fired_timestamp, e.pm_freeze_started_timestamp,
+                e.pm_navigation_started_timestamp, e.pm_reminder_shown_timestamp,
+                e.pm_item_selected_timestamp, e.pm_confidence_rated_timestamp,
+                e.pm_auto_execute_done_timestamp, e.pm_resume_timestamp,
+                e.post_pm_first_action_timestamp,
             ])
         for e in fake_result.scalars().all():
             participant_id, session_id = participant_fields(e.session_id)
@@ -842,6 +847,9 @@ async def export_full_zip(
                 "", export_trigger_type(e.trigger_type), True, p.condition if p else "",
                 e.actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
                 "", "", "", "", "", "", "",
+                e.pm_trigger_fired_timestamp, e.pm_freeze_started_timestamp,
+                e.pm_navigation_started_timestamp, "", "", "", "",
+                e.pm_resume_timestamp, e.post_pm_first_action_timestamp,
             ])
 
     cooking_status = {
@@ -972,6 +980,11 @@ async def export_full_zip(
             "reminder_shown_at", "reminder_dismissed_at",
             "item_selected", "item_correct", "confidence_rating",
             "auto_execute_started_at", "auto_execute_finished_at",
+            "pm_trigger_fired_timestamp", "pm_freeze_started_timestamp",
+            "pm_navigation_started_timestamp", "pm_reminder_shown_timestamp",
+            "pm_item_selected_timestamp", "pm_confidence_rated_timestamp",
+            "pm_auto_execute_done_timestamp", "pm_resume_timestamp",
+            "post_pm_first_action_timestamp",
         ], pm_rows))
         zf.writestr("cooking_steps.csv", csv_bytes([
             "participant_id", "session_id",
@@ -1062,6 +1075,11 @@ async def export_per_participant(
         "reminder_shown_at", "reminder_dismissed_at",
         "item_options_order", "item_selected", "item_correct",
         "confidence_rating", "auto_execute_started_at", "auto_execute_finished_at",
+        "pm_trigger_fired_timestamp", "pm_freeze_started_timestamp",
+        "pm_navigation_started_timestamp", "pm_reminder_shown_timestamp",
+        "pm_item_selected_timestamp", "pm_confidence_rated_timestamp",
+        "pm_auto_execute_done_timestamp", "pm_resume_timestamp",
+        "post_pm_first_action_timestamp",
         "pipeline_was_interrupted",
     ])
     for e, token, p_task_order in real_rows:
@@ -1073,6 +1091,11 @@ async def export_per_participant(
             e.decoy_selected_option, e.decoy_correct,
             e.confidence_rating,
             e.action_animation_start_time, e.action_animation_complete_time,
+            e.pm_trigger_fired_timestamp, e.pm_freeze_started_timestamp,
+            e.pm_navigation_started_timestamp, e.pm_reminder_shown_timestamp,
+            e.pm_item_selected_timestamp, e.pm_confidence_rated_timestamp,
+            e.pm_auto_execute_done_timestamp, e.pm_resume_timestamp,
+            e.post_pm_first_action_timestamp,
             e.pipeline_was_interrupted,
         ])
     for e, token, p_task_order, condition in fake_rows:
@@ -1080,6 +1103,9 @@ async def export_per_participant(
             token, e.session_id, "", export_trigger_type(e.trigger_type), True, condition, p_task_order,
             e.actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
             "", "", "", "", "", "", "", "",
+            e.pm_trigger_fired_timestamp, e.pm_freeze_started_timestamp,
+            e.pm_navigation_started_timestamp, "", "", "", "",
+            e.pm_resume_timestamp, e.post_pm_first_action_timestamp,
             e.pipeline_was_interrupted,
         ])
     buf.seek(0)

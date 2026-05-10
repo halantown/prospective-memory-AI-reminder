@@ -25,26 +25,33 @@ async def init_db():
 
 async def _patch_pm_schema(conn):
     """Add PM columns required by newer code when using an existing dev DB."""
-    await conn.execute(text(
-        "ALTER TABLE pm_task_events "
-        "ADD COLUMN IF NOT EXISTS trigger_responded_at FLOAT"
-    ))
-    await conn.execute(text(
-        "ALTER TABLE pm_task_events "
-        "ADD COLUMN IF NOT EXISTS trigger_timed_out BOOLEAN NOT NULL DEFAULT FALSE"
-    ))
-    await conn.execute(text(
-        "ALTER TABLE fake_trigger_events "
-        "ADD COLUMN IF NOT EXISTS trigger_responded_at FLOAT"
-    ))
-    await conn.execute(text(
-        "ALTER TABLE fake_trigger_events "
-        "ADD COLUMN IF NOT EXISTS trigger_timed_out BOOLEAN NOT NULL DEFAULT FALSE"
-    ))
-    await conn.execute(text(
-        "ALTER TABLE fake_trigger_events "
-        "ADD COLUMN IF NOT EXISTS resolved_at FLOAT"
-    ))
+    pm_task_columns = [
+        "trigger_responded_at FLOAT",
+        "trigger_timed_out BOOLEAN NOT NULL DEFAULT FALSE",
+        "pm_trigger_fired_timestamp FLOAT",
+        "pm_freeze_started_timestamp FLOAT",
+        "pm_navigation_started_timestamp FLOAT",
+        "pm_reminder_shown_timestamp FLOAT",
+        "pm_item_selected_timestamp FLOAT",
+        "pm_confidence_rated_timestamp FLOAT",
+        "pm_auto_execute_done_timestamp FLOAT",
+        "pm_resume_timestamp FLOAT",
+        "post_pm_first_action_timestamp FLOAT",
+    ]
+    fake_trigger_columns = [
+        "trigger_responded_at FLOAT",
+        "trigger_timed_out BOOLEAN NOT NULL DEFAULT FALSE",
+        "resolved_at FLOAT",
+        "pm_trigger_fired_timestamp FLOAT",
+        "pm_freeze_started_timestamp FLOAT",
+        "pm_navigation_started_timestamp FLOAT",
+        "pm_resume_timestamp FLOAT",
+        "post_pm_first_action_timestamp FLOAT",
+    ]
+    for column_sql in pm_task_columns:
+        await conn.execute(text(f"ALTER TABLE pm_task_events ADD COLUMN IF NOT EXISTS {column_sql}"))
+    for column_sql in fake_trigger_columns:
+        await conn.execute(text(f"ALTER TABLE fake_trigger_events ADD COLUMN IF NOT EXISTS {column_sql}"))
 
 
 async def seed_dev_participant():

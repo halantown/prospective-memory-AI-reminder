@@ -16,6 +16,64 @@ logger = logging.getLogger(__name__)
 # Per-participant active block runtime.  Single-session study flow means one
 # active block per participant; reconnect is intentionally best-effort.
 _block_runtimes: dict[str, BlockRuntime] = {}
+_pending_post_pm_first_action: dict[str, tuple[str, int]] = {}
+
+
+async def _find_active_pm_event(participant_id: str, data: dict, db):
+    """Return the active real/fake PM event row for a client PM pipeline message."""
+    from sqlalchemy import select
+    from models.pm_module import FakeTriggerEvent, PMTaskEvent
+
+    if data.get("is_fake"):
+        trigger_type = data.get("trigger_type", "")
+        result = await db.execute(
+            select(FakeTriggerEvent).where(
+                FakeTriggerEvent.session_id == participant_id,
+                FakeTriggerEvent.trigger_type == trigger_type,
+                FakeTriggerEvent.acknowledged == False,  # noqa: E712
+            ).order_by(FakeTriggerEvent.id.desc()).limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    task_id = data.get("task_id")
+    if not task_id:
+        return None
+    result = await db.execute(
+        select(PMTaskEvent).where(
+            PMTaskEvent.session_id == participant_id,
+            PMTaskEvent.task_id == task_id,
+            PMTaskEvent.action_animation_complete_time.is_(None),
+        ).order_by(PMTaskEvent.id.desc()).limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def _mark_post_pm_first_action_if_pending(
+    participant_id: str,
+    timestamp: float,
+    db_factory,
+) -> None:
+    """Record the first ongoing-task action after a PM resume, once per PM event."""
+    pending = _pending_post_pm_first_action.pop(participant_id, None)
+    if not pending:
+        return
+    event_kind, event_id = pending
+
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.pm_module import FakeTriggerEvent, PMTaskEvent
+
+        model = PMTaskEvent if event_kind == "real" else FakeTriggerEvent
+        result = await db.execute(select(model).where(model.id == event_id).limit(1))
+        evt = result.scalar_one_or_none()
+        if evt and evt.post_pm_first_action_timestamp is None:
+            evt.post_pm_first_action_timestamp = timestamp
+            await db.commit()
+
+
+def _track_pending_post_pm_action(participant_id: str, event_kind: str, event_id: int | None) -> None:
+    if event_id is not None:
+        _pending_post_pm_first_action[participant_id] = (event_kind, event_id)
 
 
 async def handle_game_ws(
@@ -211,6 +269,8 @@ async def _ws_receiver(
                     await _handle_pm_greeting_complete(participant_id, data, db_factory)
                 elif msg_type == "pm_trigger_responded":
                     await _handle_pm_trigger_responded(participant_id, data, db_factory)
+                elif msg_type == "pm_navigation_started":
+                    await _handle_pm_navigation_started(participant_id, data, db_factory)
                 elif msg_type == "pm_trigger_timed_out":
                     await _handle_pm_trigger_timed_out(participant_id, block_number, data, db_factory)
                 elif msg_type == "pm_reminder_shown":
@@ -437,11 +497,23 @@ async def _handle_cooking_action(participant_id, block_number, data, db_factory)
 
     # Also log as interaction for general event tracking
     await _handle_interaction(participant_id, block_number, "cooking_action", data, db_factory)
+    await _mark_post_pm_first_action_if_pending(participant_id, ts, db_factory)
+
+
+async def _handle_pm_navigation_started(participant_id: str, data: dict, db_factory):
+    """Record when the participant starts moving toward the PM trigger."""
+    ts = data.get("timestamp", time.time())
+    async with db_factory() as db:
+        evt = await _find_active_pm_event(participant_id, data, db)
+        if evt and evt.pm_navigation_started_timestamp is None:
+            evt.pm_navigation_started_timestamp = ts
+            await db.commit()
 
 
 async def _handle_pm_trigger_responded(participant_id: str, data: dict, db_factory):
     """Record that the participant responded to the trigger affordance."""
     ts = data.get("game_time", time.time())
+    wall_ts = data.get("timestamp", time.time())
     if data.get("is_fake"):
         trigger_type = data.get("trigger_type", "")
         async with db_factory() as db:
@@ -458,6 +530,8 @@ async def _handle_pm_trigger_responded(participant_id: str, data: dict, db_facto
             if evt:
                 evt.trigger_responded_at = ts
                 evt.trigger_timed_out = False
+                if evt.pm_navigation_started_timestamp is None:
+                    evt.pm_navigation_started_timestamp = wall_ts
                 await db.commit()
         return
 
@@ -478,6 +552,8 @@ async def _handle_pm_trigger_responded(participant_id: str, data: dict, db_facto
         if evt:
             evt.trigger_responded_at = ts
             evt.trigger_timed_out = False
+            if evt.pm_navigation_started_timestamp is None:
+                evt.pm_navigation_started_timestamp = wall_ts
             await db.commit()
 
 
@@ -486,6 +562,8 @@ async def _handle_pm_trigger_timed_out(participant_id: str, block_number: int, d
     ts = data.get("game_time", time.time())
     if data.get("is_fake"):
         trigger_type = data.get("trigger_type", "")
+        completed_event_id: int | None = None
+        resume_ts = time.time()
         async with db_factory() as db:
             from sqlalchemy import select
             from models.experiment import Participant
@@ -502,6 +580,8 @@ async def _handle_pm_trigger_timed_out(participant_id: str, block_number: int, d
                 evt.trigger_timed_out = True
                 evt.resolved_at = ts
                 evt.acknowledged = True
+                evt.pm_resume_timestamp = resume_ts
+                completed_event_id = evt.id
             p_result = await db.execute(select(Participant).where(Participant.id == participant_id))
             p = p_result.scalar_one_or_none()
             if p:
@@ -511,6 +591,7 @@ async def _handle_pm_trigger_timed_out(participant_id: str, block_number: int, d
         runtime = _block_runtimes.get(participant_id)
         if runtime:
             runtime.resume("pm")
+        _track_pending_post_pm_action(participant_id, "fake", completed_event_id)
         signal_pipeline_complete(participant_id)
         return
 
@@ -551,6 +632,7 @@ async def _handle_pm_reminder_shown(participant_id: str, data: dict, db_factory)
         evt = result.scalar_one_or_none()
         if evt and evt.reminder_display_time is None:
             evt.reminder_display_time = data.get("game_time", time.time())
+            evt.pm_reminder_shown_timestamp = data.get("timestamp", time.time())
             await db.commit()
 
 
@@ -621,6 +703,7 @@ async def _handle_pm_decoy_selected(participant_id: str, data: dict, db_factory)
             evt.decoy_correct = data.get("item_correct", data.get("decoy_correct", False))
             rt_ms = data.get("response_time_ms")
             evt.decoy_response_time = rt_ms / 1000.0 if rt_ms is not None else None
+            evt.pm_item_selected_timestamp = data.get("timestamp", time.time())
             await db.commit()
 
 
@@ -647,6 +730,7 @@ async def _handle_pm_confidence_rated(participant_id: str, data: dict, db_factor
                 evt.confidence_rating = data.get("confidence_rating")
                 rt_ms = data.get("response_time_ms")
                 evt.confidence_response_time = rt_ms / 1000.0 if rt_ms is not None else None
+                evt.pm_confidence_rated_timestamp = data.get("timestamp", time.time())
                 await db.commit()
     except Exception:
         logger.exception(
@@ -667,6 +751,8 @@ async def _handle_pm_action_complete(participant_id: str, block_number: int, dat
     task_id = data.get("task_id")
     if not task_id:
         return
+    completed_event_id: int | None = None
+    resume_ts = time.time()
     async with db_factory() as db:
         from sqlalchemy import select
         from models.experiment import Participant
@@ -683,6 +769,9 @@ async def _handle_pm_action_complete(participant_id: str, block_number: int, dat
         if evt:
             evt.action_animation_start_time = data.get("action_animation_start_time", now)
             evt.action_animation_complete_time = data.get("action_animation_complete_time", now)
+            evt.pm_auto_execute_done_timestamp = data.get("timestamp", resume_ts)
+            evt.pm_resume_timestamp = resume_ts
+            completed_event_id = evt.id
 
         # Unfreeze game time
         p_result = await db.execute(select(Participant).where(Participant.id == participant_id))
@@ -698,6 +787,8 @@ async def _handle_pm_action_complete(participant_id: str, block_number: int, dat
     else:
         logger.warning("[GAME_HANDLER] PM complete but no BlockRuntime for %s", participant_id)
 
+    _track_pending_post_pm_action(participant_id, "real", completed_event_id)
+
     # Advance PM session to next trigger
     signal_pipeline_complete(participant_id)
 
@@ -705,6 +796,8 @@ async def _handle_pm_action_complete(participant_id: str, block_number: int, dat
 async def _handle_fake_trigger_ack(participant_id: str, block_number: int, data: dict, db_factory):
     """Acknowledge a fake trigger and resume the game."""
     trigger_type = data.get("trigger_type", "")
+    completed_event_id: int | None = None
+    resume_ts = time.time()
     async with db_factory() as db:
         from sqlalchemy import select
         from models.experiment import Participant
@@ -723,6 +816,8 @@ async def _handle_fake_trigger_ack(participant_id: str, block_number: int, data:
             if evt.trigger_responded_at is None:
                 evt.trigger_responded_at = data.get("game_time", now)
             evt.resolved_at = data.get("resolved_at", now)
+            evt.pm_resume_timestamp = resume_ts
+            completed_event_id = evt.id
 
         # Unfreeze game time
         p_result = await db.execute(
@@ -739,6 +834,8 @@ async def _handle_fake_trigger_ack(participant_id: str, block_number: int, data:
         runtime.resume("pm")
     else:
         logger.warning("[GAME_HANDLER] fake trigger ack but no BlockRuntime for %s", participant_id)
+
+    _track_pending_post_pm_action(participant_id, "fake", completed_event_id)
 
     signal_pipeline_complete(participant_id)
 
