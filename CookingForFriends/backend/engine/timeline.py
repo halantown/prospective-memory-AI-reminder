@@ -70,16 +70,18 @@ async def _emit_time_tick(
     send_fn,
     elapsed: float,
     clock_end_seconds: int,
+    clock: GameClock | None = None,
     *,
     tail: bool = False,
 ) -> None:
     """Emit one authoritative gameplay clock tick."""
+    frozen = clock.is_paused if clock is not None else False
     try:
         await send_fn("time_tick", {
             "elapsed": int(elapsed),  # Backward-compatible field.
             "game_time_s": int(elapsed),
             "game_clock": format_game_clock(elapsed, clock_end_seconds),
-            "frozen": False,
+            "frozen": frozen,
             "clock_end_seconds": clock_end_seconds,
         })
     except Exception as e:
@@ -216,7 +218,7 @@ async def run_timeline(
                     tick_num = int(elapsed) // 10
                     if tick_num != last_tick_num:
                         last_tick_num = tick_num
-                        await _emit_time_tick(send_fn, elapsed, clock_end_seconds)
+                        await _emit_time_tick(send_fn, elapsed, clock_end_seconds, control.clock)
                     await _sleep_timeline(1.0, control)
                     elapsed = _timeline_elapsed(start_time, control)
 
@@ -295,7 +297,7 @@ async def run_timeline(
                 tick_num = int(elapsed) // 10
                 if tick_num != last_tick_num:
                     last_tick_num = tick_num
-                    await _emit_time_tick(send_fn, elapsed, clock_end_seconds, tail=True)
+                    await _emit_time_tick(send_fn, elapsed, clock_end_seconds, control.clock, tail=True)
                 await _sleep_timeline(1.0, control)
                 remaining = duration - _timeline_elapsed(start_time, control)
 

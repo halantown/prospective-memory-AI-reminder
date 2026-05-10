@@ -100,3 +100,80 @@ def test_snapshot_includes_display_clock_and_freeze_state():
     assert snapshot.frozen is True
     assert snapshot.frozen_reason == "pm"
     assert snapshot.game_clock == "17:18"
+
+
+def test_restore_running_sets_correct_game_time():
+    """restore() with paused=False puts the clock at the given game time."""
+    fake = FakeTime(now=1000.0)
+    clock = GameClock(time_fn=fake.now, sleep_fn=fake.sleep)
+
+    clock.restore(game_time_s=300.0, paused=False)
+    assert clock.is_started
+    assert not clock.is_paused
+    assert clock.now() == pytest.approx(300.0)
+
+    # Clock advances from this point
+    fake.value += 10
+    assert clock.now() == pytest.approx(310.0)
+
+
+def test_restore_paused_freezes_at_correct_game_time():
+    """restore() with paused=True returns frozen game time and blocks."""
+    fake = FakeTime(now=1000.0)
+    clock = GameClock(time_fn=fake.now, sleep_fn=fake.sleep)
+
+    clock.restore(game_time_s=250.0, paused=True, reason="pm")
+    assert clock.is_started
+    assert clock.is_paused
+    assert clock.now() == pytest.approx(250.0)
+
+    # Wall time passing doesn't change game time while paused
+    fake.value += 60
+    assert clock.now() == pytest.approx(250.0)
+
+    # Resume picks up from correct position
+    clock.resume("pm")
+    fake.value += 5
+    assert clock.now() == pytest.approx(255.0)
+
+
+def test_restore_prevents_start_from_overwriting_state():
+    """A subsequent start() call is a no-op after restore()."""
+    fake = FakeTime(now=1000.0)
+    clock = GameClock(time_fn=fake.now, sleep_fn=fake.sleep)
+
+    clock.restore(game_time_s=400.0, paused=False)
+    clock.start(started_at_wall_ts=0.0)  # would set game_time to 1000.0 if not guarded
+
+    assert clock.now() == pytest.approx(400.0)
+
+
+@pytest.mark.asyncio
+async def test_wait_until_running_returns_immediately_when_not_paused():
+    fake = FakeTime()
+    clock = GameClock(time_fn=fake.now, sleep_fn=fake.sleep)
+    clock.start()
+    # Should return without any poll sleep
+    await clock.wait_until_running()  # no assertion needed — must not hang
+
+
+@pytest.mark.asyncio
+async def test_wait_until_running_blocks_until_resumed():
+    fake = FakeTime()
+    poll_calls = 0
+
+    async def counting_sleep(s: float):
+        nonlocal poll_calls
+        poll_calls += 1
+        fake.value += s
+        if poll_calls >= 3:
+            clock.resume("pm")
+        await asyncio.sleep(0)
+
+    clock = GameClock(time_fn=fake.now, sleep_fn=counting_sleep)
+    clock.start()
+    clock.pause("pm")
+
+    await clock.wait_until_running()
+    assert not clock.is_paused
+    assert poll_calls >= 3

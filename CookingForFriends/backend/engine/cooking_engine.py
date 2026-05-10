@@ -153,6 +153,9 @@ class CookingEngine:
 
                 # Wait until the scheduled time
                 await self._clock.sleep_until(entry.t)
+                # If PM overlay fired at this exact game time, wait for resume
+                # before activating — prevents cooking steps triggering mid-overlay.
+                await self._clock.wait_until_running()
 
                 if not self._running:
                     break
@@ -172,6 +175,7 @@ class CookingEngine:
                 if not self._running:
                     break
                 await self._clock.sleep_until(comment.t)
+                await self._clock.wait_until_running()
                 if not self._running:
                     break
                 await self._send("robot_idle_comment", {

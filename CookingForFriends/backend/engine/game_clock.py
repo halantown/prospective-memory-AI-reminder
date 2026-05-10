@@ -127,6 +127,34 @@ class GameClock:
         target = self.now() + max(0.0, game_seconds)
         await self.sleep_until(target)
 
+    def restore(
+        self,
+        game_time_s: float,
+        paused: bool = False,
+        reason: str | None = None,
+    ) -> None:
+        """Restore clock to a specific game time (used on reconnect).
+
+        Sets the clock as if it started exactly `game_time_s` gameplay seconds
+        ago. Must be called before start() — or instead of it — to initialise
+        the clock to the persisted DB game time rather than deriving it from the
+        raw block wall-clock start timestamp (which would ignore prior PM pauses).
+        """
+        wall_now = self._time_fn()
+        self._total_paused_s = 0.0
+        self._started_wall_time = wall_now - game_time_s
+        if paused:
+            self._paused_at = wall_now
+            self._pause_reason = reason
+        else:
+            self._paused_at = None
+            self._pause_reason = None
+
+    async def wait_until_running(self) -> None:
+        """Block until the clock is not paused (no-op if already running)."""
+        while self.is_paused:
+            await self._sleep_fn(self._poll_interval_s)
+
     async def sleep_until(self, game_second: float) -> None:
         """Sleep until a target gameplay second."""
         if self._started_wall_time is None:

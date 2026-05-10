@@ -108,6 +108,22 @@ async def handle_game_ws(
                         block_start_time=block_start_ts,
                     )
                     _block_runtimes[participant_id] = runtime
+                    # Restore the clock to the correct persisted game time before
+                    # starting so that (a) PM pauses that accumulated before this
+                    # reconnect are not forgotten and (b) if a PM overlay is still
+                    # active the new clock starts paused.
+                    if participant is not None:
+                        from engine.game_time import get_current_game_time
+                        _frozen = participant.frozen_since is not None
+                        _game_time = (
+                            participant.game_time_elapsed_s
+                            if _frozen
+                            else get_current_game_time(participant)
+                        )
+                        logger.info(
+                            f"[GAME_HANDLER] Restoring clock: game_time={_game_time:.1f}s frozen={_frozen}"
+                        )
+                        runtime.clock.restore(_game_time, paused=_frozen, reason="pm" if _frozen else None)
                     await runtime.start()
                     timeline_task = runtime.timeline_task
                     logger.info(f"[GAME_HANDLER] Runtime resumed for {participant_id} block {block_number}")
