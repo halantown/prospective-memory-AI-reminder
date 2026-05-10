@@ -3,7 +3,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
-import type { ActiveCookingStep } from '../../../types'
+import type { ActiveCookingStep, KitchenStationId } from '../../../types'
+
+// ⑬ Station-contextual emoji shown alongside dish emoji in the banner header.
+const STATION_CONTEXT_EMOJI: Record<KitchenStationId, string> = {
+  fridge:        '🧊',
+  cutting_board: '🔪',
+  spice_rack:    '🧂',
+  burner1:       '🔥',
+  burner2:       '🔥',
+  burner3:       '🔥',
+  oven:          '♨️',
+  plating_area:  '🍽️',
+}
 
 function formatRemaining(seconds: number) {
   const safe = Math.max(0, Math.ceil(seconds))
@@ -56,19 +68,26 @@ export default function KitchenTimerBanner() {
         key: `missed-${missedItem.dishId}-${missedItem.stepIndex}`,
         missed: true,
         emoji: missedItem.emoji,
+        stationEmoji: null as string | null,
         title: 'Missed!',
         detail: missedItem.stepLabel,
         remainingLabel: '',
+        progressRatio: null as number | null,
       }
     }
     if (activeStep) {
+      const progressRatio = activeStep.windowSeconds > 0
+        ? Math.max(0, remaining / activeStep.windowSeconds)
+        : null
       return {
         key: `${activeStep.dishId}-${activeStep.stepIndex}`,
         missed: false,
         emoji: activeDish?.emoji || '🍳',
+        stationEmoji: STATION_CONTEXT_EMOJI[activeStep.station] ?? null,
         title: activeStep.stepLabel,
         detail: '',
         remainingLabel: formatRemaining(remaining),
+        progressRatio,
       }
     }
     return null
@@ -106,7 +125,13 @@ export default function KitchenTimerBanner() {
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <span className="text-2xl leading-none">{banner.emoji}</span>
+              {/* ⑬ Dish emoji + station context emoji */}
+              <div className="flex items-center gap-0.5 leading-none flex-shrink-0">
+                <span className="text-2xl">{banner.emoji}</span>
+                {banner.stationEmoji && (
+                  <span className="text-base -mt-2 -ml-1 drop-shadow">{banner.stationEmoji}</span>
+                )}
+              </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[16px] font-black leading-tight truncate">
@@ -122,6 +147,21 @@ export default function KitchenTimerBanner() {
                   <p className="mt-1 text-[11px] font-semibold leading-snug text-white/85 truncate">
                     {banner.detail}
                   </p>
+                )}
+                {/* ⑬ Time progress bar: green → yellow → red */}
+                {banner.progressRatio != null && (
+                  <div className="mt-1.5 h-1 w-full rounded-full bg-black/20 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-1000"
+                      style={{
+                        width: `${Math.max(0, Math.min(1, banner.progressRatio)) * 100}%`,
+                        backgroundColor:
+                          banner.progressRatio > 0.5 ? '#86efac'
+                          : banner.progressRatio > 0.25 ? '#fde047'
+                          : '#fca5a5',
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             </div>
