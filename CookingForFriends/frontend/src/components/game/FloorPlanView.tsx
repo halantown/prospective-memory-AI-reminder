@@ -44,6 +44,7 @@ interface FloorPlanViewProps {
   initialCharRoom?: FloorRoom
   initialRobotRoom?: FloorRoom
   disableNavigation?: boolean
+  mainExperimentNavigation?: boolean
   highlightedRoom?: FloorRoom | null
   scriptedDoorEncounterId?: string | null
   scriptedDoorEncounterResting?: boolean
@@ -181,6 +182,8 @@ const KITCHEN_MAX_OFFSET_Y = 25
 const BEDROOM_BOTTOM_EDGE_GAP = 8
 const TRANSIT_DELAY_MS = 1500
 const ROBOT_FOLLOW_DELAY_MS = 2200
+const SHOW_DEV_NAV_CONTROLS = import.meta.env.DEV
+  && import.meta.env.VITE_CFF_SHOW_DEV_NAV_CONTROLS !== 'false'
 
 function snapToDevicePixel(value: number) {
   const dpr = window.devicePixelRatio || 1
@@ -199,6 +202,7 @@ export default function FloorPlanView({
   initialCharRoom = 'living_room',
   initialRobotRoom = 'living_room',
   disableNavigation = false,
+  mainExperimentNavigation = false,
   highlightedRoom = null,
   scriptedDoorEncounterId = null,
   scriptedDoorEncounterResting = false,
@@ -287,6 +291,16 @@ export default function FloorPlanView({
   const isCharMoving    = useCharacterStore((s) => s.isMoving)
 
   const isZoomed = currentRoom !== null
+  const isRoomAvailable = useCallback((room: FloorRoom) => {
+    if (!mainExperimentNavigation || SHOW_DEV_NAV_CONTROLS) return true
+    if (room === 'living_room') return doorbellActive
+    return room === 'kitchen'
+  }, [doorbellActive, mainExperimentNavigation])
+
+  const visibleNavLinks = useMemo(() => {
+    if (!currentRoom) return []
+    return ADJACENCY[currentRoom].filter((nav) => isRoomAvailable(nav.target))
+  }, [currentRoom, isRoomAvailable])
 
   const answerDoorbellAtDoor = useCallback(() => {
     if (doorbellAlreadyAnsweredRef.current) return
@@ -419,7 +433,6 @@ export default function FloorPlanView({
   }, [activeStation])
 
   const openStationPopup = useCallback((point: { clientX: number; clientY: number }) => {
-    if (!pointerInsideGameAreaRef.current) return false
     const rect = viewRef.current?.getBoundingClientRect()
     if (!rect) return false
     setStationPopupAnchor({
@@ -554,6 +567,7 @@ export default function FloorPlanView({
 
         {/* Room click targets (overview mode) */}
         {!isZoomed && !disableNavigation && ALL_ROOMS.map((rid) => {
+          if (!isRoomAvailable(rid)) return null
           if (doorbellActive && rid !== 'living_room') return null
           const r = ROOM_DEFS[rid]
           const isHighlightedTarget = highlightedRoom === rid || (doorbellActive && rid === 'living_room')
@@ -675,7 +689,7 @@ export default function FloorPlanView({
         </AnimatePresence>
 
         {/* ── Waypoint Editor overlay (DEV only, inside zoom div) ── */}
-        {import.meta.env.DEV && (
+        {SHOW_DEV_NAV_CONTROLS && (
           <WaypointEditor currentRoom={currentRoom} isActive={showWaypointEditor} />
         )}
       </div>
@@ -707,7 +721,7 @@ export default function FloorPlanView({
 
       {/* ── Doorbell navigation prompt (only visible during PM trigger) ── */}
       {doorbellActive && currentRoom && currentRoom !== 'living_room' && !disableNavigation && !isMoving && !isCharMoving && (
-        ADJACENCY[currentRoom].map((nav) => {
+        visibleNavLinks.map((nav) => {
           const isDoorbellTarget = doorbellActive && nav.target === 'living_room'
           if (!isDoorbellTarget) return null
           return (
@@ -717,7 +731,7 @@ export default function FloorPlanView({
                          bg-amber-500 text-slate-950 border-2 border-amber-100
                          rounded-lg shadow-2xl shadow-amber-950/40 whitespace-nowrap
                          transition-all duration-200 hover:scale-105 active:scale-95
-                         cursor-pointer animate-pulse ring-4 ring-amber-400/35"
+                         cursor-pointer animate-bounce ring-4 ring-amber-400/35"
               style={navButtonStyle(nav)}
               onClick={() => navigateToRoom(nav.target)}
             >
@@ -731,7 +745,7 @@ export default function FloorPlanView({
 
       {/* ── Room navigation buttons (zoomed mode) ── */}
       {isZoomed && currentRoom && !doorbellActive && !disableNavigation && !isMoving && !isCharMoving && (
-        ADJACENCY[currentRoom].map((nav) => {
+        visibleNavLinks.map((nav) => {
           const isHighlightedTarget = highlightedRoom === nav.target
           return (
             <button
@@ -774,7 +788,7 @@ export default function FloorPlanView({
 
 
       {/* ── DEV: Waypoint editor toggle ── */}
-      {import.meta.env.DEV && (
+      {SHOW_DEV_NAV_CONTROLS && (
         <button
           className={`absolute bottom-5 right-5 z-40 text-xs px-3 py-1.5 rounded-lg border font-mono shadow-lg transition-colors
             ${showWaypointEditor

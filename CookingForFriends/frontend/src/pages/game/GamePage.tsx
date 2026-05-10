@@ -70,7 +70,12 @@ export default function GamePage() {
       {/* World area — FloorPlanView replaces old WorldView tile layout.
            RobotAvatar is suppressed here; Pepper is rendered inside FloorPlanView. */}
       <div className={`relative flex-1 min-w-0 ${pmBlocksOngoingTask ? 'pointer-events-none' : ''}`}>
-        <FloorPlanView initialRoom="kitchen" initialCharRoom="kitchen" initialRobotRoom="kitchen" />
+        <FloorPlanView
+          initialRoom="kitchen"
+          initialCharRoom="kitchen"
+          initialRobotRoom="kitchen"
+          mainExperimentNavigation
+        />
         <HUD />
         {/* RobotAvatar hidden — robot sprite lives inside FloorPlanView on the map */}
         {/* <RobotAvatar /> */}

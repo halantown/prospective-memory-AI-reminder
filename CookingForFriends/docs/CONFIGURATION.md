@@ -85,6 +85,17 @@ design is archived and should not be used for new implementation work.
 | API proxy | `/api → http://localhost:5000` | REST proxy |
 | WS proxy | `/ws → ws://localhost:5000` | WebSocket proxy |
 
+### Participant UI Debug Controls
+
+| Env Var | Current local value | Production behavior | Description |
+|---------|---------------------|---------------------|-------------|
+| `VITE_CFF_SHOW_DEV_NAV_CONTROLS` | `false` in `frontend/.env.local` | Always hidden unless built in Vite dev mode and this value is not `false` | Shows development-only main-experiment navigation controls and the Waypoint Editor button. Keep `false` when demonstrating the production participant experience from `npm run dev`. |
+
+Main experiment navigation is intentionally sparse for participants: kitchen is
+the normal active room, bedroom/bathroom and dining hall buttons are hidden, and
+the living room button appears only during a doorbell PM trigger. In that PM
+trigger state, the living room navigation button is highlighted and bounces.
+
 ### WebSocket (`frontend/src/hooks/useWebSocket.ts`)
 
 | Constant | Value | Description |
