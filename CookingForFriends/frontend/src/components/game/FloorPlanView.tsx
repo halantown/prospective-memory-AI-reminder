@@ -207,7 +207,6 @@ export default function FloorPlanView({
   const pointerInsideGameAreaRef = useRef(true)
   const doorbellSequenceWasActiveRef = useRef(false)
   const doorbellAlreadyAnsweredRef = useRef(false)
-  const doorbellNavigationLoggedRef = useRef(false)
   const previousVisitorWaypointRef = useRef<string | null>(null)
   const [viewSize, setViewSize] = useState({ width: 0, height: 0 })
   const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(initialRoom)
@@ -247,7 +246,6 @@ export default function FloorPlanView({
   const robotState = useGameStore((s) => s.robot)
   const setActiveStation = useGameStore((s) => s.setActiveStation)
   const activeStation = useGameStore((s) => s.activeStation)
-  const wsSend = useGameStore((s) => s.wsSend)
 
   // Doorbell PM trigger → highlight living room navigation and front-door area.
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
@@ -299,9 +297,7 @@ export default function FloorPlanView({
   }, [moveToWaypoint])
 
   useEffect(() => {
-    if (doorbellActive) return
     doorbellAlreadyAnsweredRef.current = false
-    doorbellNavigationLoggedRef.current = false
   }, [doorbellActive])
 
   useEffect(() => {
@@ -375,26 +371,10 @@ export default function FloorPlanView({
     }
   }, [answerDoorbellAtDoor, currentRoom, disableNavigation, doorbellActive, isMoving, isCharMoving, moveToWaypoint, scheduleRobotFollow, setActiveStation, teleportTo])
 
-  useEffect(() => {
-    if (!doorbellActive || currentRoom === 'living_room' || isMoving || isCharMoving) return
-    if (!doorbellNavigationLoggedRef.current && wsSend) {
-      doorbellNavigationLoggedRef.current = true
-      wsSend({
-        type: 'pm_navigation_started',
-        data: {
-          task_id: pmPipelineState?.taskId ?? null,
-          trigger_type: 'doorbell',
-          is_fake: Boolean(pmPipelineState?.isFake),
-          timestamp: Date.now() / 1000,
-        },
-      })
-    }
-    navigateToRoom('living_room')
-  }, [currentRoom, doorbellActive, isCharMoving, isMoving, navigateToRoom, pmPipelineState?.isFake, pmPipelineState?.taskId, wsSend])
-
   // Enter a room from overview — robot follows immediately with delay
   const enterRoom = useCallback((room: FloorRoom) => {
     if (disableNavigation) return
+    if (doorbellActive && room !== 'living_room') return
     setActiveStation(null)
     setStationPopupAnchor(null)
     setCurrentRoom(room)
@@ -567,15 +547,16 @@ export default function FloorPlanView({
               {/* Sprite layer — transparent placeholders until PNGs added */}
               <KitchenFurniture />
               {/* Interactive hotspot layer — only when zoomed into kitchen */}
-              {inKitchen && <KitchenRoom isActive={true} onStationOpen={openStationPopup} />}
+              {inKitchen && !doorbellActive && <KitchenRoom isActive={true} onStationOpen={openStationPopup} />}
             </div>
           )
         })()}
 
         {/* Room click targets (overview mode) */}
         {!isZoomed && !disableNavigation && ALL_ROOMS.map((rid) => {
+          if (doorbellActive && rid !== 'living_room') return null
           const r = ROOM_DEFS[rid]
-          const isHighlightedTarget = highlightedRoom === rid
+          const isHighlightedTarget = highlightedRoom === rid || (doorbellActive && rid === 'living_room')
           return (
             <div
               key={rid}
@@ -741,7 +722,7 @@ export default function FloorPlanView({
               onClick={() => navigateToRoom(nav.target)}
             >
               <span className="text-base font-bold">{ARROWS[nav.direction]}</span>
-              <span className="text-sm font-bold">Front Door</span>
+              <span className="text-sm font-bold">Living Room</span>
               <span className="text-base">🔔</span>
             </button>
           )

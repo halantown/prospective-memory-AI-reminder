@@ -23,7 +23,9 @@ export default function GamePage() {
   const setActivePhoneTab = useGameStore((s) => s.setActivePhoneTab)
   const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
-  const pmBlocksOngoingTask = Boolean(pmPipelineState)
+  const pmTriggerWaiting = pmPipelineState?.step === 'trigger_event'
+  const doorbellTriggerWaiting = pmTriggerWaiting && pmPipelineState?.triggerType === 'doorbell'
+  const pmBlocksOngoingTask = Boolean(pmPipelineState && !doorbellTriggerWaiting)
   const pmBlocksPhone = Boolean(pmPipelineState)
 
   useEffect(() => {
@@ -79,9 +81,6 @@ export default function GamePage() {
           <div className="absolute top-0 left-0 right-0 bg-red-600 text-white text-center text-sm py-1 z-50">
             Reconnecting to server...
           </div>
-        )}
-        {pmBlocksOngoingTask && (
-          <div className="absolute inset-0 z-overlay-pm bg-slate-950/45 backdrop-blur-[1px]" />
         )}
       </div>
 

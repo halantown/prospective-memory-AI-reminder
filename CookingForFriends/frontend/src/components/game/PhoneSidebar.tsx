@@ -77,6 +77,7 @@ export default function PhoneSidebar() {
               <span className="text-white/60">🔋</span>
             </div>
           </div>
+          <NotificationBanner />
 
           {/* Screen content */}
           <div className="relative flex-1 flex flex-col overflow-hidden min-h-0">
@@ -87,7 +88,6 @@ export default function PhoneSidebar() {
               </h3>
             </div>
             <KitchenTimerBanner />
-            <NotificationBanner belowKitchenCue={hasKitchenCue} />
 
             {/* Tab content */}
             {activePhoneTab === 'chats' ? (

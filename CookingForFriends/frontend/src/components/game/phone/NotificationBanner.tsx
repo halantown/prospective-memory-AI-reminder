@@ -4,7 +4,8 @@
  *  1. System notifications (weather, battery, delivery) — auto-dismiss 3s, no contact nav.
  *  2. Cross-contact chat alerts — shows sender + preview. Tap → navigate to contact.
  *
- *  Renders as an overlay so it cannot push the Kitchen Timer or chats down. */
+ *  Renders from the phone shell so it overlays the status bar/header area
+ *  without pushing the Kitchen Timer or chats down. */
 
 import { useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,7 +14,7 @@ import { useGameStore } from '../../../stores/gameStore'
 const CHAT_BANNER_DURATION = 5_000
 const SYSTEM_BANNER_DURATION = 3_000
 
-export default function NotificationBanner({ belowKitchenCue = false }: { belowKitchenCue?: boolean }) {
+export default function NotificationBanner() {
   const banner = useGameStore((s) => s.phoneBanner)
   const contacts = useGameStore((s) => s.contacts)
   const setBanner = useGameStore((s) => s.setPhoneBanner)
@@ -65,8 +66,7 @@ export default function NotificationBanner({ belowKitchenCue = false }: { belowK
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-          className={`absolute ${belowKitchenCue ? 'bottom-[var(--kitchen-banner-height)] left-4 right-4' : 'left-4 right-4 top-[44px]'} z-30 rounded-xl shadow-lg shadow-black/30
-                     border cursor-pointer overflow-hidden`}
+          className="pointer-events-auto absolute left-4 right-4 top-[34px] z-50 rounded-xl border shadow-lg shadow-black/30 cursor-pointer overflow-hidden"
           style={{
             backgroundColor: isSystemNotification ? 'rgba(30, 41, 59, 0.96)' : '#ffffff',
             borderColor: isSystemNotification ? 'rgba(148, 163, 184, 0.35)' : 'rgba(255, 255, 255, 0.2)',
@@ -81,8 +81,8 @@ export default function NotificationBanner({ belowKitchenCue = false }: { belowK
             transition={{ duration: duration / 1000, ease: 'linear' }}
             className={`h-[3px] rounded-t-xl ${isSystemNotification ? 'bg-slate-400' : 'bg-blue-500'}`}
           />
-          <div className={`flex items-center gap-3 px-3 ${belowKitchenCue ? 'py-2' : 'py-2.5'}`}>
-            <div className={`${belowKitchenCue ? 'h-9 w-9 rounded-lg text-base' : 'h-12 w-12 rounded-xl text-xl'} bg-slate-100 flex flex-shrink-0 items-center justify-center shadow-sm`}>
+          <div className="flex items-center gap-2.5 px-3 py-2">
+            <div className="h-9 w-9 rounded-lg text-base bg-slate-100 flex flex-shrink-0 items-center justify-center shadow-sm">
               {displayAvatar}
             </div>
             <div className="flex-1 min-w-0">
@@ -90,7 +90,7 @@ export default function NotificationBanner({ belowKitchenCue = false }: { belowK
                 <span className={`text-[13px] font-semibold leading-none ${isSystemNotification ? 'text-slate-100' : 'text-slate-900'}`}>{displayName}</span>
                 <span className={`text-[10px] font-medium ${isSystemNotification ? 'text-slate-400' : 'text-slate-400'}`}>now</span>
               </div>
-              <p className={`${belowKitchenCue ? 'text-[12px] line-clamp-1' : 'text-[13px] line-clamp-2'} leading-snug ${isSystemNotification ? 'text-slate-300' : 'text-slate-600'}`}>{banner.text}</p>
+              <p className={`text-[12px] line-clamp-1 leading-snug ${isSystemNotification ? 'text-slate-300' : 'text-slate-600'}`}>{banner.text}</p>
             </div>
           </div>
         </motion.div>
