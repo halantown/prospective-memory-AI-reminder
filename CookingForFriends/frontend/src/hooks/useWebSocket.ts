@@ -126,6 +126,9 @@ export function useWebSocket(sessionId: string | null) {
         break
 
       case 'session_end':
+        store.setPMPipelineState(null)
+        store.setGameTimeFrozen(false)
+        store.clearRobotSpeech()
         store.setPhase('POST_MANIP_CHECK')
         break
 
@@ -205,7 +208,10 @@ export function useWebSocket(sessionId: string | null) {
         break
 
       case 'block_end':
-        store.setPhase('debrief')
+        store.setPMPipelineState(null)
+        store.setGameTimeFrozen(false)
+        store.clearRobotSpeech()
+        store.setPhase('POST_MANIP_CHECK')
         break
 
       case 'block_error':

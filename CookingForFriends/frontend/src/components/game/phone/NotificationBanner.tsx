@@ -66,7 +66,7 @@ export default function NotificationBanner() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-          className="pointer-events-auto absolute left-4 right-4 top-[34px] z-50 rounded-xl border shadow-lg shadow-black/30 cursor-pointer overflow-hidden"
+          className="pointer-events-auto absolute left-[72px] right-3 top-[46px] z-50 rounded-xl border shadow-lg shadow-black/30 cursor-pointer overflow-hidden"
           style={{
             backgroundColor: isSystemNotification ? 'rgba(30, 41, 59, 0.96)' : '#ffffff',
             borderColor: isSystemNotification ? 'rgba(148, 163, 184, 0.35)' : 'rgba(255, 255, 255, 0.2)',
