@@ -19,7 +19,7 @@ Entry 5: fake  phone call                —  60 s after entry 4 pipeline ends
 Entry 6: real  trigger (T at position 4) —  60 s after entry 5 pipeline ends
 Session ends                             —  60 s after entry 6 pipeline ends
 ```
-Gameplay trigger encounters are in-world interaction flows, not encoding cutscenes. The current backend pauses the shared `GameClock` during the PM pipeline, so cooking, phone delivery, and time ticks resume after the trigger flow resolves. The scheduler delay for the next trigger starts after the current trigger flow resolves.
+Gameplay trigger encounters are in-world interaction flows, not encoding cutscenes. The backend pauses the shared `GameClock` immediately when a PM event fires, before emitting `pm_trigger`, so cooking activations, active cooking-step timeouts, phone delivery, robot idle comments, and time ticks resume from the same game-time point after the trigger flow resolves. The scheduler delay for the next trigger starts after the current trigger flow resolves.
 
 ### PM Pipeline (real trigger — 6 steps)
 `trigger_affordance → trigger_encounter_dialogue → reminder (robot avatar) → item selection → confidence rating → avatar auto-action`
@@ -182,7 +182,10 @@ Columns: `token, session_id, task_id, position_in_order, condition, task_order, 
 trigger_scheduled_game_time, trigger_actual_game_time, greeting_complete_time,
 reminder_display_time, reminder_acknowledge_time, decoy_options_order, decoy_selected_option,
 decoy_correct, decoy_response_time, confidence_rating, confidence_response_time,
-action_animation_start_time, action_animation_complete_time, pipeline_was_interrupted`
+action_animation_start_time, action_animation_complete_time, pm_trigger_fired_timestamp,
+pm_freeze_started_timestamp, pm_navigation_started_timestamp, pm_reminder_shown_timestamp,
+pm_item_selected_timestamp, pm_confidence_rated_timestamp, pm_auto_execute_done_timestamp,
+pm_resume_timestamp, post_pm_first_action_timestamp, pipeline_was_interrupted`
 
 ### Aggregated CSV (per participant)
 One row per participant with summary metrics.
@@ -247,6 +250,7 @@ DEV_TOKEN=DEVTEST uvicorn main:app --port 5000
 
 #### Key WS message types (client → server)
 - `heartbeat` — sent every 30 s to maintain connection
+- `pm_navigation_started` — `{task_id, trigger_type, is_fake, timestamp}`
 - `pm_greeting_complete` — `{game_time}`
 - `pm_reminder_ack` — `{game_time}`
 - `pm_decoy_selected` — `{decoy_options_order, decoy_selected_option, decoy_correct, decoy_response_time}`

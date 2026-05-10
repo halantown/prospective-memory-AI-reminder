@@ -1,6 +1,6 @@
 # PM Trigger Encounter Flow
 
-> Development reference. Last updated: 2026-05-07.
+> Development reference. Last updated: 2026-05-10.
 
 ## Terminology
 
@@ -35,9 +35,11 @@ This flow covers:
 - Clicking after the line is complete advances to the next line.
 - Previous dialogue lines disappear.
 - During dialogue, normal world interactions are disabled.
-- Cooking timers are paused with the shared gameplay clock during trigger encounters.
-- Phone-message delivery is paused with the shared gameplay clock during trigger encounters. The phone UI remains non-interactive unless the current encounter explicitly needs the phone call UI.
+- The PM trigger starts a time-stop immediately when the scheduled PM event fires. The backend pauses the shared `GameClock` before emitting `pm_trigger`, so timeline events, phone delivery, robot idle comments, cooking activations, and active cooking-step timeout timers stop advancing until the PM flow resolves.
+- Cooking UI is masked and non-interactive for the whole PM pipeline, including the initial trigger affordance. Kitchen scene clicks, station hotspots, the Kitchen Timer Banner, and recipe access are blocked behind the PM overlay.
+- Phone chat and recipe tabs are disabled during trigger encounters. The only phone UI that remains interactive is the PM phone-call affordance itself.
 - Trigger encounter state transitions should be logged for monitoring and data export.
+- PM and COOK schedule points must not share the same game second. The main runtime plan keeps every PM trigger at least 5 seconds before the nearest COOK activation so the PM freeze wins before cooking work appears.
 
 ## Dialogue Types
 
@@ -83,8 +85,8 @@ Use trigger-specific naming:
 
 ```text
 idle
-→ trigger_fired
-→ navigating_to_trigger        doorbell only
+→ trigger_fired                backend freezes shared GameClock immediately
+→ navigating_to_trigger        forced navigation for doorbell, answer affordance for phone
 → entry_transition             doorbell only
 → encounter_focus
 → greeting_dialogue
@@ -187,6 +189,10 @@ Sprite-sheet rendering note:
 - Phone encounters show caller dialogue as a cloud-style bubble with the caller sprite.
 - Tutorial trigger reuses the same click-to-advance dialogue and pixel bubble components.
 - The frontend emits `trigger_encounter_state` WebSocket messages, persisted as `InteractionLog` rows for monitoring/export.
+- The frontend emits `pm_navigation_started`; backend PM rows also backfill this timestamp when the trigger is answered, so reconnect or missed navigation telemetry still has a conservative value.
+- Real PM rows record wall-clock telemetry for `pm_trigger_fired_timestamp`, `pm_freeze_started_timestamp`, `pm_navigation_started_timestamp`, `pm_reminder_shown_timestamp`, `pm_item_selected_timestamp`, `pm_confidence_rated_timestamp`, `pm_auto_execute_done_timestamp`, `pm_resume_timestamp`, and `post_pm_first_action_timestamp`.
+- Fake trigger rows record the shared time-stop telemetry subset: `pm_trigger_fired_timestamp`, `pm_freeze_started_timestamp`, `pm_navigation_started_timestamp`, `pm_resume_timestamp`, and `post_pm_first_action_timestamp`.
+- `post_pm_first_action_timestamp` is filled by the first cooking action after resume and is intended for exploratory task-resumption latency analysis against `pm_resume_timestamp`.
 
 ## Implementation Priority
 
