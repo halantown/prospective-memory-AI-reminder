@@ -11,13 +11,16 @@
           "label": "Game controller",
           "duration_ms": 12000,
           "click_target": {
+            "task_id": "T1",
+            "segment_id": "segment1",
+            "segment_index": 0,
             "id": "game_controller",
             "label": "Game controller",
             "hint": "Click the game controller",
-            "x": 311,
-            "y": 600,
-            "width": 222,
-            "height": 133
+            "x": 509,
+            "y": 525,
+            "width": 144,
+            "height": 101
           },
           "placeholder": "Mei invites you to play one more round. The game controller is on the coffee table."
         },
@@ -27,13 +30,16 @@
           "label": "Snack box",
           "duration_ms": 14000,
           "click_target": {
+            "task_id": "T1",
+            "segment_id": "segment2",
+            "segment_index": 1,
             "id": "snack_box",
             "label": "Snack box",
             "hint": "Click the snack box",
-            "x": 523,
-            "y": 559,
-            "width": 245,
-            "height": 133
+            "x": 486,
+            "y": 539,
+            "width": 201,
+            "height": 157
           },
           "placeholder": "You put the snack box on the table and Mei tries one of the pastries."
         },
@@ -43,13 +49,16 @@
           "label": "Baking book",
           "duration_ms": 15000,
           "click_target": {
+            "task_id": "T1",
+            "segment_id": "segment3",
+            "segment_index": 2,
             "id": "baking_book_bubble",
             "label": "Baking book",
             "hint": "Click the baking book",
-            "x": 645,
-            "y": 259,
-            "width": 222,
-            "height": 150
+            "x": 906,
+            "y": 248,
+            "width": 174,
+            "height": 167
           },
           "placeholder": "Mei asks how you made the snacks. You mention the baking book at home."
         },
@@ -59,6 +68,9 @@
           "label": "Continue",
           "duration_ms": 11000,
           "click_target": {
+            "task_id": "T1",
+            "segment_id": "segment4",
+            "segment_index": 3,
             "id": "continue",
             "label": "Continue",
             "hint": "Continue",

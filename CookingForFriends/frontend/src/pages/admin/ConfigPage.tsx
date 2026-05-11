@@ -13,6 +13,7 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  MousePointerClick,
 } from 'lucide-react'
 
 // ── Types ──
@@ -332,6 +333,16 @@ export default function ConfigPage() {
             className="px-4 py-2 text-sm font-medium text-white bg-cooking-500 rounded-lg"
           >
             Config
+          </button>
+          <button
+            onClick={() => navigate('/admin/encoding-hotspots')}
+            className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700
+                       rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <MousePointerClick className="w-3.5 h-3.5" />
+              Encoding Hotspots
+            </span>
           </button>
         </div>
 

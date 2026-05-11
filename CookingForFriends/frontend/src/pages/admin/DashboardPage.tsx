@@ -23,6 +23,7 @@ import {
   BarChart2,
   RadioTower,
   CalendarClock,
+  MousePointerClick,
 } from 'lucide-react'
 import {
   createParticipant,
@@ -998,6 +999,15 @@ export default function AdminDashboard() {
                 <span className="inline-flex items-center gap-1.5">
                   <CalendarClock className="w-3.5 h-3.5" />
                   Runtime Plan
+                </span>
+              </button>
+              <button
+                onClick={() => navigate('/admin/encoding-hotspots')}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <MousePointerClick className="w-3.5 h-3.5" />
+                  Encoding Hotspots
                 </span>
               </button>
             </nav>

@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, MousePointerClick, Play } from 'lucide-react'
 
 export interface EncodingClickTarget {
+  task_id?: string
+  segment_id?: string
+  segment_index?: number
   id: string
   label: string
   hint: string
@@ -32,7 +35,7 @@ interface InteractiveEncodingVideoProps {
   onComplete: () => void
 }
 
-type SegmentMode = 'playing' | 'waiting'
+type SegmentMode = 'ready' | 'playing' | 'waiting'
 
 const FALLBACK_SEGMENTS: EncodingVideoSegment[] = [
   {
@@ -81,8 +84,9 @@ export default function InteractiveEncodingVideo({
     [segments],
   )
   const [segmentIndex, setSegmentIndex] = useState(0)
-  const [mode, setMode] = useState<SegmentMode>('playing')
-  const [progress, setProgress] = useState(0)
+  const [mode, setMode] = useState<SegmentMode>('ready')
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const autoStartPendingRef = useRef(false)
   const segmentStartedAtRef = useRef(Date.now())
   const waitingStartedAtRef = useRef(Date.now())
   const viewedLoggedRef = useRef(false)
@@ -100,8 +104,8 @@ export default function InteractiveEncodingVideo({
 
   useEffect(() => {
     setSegmentIndex(0)
-    setMode('playing')
-    setProgress(0)
+    setMode('ready')
+    autoStartPendingRef.current = false
     segmentStartedAtRef.current = Date.now()
     waitingStartedAtRef.current = Date.now()
     viewedLoggedRef.current = false
@@ -111,23 +115,41 @@ export default function InteractiveEncodingVideo({
     if (mode !== 'playing') return
     viewedLoggedRef.current = false
     segmentStartedAtRef.current = Date.now()
-    setProgress(0)
 
     const durationMs = Math.max(segment.duration_ms, 1000)
-    const tick = window.setInterval(() => {
-      const elapsed = Date.now() - segmentStartedAtRef.current
-      setProgress(Math.min(100, (elapsed / durationMs) * 100))
-    }, 100)
-
     const timer = currentVideoSrc
       ? undefined
       : window.setTimeout(() => finishSegmentPlayback(), durationMs)
 
     return () => {
-      window.clearInterval(tick)
       if (timer) window.clearTimeout(timer)
     }
   }, [currentVideoSrc, mode, segment, segmentIndex])
+
+  const handleStartSegment = () => {
+    if (loading) return
+    autoStartPendingRef.current = false
+    viewedLoggedRef.current = false
+    segmentStartedAtRef.current = Date.now()
+    setMode('playing')
+
+    const video = videoRef.current
+    if (!video || !currentVideoSrc) return
+    video.muted = false
+    video.volume = 1
+    video.currentTime = 0
+    video.play().catch(() => {
+      setMode('ready')
+    })
+  }
+
+  useEffect(() => {
+    if (mode !== 'ready' || !autoStartPendingRef.current) return
+    const frame = window.requestAnimationFrame(() => {
+      handleStartSegment()
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [mode, segmentIndex])
 
   function finishSegmentPlayback() {
     const elapsed = Date.now() - segmentStartedAtRef.current
@@ -136,7 +158,6 @@ export default function InteractiveEncodingVideo({
       onSegmentViewed?.(segment, segmentIndex, elapsed)
     }
     waitingStartedAtRef.current = Date.now()
-    setProgress(100)
     setMode('waiting')
   }
 
@@ -147,8 +168,9 @@ export default function InteractiveEncodingVideo({
       onComplete()
       return
     }
+    autoStartPendingRef.current = true
     setSegmentIndex((current) => current + 1)
-    setMode('playing')
+    setMode('ready')
   }
 
   return (
@@ -162,8 +184,8 @@ export default function InteractiveEncodingVideo({
             <h1 className="mt-1 text-lg font-bold text-slate-950">{title}</h1>
           </div>
           <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-            {mode === 'playing' ? <Play className="h-4 w-4" /> : <MousePointerClick className="h-4 w-4" />}
-            {mode === 'playing' ? 'Playing' : 'Waiting for click'}
+            {mode === 'waiting' ? <MousePointerClick className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {mode === 'ready' ? 'Ready' : mode === 'playing' ? 'Playing' : 'Waiting for click'}
           </div>
         </div>
       </div>
@@ -172,18 +194,30 @@ export default function InteractiveEncodingVideo({
         {currentVideoSrc ? (
           <video
             key={`${currentVideoSrc}-${segment.id}`}
-            className="h-full w-full object-cover opacity-80"
+            ref={videoRef}
+            className="h-full w-full object-cover"
             src={currentVideoSrc}
-            muted
             playsInline
-            autoPlay
             onEnded={finishSegmentPlayback}
           />
         ) : null}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_40%_35%,rgba(250,250,250,0.10),transparent_35%),linear-gradient(135deg,rgba(15,23,42,0.10),rgba(15,23,42,0.70))]" />
         <div className="absolute left-5 top-5 max-w-md rounded-md bg-slate-950/75 px-4 py-3 text-sm leading-relaxed text-white shadow-lg">
           {segment.placeholder ?? segment.label}
         </div>
+
+        {mode === 'ready' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/20">
+            <button
+              type="button"
+              onClick={handleStartSegment}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-amber-600 disabled:cursor-wait disabled:bg-slate-400"
+            >
+              <Play className="h-4 w-4" />
+              Play
+            </button>
+          </div>
+        )}
 
         {mode === 'waiting' && (
           <button
@@ -192,21 +226,18 @@ export default function InteractiveEncodingVideo({
             title={target.hint}
             onClick={handleTargetClick}
             disabled={loading}
-            className="absolute flex items-center justify-center rounded-lg border-2 border-amber-300 bg-amber-300/20 text-amber-100 shadow-[0_0_0_8px_rgba(251,191,36,0.18)] transition hover:bg-amber-300/30 disabled:cursor-wait disabled:opacity-70"
+            className="absolute rounded-lg border-2 border-amber-300 bg-amber-300/20 text-amber-100 shadow-[0_0_0_8px_rgba(251,191,36,0.18)] transition hover:bg-amber-300/30 disabled:cursor-wait disabled:opacity-70"
             style={targetStyle}
           >
             <span className="pointer-events-none absolute inset-0 rounded-lg border-2 border-amber-200 opacity-75 animate-ping" />
-            <span className="rounded-md bg-slate-950/80 px-3 py-1 text-xs font-semibold">
-              {loading ? 'Saving...' : target.label}
+            <span className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-950/85 px-3 py-1 text-xs font-semibold shadow-lg">
+              {loading ? 'Saving...' : target.hint}
             </span>
           </button>
         )}
       </div>
 
       <div className="space-y-4 px-5 py-4">
-        <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full bg-slate-900 transition-[width]" style={{ width: `${progress}%` }} />
-        </div>
         <div className="grid grid-cols-4 gap-2">
           {playableSegments.map((item, index) => (
             <div
