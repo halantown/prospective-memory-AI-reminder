@@ -329,83 +329,57 @@ Avoid: "What did Benjamin drink?" and "What should you take out later?"
 
 ---
 
-## Task 4: Delivery Person - Front Door Instruction
+## Task 4: Delivery Person — Front Door Instruction
 
-Source files:
+### Narrative Summary
 
-- `Participant/Self_script.md`
-- `Participant/Self_interact.md`
+Yesterday morning, you were tidying the hallway at home before dinner preparation. You briefly talked with your neighbor near the entrance, then returned home and checked the hallway. You noticed the mailbox on the wall and some delivery boxes near the front door. After clearing enough space beside the front door, you decided it would be the best place for today's delivery. Later today, the delivery person calls ahead to ask how you'd like the package delivered.
 
-### Design Summary
+### Encoding Video Storyboard
 
-Yesterday morning, the participant was tidying at home before dinner
-preparation. The hallway/front-door area is the episode context. Later, the
-delivery person calls to ask how the small package should be delivered.
+| Seg | Content | Key Objects | Interaction / Click Target | Attention-check Direction |
+| --- | ------- | ----------- | -------------------------- | ------------------------- |
+| S1 | Yesterday morning, you briefly talk with your neighbor near the entrance while tidying the hallway. | Neighbor | Click the neighbor | Ask who you talked with near the entrance. |
+| S2 | You return to the hallway and notice the mailbox on the wall, then move some delivery boxes away from the front door area. | Mailbox, delivery boxes | Click the delivery boxes | Ask what objects were near the front door. |
+| S3 | You check the front door area and see that there is now enough clear space for the package. You decide this is the best delivery spot. | Front door (target) | Click the front door | Ask which area was checked for the delivery. |
+| S4 | You finish tidying the hallway and continue preparing for the dinner. | Hallway / continue button | Click Continue or hallway area | Ask what activity you were doing yesterday morning. |
 
-This is the only instruction-style task. It remains structurally equivalent
-because the selection screen still asks the participant to recall the assignment
-and choose one of three same-category delivery instructions.
+### Explicit PM Assignment Screen
 
-### Assignment Screen
+> Later today, a delivery person will call to ask how you'd like the package delivered. Remember to ask them to leave the package by the front door.
 
-> Later today, a delivery person will call to ask how you would like the small package delivered. Remember to ask them to leave the package by the front door.
+### Task Parameters
 
-### Final Selection Options
+| Field | Value |
+| ----- | ----- |
+| **Trigger** | Phone call, delivery person asks how to deliver |
+| **Action** | Tell the delivery person to leave the package by the front door |
+| **Target** | Front door delivery instruction |
+| **Distractors, same-category** | Put it in the mailbox; Call when arriving |
+| **EE1 wording direction** | Refer to yesterday morning tidying the hallway before dinner preparation. Do not mention the front door, mailbox, boxes, neighbor, or delivery spot. |
+| **EE0 wording direction** | State only that there is a delivery instruction to give, without episode reference and without target. |
+| **EE1 leakage check** | "Yesterday morning tidying the hallway before dinner preparation" should anchor the prior episode but should not directly reveal "front door." Avoid "front door," "entrance," "mailbox," "boxes," "neighbor," "cleared space," or "delivery spot" in the EE1 reminder. |
 
-| Option | Role | Notes |
-|--------|------|-------|
-| Leave it by the front door | Target | Exact assignment target. |
-| Leave it by the side gate | Distractor | Same delivery-location category; should not appear in encoding video. |
-| Leave it on the porch bench | Distractor | Same delivery-location category; should not appear in encoding video. |
+### Candidate Reminder Wording
 
-Do not use `neighbor`, `mailbox`, or `delivery boxes` as final distractors.
-They are present in the encoding video, so using them as final options would
-violate the decoupled distractor rule.
+| Condition | Reminder |
+| --------- | ------- |
+| **EE0** | The delivery person is calling. Remember to give the correct delivery instruction. |
+| **EE1** | Yesterday morning, while tidying the hallway before dinner preparation, you decided on a delivery instruction. Remember to give the correct delivery instruction. |
 
-### Reminder Wording
+### Final Choice Options
 
-EE-:
+* Leave it by the front door
+* Put it in the mailbox
+* Call when arriving
 
-> The delivery person is calling. Remember to choose the correct delivery instruction.
+### Notes
 
-EE+:
-
-> Yesterday morning at home, while tidying before dinner preparation, you spent time getting the house ready. The delivery person is calling. Remember to choose the correct delivery instruction.
-
-EE+ excluded words/phrases:
-
-- front door
-- door
-- entrance
-- hallway
-- package spot / delivery spot
-- boxes
-- mailbox
-- neighbor
-- leave it by
-- decided / planned / chose
-
-Leakage check: the approved EE+ anchor should provide temporal, spatial, and
-activity context only. It must not mention the front-door area, cleared space,
-neighbor, mailbox, boxes, or that the participant "decided" on an instruction.
-
-### Attention Check Direction
-
-Use shallow scene checks:
-
-- S1: who the participant briefly talked with.
-- S2: what object was moved while tidying.
-- S3: what changed after tidying, not the exact delivery location.
-- S4: what household activity the participant returned to.
-
-Avoid: "Where should the package be left?"
-
-### Residual Risk
-
-`Leave it by the front door` may still be a common-sense default. Pilot data
-should check whether EE- participants select it at ceiling without relying on
-the assignment. If accuracy is too high and confidence has no room to vary,
-switch T4 to a less-default delivery target before formal data collection.
+* Delivery person calls ahead to ask delivery preference — all three options are equally plausible responses. No common sense default.
+* Mailbox is visible in encoding video (S2) as a scene element but is not the target. This is consistent with the decoupled distractor principle: distractors appear in the option interface, and the mailbox's presence in the video is a narrative element, not a retrieval cue for the target.
+* Target-in-video: front door appears in S3 as the clicked interaction object. Same symmetric exposure as T1-T3 (both groups see same video). Covered by the existing target-in-video defense.
+* Secondary DV: target selection accuracy (instruction, not item).
+* EE1 reminder anchors episode without revealing target — "tidying the hallway before dinner preparation" does not differentially point to any of the three options.
 
 ---
 
