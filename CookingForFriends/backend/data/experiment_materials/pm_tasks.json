@@ -20,8 +20,8 @@
       },
       "decoy_items": [
         { "id": "target", "label": "Baking book", "is_target": true },
-        { "id": "intra1", "label": "Game controller", "is_target": false },
-        { "id": "intra2", "label": "Cake box", "is_target": false },
+        { "id": "intra1", "label": "Cookbook", "is_target": false },
+        { "id": "intra2", "label": "Novel", "is_target": false },
         { "id": "cross1", "label": "Gift bag", "is_target": false },
         { "id": "cross2", "label": "Barbecue grill", "is_target": false },
         { "id": "unrelated", "label": "[T1 unrelated TBD]", "is_target": false }
@@ -29,13 +29,13 @@
     },
     "T2": {
       "task_id": "T2",
-      "person": "Anna-Lina",
+      "person": "Sophia",
       "trigger_type": "doorbell",
       "target_room": "kitchen",
       "action_type": "bring_item",
       "target_item": "chocolate",
-      "assign_text": "Tonight, remember to give Anna-Lina the chocolate when she visits.",
-      "recap_text": "Give Anna-Lina the chocolate when she visits",
+      "assign_text": "Tonight, remember to give Sophia the chocolate when she visits.",
+      "recap_text": "Give Sophia the chocolate when she visits",
       "greeting_lines": [
         "Hey, thanks for having me.",
         "I came straight here after work.",
@@ -43,12 +43,12 @@
       ],
       "reminders": {
         "EE1": "Remember what Anna-Lina asked after she studied with you recently.",
-        "EE0": "You promised to give Anna-Lina something."
+        "EE0": "You promised to give Sophia something."
       },
       "decoy_items": [
         { "id": "target", "label": "Chocolate", "is_target": true },
-        { "id": "intra1", "label": "Gift bag", "is_target": false },
-        { "id": "intra2", "label": "Postcard", "is_target": false },
+        { "id": "intra1", "label": "Cookies", "is_target": false },
+        { "id": "intra2", "label": "Candy", "is_target": false },
         { "id": "cross1", "label": "Game controller", "is_target": false },
         { "id": "cross2", "label": "Old battery", "is_target": false },
         { "id": "unrelated", "label": "[T2 unrelated TBD]", "is_target": false }
@@ -56,26 +56,26 @@
     },
     "T3": {
       "task_id": "T3",
-      "person": "Tom",
+      "person": "Benjamin",
       "trigger_type": "phone_call",
       "target_room": "kitchen",
       "action_type": "take_from_fridge",
       "target_item": "apple juice",
-      "assign_text": "Tonight, remember to give Tom the apple juice when he calls.",
-      "recap_text": "Give Tom the apple juice when he calls",
+      "assign_text": "Tonight, remember to give Benjamin the apple juice when he calls.",
+      "recap_text": "Give Benjamin the apple juice when he calls",
       "greeting_lines": [
         "Hey, I am almost there.",
         "I should arrive in a few minutes.",
         "See you soon."
       ],
       "reminders": {
-        "EE1": "Remember what Tom asked after you had a picnic together recently.",
-        "EE0": "You promised to do something for Tom."
+        "EE1": "Remember what Benjamin asked after you went camping together recently.",
+        "EE0": "You promised to do something for Benjamin."
       },
       "decoy_items": [
         { "id": "target", "label": "Apple juice", "is_target": true },
-        { "id": "intra1", "label": "Barbecue grill", "is_target": false },
-        { "id": "intra2", "label": "Bluetooth speaker", "is_target": false },
+        { "id": "intra1", "label": "Orange juice", "is_target": false },
+        { "id": "intra2", "label": "Iced tea", "is_target": false },
         { "id": "cross1", "label": "Cake box", "is_target": false },
         { "id": "cross2", "label": "Cardboard box", "is_target": false },
         { "id": "unrelated", "label": "[T3 unrelated TBD]", "is_target": false }

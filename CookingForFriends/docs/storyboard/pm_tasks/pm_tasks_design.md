@@ -99,8 +99,8 @@ the source of PM-task instruction.
 
 | Task | Trigger | Target | Final 3-option selection set | Encoding click targets |
 |------|---------|--------|------------------------------|------------------------|
-| T1 Mei | Doorbell | Baking book | Baking book; cooking magazine; recipe notebook | Game controller; snack box; baking book bubble; Continue/Mei |
-| T2 Anna/Sophia | Doorbell, Sophia arrives | Chocolate | Chocolate box; cookie tin; candy bag | Gift bag; postcard; chocolate; Continue/postcard/gift bag |
+| T1 Mei | Doorbell | Baking book | Baking book; cookbook; novel | Game controller; snack box; baking book bubble; Continue/Mei |
+| T2 Anna/Sophia | Doorbell, Sophia arrives | Chocolate | Chocolate; cookies; candy | Gift bag; postcard; chocolate; Continue/postcard/gift bag |
 | T3 Benjamin | Phone call | Apple juice | Apple juice; orange juice; iced tea | Bluetooth speaker; apple juice; cooler box; Continue/Benjamin |
 | T4 Delivery | Phone call | Leave package by front door | Leave it by the front door; leave it by the side gate; leave it on the porch bench | Neighbor; delivery boxes; front door; Continue/hallway |
 
@@ -108,8 +108,8 @@ Selection option IDs recommended for implementation:
 
 | Task | Target ID | Distractor IDs |
 |------|-----------|----------------|
-| T1 | `baking_book` | `cooking_magazine`, `recipe_notebook` |
-| T2 | `chocolate_box` | `cookie_tin`, `candy_bag` |
+| T1 | `baking_book` | `cookbook`, `novel` |
+| T2 | `chocolate` | `cookies`, `candy` |
 | T3 | `apple_juice` | `orange_juice`, `iced_tea` |
 | T4 | `front_door` | `side_gate`, `porch_bench` |
 
@@ -180,8 +180,7 @@ EE+ excluded words/phrases:
 - give her the book
 
 Leakage check: the approved EE+ anchor points to Mei, living room, and game
-activity. It does not semantically favor baking book over cooking magazine or
-recipe notebook.
+activity. It does not semantically favor baking book over cookbook or novel.
 
 ### Attention Check Direction
 

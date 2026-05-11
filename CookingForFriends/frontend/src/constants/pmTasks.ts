@@ -39,7 +39,7 @@ export const PM_TASKS: Record<string, PMTaskFrontendDef> = {
   },
   T2: {
     taskId: 'T2',
-    guestName: 'Lina',
+    guestName: 'Sophia',
     triggerType: 'doorbell',
     targetRoom: 'kitchen',
     actionType: 'bring_item',
@@ -47,7 +47,7 @@ export const PM_TASKS: Record<string, PMTaskFrontendDef> = {
   },
   T3: {
     taskId: 'T3',
-    guestName: 'Tom',
+    guestName: 'Benjamin',
     triggerType: 'phone_call',
     targetRoom: 'kitchen',
     actionType: 'take_from_fridge',
@@ -65,25 +65,25 @@ export const PM_TASKS: Record<string, PMTaskFrontendDef> = {
 
 export const DECOY_OPTIONS: Record<string, DecoyOption[]> = {
   T1: [
-    { id: 'target',    label: '烘焙书',             isTarget: true },
-    { id: 'intra1',    label: '游戏手柄',            isTarget: false },
-    { id: 'intra2',    label: '蛋糕盒子',            isTarget: false },
+    { id: 'target',    label: 'Baking book',        isTarget: true },
+    { id: 'intra1',    label: 'Cookbook',           isTarget: false },
+    { id: 'intra2',    label: 'Novel',              isTarget: false },
     { id: 'cross1',    label: '礼品袋',              isTarget: false },
     { id: 'cross2',    label: '烧烤架',              isTarget: false },
     { id: 'unrelated', label: '[T1 unrelated TBD]', isTarget: false },
   ],
   T2: [
-    { id: 'target',    label: '巧克力',              isTarget: true },
-    { id: 'intra1',    label: '礼品袋',              isTarget: false },
-    { id: 'intra2',    label: '明信片',              isTarget: false },
+    { id: 'target',    label: 'Chocolate',          isTarget: true },
+    { id: 'intra1',    label: 'Cookies',            isTarget: false },
+    { id: 'intra2',    label: 'Candy',              isTarget: false },
     { id: 'cross1',    label: '游戏手柄',            isTarget: false },
     { id: 'cross2',    label: '旧电池',              isTarget: false },
     { id: 'unrelated', label: '[T2 unrelated TBD]', isTarget: false },
   ],
   T3: [
-    { id: 'target',    label: '苹果汁',              isTarget: true },
-    { id: 'intra1',    label: '烧烤架',              isTarget: false },
-    { id: 'intra2',    label: '蓝牙音箱',            isTarget: false },
+    { id: 'target',    label: 'Apple juice',        isTarget: true },
+    { id: 'intra1',    label: 'Orange juice',       isTarget: false },
+    { id: 'intra2',    label: 'Iced tea',           isTarget: false },
     { id: 'cross1',    label: '蛋糕盒子',            isTarget: false },
     { id: 'cross2',    label: '纸箱',                isTarget: false },
     { id: 'unrelated', label: '[T3 unrelated TBD]', isTarget: false },

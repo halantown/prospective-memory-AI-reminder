@@ -158,9 +158,12 @@ The frontend component is:
 frontend/src/components/game/InteractiveEncodingVideo.tsx
 ```
 
-The formal participant-facing player has no visible video controls. Each
-segment autoplays, stops when the segment video ends, then shows a pulsing
-hotspot. The participant advances only by clicking the highlighted target.
+The formal participant-facing player has no visible native video controls.
+Because browsers block automatic playback with sound, the first segment starts
+from a participant click (`Play`). The segment then plays with audio, stops when
+the video ends, and shows a pulsing hotspot. After the participant clicks the
+hotspot, the next segment starts automatically; no separate continue button is
+part of the normal segment-to-segment flow.
 
 The configured source of truth for each segment is:
 
@@ -171,6 +174,9 @@ The configured source of truth for each segment is:
   "label": "Game controller",
   "duration_ms": 12000,
   "click_target": {
+    "task_id": "T1",
+    "segment_id": "segment1",
+    "segment_index": 0,
     "id": "game_controller",
     "label": "Game controller",
     "hint": "Click the game controller",
@@ -197,9 +203,11 @@ Workflow:
 
 1. Place the segment video under `frontend/public/assets/encoding/t*/`.
 2. Open `/admin/encoding-hotspots`.
-3. Enter the public video path, for example `/assets/encoding/t1/segment1.mp4`.
-4. Keep frame size at `1112 x 834` unless the exported video resolution changes.
-5. Drag a rectangle over the click target.
+3. Select the task/segment from the dropdown. The tool fills the video path,
+   target id, target label, frame size, and current saved rectangle.
+4. In Preview mode, use the video controls to pause on the final interaction
+   frame.
+5. Toggle Draw mode, then drag a rectangle over the click target.
 6. Copy the generated `click_target` JSON into the matching segment in
    `backend/data/experiment_materials/encoding_materials.json`.
 7. Reload the participant flow and verify the hotspot appears on the final

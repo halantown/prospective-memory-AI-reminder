@@ -13,7 +13,7 @@ from data.materials import (
 @dataclass(frozen=True)
 class PMTaskDef:
     task_id: str             # "T1" | "T2" | "T3" | "T4"
-    guest_name: str          # "Mei" | "Lina" | "Tom" | "Delivery"
+    guest_name: str          # "Mei" | "Sophia" | "Benjamin" | "Delivery"
     trigger_type: str        # "doorbell" | "phone_call"
     target_room: str | None  # room where the target item lives (None for T4)
     action_type: str         # "bring_item" | "take_from_fridge" | "reply_in_chat"
@@ -25,7 +25,7 @@ class PMTaskDef:
 @dataclass(frozen=True)
 class DecoyOption:
     id: str          # "target" | "intra1" | "intra2" | "cross1" | "cross2" | "unrelated"
-    label: str       # item name (Chinese label, hardcoded)
+    label: str       # item name displayed in the item-selection step
     is_target: bool
 
 

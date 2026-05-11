@@ -164,8 +164,8 @@ options, not episode-internal click objects.
 
 | Task | Person/Entity | Target | Trigger | Distractors (same-category) |
 |------|--------------|--------|---------|---------------------------|
-| T1 | Mei | 烘焙书 (baking book) | Doorbell | Cooking magazine; recipe notebook |
-| T2 | Anna / Sophia | 巧克力 (chocolate) | Doorbell | Cookie tin; candy bag |
+| T1 | Mei | 烘焙书 (baking book) | Doorbell | Cookbook; novel |
+| T2 | Anna / Sophia | 巧克力 (chocolate) | Doorbell | Cookies; candy |
 | T3 | Benjamin | 苹果汁 (apple juice) | Phone | Orange juice; iced tea |
 | T4 | 快递员 (delivery person) | Front door instruction | Phone | Leave by side gate; leave on porch bench |
 
