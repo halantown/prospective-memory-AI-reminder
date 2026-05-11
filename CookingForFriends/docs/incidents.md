@@ -127,3 +127,145 @@ Files changed:
 - [ ] Review reconnect resume-offset handling in `engine/timeline.py`: if `BlockRuntime` restores `GameClock` from DB but `block_start_time` is unavailable or ignored as stale, `resume_offset` can still be `0`, so past timeline events may be replayed. This is a reconnect/stale-block edge case and is intentionally not fixed in this patch.
 - [ ] Review cooking-engine reconnect recovery: `CookingEngine.start()` resets `_next_timeline_index` to `0`, so after reconnect during a PM freeze, old cooking events may fire quickly after resume unless already-fired cooking state is persisted or skipped from current game time. This is a reconnect-during-overlay edge case and is intentionally not fixed in this patch.
 - [ ] Monitor participant sessions for recurrence of the clock-continues symptom.
+
+---
+
+## INC-002 — Session end leaves frontend in frozen game state before post-test
+
+| Field         | Detail |
+| ------------- | ------ |
+| Date          | 2026-05-11 |
+| Severity      | P1 High |
+| Status        | Resolved |
+| Reported by   | User observation during formal session end testing |
+| Affected area | `websocket/game_handler.py` session-end event flow, `frontend/src/hooks/useWebSocket.ts`, main experiment phase transition |
+
+### Background
+
+At the end of the main experiment, the backend sends a `session_end` WebSocket event after the final PM pipeline and session-end delay. The normal expected behaviour is that the frontend immediately exits the game runtime, clears any frozen PM state, and renders `POST_MANIP_CHECK` ("Robot Reminder Question") without requiring a browser refresh.
+
+### Incident Description
+
+After a formal session ended, the participant page could transition to a white screen and appear stuck. Refreshing the page restored a partially stale game view: the phone still showed the main-experiment UI and the in-game time appeared not to advance. After a delay, the page eventually transitioned to the Robot Reminder Question page.
+
+This was a high-risk end-of-session issue because it could make participants think the experiment had crashed immediately before post-test questionnaires.
+
+### Timeline
+
+| Time (local) | Event |
+|--------------|-------|
+| — | First symptom observed: white screen after formal session end |
+| — | Refresh showed stale phone/game UI with frozen-looking clock |
+| — | Investigation started in WebSocket session-end and frontend phase handling |
+| — | Root cause identified: session-end events did not clear runtime/frozen frontend state |
+| — | Fix deployed in frontend WebSocket event handler |
+| — | Confirmed build passes |
+
+### Root Cause
+
+The frontend `useWebSocket` handler treated `session_end` as only a phase update:
+
+```ts
+store.setPhase('POST_MANIP_CHECK')
+```
+
+It did not clear the PM pipeline state, did not unset `gameTimeFrozen`, and did not clear robot speech. If the session ended after a PM-trigger-controlled freeze or while stale runtime state was still present, the frontend could continue rendering game-era state long enough to produce a blank/stale transition before the post-test page stabilized.
+
+A second inconsistency existed for `block_end`: the handler still routed to the legacy `debrief` phase instead of the canonical post-test flow. That made the end-of-main-experiment path depend on which terminal WS event arrived.
+
+### Contributing Factors
+
+- The current experiment moved to canonical phases (`MAIN_EXPERIMENT -> POST_MANIP_CHECK`), but `block_end` still contained legacy `debrief` routing.
+- The WebSocket end-event handlers did not perform runtime cleanup even though PM triggers can leave `gameTimeFrozen` and `pmPipelineState` active.
+- The frontend does not currently have an integration test that simulates the final backend `session_end` event while PM/game runtime state is non-idle.
+
+### Fix
+
+Updated `frontend/src/hooks/useWebSocket.ts` so both `session_end` and `block_end` perform the same cleanup before entering post-test:
+
+- `setPMPipelineState(null)`
+- `setGameTimeFrozen(false)`
+- `clearRobotSpeech()`
+- `setPhase('POST_MANIP_CHECK')`
+
+This makes terminal backend events idempotently leave the main experiment runtime and enter the canonical post-test flow.
+
+Related fix commit:
+
+- `a69c977 fix(frontend): prevent invisible phone overlays`
+
+### Verification
+
+- Frontend production build passed with `cd CookingForFriends/frontend && npm run build`.
+- Manual reasoning check: both backend terminal events now clear frozen/runtime state before phase transition, and `block_end` no longer routes to legacy `debrief`.
+
+### Follow-up Actions
+
+- [ ] Add a frontend/WebSocket integration test that dispatches `session_end` while `pmPipelineState` is active and `gameTimeFrozen=true`, then asserts `phase === POST_MANIP_CHECK`, `pmPipelineState === null`, and `gameTimeFrozen === false`.
+- [ ] Audit remaining legacy phase transitions that still route directly to `debrief` or `post_questionnaire`.
+- [ ] Add lightweight runtime logging for `session_end` receipt and frontend phase transition completion during pilot sessions.
+
+---
+
+## INC-003 — Tutorial-to-main transition can enter blank/stale game state
+
+| Field         | Detail |
+| ------------- | ------ |
+| Date          | 2026-05-11 |
+| Severity      | P1 High |
+| Status        | Resolved |
+| Reported by   | User observation during tutorial-to-formal-session testing |
+| Affected area | `frontend/src/pages/game/TutorialFlowPage.tsx`, `frontend/src/pages/game/GamePage.tsx`, main experiment phase transition |
+
+### Background
+
+After `TUTORIAL_TRIGGER`, the frontend advances to `MAIN_EXPERIMENT`. Normal expected behaviour is that the practice/tutorial runtime is discarded, formal cooking definitions are loaded, the game state starts from a clean 17:00 session, and the WebSocket starts the backend block timeline.
+
+### Incident Description
+
+The participant page could turn white or remain in an unusable stale state when switching from tutorial to the formal session. This resembled the earlier formal-session-to-questionnaire transition issue, but happened at the boundary between tutorial practice state and the real game runtime.
+
+### Timeline
+
+| Time (local) | Event |
+|--------------|-------|
+| — | First symptom observed: white screen during tutorial-to-session phase switch |
+| — | Investigation started in frontend phase routing and runtime initialization |
+| — | Root cause identified: formal game mounted with tutorial cooking/runtime state still in the global store |
+| — | Fix deployed in `GamePage` initialization path |
+| — | Confirmed frontend build passes |
+
+### Root Cause
+
+`TutorialFlowPage` intentionally mutates global game state for practice: it loads a fried-egg tutorial recipe, injects tutorial phone messages/contacts, unlocks the phone, and temporarily overrides `wsSend` to intercept cooking actions. When the backend phase advanced to `MAIN_EXPERIMENT`, `GamePage` mounted and immediately opened the formal WebSocket, but it did not first reload formal cooking definitions or clear tutorial PM/phone/cooking/runtime state.
+
+That left the first formal-session render dependent on stale tutorial state while the backend runtime expected the real main-experiment recipe and timeline.
+
+### Contributing Factors
+
+- Tutorial practice and formal gameplay share the same global Zustand store.
+- `GamePage` assumed cooking definitions had already been initialized correctly.
+- The WebSocket could start before the formal main-session state was reset.
+- Frontend automation does not currently cover cross-phase transitions.
+
+### Fix
+
+Updated `frontend/src/pages/game/GamePage.tsx` so formal runtime initialization is explicit before opening the WebSocket:
+
+- Load formal cooking definitions with `getCookingDefinitions(sessionId)`.
+- Reinitialize cooking definitions and call `resetBlock()`.
+- Clear tutorial/runtime residue: PM pipeline state, `gameTimeFrozen`, robot speech, and any temporary `wsSend`.
+- Reset the visible game clock, elapsed seconds, phone tab, and lock state.
+- Delay `useWebSocket` activation until initialization succeeds.
+- Render a visible initialization error page if setup fails instead of leaving an indefinite blank/loading state.
+
+### Verification
+
+- Frontend production build passed with `cd CookingForFriends/frontend && npm run build`.
+- Manual reasoning check: `GamePage` no longer opens the WebSocket or sends `start_game` until formal cooking definitions are loaded and tutorial state has been cleared.
+
+### Follow-up Actions
+
+- [ ] Add a frontend transition test for `TUTORIAL_TRIGGER -> MAIN_EXPERIMENT` that asserts formal cooking definitions are loaded before `start_game`.
+- [ ] Consider separating tutorial practice state from main game runtime state so future tutorials cannot leak into formal sessions.
+- [ ] Add lightweight runtime logging for formal game initialization completion during pilot sessions.

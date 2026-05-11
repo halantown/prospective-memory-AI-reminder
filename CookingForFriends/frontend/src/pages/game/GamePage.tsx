@@ -1,9 +1,10 @@
 /** Main game page — floor plan view replacing WorldView, phone sidebar preserved. */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { useMouseTracker } from '../../hooks/useMouseTracker'
+import { getCookingDefinitions } from '../../services/api'
 import FloorPlanView from '../../components/game/FloorPlanView'
 import PhoneSidebar from '../../components/game/PhoneSidebar'
 import HUD from '../../components/game/HUD'
@@ -22,7 +23,15 @@ export default function GamePage() {
   const setElapsedSeconds = useGameStore((s) => s.setElapsedSeconds)
   const setActivePhoneTab = useGameStore((s) => s.setActivePhoneTab)
   const setPhoneLocked = useGameStore((s) => s.setPhoneLocked)
+  const initializeCookingDefinitions = useGameStore((s) => s.initializeCookingDefinitions)
+  const resetBlock = useGameStore((s) => s.resetBlock)
+  const setPMPipelineState = useGameStore((s) => s.setPMPipelineState)
+  const setGameTimeFrozen = useGameStore((s) => s.setGameTimeFrozen)
+  const clearRobotSpeech = useGameStore((s) => s.clearRobotSpeech)
+  const setWsSend = useGameStore((s) => s.setWsSend)
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
+  const [runtimeReady, setRuntimeReady] = useState(false)
+  const [initError, setInitError] = useState<string | null>(null)
   const pmTriggerWaiting = pmPipelineState?.step === 'trigger_event'
   const doorbellTriggerWaiting = pmTriggerWaiting && pmPipelineState?.triggerType === 'doorbell'
   const pmBlocksOngoingTask = Boolean(pmPipelineState && !doorbellTriggerWaiting)
@@ -33,16 +42,87 @@ export default function GamePage() {
   }, [sessionId, setPhase])
 
   useEffect(() => {
-    setGameClock('17:00')
-    setElapsedSeconds(0)
-    setActivePhoneTab('chats')
-    setPhoneLocked(false)
-  }, [setActivePhoneTab, setElapsedSeconds, setGameClock, setPhoneLocked])
+    if (!sessionId) return
 
-  useWebSocket(sessionId)
+    let cancelled = false
+    setRuntimeReady(false)
+    setInitError(null)
+
+    getCookingDefinitions(sessionId)
+      .then((definitions) => {
+        if (cancelled) return
+        initializeCookingDefinitions(definitions)
+        resetBlock()
+        setPMPipelineState(null)
+        setGameTimeFrozen(false)
+        clearRobotSpeech()
+        setWsSend(null)
+        setGameClock('17:00')
+        setElapsedSeconds(0)
+        setActivePhoneTab('chats')
+        setPhoneLocked(false)
+        setRuntimeReady(true)
+      })
+      .catch((error) => {
+        console.error('[GamePage] Failed to initialize main experiment runtime', error)
+        if (!cancelled) {
+          setInitError(error instanceof Error ? error.message : 'Failed to initialize main session')
+          setRuntimeReady(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    clearRobotSpeech,
+    initializeCookingDefinitions,
+    resetBlock,
+    sessionId,
+    setActivePhoneTab,
+    setElapsedSeconds,
+    setGameClock,
+    setGameTimeFrozen,
+    setPMPipelineState,
+    setPhoneLocked,
+    setWsSend,
+  ])
+
+  useWebSocket(runtimeReady ? sessionId : null)
   useMouseTracker()
 
   if (!sessionId) return null
+
+  if (initError) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-lg border border-red-200 bg-white p-6 text-center shadow-lg">
+          <h1 className="text-xl font-bold text-slate-900">Session initialization failed</h1>
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            The main session could not be prepared. Please contact the experimenter.
+          </p>
+          {participantId && (
+            <p className="mt-4 rounded bg-slate-100 px-3 py-2 font-mono text-xs text-slate-600">
+              Participant: {participantId}
+            </p>
+          )}
+          <p className="mt-3 rounded bg-red-50 px-3 py-2 font-mono text-xs text-red-600">
+            {initError}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!runtimeReady) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600 shadow-sm">
+          Loading main session...
+        </div>
+      </div>
+    )
+  }
 
   if (blockError) {
     return (
