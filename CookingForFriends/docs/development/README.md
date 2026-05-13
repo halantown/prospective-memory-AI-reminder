@@ -1,0 +1,11 @@
+# Development Docs
+
+Current implementation references. These files should track the active codebase.
+
+| Topic | File |
+|-------|------|
+| System architecture | [architecture.md](architecture.md) |
+| Configuration | [configuration.md](configuration.md) |
+| Manual testing | [testing.md](testing.md) |
+| PM trigger flow | [pm-trigger-flow.md](pm-trigger-flow.md) |
+| Cooking task | [cooking.md](cooking.md) |

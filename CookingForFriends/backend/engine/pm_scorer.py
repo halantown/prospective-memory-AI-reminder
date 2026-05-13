@@ -1,4 +1,4 @@
-"""PM Scoring Engine — 0-6 scale from docs/archive/plans/experiment_plan_v3.md.
+"""PM Scoring Engine — 0-6 behavioral scoring scale.
 
 Score criteria:
   6 — Perfect: correct room, correct target, correct action, ≤15s

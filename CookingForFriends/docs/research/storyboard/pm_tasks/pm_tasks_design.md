@@ -1,7 +1,7 @@
 # PM Task Design Review and Current Spec
 
 > Reviewed on 2026-05-09 against
-> `CookingForFriends/docs/storyboard/pm_tasks/PM_Task_Design_Principles.md`.
+> `CookingForFriends/docs/research/storyboard/pm_tasks/PM_Task_Design_Principles.md`.
 > This file replaces the older PM task summary and aligns the storyboard scripts
 > with the current decoupled same-category selection design.
 

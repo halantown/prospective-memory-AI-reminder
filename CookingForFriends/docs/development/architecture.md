@@ -97,8 +97,9 @@ Gameplay sleeps and deadlines should use gameplay seconds, not direct wall-clock
 elapsed time. This matters because PM encounters can pause or otherwise control
 the runtime while preserving experimental timing semantics.
 
-The historical GameClock migration report is archived at
-[archive/migrations/GAME_CLOCK_MIGRATION_REPORT_2026-05-03.md](archive/migrations/GAME_CLOCK_MIGRATION_REPORT_2026-05-03.md).
+Historical GameClock migration notes were removed from the active docs. The
+current source of truth is `backend/engine/game_clock.py` and the runtime
+ownership notes in this file.
 
 ## Runtime Plan
 
