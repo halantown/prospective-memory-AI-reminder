@@ -78,21 +78,6 @@ interface PhoneMessageEvent {
   }
 }
 
-interface KitchenTimerEvent {
-  event: 'kitchen_timer'
-  data: Record<string, unknown>
-}
-
-interface PhoneNotificationEvent {
-  event: 'phone_notification'
-  data: { sender: string; preview: string; is_ad: boolean }
-}
-
-interface PhoneLockEvent {
-  event: 'phone_lock'
-  data: Record<string, unknown>
-}
-
 interface BlockEndEvent {
   event: 'block_end'
   data: Record<string, unknown>
@@ -135,9 +120,6 @@ export type WSServerEvent =
   | HeartbeatAckEvent
   | PhoneContactsEvent
   | PhoneMessageEvent
-  | KitchenTimerEvent
-  | PhoneNotificationEvent
-  | PhoneLockEvent
   | BlockEndEvent
   | BlockErrorEvent
   | PMReceivedEvent

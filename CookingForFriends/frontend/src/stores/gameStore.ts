@@ -59,7 +59,6 @@ export const useGameStore = create<GameState>()((...a) => {
       diningScore: 0,
       visitors: [],
       phoneMessages: [],
-      phoneNotifications: [],
       phoneLocked: true,
       phoneBanner: null,
       contacts: [],

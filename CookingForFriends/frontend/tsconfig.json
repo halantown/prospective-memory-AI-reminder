@@ -18,6 +18,5 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"],
-  "exclude": ["src/**/_archive/**", "src/archive/**"]
+  "include": ["src"]
 }

@@ -13,7 +13,6 @@ import ErrorBoundary from './components/ErrorBoundary'
 import WelcomePage from './pages/game/WelcomePage'
 import ConsentPage from './pages/game/ConsentPage'
 import DemographicsPage from './pages/game/DemographicsPage'
-import IntroductionPage from './pages/game/IntroductionPage'
 import MSEPrePage from './pages/game/MSEPrePage'
 import StoryIntroPage from './pages/game/StoryIntroPage'
 
@@ -22,7 +21,6 @@ const EncodingFlowPage = lazy(() => import('./pages/game/EncodingFlowPage'))
 const TutorialFlowPage = lazy(() => import('./pages/game/TutorialFlowPage'))
 const EveningTransitionPage = lazy(() => import('./pages/game/EveningTransitionPage'))
 const GamePage = lazy(() => import('./pages/game/GamePage'))
-const PostQuestionnairePage = lazy(() => import('./pages/game/PostQuestionnairePage'))
 const PostTestFlowPage = lazy(() => import('./pages/game/PostTestFlowPage'))
 const DebriefPage = lazy(() => import('./pages/game/DebriefPage'))
 
@@ -90,7 +88,7 @@ function GameShell() {
 
   // Warn before tab close during active gameplay or early phases
   useEffect(() => {
-    const activePhases: Phase[] = ['playing', 'consent', 'introduction', 'MAIN_EXPERIMENT', 'CONSENT']
+    const activePhases: Phase[] = ['MAIN_EXPERIMENT', 'CONSENT']
     if (!activePhases.includes(phase)) return
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
@@ -175,13 +173,10 @@ function GameShell() {
       case 'encoding_flow':  return <EncodingFlowPage />
       case 'tutorial_flow':  return <TutorialFlowPage />
       case 'evening_transition': return <EveningTransitionPage />
-      case 'introduction':   return <IntroductionPage />
       case 'playing':        return <GamePage />
       case 'post_test':      return <PostTestFlowPage />
-      case 'post_questionnaire': return <PostQuestionnairePage />
       case 'debrief':        return <DebriefPage />
       case 'complete':       return <CompletePage />
-      default:               return <WelcomePage />
     }
   })()
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { postMouseTrackingBatch } from '../services/api'
 import { useGameStore } from '../stores/gameStore'
+import { isMainExperimentPhase } from '../utils/phase'
 
 const SAMPLE_INTERVAL = 100
 const BATCH_INTERVAL = 60_000
@@ -64,7 +65,7 @@ export function useMouseTracker() {
   }, [sessionId])
 
   useEffect(() => {
-    if (phase !== 'playing' || !sessionId) {
+    if (!isMainExperimentPhase(phase) || !sessionId) {
       void flush(true)
       return
     }

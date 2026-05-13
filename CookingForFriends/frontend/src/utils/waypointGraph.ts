@@ -31,7 +31,7 @@ export interface WaypointData {
 
 /**
  * Resolve a room_meta exit/entry field, optionally for a specific other room.
- * Supports both legacy string values and per-destination maps.
+ * Supports both single waypoint IDs and per-destination maps.
  */
 export function resolveRoomPoint(
   field: RoomPointSpec | undefined,

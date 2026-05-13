@@ -188,25 +188,6 @@ export function useWebSocket(sessionId: string | null) {
         break
       }
 
-      case 'kitchen_timer':
-        console.warn('[WS] Ignoring legacy kitchen_timer event; cooking timers are derived from step_activate:', msg.data)
-        break
-
-      case 'phone_notification':
-        store.addPhoneNotification({
-          id: `notif_${Date.now()}`,
-          sender: msg.data.sender,
-          preview: msg.data.preview,
-          is_ad: msg.data.is_ad,
-          timestamp: Date.now(),
-          read: false,
-        })
-        break
-
-      case 'phone_lock':
-        store.setPhoneLocked(false)
-        break
-
       case 'block_end':
         store.setPMPipelineState(null)
         store.setGameTimeFrozen(false)

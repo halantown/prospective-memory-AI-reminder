@@ -1,5 +1,5 @@
 import type {
-  Phase, RoomId, Pan, PhoneNotification, PhoneMessage, RobotState, SessionData,
+  Phase, RoomId, Pan, PhoneMessage, RobotState, SessionData,
   ActivePMTrial, DiningPhase, SeatState, UtensilType,
   DishId, DishState, KitchenStationId, Contact,
   ActiveCookingStep, CookingWaitStep,
@@ -64,7 +64,6 @@ export interface CookingSlice {
 
 export interface PhoneSlice {
   phoneMessages: PhoneMessage[]
-  phoneNotifications: PhoneNotification[]
   phoneLocked: boolean
   phoneLastActivity: number
   phoneBanner: PhoneMessage | null
@@ -76,9 +75,7 @@ export interface PhoneSlice {
   lockSystemNotifications: Array<{ id: string; sender: string; text: string; timestamp: number }>
 
   addPhoneMessage: (msg: PhoneMessage) => void
-  addPhoneNotification: (notif: PhoneNotification) => void
   setPhoneLocked: (locked: boolean) => void
-  markNotificationRead: (id: string) => void
   markMessageRead: (id: string) => void
   markContactMessagesRead: (contactId: string) => void
   answerPhoneMessage: (messageId: string, chosenText: string, isCorrect: boolean) => void

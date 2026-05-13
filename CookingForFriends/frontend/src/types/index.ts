@@ -37,18 +37,9 @@ export type ExperimentPhase =
   | 'DEBRIEF'
   | 'COMPLETED'
 
-export type LegacyPhase =
-  | 'welcome'
-  | 'onboarding'       // kept for backward compat
-  | 'consent'
-  | 'introduction'
-  | 'encoding'
-  | 'playing'
-  | 'post_questionnaire'
-  | 'debrief'
-  | 'complete'
+export type UIPhase = 'welcome' | 'complete'
 
-export type Phase = LegacyPhase | ExperimentPhase
+export type Phase = UIPhase | ExperimentPhase
 
 export type TaskOrder = 'A' | 'B' | 'C' | 'D'
 
@@ -392,16 +383,6 @@ export interface PhoneMessage {
   feedbackVisible?: boolean   // true after feedback delay has elapsed
   respondedAt?: number
   userChoice?: string  // the actual text the participant chose
-}
-
-/** @deprecated Use PhoneMessage instead — kept for backward compat with old phone_notification events */
-export interface PhoneNotification {
-  id: string
-  sender: string
-  preview: string
-  is_ad: boolean
-  timestamp: number
-  read: boolean
 }
 
 // ── Robot ──

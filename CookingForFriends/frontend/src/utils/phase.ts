@@ -9,10 +9,8 @@ type RenderPhase =
   | 'encoding_flow'
   | 'tutorial_flow'
   | 'evening_transition'
-  | 'introduction'
   | 'playing'
   | 'post_test'
-  | 'post_questionnaire'
   | 'debrief'
   | 'complete'
 
@@ -50,23 +48,18 @@ const CANONICAL_TO_RENDER: Record<string, RenderPhase> = {
   COMPLETED: 'complete',
 }
 
-const LEGACY_TO_RENDER: Record<string, RenderPhase> = {
+const UI_TO_RENDER: Record<string, RenderPhase> = {
   welcome: 'welcome',
-  onboarding: 'welcome',
-  consent: 'consent',
-  introduction: 'introduction',
-  encoding: 'introduction',
-  playing: 'playing',
-  pending: 'playing',
-  completed: 'debrief',
-  post_questionnaire: 'post_questionnaire',
-  debrief: 'debrief',
   complete: 'complete',
 }
 
 export function renderPhaseFor(phase: string | null | undefined): RenderPhase {
   if (!phase) return 'welcome'
-  return CANONICAL_TO_RENDER[phase] ?? LEGACY_TO_RENDER[phase] ?? CANONICAL_TO_RENDER[phase.toUpperCase()] ?? 'welcome'
+  const renderPhase = CANONICAL_TO_RENDER[phase] ?? UI_TO_RENDER[phase]
+  if (!renderPhase) {
+    throw new Error(`Unknown frontend phase: ${phase}`)
+  }
+  return renderPhase
 }
 
 export function frontendPhaseForBackend(phase: string | null | undefined): Phase {
@@ -76,29 +69,18 @@ export function frontendPhaseForBackend(phase: string | null | undefined): Phase
   const upper = phase.toUpperCase()
   if (CANONICAL_TO_RENDER[upper]) return upper as Phase
 
-  const legacyToCanonical: Record<string, Phase> = {
+  const uiPhase: Record<string, Phase> = {
     welcome: 'WELCOME',
-    onboarding: 'WELCOME',
-    consent: 'CONSENT',
-    demographics: 'DEMOGRAPHICS',
-    mse_pre: 'MSE_PRE',
-    story_intro: 'STORY_INTRO',
-    encoding: 'ENCODING_VIDEO_1',
-    encoding_flow: 'ENCODING_VIDEO_1',
-    tutorial_flow: 'TUTORIAL_PHONE',
-    introduction: 'STORY_INTRO',
-    playing: 'MAIN_EXPERIMENT',
-    pending: 'MAIN_EXPERIMENT',
-    post_test: 'POST_MANIP_CHECK',
-    post_questionnaire: 'POST_MANIP_CHECK',
-    debrief: 'DEBRIEF',
-    completed: 'COMPLETED',
     complete: 'COMPLETED',
   }
 
-  return legacyToCanonical[phase] ?? 'WELCOME'
+  const mapped = uiPhase[phase]
+  if (!mapped) {
+    throw new Error(`Unknown backend phase: ${phase}`)
+  }
+  return mapped
 }
 
 export function isMainExperimentPhase(phase: string | null | undefined): boolean {
-  return phase === 'MAIN_EXPERIMENT' || phase === 'playing'
+  return phase === 'MAIN_EXPERIMENT'
 }

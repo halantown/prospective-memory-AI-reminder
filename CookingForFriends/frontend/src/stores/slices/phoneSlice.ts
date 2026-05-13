@@ -3,7 +3,6 @@ import type { GameState, PhoneSlice } from './types'
 
 export const createPhoneSlice: StateCreator<GameState, [], [], PhoneSlice> = (set) => ({
   phoneMessages: [],
-  phoneNotifications: [],
   phoneLocked: false,
   phoneLastActivity: Date.now(),
   phoneBanner: null,
@@ -19,17 +18,7 @@ export const createPhoneSlice: StateCreator<GameState, [], [], PhoneSlice> = (se
     return { phoneMessages: [...s.phoneMessages, msg] }
   }),
 
-  addPhoneNotification: (notif) => set((s) => ({
-    phoneNotifications: [...s.phoneNotifications, notif],
-  })),
-
   setPhoneLocked: (_locked) => set({ phoneLocked: false, phoneLastActivity: Date.now() }),
-
-  markNotificationRead: (id) => set((s) => ({
-    phoneNotifications: s.phoneNotifications.map((n) =>
-      n.id === id ? { ...n, read: true } : n
-    ),
-  })),
 
   markMessageRead: (id) => set((s) => ({
     phoneMessages: s.phoneMessages.map((m) =>
