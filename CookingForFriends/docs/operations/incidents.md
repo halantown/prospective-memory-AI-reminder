@@ -1367,3 +1367,59 @@ Updated `frontend/src/pages/game/GamePage.tsx` so formal runtime initialization 
 - [ ] Add a frontend transition test for `TUTORIAL_TRIGGER -> MAIN_EXPERIMENT` that asserts formal cooking definitions are loaded before `start_game`.
 - [ ] Consider separating tutorial practice state from main game runtime state so future tutorials cannot leak into formal sessions.
 - [ ] Add lightweight runtime logging for formal game initialization completion during pilot sessions.
+
+---
+
+## INC-026 — First 0s cooking task skipped on fresh main-experiment start
+
+| Field         | Detail |
+| ------------- | ------ |
+| Date          | 2026-05-13 |
+| Severity      | P1 High |
+| Status        | Resolved |
+| Reported by   | User observation during main experiment session |
+| Affected area | `backend/engine/cooking_engine.py`, main experiment cooking timeline |
+
+### Background
+
+At `MAIN_EXPERIMENT` start, the backend runtime should immediately activate the first cooking step scheduled at `t=0` and send an `ongoing_task_event` to the frontend.
+
+### Incident Description
+
+The participant entered a main experiment session but did not receive the first kitchen task scheduled at 0 seconds.
+
+### Timeline
+
+| Time (local) | Event |
+|--------------|-------|
+| — | First symptom observed: 0s kitchen task did not appear |
+| — | Investigation started in runtime plan, PM scheduler, and cooking engine startup |
+| — | Root cause identified: fresh shared `GameClock` startup was treated like a resumed runtime |
+| — | Fix deployed in `CookingEngine.start` |
+| — | Backend tests and frontend build confirmed passing |
+
+### Root Cause
+
+`BlockRuntime` starts the shared `GameClock` through the timeline before constructing `CookingEngine`. On a fresh session this means `clock.now()` can already be a few milliseconds greater than zero when the cooking engine starts. The reconnect-safety logic interpreted that as a restored runtime and selected the first cooking entry with `entry.t > now`, which skipped the `t=0` entry.
+
+### Contributing Factors
+
+- Fresh starts and restored/reconnected starts both used an already-started shared `GameClock`.
+- The reconnect replay fix did not include a regression test for a fresh clock that had advanced slightly past zero.
+- The first real cooking cue is scheduled exactly at `t=0`, so even a tiny startup offset exposed the issue.
+
+### Fix
+
+Updated `CookingEngine.start` to treat an already-started clock with less than one second elapsed as a fresh start and schedule from `0.0`. Reconnect/restored starts still skip past entries when `block_start_time` is provided or the shared clock is meaningfully past zero.
+
+Added `test_fresh_shared_clock_keeps_zero_second_cooking_entry` to assert that a fresh shared clock at `0.05s` still emits the `t=0` cooking activation.
+
+### Verification
+
+- `cd CookingForFriends/backend && conda run -n thesis_server pytest tests/test_cooking_engine.py tests/test_timeline_reconnect.py tests/test_runtime_plan_loader.py -q`
+- `cd CookingForFriends/backend && conda run -n thesis_server pytest tests -q`
+- `cd CookingForFriends/frontend && npm run build`
+
+### Follow-up Actions
+
+- [ ] Add an end-to-end runtime smoke test that starts `BlockRuntime` and asserts the first cooking `ongoing_task_event` is emitted.

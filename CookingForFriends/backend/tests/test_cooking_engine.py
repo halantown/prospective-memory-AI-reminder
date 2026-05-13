@@ -110,6 +110,41 @@ class TestCookingEngineInit:
         task.cancel()
         await engine.stop()
 
+    @pytest.mark.asyncio
+    async def test_fresh_shared_clock_keeps_zero_second_cooking_entry(self, sender):
+        """Fresh BlockRuntime clocks are already started before CookingEngine starts."""
+        from data.cooking_timeline import TimelineEntry
+
+        fake = FakeTime()
+        clock = GameClock(time_fn=fake.now, sleep_fn=fake.sleep)
+        clock.start()
+        fake.value += 0.05
+
+        engine = CookingEngine(
+            participant_id="test_participant",
+            block_id=1,
+            send_fn=sender,
+            db_factory=MockDB(),
+            clock=clock,
+            cooking_timeline=[
+                TimelineEntry(t=0, dish_id="spaghetti", step_index=0, step_type="active"),
+                TimelineEntry(t=30, dish_id="spaghetti", step_index=1, step_type="wait"),
+            ],
+            robot_idle_comments=[],
+        )
+
+        task = engine.start()
+        assert engine._next_timeline_index == 0
+        await asyncio.sleep(0)
+        assert sender.messages
+        event_type, data = sender.messages[0]
+        assert event_type == "ongoing_task_event"
+        assert data["event"] == "step_activate"
+        assert data["dish"] == "spaghetti"
+        assert data["step_index"] == 0
+        task.cancel()
+        await engine.stop()
+
 
 class TestHandleAction:
     @pytest.mark.asyncio

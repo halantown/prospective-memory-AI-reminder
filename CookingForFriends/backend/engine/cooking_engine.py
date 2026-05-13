@@ -109,13 +109,21 @@ class CookingEngine:
 
     def start(self, block_start_time: float | None = None) -> asyncio.Task:
         """Start the cooking timeline. Returns the background task."""
-        restored_clock = self._clock.is_started
+        was_started = self._clock.is_started
         self._clock.start(block_start_time)
         self._running = True
         current_game_time = self._clock.now()
+        # BlockRuntime starts the shared GameClock in the timeline task before
+        # constructing CookingEngine. On a fresh block this can make now() a few
+        # milliseconds greater than zero; the t=0 cooking step must still fire.
+        # Reconnect/restored starts carry a real offset via block_start_time or
+        # a clock that is already meaningfully past zero, and should skip past
+        # entries to avoid replay.
+        resume_start = block_start_time is not None or (was_started and current_game_time >= 1.0)
+        scheduling_time = current_game_time if resume_start else 0.0
         self._next_timeline_index = self._first_pending_timeline_index(
-            current_game_time,
-            include_current=not restored_clock,
+            scheduling_time,
+            include_current=not resume_start,
         )
         self._timeline_task = asyncio.create_task(self._run_timeline())
         self._idle_comment_task = asyncio.create_task(self._run_idle_comments())
