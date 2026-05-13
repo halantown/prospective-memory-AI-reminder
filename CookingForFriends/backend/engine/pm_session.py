@@ -355,7 +355,10 @@ async def run_pm_session(
         if not await _enter_post_manip_check_if_active(session_id, db_factory):
             return
 
-        await send_fn("session_end", {"reason": "pm_schedule_complete"})
+        await send_fn("session_end", {
+            "reason": "pm_schedule_complete",
+            "next_phase": ExperimentPhase.POST_MANIP_CHECK.value,
+        })
         logger.info("[PM_SESSION] session_end sent (session=%s)", session_id)
 
     except asyncio.CancelledError:

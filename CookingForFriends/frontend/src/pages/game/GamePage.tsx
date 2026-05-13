@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { useMouseTracker } from '../../hooks/useMouseTracker'
-import { getCookingDefinitions } from '../../services/api'
+import { getCookingDefinitions, getSessionStatus } from '../../services/api'
+import { frontendPhaseForBackend, isMainExperimentPhase } from '../../utils/phase'
 import FloorPlanView from '../../components/game/FloorPlanView'
 import PhoneSidebar from '../../components/game/PhoneSidebar'
 import PMInteraction from '../../components/game/PMInteraction'
@@ -27,6 +28,7 @@ export default function GamePage() {
   const setGameTimeFrozen = useGameStore((s) => s.setGameTimeFrozen)
   const clearRobotSpeech = useGameStore((s) => s.clearRobotSpeech)
   const setWsSend = useGameStore((s) => s.setWsSend)
+  const phase = useGameStore((s) => s.phase)
   const pmPipelineState = useGameStore((s) => s.pmPipelineState)
   const [runtimeReady, setRuntimeReady] = useState(false)
   const [initError, setInitError] = useState<string | null>(null)
@@ -88,6 +90,38 @@ export default function GamePage() {
 
   useWebSocket(runtimeReady ? sessionId : null)
   useMouseTracker()
+
+  useEffect(() => {
+    if (!runtimeReady || !sessionId || !isMainExperimentPhase(phase)) return
+    let cancelled = false
+    const syncPhase = async () => {
+      try {
+        const status = await getSessionStatus(sessionId)
+        const serverPhase = frontendPhaseForBackend(status.phase)
+        if (!cancelled && !isMainExperimentPhase(serverPhase)) {
+          setPMPipelineState(null)
+          setGameTimeFrozen(false)
+          clearRobotSpeech()
+          setPhase(serverPhase)
+        }
+      } catch (error) {
+        console.warn('[GamePage] Main-session phase sync failed', error)
+      }
+    }
+    const timer = window.setInterval(syncPhase, 2500)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [
+    clearRobotSpeech,
+    phase,
+    runtimeReady,
+    sessionId,
+    setGameTimeFrozen,
+    setPMPipelineState,
+    setPhase,
+  ])
 
   if (!sessionId) return null
 

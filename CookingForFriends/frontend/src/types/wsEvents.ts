@@ -49,7 +49,7 @@ interface AvatarActionEvent {
 
 interface SessionEndEvent {
   event: 'session_end'
-  data: Record<string, unknown>
+  data: { next_phase?: string; reason?: string }
 }
 
 interface HeartbeatAckEvent {

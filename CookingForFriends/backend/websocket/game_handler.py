@@ -383,6 +383,8 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
             async with db_factory() as db:
                 from sqlalchemy import select
                 from models.block import Block, BlockStatus
+                from models.experiment import Participant
+                from engine.phase_state import ExperimentPhase, enter_phase, normalize_phase
                 result = await db.execute(
                     select(Block).where(
                         Block.participant_id == participant_id,
@@ -392,8 +394,13 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
                 blk = result.scalar_one_or_none()
                 if blk and blk.status == BlockStatus.PLAYING:
                     blk.status = BlockStatus.COMPLETED
-                    await db.commit()
                     logger.info(f"[GAME_HANDLER] Block {block_number} completed for {participant_id}")
+                participant_result = await db.execute(select(Participant).where(Participant.id == participant_id))
+                participant = participant_result.scalar_one_or_none()
+                if participant and normalize_phase(participant.current_phase) == ExperimentPhase.MAIN_EXPERIMENT:
+                    await enter_phase(db, participant, ExperimentPhase.POST_MANIP_CHECK)
+                    logger.info("[GAME_HANDLER] Participant advanced to POST_MANIP_CHECK on block complete: %s", participant_id)
+                await db.commit()
         except Exception as e:
             logger.error(f"[GAME_HANDLER] Failed to mark block complete: {e}")
 

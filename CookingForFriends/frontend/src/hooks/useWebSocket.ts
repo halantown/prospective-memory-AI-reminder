@@ -2,14 +2,29 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
-import { getSessionState } from '../services/api'
-import { isMainExperimentPhase } from '../utils/phase'
+import { getSessionState, getSessionStatus } from '../services/api'
+import { frontendPhaseForBackend, isMainExperimentPhase } from '../utils/phase'
 import type { PMPipelineStep, RoomId } from '../types'
 import type { WSServerEvent } from '../types/wsEvents'
 
 const HEARTBEAT_INTERVAL = 30_000
 const RECONNECT_BASE_MS = 500
 const RECONNECT_MAX_MS = 15_000
+
+async function syncPhaseFromServer(sessionId: string | null, fallbackPhase = 'POST_MANIP_CHECK') {
+  const store = useGameStore.getState()
+  if (!sessionId) {
+    store.setPhase(frontendPhaseForBackend(fallbackPhase))
+    return
+  }
+  try {
+    const status = await getSessionStatus(sessionId)
+    store.setPhase(frontendPhaseForBackend(status.phase || fallbackPhase))
+  } catch (error) {
+    console.warn('[WS] Failed to sync phase after session end; using fallback', error)
+    store.setPhase(frontendPhaseForBackend(fallbackPhase))
+  }
+}
 
 export function useWebSocket(sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null)
@@ -129,7 +144,7 @@ export function useWebSocket(sessionId: string | null) {
         store.setPMPipelineState(null)
         store.setGameTimeFrozen(false)
         store.clearRobotSpeech()
-        store.setPhase('POST_MANIP_CHECK')
+        void syncPhaseFromServer(sessionId, msg.data.next_phase || 'POST_MANIP_CHECK')
         break
 
       case 'heartbeat_ack':
@@ -192,7 +207,7 @@ export function useWebSocket(sessionId: string | null) {
         store.setPMPipelineState(null)
         store.setGameTimeFrozen(false)
         store.clearRobotSpeech()
-        store.setPhase('POST_MANIP_CHECK')
+        void syncPhaseFromServer(sessionId, 'POST_MANIP_CHECK')
         break
 
       case 'block_error':
@@ -217,7 +232,7 @@ export function useWebSocket(sessionId: string | null) {
       default:
         console.log('[WS] Unknown event:', (msg as { event: string }).event, (msg as { data: unknown }).data)
     }
-  }, [])   // no deps — reads from getState() so always stable
+  }, [sessionId])
 
   const connect = useCallback(() => {
     if (!sessionId) return

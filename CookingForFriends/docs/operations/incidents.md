@@ -54,6 +54,57 @@ Each entry follows the standard template below.
 
 ---
 
+## INC-006 — Main session did not live-transition to post-test
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-13 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | Manual testing / participant flow report |
+| Affected area| Main experiment completion, WebSocket session end, phase sync |
+
+### Background
+> After the main CookingForFriends session finishes, the participant should automatically leave the gameplay view and enter `POST_MANIP_CHECK` without a manual browser refresh.
+
+### Incident Description
+> The main session could finish while the participant remained on a blank/stale gameplay screen. Refreshing the browser recovered the correct next phase, showing that backend phase state could be ahead of the live frontend state.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 17:18 | Bug report reviewed |
+| 17:20 | Investigation started |
+| 17:27 | Root cause identified: live transition depended on a single WS end event and had no status-sync fallback |
+| 17:35 | Fix deployed in backend WS completion and frontend phase sync |
+| 17:40 | Build/tests run for verification |
+
+### Root Cause
+> The frontend relied on receiving `session_end` / `block_end` over the active WebSocket and then hard-coded a local transition to `POST_MANIP_CHECK`. If that end event was missed, delayed, or sent around a reconnect boundary, the active page did not re-check server phase state. Separately, the reconnect state endpoint path accepted a `{token}` parameter while the frontend called it with `sessionId`, so PM reconnect restore could fail.
+
+### Contributing Factors
+> - No polling or status-sync fallback while in `MAIN_EXPERIMENT`
+> - Timeline `block_end` did not persist phase advancement itself
+> - `session_end` payload did not include the authoritative next phase
+> - Reconnect state endpoint parameter naming did not match the frontend caller
+
+### Fix
+> - `backend/engine/pm_session.py`: `session_end` now includes `next_phase: POST_MANIP_CHECK`.
+> - `backend/websocket/game_handler.py`: block completion persists the participant phase to `POST_MANIP_CHECK` when still in `MAIN_EXPERIMENT`.
+> - `backend/routers/session.py`: `/session/{session_id}/state` now verifies the session owner by session id, matching the frontend caller.
+> - `frontend/src/hooks/useWebSocket.ts`: end events sync phase from `/status` and fall back to `POST_MANIP_CHECK`.
+> - `frontend/src/pages/game/GamePage.tsx`: main gameplay polls `/status` every 2.5s and exits gameplay if the server phase has advanced.
+
+### Verification
+> - Frontend production build passed.
+> - Backend tests run after the fix.
+
+### Follow-up Actions
+> - [ ] Add an integration test that simulates a missed `session_end` event and verifies the frontend recovers from `/status`.
+> - [ ] Add an end-to-end test for the complete main-session-to-post-test transition.
+
+---
+
 ## INC-001 — `MultipleResultsFound` on phone_reply handler
 
 | Field         | Detail                                                      |

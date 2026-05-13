@@ -340,13 +340,14 @@ async def log_intention_check(
     return {"status": "ok"}
 
 
-@router.get("/session/{token}/state", response_model=SessionStateResponse)
-async def get_session_state(token: str, db: AsyncSession = Depends(get_db)):
-    """Lightweight state endpoint — looks up by token, returns current pipeline step."""
-    result = await db.execute(select(Participant).where(Participant.token == token))
-    p = result.scalar_one_or_none()
-    if not p:
-        raise HTTPException(404, "Token not found")
+@router.get("/session/{session_id}/state", response_model=SessionStateResponse)
+async def get_session_state(
+    session_id: str,
+    participant: Participant = Depends(verify_session_owner),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lightweight state endpoint for reconnect restore."""
+    p = participant
 
     # Find the active PMTaskEvent (most recent with no action_animation_complete_time)
     evt_result = await db.execute(
