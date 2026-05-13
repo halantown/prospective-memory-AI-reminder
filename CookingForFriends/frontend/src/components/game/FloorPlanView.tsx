@@ -30,10 +30,11 @@ import CharacterSpriteSheet, { type CharacterSpriteId } from './CharacterSpriteS
 import { useCharacterStore } from '../../stores/characterStore'
 import waypointData from '../../data/waypoints.json'
 import type { WaypointData } from '../../utils/waypointGraph'
-import { resolveRoomPoint } from '../../utils/waypointGraph'
+import { buildAdjacency, bfsPath, resolveRoomPoint } from '../../utils/waypointGraph'
 import { getActiveTriggerEncounterConfig, getTriggerEncounterConfig } from '../../data/triggerEncounters'
 
 const wpData = waypointData as unknown as WaypointData
+const waypointAdjacency = buildAdjacency(wpData)
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -182,6 +183,7 @@ const KITCHEN_MAX_OFFSET_Y = 25
 const BEDROOM_BOTTOM_EDGE_GAP = 8
 const TRANSIT_DELAY_MS = 1500
 const ROBOT_FOLLOW_DELAY_MS = 2200
+const VISITOR_SEGMENT_MS = 550
 const SHOW_DEV_NAV_CONTROLS = import.meta.env.DEV
   && import.meta.env.VITE_CFF_SHOW_DEV_NAV_CONTROLS !== 'false'
 
@@ -211,12 +213,14 @@ export default function FloorPlanView({
   const pointerInsideGameAreaRef = useRef(true)
   const doorbellSequenceWasActiveRef = useRef(false)
   const doorbellAlreadyAnsweredRef = useRef(false)
-  const previousVisitorWaypointRef = useRef<string | null>(null)
+  const visitorWaypointRef = useRef<string>('door_visitor')
+  const visitorPathTimers = useRef<ReturnType<typeof setTimeout>[]>([])
   const [viewSize, setViewSize] = useState({ width: 0, height: 0 })
   const [currentRoom, setCurrentRoom] = useState<FloorRoom | null>(initialRoom)
   const [charRoom, setCharRoom] = useState<FloorRoom>(initialCharRoom)
   const [isMoving, setIsMoving] = useState(false)
   const [visitorWalking, setVisitorWalking] = useState(false)
+  const [visitorRenderWaypointId, setVisitorRenderWaypointId] = useState('door_visitor')
   const [stationPopupAnchor, setStationPopupAnchor] = useState<{ x: number; y: number } | null>(null)
 
   // DEV-only: waypoint annotation tool
@@ -230,6 +234,16 @@ export default function FloorPlanView({
   const clearRobotTimers = useCallback(() => {
     robotTimers.current.forEach(clearTimeout)
     robotTimers.current = []
+  }, [])
+
+  const clearVisitorPathTimers = useCallback(() => {
+    visitorPathTimers.current.forEach(clearTimeout)
+    visitorPathTimers.current = []
+  }, [])
+
+  const setVisitorWaypoint = useCallback((waypointId: string) => {
+    visitorWaypointRef.current = waypointId
+    setVisitorRenderWaypointId(waypointId)
   }, [])
 
   const scheduleRobotFollow = useCallback((target: FloorRoom, initialDelay: number) => {
@@ -280,11 +294,16 @@ export default function FloorPlanView({
       || pmPipelineState.step === 'auto_execute'
       || pmPipelineState.step === 'fake_resolution'
       || pmPipelineState.step === 'direct_request'))
+  const realDoorEncounterReadyToRest = pmPipelineState?.triggerType === 'doorbell'
+    && !pmPipelineState.isFake
+    && (pmPipelineState.step === 'confidence_rating'
+      || pmPipelineState.step === 'auto_execute')
+  const fakeDoorEncounterReadyToRest = pmPipelineState?.triggerType === 'doorbell'
+    && pmPipelineState.isFake
+    && (pmPipelineState.step === 'direct_request'
+      || pmPipelineState.step === 'fake_resolution')
   const visitorShouldRest = Boolean(scriptedDoorEncounterConfig && scriptedDoorEncounterResting)
-    || Boolean(pmPipelineState?.triggerType === 'doorbell'
-      && pmPipelineState.step !== 'trigger_event'
-      && pmPipelineState.step !== 'greeting'
-      && pmPipelineState.step !== 'completed')
+    || Boolean(realDoorEncounterReadyToRest || fakeDoorEncounterReadyToRest)
 
   const moveToWaypoint  = useCharacterStore((s) => s.moveToWaypoint)
   const teleportTo      = useCharacterStore((s) => s.teleportTo)
@@ -402,6 +421,7 @@ export default function FloorPlanView({
   }, [answerDoorbellAtDoor, disableNavigation, doorbellActive, setActiveStation, scheduleRobotFollow, teleportTo])
 
   useEffect(() => clearRobotTimers, [clearRobotTimers])
+  useEffect(() => clearVisitorPathTimers, [clearVisitorPathTimers])
 
   useEffect(() => {
     const el = viewRef.current
@@ -489,28 +509,49 @@ export default function FloorPlanView({
   const visitorRestPose = activeDoorEncounterConfig
     ? DOOR_VISITOR_REST_POSES[activeDoorEncounterConfig.npcId] ?? DOOR_VISITOR_REST_POSES.courier
     : null
-  const visitorWaypointId = visitorShouldRest && visitorRestPose ? visitorRestPose.waypointId : 'door_visitor'
-  const visitorPosition = waypointPosition(visitorWaypointId, visitorShouldRest ? { x: 86.6, y: 71.6 } : { x: 69.5, y: 82.0 })
+  const visitorTargetWaypointId = visitorShouldRest && visitorRestPose ? visitorRestPose.waypointId : 'door_visitor'
+  const visitorPosition = waypointPosition(visitorRenderWaypointId, visitorShouldRest ? { x: 86.6, y: 71.6 } : { x: 69.5, y: 82.0 })
   const visitorAnimation = visitorWalking ? 'walk' : visitorShouldRest && visitorRestPose ? visitorRestPose.animation : 'idle'
   const visitorFacing = visitorShouldRest && visitorRestPose ? visitorRestPose.facing : 'left'
 
   useEffect(() => {
+    clearVisitorPathTimers()
+
     if (!visitorVisible) {
-      previousVisitorWaypointRef.current = null
+      setVisitorWaypoint('door_visitor')
       setVisitorWalking(false)
       return
     }
-    if (previousVisitorWaypointRef.current === null) {
-      previousVisitorWaypointRef.current = visitorWaypointId
+
+    const fromId = visitorWaypointRef.current
+    if (fromId === visitorTargetWaypointId) {
       setVisitorWalking(false)
       return
     }
-    if (previousVisitorWaypointRef.current === visitorWaypointId) return
-    previousVisitorWaypointRef.current = visitorWaypointId
+
+    const path = bfsPath(waypointAdjacency, fromId, visitorTargetWaypointId)
+    if (!path || path.length <= 1) {
+      setVisitorWaypoint(visitorTargetWaypointId)
+      setVisitorWalking(false)
+      return
+    }
+
     setVisitorWalking(true)
-    const timer = window.setTimeout(() => setVisitorWalking(false), 850)
-    return () => window.clearTimeout(timer)
-  }, [visitorVisible, visitorWaypointId])
+    path.slice(1).forEach((waypointId, index, steps) => {
+      const timer = window.setTimeout(() => {
+        setVisitorWaypoint(waypointId)
+        if (index === steps.length - 1) {
+          const stopTimer = window.setTimeout(() => {
+            setVisitorWalking(false)
+          }, VISITOR_SEGMENT_MS)
+          visitorPathTimers.current.push(stopTimer)
+        }
+      }, index * VISITOR_SEGMENT_MS)
+      visitorPathTimers.current.push(timer)
+    })
+
+    return clearVisitorPathTimers
+  }, [clearVisitorPathTimers, setVisitorWaypoint, visitorTargetWaypointId, visitorVisible])
 
   return (
     <div
