@@ -109,12 +109,29 @@ class CookingEngine:
 
     def start(self, block_start_time: float | None = None) -> asyncio.Task:
         """Start the cooking timeline. Returns the background task."""
+        restored_clock = self._clock.is_started
         self._clock.start(block_start_time)
         self._running = True
-        self._next_timeline_index = 0
+        current_game_time = self._clock.now()
+        self._next_timeline_index = self._first_pending_timeline_index(
+            current_game_time,
+            include_current=not restored_clock,
+        )
         self._timeline_task = asyncio.create_task(self._run_timeline())
         self._idle_comment_task = asyncio.create_task(self._run_idle_comments())
         return self._timeline_task
+
+    def _first_pending_timeline_index(
+        self,
+        game_time_s: float,
+        *,
+        include_current: bool,
+    ) -> int:
+        """Return first cooking entry that has not already passed."""
+        for index, entry in enumerate(self._cooking_timeline):
+            if entry.t > game_time_s or (include_current and entry.t >= game_time_s):
+                return index
+        return len(self._cooking_timeline)
 
     async def stop(self):
         """Stop the cooking engine and cancel pending timers."""
@@ -172,6 +189,8 @@ class CookingEngine:
         """Emit non-interactive robot comments during lighter cooking gaps."""
         try:
             for comment in self._robot_idle_comments:
+                if comment.t < self._clock.now():
+                    continue
                 if not self._running:
                     break
                 await self._clock.sleep_until(comment.t)

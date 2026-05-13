@@ -9,6 +9,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from engine.cooking_engine import CookingEngine, StepResult, DishProgress
+from engine.game_clock import GameClock
 from data.cooking_recipes import ALL_RECIPES
 from data.cooking_timeline import COOKING_TIMELINE
 
@@ -40,6 +41,18 @@ class FakeSender:
         self.messages.append((event_type, data))
 
 
+class FakeTime:
+    def __init__(self, now: float = 1000.0):
+        self.value = now
+
+    def now(self) -> float:
+        return self.value
+
+    async def sleep(self, seconds: float) -> None:
+        self.value += seconds
+        await asyncio.sleep(0)
+
+
 @pytest.fixture
 def sender():
     return FakeSender()
@@ -68,6 +81,34 @@ class TestCookingEngineInit:
             assert dish.phase == "idle"
             assert dish.current_step_index == 0
             assert dish.results == []
+
+    @pytest.mark.asyncio
+    async def test_restored_clock_skips_past_cooking_entries(self, sender):
+        """Reconnect restore should not replay cooking activations already in the past."""
+        from data.cooking_timeline import TimelineEntry
+
+        fake = FakeTime()
+        clock = GameClock(time_fn=fake.now, sleep_fn=fake.sleep)
+        clock.restore(game_time_s=30.0, paused=False)
+
+        engine = CookingEngine(
+            participant_id="test_participant",
+            block_id=1,
+            send_fn=sender,
+            db_factory=MockDB(),
+            clock=clock,
+            cooking_timeline=[
+                TimelineEntry(t=0, dish_id="spaghetti", step_index=0, step_type="active"),
+                TimelineEntry(t=30, dish_id="spaghetti", step_index=1, step_type="wait"),
+                TimelineEntry(t=40, dish_id="spaghetti", step_index=2, step_type="active"),
+            ],
+            robot_idle_comments=[],
+        )
+
+        task = engine.start()
+        assert engine._next_timeline_index == 2
+        task.cancel()
+        await engine.stop()
 
 
 class TestHandleAction:

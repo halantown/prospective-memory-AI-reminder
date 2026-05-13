@@ -177,8 +177,10 @@ async def run_timeline(
             start_time = block_start_time if block_start_time else time.time()
             if control.clock:
                 control.clock.start(start_time)
-            # How far into the block are we already?  0 on first start, >0 on reconnect.
-            resume_offset = _timeline_elapsed(start_time, control) if block_start_time else 0.0
+            # How far into the block are we already?  Fresh clocks start at 0.
+            # Reconnected runtimes may restore GameClock directly from persisted
+            # participant state even when block_start_time is unavailable.
+            resume_offset = _timeline_elapsed(start_time, control)
             logger.info(f"[TIMELINE] _run started: {key} ({len(events)} events, {duration}s, resume_offset={resume_offset:.1f}s)")
 
             # Send contacts list for phone chat UI
