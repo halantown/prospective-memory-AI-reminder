@@ -121,30 +121,34 @@ Character: latest start, dense and time-critical.
 
 ## Kitchen Utensils
 
-| Public asset path | Internal station ID | Used by |
-|-------------------|---------------------|---------|
-| `assets/kitchen/fridge.png` | `fridge` | Roasted Vegetables, Tomato Soup, Steak |
-| `assets/kitchen/cutting_board.png` | `cutting_board` | Roasted Vegetables, Tomato Soup, Steak |
-| `assets/kitchen/spice_rack.png` | `spice_rack` | Roasted Vegetables, Tomato Soup, Spaghetti |
-| `assets/kitchen/burner1.png` | `burner1` | Spaghetti |
-| `assets/kitchen/burner2.png` | `burner2` | Tomato Soup |
-| `assets/kitchen/burner3.png` | `burner3` | Steak |
-| `assets/kitchen/oven.png` | `oven` | Roasted Vegetables |
-| `assets/kitchen/plating_area.png` | `plating_area` | All dishes |
+Kitchen station image assets are optional. If a PNG is absent under
+`frontend/public/assets/kitchen/<station>.png`, the frontend falls back to a
+labelled station graphic.
+
+| Internal station ID | Used by |
+|---------------------|---------|
+| `fridge` | Roasted Vegetables, Tomato Soup, Steak |
+| `cutting_board` | Roasted Vegetables, Tomato Soup, Steak |
+| `spice_rack` | Roasted Vegetables, Tomato Soup, Spaghetti |
+| `burner1` | Spaghetti |
+| `burner2` | Tomato Soup |
+| `burner3` | Steak |
+| `oven` | Roasted Vegetables |
+| `plating_area` | All dishes |
 
 Kitchen positions are percentages of the kitchen room div and should match
 `STATION_POSITIONS` in `KitchenRoom.tsx`.
 
 | Station ID | left | top | width | height |
 |------------|------|-----|-------|--------|
-| `fridge` | 78% | 2% | 20% | 32% |
-| `cutting_board` | 22% | 2% | 28% | 14% |
-| `spice_rack` | 2% | 72% | 25% | 20% |
-| `burner1` | 18% | 32% | 20% | 30% |
-| `burner2` | 40% | 32% | 20% | 30% |
-| `burner3` | 60% | 32% | 20% | 30% |
-| `oven` | 65% | 70% | 33% | 28% |
-| `plating_area` | 52% | 2% | 24% | 14% |
+| `fridge` | 84.4% | 5% | 9% | 28% |
+| `cutting_board` | 54.2% | 15.5% | 15.1% | 9% |
+| `spice_rack` | 77.3% | 13% | 8% | 12% |
+| `burner1` | 29.1% | 12.25% | 12% | 16.5% |
+| `burner2` | 31% | 15% | 0% | 0% |
+| `burner3` | 31% | 15% | 0% | 0% |
+| `oven` | 13.1% | 24% | 12% | 12% |
+| `plating_area` | 51.5% | 51% | 14.2% | 19% |
 
 ## Recipe Display
 
@@ -181,23 +185,18 @@ Logged cooking measures include:
 - Recipe viewing frequency and duration
 - Runtime snapshots including active cooking steps, phone state, and PM state
 
-## Asset Specification
+## Optional Asset Paths
 
-| Asset | Recommendation |
-|-------|----------------|
-| Kitchen utensil images | PNG with transparency, 256 x 256 px |
-| Dish images | PNG with transparency, 512 x 512 px |
-| Perspective | Top-down, matching the floor plan |
-| Style | Pixel art or flat illustration matching the existing home aesthetic |
+These paths are optional enhancement points, not required current assets.
 
-Dish image paths:
+Kitchen station paths follow:
 
-| Public asset path | Dish ID |
-|-------------------|---------|
-| `assets/dishes/roasted_vegetables.png` | `roasted_vegetables` |
-| `assets/dishes/tomato_soup.png` | `tomato_soup` |
-| `assets/dishes/spaghetti.png` | `spaghetti` |
-| `assets/dishes/steak.png` | `steak` |
+```text
+frontend/public/assets/kitchen/<station_id>.png
+```
 
-Archived/older assets may exist under frontend `_archive` folders. Treat them as
-reference only unless a current component still imports them.
+Dish image paths follow:
+
+```text
+frontend/public/assets/dishes/<dish_id>.png
+```

@@ -40,7 +40,7 @@ start phase without affecting round-robin counts.
    - Verify login succeeds
 
 2. **Encoding / Tutorial Flow**
-   - Watch encoding cutscene material
+   - Watch encoding material
    - Complete detail and intention checks
    - Continue through phone/cooking/trigger tutorial phases
 
@@ -48,7 +48,7 @@ start phase without affecting round-robin counts.
    - Floor plan: Kitchen, Dining Room, Living Room, Study, Bathroom/Balcony, Hallway
    - Click rooms to navigate
    - Complete cooking steps when the Cooking Indicator appears
-   - Watch for robot speech (avatar speech bubble)
+   - Watch for robot reminder text in the avatar speech bubble
 
 4. **PM Trigger** (triggered during game)
    - Doorbell or phone-call affordance appears
@@ -57,7 +57,7 @@ start phase without affecting round-robin counts.
    - Fake trigger: direct request → single action
 
 5. **Post-Test and Debrief**
-   - Complete post-test questionnaires
+   - Complete the available post-test screens
    - Continue to debrief and completion
 
 ## Admin Dashboard
@@ -104,7 +104,7 @@ curl -X POST http://localhost:5000/api/admin/test-session \
 5. View **Messages** tab to see real-time events:
    - `block_start` — game begins
    - `time_tick` — clock update
-   - `robot_speak` — robot utterance
+   - `robot_speak` — robot reminder/comment text
    - `pm_trigger` — PM reminder fired
    - `phone_notification` — phone alert
 
@@ -112,22 +112,14 @@ curl -X POST http://localhost:5000/api/admin/test-session \
 - Frontend logs all WebSocket events with `[WS]` prefix
 - Backend logs to console with timestamps
 
-## Known Issues / Limitations
-
-- **Reminders are placeholders** — all robot speech uses placeholder text (agent system pending)
-- **No sound** — robot doesn't speak audio yet
-- **No persistence across tabs** — session only in current browser tab
-- **No animations** — basic CSS/Framer Motion (not polished)
-- **Cooking feedback visible** — active steps use the Kitchen Timer banner; missed steps flash red, and station choices flash green/red before advancing
-- **PM scoring hidden** — all PM attempts scored server-side but not shown to participant
-
 ## API Endpoints (for testing)
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/session/start` | POST | Login with token |
-| `/api/session/{id}/block/{n}/encoding` | GET | Get PM task data |
-| `/api/session/{id}/status` | GET | Current session state |
+| `/api/session/{session_id}/encoding` | GET | Get PM encoding data |
+| `/api/session/{session_id}/experiment-config` | GET | Get participant-safe phase material |
+| `/api/session/{session_id}/status` | GET | Current session status |
 | `/api/admin/participant/create` | POST | Create test participant |
 | `/api/admin/participants` | GET | List all participants |
 | `/api/admin/experiment/overview` | GET | Stats (participants, blocks completed) |
@@ -147,4 +139,4 @@ curl -X POST http://localhost:5000/api/admin/test-session \
 ### WebSocket Connection Refused
 - Ensure backend running (not just frontend dev server)
 - Check firewall/network allows WebSocket
-- Try direct connection: `wscat -c ws://localhost:5000/ws/game/SESSION_ID/1`
+- Try direct connection: `wscat -c ws://localhost:5000/ws/game/SESSION_ID`

@@ -37,22 +37,23 @@
 | `TASK_ORDERS` | Loaded from `counterbalancing.json` | condition_assigner.py | Four Latin-square orders over `T1`-`T4` |
 | `TRIGGER_SCHEDULE` | Loaded from `counterbalancing.json` | pm_session.py | Event-driven trigger delays in game-time seconds |
 | `SESSION_END_DELAY_AFTER_LAST_TRIGGER_S` | `60` | pm_session.py | Delay after final real trigger pipeline before post-test |
-| `BLOCK_DURATION_S` | `900` | legacy timeline compatibility | Main experiment duration cap in gameplay seconds |
-| `EXECUTION_WINDOW_S` | `120` | legacy compatibility | Historical PM response window constant |
-| `LATE_WINDOW_S` | `60` | legacy compatibility | Historical late-window constant |
-| `REMINDER_LEAD_S` | `30` | legacy compatibility | Historical reminder lead constant |
+| `BLOCK_DURATION_S` | `900` | config.py, admin.py | Main experiment duration cap in gameplay seconds |
+| `EXECUTION_WINDOW_S` | `120` | pm_scorer.py, execution_window.py | Primary PM response window constant |
+| `LATE_WINDOW_S` | `60` | pm_scorer.py, execution_window.py | Late PM response window constant |
+| `REMINDER_LEAD_S` | `30` | admin.py | Reminder lead value exposed in admin config |
 
 The current active design is one main experiment runtime with four real PM tasks,
-plus fake trigger encounters. Older docs may mention 3 blocks / 12 PM tasks; that
-design is archived and should not be used for new implementation work.
+plus fake trigger encounters.
 
 ### Phone
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `PHONE_LOCK_TIMEOUT_S` | `15` | Must match frontend lock timeout if phone lock is enabled |
 | `MESSAGE_COOLDOWN_S` | `10` default from env | Minimum gap between messages |
 | `PHONE_MESSAGE_EXPIRY_MS` | `20,000` | Per-message expiry, must match frontend |
+
+Phone lock is disabled in the active participant UI. `PHONE_LOCK_TIMEOUT_S`
+remains in backend config for admin/config compatibility.
 
 ### Data Capture
 
@@ -110,7 +111,7 @@ trigger state, the living room navigation button is highlighted and bounces.
 |----------|-------|-------------|
 | `SYSTEM_BANNER_DURATION` | `3,000 ms` | Low-key system notification banner auto-dismiss time |
 | `CHAT_BANNER_DURATION` | `5,000 ms` | Chat preview banner auto-dismiss time |
-| Phone lock | Temporarily disabled | `LockScreen.tsx` and `phoneLocked` are legacy placeholders; phone remains accessible throughout gameplay |
+| Phone lock | Disabled | Phone remains accessible throughout gameplay |
 
 ### Cooking Indicator (`frontend/src/components/game/phone/KitchenTimerBanner.tsx`)
 
@@ -133,7 +134,7 @@ Encoding video material is configured in:
 backend/data/experiment_materials/encoding_materials.json
 ```
 
-Each task uses four separate video segment files under:
+Each task is configured for four separate video segment files under:
 
 ```text
 frontend/public/assets/encoding/t1/segment1.mp4
@@ -144,6 +145,8 @@ frontend/public/assets/encoding/t2/segment1.mp4
 ...
 frontend/public/assets/encoding/t4/segment4.mp4
 ```
+
+Current asset status is tracked in [missing-materials.md](missing-materials.md).
 
 Files in `frontend/public/` are served directly by Vite. A material path such as
 `/assets/encoding/t1/segment1.mp4` maps to:
@@ -220,8 +223,7 @@ controls are not present in the participant-facing encoding player.
 
 ## Runtime Plan and Trigger Schedule
 
-The current runtime uses editable material/runtime files rather than the old
-per-block generated timelines.
+The current runtime uses editable material/runtime files.
 
 | File | Purpose |
 |------|---------|
@@ -275,17 +277,27 @@ data/
 ### Phone Message Format (`messages_day1.json`)
 ```json
 {
-  "messages": [
+  "contacts": [
+    { "id": "alice", "name": "Alice", "avatar": "👩" }
+  ],
+  "chats": [
     {
-      "id": "msg_001",
-      "sender": "Mom",
-      "avatar": "👩",
-      "text": "Don't forget to...",
-      "type": "chat",
-      "replies": [
-        {"id": "r1", "text": "Sure!", "correct": true},
-        {"id": "r2", "text": "Later", "correct": false}
-      ]
+      "id": "q_001",
+      "t": 30,
+      "contact_id": "alice",
+      "text": "Question text",
+      "correct_choice": "Correct reply",
+      "wrong_choice": "Wrong reply",
+      "feedback_correct": "Correct feedback",
+      "feedback_incorrect": "Incorrect feedback"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "n_001",
+      "t": 120,
+      "sender": "System",
+      "text": "Notification text"
     }
   ]
 }
@@ -298,7 +310,7 @@ data/
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `DELAYED_THRESHOLD_S` | `15.0` | Boundary between score 6 (≤15s) and 5 (>15s) |
-| `EXECUTION_WINDOW_S` | `30` | From config — primary window boundary |
+| `EXECUTION_WINDOW_S` | `120` | From config — primary window boundary |
 | `LATE_WINDOW_S` | `60` | From config — late window boundary |
 
 ---

@@ -76,7 +76,7 @@ Key areas:
 
 ## WebSocket Runtime
 
-The main game uses `/ws/game/{session_id}/{block_id}` for runtime events.
+The main game uses `/ws/game/{session_id}` for runtime events.
 The active runtime emits:
 
 - PM trigger and fake-trigger events
@@ -97,8 +97,7 @@ Gameplay sleeps and deadlines should use gameplay seconds, not direct wall-clock
 elapsed time. This matters because PM encounters can pause or otherwise control
 the runtime while preserving experimental timing semantics.
 
-Historical GameClock migration notes were removed from the active docs. The
-current source of truth is `backend/engine/game_clock.py` and the runtime
+The current source of truth is `backend/engine/game_clock.py` and the runtime
 ownership notes in this file.
 
 ## Runtime Plan
@@ -127,8 +126,8 @@ plan through:
 - `POST /api/admin/timelines/preview`
 - `GET /api/admin/timelines/schema`
 
-The old generated/static timeline system is archived. Do not reintroduce legacy
-`CONTROL` / `AF` / `AFCB` timeline generation or per-block static timeline JSONs.
+Do not reintroduce `CONTROL` / `AF` / `AFCB` timeline generation or per-block
+static timeline JSONs.
 
 ## Data and Export
 
@@ -136,6 +135,5 @@ Participant state, PM events, cooking logs, interaction logs, and phase history
 are persisted in PostgreSQL through SQLAlchemy models under `backend/models/`.
 Admin CSV exports are served by `backend/routers/admin.py`.
 
-Schema migrations are not yet managed by Alembic; startup still relies on
-SQLAlchemy table creation for local development. Treat production schema changes
-as manual migrations unless a migration framework is added.
+Schema changes are currently manual. Local startup still relies on SQLAlchemy
+table creation for development databases.

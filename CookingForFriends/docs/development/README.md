@@ -9,3 +9,4 @@ Current implementation references. These files should track the active codebase.
 | Manual testing | [testing.md](testing.md) |
 | PM trigger flow | [pm-trigger-flow.md](pm-trigger-flow.md) |
 | Cooking task | [cooking.md](cooking.md) |
+| Missing study materials | [missing-materials.md](missing-materials.md) |
