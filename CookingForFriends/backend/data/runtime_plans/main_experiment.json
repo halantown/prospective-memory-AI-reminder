@@ -37,7 +37,7 @@
   "session_end_delay_after_last_trigger_s": 60,
   "cooking_schedule": [
     {
-      "t": 0,
+      "t": 5,
       "dish_id": "roasted_vegetables",
       "step_index": 0,
       "step_type": "active"
