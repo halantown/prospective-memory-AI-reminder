@@ -78,7 +78,7 @@ async def _emit_time_tick(
     frozen = clock.is_paused if clock is not None else False
     try:
         await send_fn("time_tick", {
-            "elapsed": int(elapsed),  # Backward-compatible field.
+            "elapsed": int(elapsed),
             "game_time_s": int(elapsed),
             "game_clock": format_game_clock(elapsed, clock_end_seconds),
             "frozen": frozen,

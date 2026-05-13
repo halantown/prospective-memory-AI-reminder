@@ -132,18 +132,17 @@ async def create_test_session(
     start_phase is provided the participant is immediately advanced to that
     phase so the frontend lands on the right screen without extra steps.
     """
-    # Build a compatible request object for _create_participant_row
-    compat: Optional[AdminParticipantCreateRequest] = None
+    participant_req: Optional[AdminParticipantCreateRequest] = None
     if req is not None:
-        compat = AdminParticipantCreateRequest(
+        participant_req = AdminParticipantCreateRequest(
             condition=req.condition or None,
             task_order=req.order or None,
         )
-    participant = await _create_participant_row(db, is_test=True, req=compat)
+    participant = await _create_participant_row(db, is_test=True, req=participant_req)
 
     # Advance to requested start phase (skip WELCOME so the frontend can land
     # directly on the desired screen without going through the welcome form).
-    if req and req.start_phase and req.start_phase.lower() not in ("welcome", ""):
+    if req and req.start_phase and req.start_phase.upper() not in ("WELCOME", ""):
         await enter_phase(db, participant, req.start_phase)
 
     await db.commit()

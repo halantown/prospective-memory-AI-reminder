@@ -61,7 +61,8 @@ async def _wait_game_seconds(
 ) -> None:
     """Wait until `seconds` of game time have elapsed since this call was made.
 
-    Uses GameClock when available. Falls back to DB polling for legacy callers.
+    Uses GameClock when available. Falls back to DB polling for callers that do
+    not have a runtime clock.
     """
     if clock is not None:
         await clock.sleep_for(seconds)

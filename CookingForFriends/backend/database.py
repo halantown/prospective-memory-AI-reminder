@@ -92,7 +92,7 @@ async def seed_dev_participant():
             p.started_at = None
             p.completed_at = None
             p.is_online = False
-            p.current_phase = "welcome"
+            p.current_phase = "WELCOME"
             p.game_time_elapsed_s = 0.0
             p.frozen_since = None
             p.last_unfreeze_at = None
@@ -114,7 +114,7 @@ async def seed_dev_participant():
                 condition="EE1",
                 task_order="A",
                 is_test=True,
-                current_phase="welcome",
+                current_phase="WELCOME",
             )
             db.add(p)
             await db.flush()

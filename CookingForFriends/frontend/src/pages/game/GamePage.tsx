@@ -7,8 +7,6 @@ import { useMouseTracker } from '../../hooks/useMouseTracker'
 import { getCookingDefinitions } from '../../services/api'
 import FloorPlanView from '../../components/game/FloorPlanView'
 import PhoneSidebar from '../../components/game/PhoneSidebar'
-import HUD from '../../components/game/HUD'
-import RobotAvatar from '../../components/game/RobotAvatar'
 import PMInteraction from '../../components/game/PMInteraction'
 import TriggerEffects from '../../components/game/TriggerEffects'
 import PMTriggerModal from '../../components/game/PMTriggerModal'
@@ -147,8 +145,7 @@ export default function GamePage() {
 
   return (
     <div className="h-screen w-screen flex overflow-hidden bg-slate-900 select-none">
-      {/* World area — FloorPlanView replaces old WorldView tile layout.
-           RobotAvatar is suppressed here; Pepper is rendered inside FloorPlanView. */}
+      {/* World area — FloorPlanView replaces old WorldView tile layout. */}
       <div className={`relative flex-1 min-w-0 ${pmBlocksOngoingTask ? 'pointer-events-none' : ''}`}>
         <FloorPlanView
           initialRoom="kitchen"
@@ -156,9 +153,6 @@ export default function GamePage() {
           initialRobotRoom="kitchen"
           mainExperimentNavigation
         />
-        <HUD />
-        {/* RobotAvatar hidden — robot sprite lives inside FloorPlanView on the map */}
-        {/* <RobotAvatar /> */}
         <PMInteraction />
         <TriggerEffects />
 

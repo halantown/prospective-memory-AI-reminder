@@ -216,24 +216,3 @@ export function TriggerRoomGlow({ room }: { room: RoomId }) {
     />
   )
 }
-
-/** HUD clock trigger effect — kept for backward compatibility.
- *  No current trigger_visual maps to a clock effect. */
-export function ClockTriggerEffect() {
-  const activeTriggerEffects = useGameStore((s) => s.activeTriggerEffects)
-
-  // No trigger_visual currently activates the clock effect
-  const isClockTrigger = activeTriggerEffects.some(
-    e => e.triggerEvent === 'clock_6pm'
-  )
-
-  if (!isClockTrigger) return null
-
-  return (
-    <motion.span
-      animate={{ scale: [1, 1.2, 1], color: ['#fff', '#fbbf24', '#fff'] }}
-      transition={{ repeat: 3, duration: 0.8 }}
-      className="absolute inset-0"
-    />
-  )
-}

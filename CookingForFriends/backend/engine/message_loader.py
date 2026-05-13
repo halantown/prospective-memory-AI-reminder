@@ -56,12 +56,6 @@ def load_message_pool(block_number: int) -> dict[str, dict]:
         if msg_id:
             pool[msg_id] = {**msg, "channel": "notification"}
 
-    # Backward compat: also check legacy 'messages' array
-    for msg in data.get("messages", []):
-        msg_id = msg.get("id", "")
-        if msg_id and msg_id not in pool:
-            pool[msg_id] = msg
-
     _message_pools[block_number] = pool
     logger.info(f"[MSG_LOADER] Loaded {len(pool)} messages for block {block_number}")
     return pool

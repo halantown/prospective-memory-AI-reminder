@@ -73,25 +73,3 @@ def score_pm_attempt(
 
     # Wrong room but showed PM intent
     return 2, response_time_ms
-
-
-# Keep legacy function for backward compat during transition
-def score_pm_trial(
-    trigger_fired_at: float,
-    user_actions: list[dict] | None,
-    task_config: dict,
-    current_time: float,
-) -> tuple[int, int | None]:
-    """Legacy scoring interface — delegates to score_pm_attempt."""
-    if not user_actions:
-        return 0, None
-
-    first = user_actions[0]
-    return score_pm_attempt(
-        trigger_fired_at=trigger_fired_at,
-        attempt_time=first.get("timestamp", current_time),
-        room=first.get("room", ""),
-        target_selected=first.get("target_selected"),
-        action_performed=first.get("action"),
-        task_config=task_config,
-    )

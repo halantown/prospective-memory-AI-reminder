@@ -64,7 +64,7 @@ class Participant(Base):
     # PM Task Module — EE1/EE0 experiment
     task_order: Mapped[str] = mapped_column(String(2), nullable=False, default="A")
     is_test: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    current_phase: Mapped[str] = mapped_column(String(30), nullable=False, default="welcome")
+    current_phase: Mapped[str] = mapped_column(String(30), nullable=False, default="WELCOME")
 
     # Game time freeze mechanism (all values are epoch-seconds floats)
     game_time_elapsed_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)

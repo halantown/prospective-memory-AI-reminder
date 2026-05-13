@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import FloorPlanView from './FloorPlanView'
 import type { FloorRoom } from './FloorPlanView'
-import HUD from './HUD'
 import PhoneSidebar from './PhoneSidebar'
 import { useGameStore } from '../../stores/gameStore'
 
@@ -48,7 +47,6 @@ export default function ExperimentHomeShell({
           scriptedDoorEncounterId={scriptedDoorEncounterId}
           scriptedDoorEncounterResting={scriptedDoorEncounterResting}
         />
-        <HUD />
         <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-overlay-shell bg-gradient-to-t from-black/65 via-black/25 to-transparent p-4">
           <div className="mx-auto w-full max-w-4xl">
             {children}

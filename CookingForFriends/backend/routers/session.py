@@ -19,7 +19,7 @@ from models.schemas import (
     DebriefRequest, StatusResponse,
     QuizSubmitRequest, QuizSubmitResponse, QuizResultItem,
     EncodingQuizAttemptRequest,
-    PhaseUpdateRequest, CutsceneEventRequest, IntentionCheckRequest, SessionStateResponse,
+    CutsceneEventRequest, IntentionCheckRequest, SessionStateResponse,
     MouseTrackingBatchRequest,
     PhaseAdvanceRequest, PhaseAdvanceResponse, ExperimentResponsesSubmitRequest,
     ManipulationCheckSubmitRequest,
@@ -27,7 +27,7 @@ from models.schemas import (
 from websocket.game_handler import handle_game_ws
 from engine.timeline import run_timeline
 from engine.game_time import unfreeze_game_time, get_current_game_time
-from engine.phase_state import close_phase, enter_phase, next_phase_after, normalize_phase
+from engine.phase_state import enter_phase, next_phase_after, normalize_phase
 from data.materials import evaluate_manipulation_check, get_experiment_config_for_phase
 from data.cooking_recipes import serialize_cooking_definitions
 
@@ -125,7 +125,7 @@ async def start_session(req: TokenStartRequest, request: Request, db: AsyncSessi
         condition=participant.condition,
         task_order=participant.task_order,
         is_test=participant.is_test,
-        current_phase=participant.current_phase or "welcome",
+        current_phase=participant.current_phase or "WELCOME",
         cooking_definitions=serialize_cooking_definitions(),
     )
 
@@ -199,33 +199,8 @@ async def get_session_status(
     """Get current session status for reconnection."""
     return StatusResponse(
         status=participant.status.value if isinstance(participant.status, ParticipantStatus) else participant.status,
-        phase=participant.current_phase or "welcome",
+        phase=participant.current_phase or "WELCOME",
     )
-
-
-@router.post("/session/{session_id}/phase")
-async def update_phase(
-    req: PhaseUpdateRequest,
-    participant: Participant = Depends(verify_session_owner),
-    db: AsyncSession = Depends(get_db),
-):
-    """Backward-compatible phase logging endpoint.
-
-    New flow code should prefer `/phase/advance`.  This endpoint now uses the
-    same phase service so old frontend calls still produce coherent history.
-    """
-    try:
-        if req.event_type == "start":
-            await enter_phase(db, participant, req.phase_name)
-        elif req.event_type == "end":
-            await close_phase(db, participant, req.phase_name)
-        else:
-            raise HTTPException(400, "event_type must be 'start' or 'end'")
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-    await db.commit()
-    return {"status": "ok"}
 
 
 @router.post("/session/{session_id}/phase/advance", response_model=PhaseAdvanceResponse)
@@ -399,7 +374,7 @@ async def get_session_state(token: str, db: AsyncSession = Depends(get_db)):
 
     return SessionStateResponse(
         session_id=p.id,
-        phase=p.current_phase or "welcome",
+        phase=p.current_phase or "WELCOME",
         frozen=p.frozen_since is not None,
         game_time_elapsed_s=get_current_game_time(p),
         pipeline_step=pipeline_step,

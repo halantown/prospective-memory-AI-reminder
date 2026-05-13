@@ -43,11 +43,6 @@ class SessionStateResponse(BaseModel):
 # Phase transitions
 # ---------------------------------------------------------------------------
 
-class PhaseUpdateRequest(BaseModel):
-    phase_name: str          # e.g. "encoding", "playing", "post_questionnaire"
-    event_type: str          # "start" | "end"
-
-
 class PhaseAdvanceRequest(BaseModel):
     next_phase: Optional[str] = None
 
@@ -168,7 +163,7 @@ class ParticipantCreateResponse(BaseModel):
 class TestSessionRequest(BaseModel):
     condition: str          # "EE1" | "EE0"
     order: str              # "A" | "B" | "C" | "D"
-    start_phase: str        # "welcome" | "consent" | "introduction" | "encoding" | "playing" | "post_questionnaire"
+    start_phase: str        # canonical ExperimentPhase value, e.g. "MAIN_EXPERIMENT"
 
 
 class TestSessionResponse(BaseModel):
@@ -178,7 +173,7 @@ class TestSessionResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Old schemas kept for backward-compatible endpoints (encoding quiz, debrief)
+# Encoding, manipulation check, and post-test endpoints
 # ---------------------------------------------------------------------------
 
 class BlockEncodingResponse(BaseModel):

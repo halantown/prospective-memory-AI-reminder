@@ -114,13 +114,6 @@ export async function submitDebrief(sessionId: string, data: {
 
 // ── Phase tracking ──
 
-export async function updatePhase(sessionId: string, phaseName: string, eventType: 'start' | 'end') {
-  return request<{ status: string }>(`/session/${sessionId}/phase`, {
-    method: 'POST',
-    body: JSON.stringify({ phase_name: phaseName, event_type: eventType }),
-  })
-}
-
 export async function advancePhase(sessionId: string, nextPhase?: string) {
   return request<{ previous_phase: string; current_phase: string }>(`/session/${sessionId}/phase/advance`, {
     method: 'POST',

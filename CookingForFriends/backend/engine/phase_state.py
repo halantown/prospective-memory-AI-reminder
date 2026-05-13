@@ -48,28 +48,12 @@ class ExperimentPhase(StrEnum):
 
 PHASE_SEQUENCE: tuple[ExperimentPhase, ...] = tuple(ExperimentPhase)
 
-LEGACY_PHASE_MAP: dict[str, ExperimentPhase] = {
-    "welcome": ExperimentPhase.WELCOME,
-    "onboarding": ExperimentPhase.WELCOME,
-    "consent": ExperimentPhase.CONSENT,
-    "introduction": ExperimentPhase.STORY_INTRO,
-    "encoding": ExperimentPhase.ENCODING_VIDEO_1,
-    "playing": ExperimentPhase.MAIN_EXPERIMENT,
-    "post_questionnaire": ExperimentPhase.POST_MANIP_CHECK,
-    "debrief": ExperimentPhase.DEBRIEF,
-    "complete": ExperimentPhase.COMPLETED,
-    "completed": ExperimentPhase.COMPLETED,
-}
-
-
 def normalize_phase(phase: str | ExperimentPhase | None) -> ExperimentPhase:
     if isinstance(phase, ExperimentPhase):
         return phase
     if not phase:
         return ExperimentPhase.WELCOME
     stripped = phase.strip()
-    if stripped in LEGACY_PHASE_MAP:
-        return LEGACY_PHASE_MAP[stripped]
     upper = stripped.upper()
     if upper in ExperimentPhase.__members__:
         return ExperimentPhase[upper]

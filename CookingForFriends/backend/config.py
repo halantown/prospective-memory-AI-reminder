@@ -48,10 +48,10 @@ TASK_ORDERS: dict[str, list[str]] = get_task_orders()
 # "fake" entries: trigger_type is the UI affordance ("doorbell" | "phone_call")
 TRIGGER_SCHEDULE: list[dict] = get_trigger_schedule()
 
-# Seconds of game time after last real trigger pipeline completes before → post_questionnaire
+# Seconds of game time after last real trigger pipeline completes before post-test
 SESSION_END_DELAY_AFTER_LAST_TRIGGER_S = get_session_end_delay_after_last_trigger_s()
 
-# Legacy execution-window constants (kept for timeline.py backward-compat)
+# PM scoring window constants
 EXECUTION_WINDOW_S = 120   # Primary window: participant has 2 min to act
 LATE_WINDOW_S = 60         # Extended window after EXECUTION_WINDOW_S
 REMINDER_LEAD_S = 30       # How early before trigger to show reminder

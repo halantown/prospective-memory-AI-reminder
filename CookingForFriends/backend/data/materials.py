@@ -188,7 +188,7 @@ def get_experiment_config_for_phase(
     static_text = get_static_text()
     questionnaires = get_questionnaires()
 
-    if normalized in {"TOKEN_INPUT", "WELCOME", "welcome".upper()}:
+    if normalized in {"TOKEN_INPUT", "WELCOME"}:
         return {**base, "welcome": static_text["welcome"]}
 
     if normalized == "CONSENT":

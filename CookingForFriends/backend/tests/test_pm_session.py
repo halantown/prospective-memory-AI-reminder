@@ -10,7 +10,6 @@ from engine.pm_session import _is_main_experiment_phase
 
 def test_pm_session_only_runs_during_main_experiment():
     assert _is_main_experiment_phase("MAIN_EXPERIMENT") is True
-    assert _is_main_experiment_phase("playing") is True
 
     assert _is_main_experiment_phase("POST_MANIP_CHECK") is False
     assert _is_main_experiment_phase("post_questionnaire") is False

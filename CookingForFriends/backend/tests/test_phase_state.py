@@ -18,20 +18,10 @@ def test_phase_sequence_starts_and_ends_with_full_flow_boundaries():
     assert "EVENING_TRANSITION" in values
 
 
-@pytest.mark.parametrize(
-    ("legacy", "expected"),
-    [
-        ("welcome", ExperimentPhase.WELCOME),
-        ("consent", ExperimentPhase.CONSENT),
-        ("introduction", ExperimentPhase.STORY_INTRO),
-        ("encoding", ExperimentPhase.ENCODING_VIDEO_1),
-        ("playing", ExperimentPhase.MAIN_EXPERIMENT),
-        ("post_questionnaire", ExperimentPhase.POST_MANIP_CHECK),
-        ("complete", ExperimentPhase.COMPLETED),
-    ],
-)
-def test_normalize_legacy_phase_names(legacy, expected):
-    assert normalize_phase(legacy) == expected
+def test_normalize_accepts_canonical_phase_names():
+    assert normalize_phase("WELCOME") == ExperimentPhase.WELCOME
+    assert normalize_phase("MAIN_EXPERIMENT") == ExperimentPhase.MAIN_EXPERIMENT
+    assert normalize_phase("POST_MANIP_CHECK") == ExperimentPhase.POST_MANIP_CHECK
 
 
 def test_next_phase_uses_canonical_order():
@@ -45,3 +35,7 @@ def test_unknown_phase_rejected():
     with pytest.raises(ValueError):
         normalize_phase("NO_SUCH_PHASE")
 
+
+def test_removed_legacy_aliases_rejected():
+    with pytest.raises(ValueError):
+        normalize_phase("playing")
