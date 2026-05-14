@@ -24,7 +24,7 @@ from models.schemas import (
     PhaseAdvanceRequest, PhaseAdvanceResponse, ExperimentResponsesSubmitRequest,
     ManipulationCheckSubmitRequest,
 )
-from websocket.game_handler import handle_game_ws
+from websocket.game_handler import handle_game_ws, get_active_runtime_snapshot
 from engine.timeline import run_timeline
 from engine.game_time import unfreeze_game_time, get_current_game_time
 from engine.phase_state import enter_phase, next_phase_after, normalize_phase
@@ -380,6 +380,7 @@ async def get_session_state(
         game_time_elapsed_s=get_current_game_time(p),
         pipeline_step=pipeline_step,
         current_task_id=evt.task_id if evt else None,
+        runtime_state=get_active_runtime_snapshot(p.id),
         is_test=bool(p.is_test),
         incomplete=bool(p.incomplete),
     )

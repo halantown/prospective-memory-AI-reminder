@@ -17,6 +17,24 @@ logger = logging.getLogger(__name__)
 # active block per participant; reconnect is intentionally best-effort.
 _block_runtimes: dict[str, BlockRuntime] = {}
 _pending_post_pm_first_action: dict[str, tuple[str, int]] = {}
+_runtime_cleanup_tasks: dict[str, asyncio.Task] = {}
+RUNTIME_RECONNECT_GRACE_S = 30
+
+
+def get_active_runtime_snapshot(participant_id: str) -> dict | None:
+    """Return the in-memory gameplay runtime snapshot for reconnect restore."""
+    runtime = _block_runtimes.get(participant_id)
+    if not runtime:
+        return None
+    snapshot: dict = {
+        "block_number": runtime.block_number,
+        "block_id": runtime.block_id,
+        "clock": runtime.clock.snapshot().__dict__,
+    }
+    if runtime.cooking:
+        cooking_state = runtime.cooking.get_state()
+        snapshot["cooking"] = cooking_state.get("_runtime", cooking_state)
+    return snapshot
 
 
 async def _find_active_pm_event(participant_id: str, data: dict, db):
@@ -84,13 +102,22 @@ async def handle_game_ws(
     """Handle a game WebSocket connection for a participant."""
     block_number = 1  # single-session: always block 1
 
-    # Validate participant exists before accepting connection
+    # Validate participant exists and token matches before accepting connection.
+    # Browser WebSockets cannot reliably set custom headers, so the participant
+    # session token is passed as a query parameter and validated here.
     try:
+        session_token = ws.query_params.get("token", "").strip().upper()
+        if not session_token:
+            await ws.close(code=4003, reason="Missing session token")
+            return
         async with db_factory() as db:
             from sqlalchemy import select
             from models.experiment import Participant
             result = await db.execute(
-                select(Participant.id).where(Participant.id == participant_id)
+                select(Participant.id).where(
+                    Participant.id == participant_id,
+                    Participant.token == session_token,
+                )
             )
             if not result.scalar_one_or_none():
                 await ws.close(code=4004, reason="Unknown session")
@@ -100,6 +127,9 @@ async def handle_game_ws(
         return
 
     queue, conn_id = await manager.connect_participant(participant_id, ws)
+    cleanup_task = _runtime_cleanup_tasks.pop(participant_id, None)
+    if cleanup_task and not cleanup_task.done():
+        cleanup_task.cancel()
 
     # Create send function bound to this participant
     async def send_event(event_type: str, data: dict):
@@ -219,19 +249,44 @@ async def handle_game_ws(
         manager.disconnect_participant(participant_id, ws)
         pump_task.cancel()
         receiver_task.cancel()
-        # Only cancel timeline/pm_session if this connection is still the latest.
-        # A newer connection may have already started a new timeline.
+        # Defer runtime cleanup so a normal browser refresh can attach a new
+        # WebSocket and restore the in-memory cooking/PM runtime instead of
+        # forcing the participant back to an empty local store.
         if manager.is_latest_connection(participant_id, conn_id):
-            runtime = _block_runtimes.pop(participant_id, None)
-            if runtime:
-                await runtime.stop(save_scores=True)
-            elif timeline_task and not timeline_task.done():
-                timeline_task.cancel()
+            if not manager.has_active_connections(participant_id):
+                _schedule_runtime_cleanup(participant_id)
         else:
             logger.info(f"Skipping timeline/pm_session cleanup for {participant_id} — superseded by newer connection")
         # Only mark offline if no active connections remain
         if not manager.has_active_connections(participant_id):
             await _set_participant_offline(participant_id, db_factory)
+
+
+def _schedule_runtime_cleanup(participant_id: str) -> None:
+    existing = _runtime_cleanup_tasks.get(participant_id)
+    if existing and not existing.done():
+        existing.cancel()
+
+    async def _cleanup_after_grace():
+        try:
+            await asyncio.sleep(RUNTIME_RECONNECT_GRACE_S)
+            if manager.has_active_connections(participant_id):
+                return
+            runtime = _block_runtimes.pop(participant_id, None)
+            if runtime:
+                await runtime.stop(save_scores=True)
+                logger.info(
+                    "[GAME_HANDLER] Runtime cleaned up after reconnect grace: %s",
+                    participant_id,
+                )
+        except asyncio.CancelledError:
+            return
+        finally:
+            current = _runtime_cleanup_tasks.get(participant_id)
+            if current is asyncio.current_task():
+                _runtime_cleanup_tasks.pop(participant_id, None)
+
+    _runtime_cleanup_tasks[participant_id] = asyncio.create_task(_cleanup_after_grace())
 
 
 async def _ws_receiver(
@@ -355,8 +410,9 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
             logger.info(f"[GAME_HANDLER] start_game: block already in state {block.status}, skipping timeline start")
             return
 
-        block.status = BlockStatus.PLAYING
-        block.started_at = block.started_at or datetime.now(timezone.utc)
+        had_started_at = block.started_at is not None
+        if not block.started_at:
+            block.started_at = datetime.now(timezone.utc)
 
         # Load participant to get task_order and initialise game time
         from models.experiment import Participant
@@ -370,7 +426,7 @@ async def _handle_start_game(participant_id: str, block_number: int, db_factory,
         await db.commit()
         condition = block.condition
         block_id = block.id
-        block_start_ts = block.started_at.timestamp() if block.started_at else None
+        block_start_ts = block.started_at.timestamp() if had_started_at and block.started_at else None
 
     async def _on_block_complete():
         """Mark block as completed when timeline finishes normally."""

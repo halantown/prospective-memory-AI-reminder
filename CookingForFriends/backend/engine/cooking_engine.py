@@ -533,15 +533,18 @@ class CookingEngine:
 
     def get_state(self) -> dict[str, Any]:
         """Return current cooking state for snapshot/recipe display."""
-        state = {}
+        dishes = {}
+        active_steps = []
+        wait_steps = []
         for dish_id, dish in self.dishes.items():
             active_entry = self._active_step.get(dish_id)
-            state[dish_id] = {
+            wait_entry = self._active_wait[dish_id]
+            dishes[dish_id] = {
                 "phase": dish.phase,
                 "current_step_index": dish.current_step_index,
                 "total_steps": len(dish.steps),
                 "active_step": active_entry.step_index if active_entry else None,
-                "wait_step": self._active_wait[dish_id].step_index if self._active_wait[dish_id] else None,
+                "wait_step": wait_entry.step_index if wait_entry else None,
                 "results": [
                     {"step_index": r.step_index, "result": r.result}
                     for r in dish.results
@@ -549,6 +552,43 @@ class CookingEngine:
                 "started_at": dish.started_at,
                 "completed_at": dish.completed_at,
             }
+            if active_entry:
+                step_def = dish.steps[active_entry.step_index]
+                active_steps.append({
+                    "dish": dish_id,
+                    "dish_label": DISH_LABELS[dish_id],
+                    "dish_emoji": DISH_EMOJIS[dish_id],
+                    "step_index": active_entry.step_index,
+                    "step_id": step_def.id,
+                    "label": step_def.label,
+                    "description": step_def.description,
+                    "station": step_def.station,
+                    "options": [{"id": f"option_{i}", "text": t} for i, t in enumerate(step_def.options)],
+                    "window_s": COOKING_STEP_WINDOW_S,
+                    "activated_at": self._step_activated_at.get(dish_id),
+                    "activated_game_time": self._step_activated_game_time.get(dish_id),
+                    "deadline_game_time": self._step_deadline_game_time.get(dish_id),
+                    "step_type": "active",
+                })
+            if wait_entry:
+                step_def = dish.steps[wait_entry.step_index]
+                wait_steps.append({
+                    "dish": dish_id,
+                    "step_index": wait_entry.step_index,
+                    "step_id": step_def.id,
+                    "label": step_def.label,
+                    "description": step_def.description,
+                    "station": step_def.station,
+                    "wait_duration_s": step_def.wait_duration_s,
+                    "started_game_time": wait_entry.t,
+                    "step_type": "wait",
+                })
+        state = dict(dishes)
+        state["_runtime"] = {
+            "dishes": dishes,
+            "active_steps": active_steps,
+            "wait_steps": wait_steps,
+        }
         return state
 
     # ── Scoring ───────────────────────────────────────────────────────────────

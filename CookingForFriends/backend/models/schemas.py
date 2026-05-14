@@ -35,6 +35,7 @@ class SessionStateResponse(BaseModel):
     game_time_elapsed_s: float
     pipeline_step: Optional[str] = None   # None if no active pipeline
     current_task_id: Optional[str] = None
+    runtime_state: Optional[dict[str, Any]] = None
     is_test: bool
     incomplete: bool
 
