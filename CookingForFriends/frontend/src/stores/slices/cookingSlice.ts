@@ -3,7 +3,7 @@ import type { GameState, CookingSlice } from './types'
 import type {
   Pan, DishId, DishState, KitchenStationId, SeatState,
   ActiveCookingStep, CookingStepResult, CookingStepOption, CookingWaitStep,
-  CookingDefinitions,
+  CookingDefinitions, CookingFinishedWaitStep,
 } from '../../types'
 
 export const FALLBACK_DISH_ORDER: DishId[] = ['spaghetti', 'steak', 'tomato_soup', 'roasted_vegetables']
@@ -71,6 +71,7 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
   missedStepFlashes: [],
   cookingStepFeedback: null,
   cookingWaitSteps: [],
+  cookingFinishedWaitSteps: [],
   cookingScore: { correct: 0, wrong: 0, missed: 0 },
   diningPhase: 'idle',
   diningSeats: [{ ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }],
@@ -92,6 +93,7 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
     missedStepFlashes: [],
     cookingStepFeedback: null,
     cookingWaitSteps: [],
+    cookingFinishedWaitSteps: [],
     cookingScore: { correct: 0, wrong: 0, missed: 0 },
     activeStation: null,
   }),
@@ -215,6 +217,7 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
         activeCookingSteps: s.activeCookingSteps.filter(
           st => !(st.dishId === dishId && st.stepIndex === stepIndex)
         ),
+        cookingFinishedWaitSteps: s.cookingFinishedWaitSteps.filter(w => w.dishId !== dishId),
         cookingStepFeedback: completedStep
           ? { dishId, stepIndex, result, station: completedStep.station, timestamp: Date.now() }
           : s.cookingStepFeedback,
@@ -270,6 +273,7 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
         activeCookingSteps: s.activeCookingSteps.filter(
           st => !(st.dishId === dishId && st.stepIndex === stepIndex)
         ),
+        cookingFinishedWaitSteps: s.cookingFinishedWaitSteps.filter(w => w.dishId !== dishId),
         missedStepFlashes: flash
           ? [...s.missedStepFlashes, flash]
           : s.missedStepFlashes,
@@ -304,6 +308,7 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
         ...s.cookingWaitSteps.filter(w => w.dishId !== waitStep.dishId),
         waitStep,
       ],
+      cookingFinishedWaitSteps: s.cookingFinishedWaitSteps.filter(w => w.dishId !== waitStep.dishId),
       dishes: {
         ...s.dishes,
         [waitStep.dishId]: {
@@ -322,6 +327,22 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
       cookingWaitSteps: s.cookingWaitSteps.filter(
         w => !(w.dishId === dishId && w.stepIndex === stepIndex)
       ),
+      cookingFinishedWaitSteps: (() => {
+        const waitStep = s.cookingWaitSteps.find(w => w.dishId === dishId && w.stepIndex === stepIndex)
+        if (!waitStep) return s.cookingFinishedWaitSteps
+        const finished: CookingFinishedWaitStep = {
+          dishId,
+          stepIndex,
+          stepLabel: waitStep.stepLabel,
+          stepDescription: waitStep.stepDescription,
+          station: waitStep.station,
+          finishedAt: Date.now(),
+        }
+        return [
+          ...s.cookingFinishedWaitSteps.filter(w => w.dishId !== dishId),
+          finished,
+        ]
+      })(),
       dishes: {
         ...s.dishes,
         [dishId]: {
@@ -331,6 +352,12 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
       },
     }))
   },
+
+  confirmCookingWaitFinished: (dishId, stepIndex) => set((s) => ({
+    cookingFinishedWaitSteps: s.cookingFinishedWaitSteps.filter(
+      w => !(w.dishId === dishId && w.stepIndex === stepIndex)
+    ),
+  })),
 
   clearCookingStepFeedback: () => set({ cookingStepFeedback: null }),
 
@@ -397,6 +424,7 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
           set((s) => ({
             activeCookingSteps: s.activeCookingSteps.filter(st => st.dishId !== dishId),
             cookingWaitSteps: s.cookingWaitSteps.filter(w => w.dishId !== dishId),
+            cookingFinishedWaitSteps: s.cookingFinishedWaitSteps.filter(w => w.dishId !== dishId),
             dishes: {
               ...s.dishes,
               [dishId]: { ...s.dishes[dishId], phase: 'served', completedAt: Date.now() },

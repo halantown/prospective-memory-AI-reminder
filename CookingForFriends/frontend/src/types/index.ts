@@ -240,6 +240,15 @@ export interface CookingWaitStep {
   durationS: number
 }
 
+export interface CookingFinishedWaitStep {
+  dishId: DishId
+  stepIndex: number
+  stepLabel: string
+  stepDescription: string
+  station: KitchenStationId
+  finishedAt: number
+}
+
 export interface KitchenTimerBannerItem {
   id: string
   icon: string

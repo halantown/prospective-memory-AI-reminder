@@ -8,7 +8,7 @@ This repository contains several related research prototypes, but active develop
 - `CookingForFriends/frontend/`: Vite + React + TypeScript client. UI code lives in `frontend/src/`; static assets live in `frontend/public/`.
 - `CookingForFriends/db/`: PostgreSQL initialization SQL used by Docker Compose.
 - `ReminderAgent/reminder_agent/`: offline reminder-generation pipeline; tests live in `reminder_agent/tests/`.
-- `Prototype/`: older experimental apps. Treat as reference code unless a task explicitly targets it.
+- `Prototype/`: older experimental apps. Do NOT use them.
 
 ## Build, Test, and Development Commands
 
@@ -43,8 +43,6 @@ Recent history mixes concise fixes with Conventional Commit style, for example `
 - imperative, present-tense messages for one-off fixes
 
 Pull requests should state which subproject is affected, summarize behavior changes, list test commands run, and include screenshots for frontend/admin UI changes.
-
-
 
 # Copilot Instructions for Robot Reminder SysteCritical Warnings
 

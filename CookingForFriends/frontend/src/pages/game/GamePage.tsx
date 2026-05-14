@@ -11,6 +11,7 @@ import PhoneSidebar from '../../components/game/PhoneSidebar'
 import PMInteraction from '../../components/game/PMInteraction'
 import TriggerEffects from '../../components/game/TriggerEffects'
 import PMTriggerModal from '../../components/game/PMTriggerModal'
+import DinnerStatusStrip from '../../components/game/DinnerStatusStrip'
 
 export default function GamePage() {
   const sessionId = useGameStore((s) => s.sessionId)
@@ -187,6 +188,7 @@ export default function GamePage() {
           initialRobotRoom="kitchen"
           mainExperimentNavigation
         />
+        <DinnerStatusStrip />
         <PMInteraction />
         <TriggerEffects />
 

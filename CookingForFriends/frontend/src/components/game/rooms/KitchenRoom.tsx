@@ -20,7 +20,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
 import { useCharacterStore } from '../../../stores/characterStore'
 import PMTargetItems from '../PMTargetItems'
-import type { KitchenStationId, ActiveCookingStep, CookingStepOption, CookingWaitStep } from '../../../types'
+import type {
+  KitchenStationId,
+  ActiveCookingStep,
+  CookingStepOption,
+  CookingWaitStep,
+  CookingFinishedWaitStep,
+} from '../../../types'
 
 // ── Station metadata ──────────────────────────────────────────────────────────
 
@@ -104,6 +110,22 @@ function enrichText(text: string): string {
     if (re.test(text)) return `${emoji} ${text}`
   }
   return text
+}
+
+function isBurnerStation(station: KitchenStationId): boolean {
+  return station === 'burner1' || station === 'burner2' || station === 'burner3'
+}
+
+function burnerControlMeta(text: string): { icon: string; tone: string } {
+  if (/cast iron|non-stick|stainless|pan/i.test(text)) return { icon: '🍳', tone: 'border-red-300/60 bg-red-950/35' }
+  if (/large pot|medium pot|water|stock/i.test(text)) return { icon: '🫕', tone: 'border-sky-300/60 bg-sky-950/35' }
+  if (/low/i.test(text)) return { icon: '🟡', tone: 'border-yellow-300/60 bg-yellow-950/35' }
+  if (/medium/i.test(text)) return { icon: '🟠', tone: 'border-orange-300/60 bg-orange-950/35' }
+  if (/high/i.test(text)) return { icon: '🔴', tone: 'border-red-300/60 bg-red-950/35' }
+  if (/drain/i.test(text)) return { icon: '🚿', tone: 'border-cyan-300/60 bg-cyan-950/35' }
+  if (/toss|stir/i.test(text)) return { icon: '🥄', tone: 'border-amber-300/60 bg-amber-950/35' }
+  if (/place/i.test(text)) return { icon: '🥩', tone: 'border-orange-300/60 bg-orange-950/35' }
+  return { icon: '🔥', tone: 'border-amber-300/60 bg-amber-950/35' }
 }
 
 /** Extract up to 3 ingredient emojis from fridge option text (⑥). */
@@ -333,6 +355,35 @@ function SpiceCards({ options, onSelect, pending }: {
   )
 }
 
+function BurnerActionCards({ options, onSelect, pending }: {
+  options: CookingStepOption[]
+  onSelect: (o: CookingStepOption) => void
+  pending: boolean
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2 mt-2">
+      {options.map(option => {
+        const meta = burnerControlMeta(option.text)
+        return (
+          <button
+            key={option.id}
+            disabled={pending}
+            onClick={() => onSelect(option)}
+            className={`min-h-[74px] rounded-lg border p-2.5 text-left transition-all
+              hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-wait ${meta.tone}`}
+          >
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xl leading-none">{meta.icon}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-white/50">stove</span>
+            </div>
+            <span className="block text-xs font-semibold leading-snug text-slate-100">{option.text}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 /** ③ Wait-step peek popup: shown when participant clicks a wait-station. */
 function WaitPeekPopup({ waitStep, anchor, onClose }: {
   waitStep: CookingWaitStep
@@ -416,6 +467,54 @@ function WaitPeekPopup({ waitStep, anchor, onClose }: {
   )
 }
 
+function WaitFinishedPopup({ finishedStep, anchor, onConfirm, onClose }: {
+  finishedStep: CookingFinishedWaitStep
+  anchor: { x: number; y: number } | null
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  const info = STATION_INFO[finishedStep.station]
+  const x = anchor?.x ?? 24
+  const y = anchor?.y ?? 24
+
+  return (
+    <motion.div
+      className="absolute inset-0 z-kitchen-fx pointer-events-none"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+    >
+      <motion.div
+        className="absolute pointer-events-auto min-w-[220px] max-w-[280px] rounded-xl border-2 border-emerald-300/75 bg-slate-900/95 p-4 shadow-2xl"
+        style={{
+          left: `clamp(12px, ${x + 14}px, calc(100% - 296px))`,
+          top:  `clamp(12px, ${y - 24}px, calc(100% - 260px))`,
+        }}
+        initial={{ scale: 0.94, opacity: 0, y: 6 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.94, opacity: 0, y: 6 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      >
+        <div className="mb-3 flex items-center gap-2 border-b border-slate-700 pb-2">
+          <span className="text-xl">{info.waitEmoji}</span>
+          <span className="text-sm font-semibold text-emerald-200">{info.label}</span>
+        </div>
+        <p className="text-sm font-semibold text-slate-100">Timer finished</p>
+        <p className="mt-1 text-xs leading-snug text-slate-400">{finishedStep.stepLabel}</p>
+        <button
+          onClick={onConfirm}
+          className="mt-3 w-full rounded-lg bg-emerald-500 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-400 active:scale-95"
+        >
+          Check station
+        </button>
+        <button
+          className="absolute top-2 right-2 text-slate-500 hover:text-slate-300 text-sm"
+          onClick={onClose}
+        >✕</button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 /** ⑫ Correct-answer burst animation (shown inside popup for 800 ms). */
 function CorrectCelebration({ dishEmoji }: { dishEmoji: string }) {
   return (
@@ -480,6 +579,7 @@ function StationPopup({
     if (station === 'plating_area')              return <PlateSelector options={options} onSelect={handleSelect} pending={pending} />
     if (station === 'fridge')                    return <FridgeGrid    options={options} onSelect={handleSelect} pending={pending} />
     if (station === 'spice_rack')                return <SpiceCards    options={options} onSelect={handleSelect} pending={pending} />
+    if (isBurnerStation(station))                return <BurnerActionCards options={options} onSelect={handleSelect} pending={pending} />
     if (isTemperatureOptions(options))           return <TemperatureSelector options={options} onSelect={handleSelect} pending={pending} />
 
     // ⑤ Default: enriched text buttons
@@ -584,7 +684,9 @@ export default function KitchenRoom({
   const setActiveStation    = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps  = useGameStore((s) => s.activeCookingSteps)
   const cookingWaitSteps    = useGameStore((s) => s.cookingWaitSteps)
+  const cookingFinishedWaitSteps = useGameStore((s) => s.cookingFinishedWaitSteps)
   const cookingStepFeedback = useGameStore((s) => s.cookingStepFeedback)
+  const dishes              = useGameStore((s) => s.dishes)
   const isCharMoving        = useCharacterStore((s) => s.isMoving)
   const moveToStation       = useCharacterStore((s) => s.moveToStation)
 
@@ -624,7 +726,8 @@ export default function KitchenRoom({
       const hasActiveStep = state.activeCookingSteps.some(s => stationMatches(station, s.station))
       // ③ Also open station for wait steps
       const hasWaitStep   = state.cookingWaitSteps.some(w => stationMatches(station, w.station))
-      if (hasActiveStep || hasWaitStep) {
+      const hasFinishedWait = state.cookingFinishedWaitSteps.some(w => stationMatches(station, w.station))
+      if (hasActiveStep || hasWaitStep || hasFinishedWait) {
         const canOpen = onStationOpen ? onStationOpen(clickPoint) : true
         if (canOpen) setActiveStation(station)
       }
@@ -650,7 +753,17 @@ export default function KitchenRoom({
           const hasActiveStep = activeCookingSteps.some(s => stationMatches(stationId, s.station))
           const waitStep      = cookingWaitSteps.find(w => stationMatches(stationId, w.station))
           const hasWaitStep   = Boolean(waitStep)
+          const finishedStep  = cookingFinishedWaitSteps.find(w => stationMatches(stationId, w.station))
+          const hasFinishedWait = Boolean(finishedStep)
           const showFeedback  = feedback.station === stationId && feedback.type
+          const stationActiveSteps = activeCookingSteps.filter(s => stationMatches(stationId, s.station))
+          const stationWaitSteps = cookingWaitSteps.filter(w => stationMatches(stationId, w.station))
+          const stationFinishedSteps = cookingFinishedWaitSteps.filter(w => stationMatches(stationId, w.station))
+          const stoveBadges = isBurnerStation(stationId)
+            ? [...stationFinishedSteps.map(w => ({ key: `done-${w.dishId}-${w.stepIndex}`, dishId: w.dishId, label: 'ready' })),
+               ...stationActiveSteps.map(s => ({ key: `active-${s.dishId}-${s.stepIndex}`, dishId: s.dishId, label: s.stepLabel })),
+               ...stationWaitSteps.map(w => ({ key: `wait-${w.dishId}-${w.stepIndex}`, dishId: w.dishId, label: w.stepLabel }))]
+            : []
 
           // ⑪ Wait colour progress (wall-clock, decorative only)
           const waitProgress = waitStep
@@ -659,7 +772,9 @@ export default function KitchenRoom({
 
           const hotspotBg = hasActiveStep
             ? 'rgba(251,146,60,0.20)'
-            : hasWaitStep
+            : hasFinishedWait
+              ? 'rgba(16,185,129,0.24)'
+              : hasWaitStep
               ? waitBgColor(stationId, waitProgress)
               : undefined
 
@@ -668,6 +783,7 @@ export default function KitchenRoom({
               key={stationId}
               className={`group absolute z-10 rounded-lg border-2 transition-colors duration-200
                 ${hasActiveStep  ? 'border-orange-300/80 shadow-[0_0_14px_rgba(251,146,60,0.35)]' : ''}
+                ${hasFinishedWait && !hasActiveStep ? 'border-emerald-300/70 shadow-[0_0_12px_rgba(16,185,129,0.30)]' : ''}
                 ${hasWaitStep && !hasActiveStep ? 'border-amber-300/50 shadow-[0_0_10px_rgba(251,191,36,0.20)]' : ''}
                 ${!hasActiveStep && !hasWaitStep ? 'bg-slate-950/5 border-white/10 hover:bg-white/10 hover:border-white/30' : ''}
                 ${showFeedback === 'correct' ? '!border-emerald-300 !bg-emerald-400/30' : ''}
@@ -679,10 +795,24 @@ export default function KitchenRoom({
             >
               {/* Station label */}
               <div className={`absolute bottom-0.5 left-1 text-[9px] font-semibold whitespace-nowrap drop-shadow transition-opacity ${
-                hasActiveStep || hasWaitStep ? 'text-white opacity-95' : 'text-white/55 opacity-55 group-hover:opacity-90'
+                hasActiveStep || hasWaitStep || hasFinishedWait ? 'text-white opacity-95' : 'text-white/55 opacity-55 group-hover:opacity-90'
               }`}>
                 {info.emoji} {info.label}
               </div>
+
+              {stoveBadges.length > 0 && (
+                <div className="absolute left-1.5 right-1.5 top-1.5 flex flex-col gap-1 pointer-events-none">
+                  {stoveBadges.slice(0, 3).map(badge => (
+                    <div
+                      key={badge.key}
+                      className="truncate rounded bg-slate-950/70 px-1.5 py-0.5 text-[8px] font-bold leading-tight text-white shadow"
+                    >
+                      <span className="mr-0.5">{dishes[badge.dishId]?.emoji ?? '🍳'}</span>
+                      {badge.label}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* ② Wait progress ring */}
               {hasWaitStep && !hasActiveStep && <WaitProgressRing progress={waitProgress} />}
@@ -710,6 +840,16 @@ export default function KitchenRoom({
                   transition={{ repeat: Infinity, duration: 2.0 }}
                 >
                   {info.waitEmoji}
+                </motion.div>
+              )}
+
+              {hasFinishedWait && !hasActiveStep && (
+                <motion.div
+                  className="absolute inset-0 flex items-center justify-center text-xl pointer-events-none"
+                  animate={{ scale: [1, 1.12, 1], opacity: [0.75, 1, 0.75] }}
+                  transition={{ repeat: Infinity, duration: 1.1 }}
+                >
+                  ✅
                 </motion.div>
               )}
 
@@ -753,8 +893,10 @@ export function KitchenStationOverlay({
   const setActiveStation       = useGameStore((s) => s.setActiveStation)
   const activeCookingSteps     = useGameStore((s) => s.activeCookingSteps)
   const cookingWaitSteps       = useGameStore((s) => s.cookingWaitSteps)
+  const cookingFinishedWaitSteps = useGameStore((s) => s.cookingFinishedWaitSteps)
   const cookingStepFeedback    = useGameStore((s) => s.cookingStepFeedback)
   const clearCookingStepFeedback = useGameStore((s) => s.clearCookingStepFeedback)
+  const confirmCookingWaitFinished = useGameStore((s) => s.confirmCookingWaitFinished)
   const wsSend                 = useGameStore((s) => s.wsSend)
 
   const [submittedStepKeys, setSubmittedStepKeys] = useState<Set<string>>(() => new Set())
@@ -816,6 +958,11 @@ export function KitchenStationOverlay({
     return cookingWaitSteps.find(w => stationMatches(activeStation, w.station))
   }, [activeStation, cookingWaitSteps])
 
+  const finishedWaitForStation = useMemo(() => {
+    if (!activeStation) return undefined
+    return cookingFinishedWaitSteps.find(w => stationMatches(activeStation, w.station))
+  }, [activeStation, cookingFinishedWaitSteps])
+
   // Scope pendingStep to the currently open station (rubber-duck fix)
   const scopedPendingStep = (pendingStep && activeStation && stationMatches(activeStation, pendingStep.station))
     ? pendingStep : undefined
@@ -836,7 +983,17 @@ export function KitchenStationOverlay({
 
   return (
     <AnimatePresence mode="wait">
-      {activeStation && popupStep ? (
+      {activeStation && finishedWaitForStation ? (
+        <WaitFinishedPopup
+          key={`finished-${activeStation}-${finishedWaitForStation.stepIndex}`}
+          finishedStep={finishedWaitForStation}
+          anchor={anchor}
+          onConfirm={() => {
+            confirmCookingWaitFinished(finishedWaitForStation.dishId, finishedWaitForStation.stepIndex)
+          }}
+          onClose={() => setActiveStation(null)}
+        />
+      ) : activeStation && popupStep ? (
         <StationPopup
           key={`${activeStation}-${stepKey}`}
           station={activeStation}

@@ -32,6 +32,8 @@ function remainingSeconds(step: ActiveCookingStep, estimatedGameSeconds: number,
 
 export default function KitchenTimerBanner() {
   const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
+  const cookingWaitSteps = useGameStore((s) => s.cookingWaitSteps)
+  const cookingFinishedWaitSteps = useGameStore((s) => s.cookingFinishedWaitSteps)
   const missedStepFlashes = useGameStore((s) => s.missedStepFlashes)
   const dishes = useGameStore((s) => s.dishes)
   const elapsedSeconds = useGameStore((s) => s.elapsedSeconds)
@@ -82,16 +84,58 @@ export default function KitchenTimerBanner() {
       return {
         key: `${activeStep.dishId}-${activeStep.stepIndex}`,
         missed: false,
+        activeCount: activeCookingSteps.length,
         emoji: activeDish?.emoji || '🍳',
         stationEmoji: STATION_CONTEXT_EMOJI[activeStep.station] ?? null,
         title: activeStep.stepLabel,
-        detail: '',
+        detail: activeCookingSteps.length > 1
+          ? `${activeCookingSteps.length} kitchen actions active`
+          : '',
         remainingLabel: formatRemaining(remaining),
         progressRatio,
       }
     }
+    if (cookingFinishedWaitSteps.length > 0) {
+      const item = cookingFinishedWaitSteps[cookingFinishedWaitSteps.length - 1]
+      return {
+        key: `finished-${item.dishId}-${item.stepIndex}`,
+        missed: false,
+        activeCount: 0,
+        emoji: dishes[item.dishId]?.emoji || '🍳',
+        stationEmoji: STATION_CONTEXT_EMOJI[item.station] ?? null,
+        title: 'Timer finished',
+        detail: item.stepLabel,
+        remainingLabel: 'ready',
+        progressRatio: null as number | null,
+      }
+    }
+    if (cookingWaitSteps.length > 0) {
+      const item = cookingWaitSteps[0]
+      return {
+        key: `waiting-${item.dishId}-${item.stepIndex}`,
+        missed: false,
+        activeCount: 0,
+        emoji: dishes[item.dishId]?.emoji || '🍳',
+        stationEmoji: STATION_CONTEXT_EMOJI[item.station] ?? null,
+        title: item.stepLabel,
+        detail: cookingWaitSteps.length > 1
+          ? `${cookingWaitSteps.length} dishes cooking`
+          : 'Cooking',
+        remainingLabel: '',
+        progressRatio: null as number | null,
+      }
+    }
     return null
-  }, [activeDish?.emoji, activeStep, missedItem, remaining])
+  }, [activeCookingSteps, activeDish?.emoji, activeStep, cookingFinishedWaitSteps, cookingWaitSteps, dishes, missedItem, remaining])
+
+  const queueItems = useMemo(() => {
+    return activeCookingSteps.slice(0, 3).map(step => ({
+      key: `${step.dishId}-${step.stepIndex}`,
+      emoji: dishes[step.dishId]?.emoji || '🍳',
+      stationEmoji: STATION_CONTEXT_EMOJI[step.station] ?? null,
+      label: step.stepLabel,
+    }))
+  }, [activeCookingSteps, dishes])
 
   return (
     <AnimatePresence initial={false}>
@@ -147,6 +191,20 @@ export default function KitchenTimerBanner() {
                   <p className="mt-1 text-[11px] font-semibold leading-snug text-white/85 truncate">
                     {banner.detail}
                   </p>
+                )}
+                {queueItems.length > 1 && (
+                  <div className="mt-1.5 flex gap-1 overflow-hidden">
+                    {queueItems.map(item => (
+                      <span
+                        key={item.key}
+                        className="min-w-0 rounded bg-black/20 px-1.5 py-0.5 text-[9px] font-bold leading-tight text-white/90"
+                      >
+                        <span className="mr-0.5">{item.emoji}</span>
+                        {item.stationEmoji && <span className="mr-0.5">{item.stationEmoji}</span>}
+                        <span className="align-middle">{item.label}</span>
+                      </span>
+                    ))}
+                  </div>
                 )}
                 {/* ⑬ Time progress bar: green → yellow → red */}
                 {banner.progressRatio != null && (
