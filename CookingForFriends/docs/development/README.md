@@ -10,3 +10,4 @@ Current implementation references. These files should track the active codebase.
 | PM trigger flow | [pm-trigger-flow.md](pm-trigger-flow.md) |
 | Cooking task | [cooking.md](cooking.md) |
 | Missing study materials | [missing-materials.md](missing-materials.md) |
+| Task queue progress | [task-queue-progress.md](task-queue-progress.md) |
