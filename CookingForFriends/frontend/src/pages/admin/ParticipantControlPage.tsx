@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { adminFetch } from '../../services/api'
 
 /* ── Types ────────────────────────────────────────────── */
 
@@ -95,13 +96,13 @@ interface Snapshot {
 const API = '/api/admin'
 
 async function safeFetch<T>(url: string): Promise<T> {
-  const res = await fetch(url)
+  const res = await adminFetch(url)
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.json()
 }
 
 async function safePost<T>(url: string): Promise<T> {
-  const res = await fetch(url, { method: 'POST' })
+  const res = await adminFetch(url, { method: 'POST' })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.detail || `${res.status} ${res.statusText}`)

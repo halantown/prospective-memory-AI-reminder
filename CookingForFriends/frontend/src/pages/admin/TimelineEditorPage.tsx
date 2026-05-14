@@ -18,6 +18,7 @@ import {
   Save,
   Trash2,
 } from 'lucide-react'
+import { adminFetch } from '../../services/api'
 
 const API = '/api/admin/timelines'
 
@@ -83,7 +84,7 @@ type TimelineExportRow = {
 }
 
 async function apiFetch<T>(url: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts })
+  const res = await adminFetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     const detail = body.detail

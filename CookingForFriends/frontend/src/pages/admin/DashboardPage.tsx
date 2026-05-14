@@ -32,6 +32,7 @@ import {
   exportPerParticipant,
   exportAggregated,
   createTestSession,
+  adminFetch,
 } from '../../services/api'
 import { TRIGGER_SCHEDULE } from '../../constants/pmTasks'
 
@@ -255,7 +256,7 @@ function ParticipantDetailView({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetch(`/api/admin/participant/${sessionId}/detail`)
+    adminFetch(`/api/admin/participant/${sessionId}/detail`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -377,7 +378,7 @@ function TokenManagementTab() {
   const [manualResult, setManualResult] = useState<{ participant_id: string; token: string; entry_url?: string } | null>(null)
 
   const load = useCallback(async () => {
-    const r = await fetch('/api/admin/participants')
+    const r = await adminFetch('/api/admin/participants')
     if (r.ok) setParticipants(await r.json())
   }, [])
 
@@ -835,8 +836,8 @@ export default function AdminDashboard() {
     setRefreshing(true)
     try {
       const [pRes, oRes] = await Promise.all([
-        fetch('/api/admin/participants'),
-        fetch('/api/admin/experiment/overview'),
+        adminFetch('/api/admin/participants'),
+        adminFetch('/api/admin/experiment/overview'),
       ])
       if (pRes.ok) setParticipants(await pRes.json())
       if (oRes.ok) setOverview(await oRes.json())
@@ -917,7 +918,7 @@ export default function AdminDashboard() {
     const { kind, participant } = confirmAction
     const url = `/api/admin/participant/${participant.session_id}/${kind}`
     try {
-      const res = await fetch(url, { method: 'POST' })
+      const res = await adminFetch(url, { method: 'POST' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       refresh()
     } catch (err) {
@@ -929,7 +930,7 @@ export default function AdminDashboard() {
 
   const handleExport = async () => {
     try {
-      const res = await fetch('/api/admin/data/export')
+      const res = await adminFetch('/api/admin/data/export')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })

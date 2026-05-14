@@ -15,6 +15,7 @@ import {
   ChevronUp,
   MousePointerClick,
 } from 'lucide-react'
+import { adminFetch } from '../../services/api'
 
 // ── Types ──
 
@@ -37,6 +38,9 @@ interface ExperimentConfig {
     heartbeat_interval_s: number
     heartbeat_timeout_s: number
     token_length: number
+    environment?: string
+    is_production?: boolean
+    test_hooks_enabled?: boolean
   }
   latin_square?: Record<string, string[]>
   groups?: string[]
@@ -226,7 +230,7 @@ export default function ConfigPage() {
   // Load config, tasks, reminders on mount
   useEffect(() => {
     const safeFetch = (url: string) =>
-      fetch(url).then((r) => {
+      adminFetch(url).then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status} from ${url}`)
         return r.json()
       })
@@ -249,7 +253,7 @@ export default function ConfigPage() {
   // Lazy-load assignments
   const loadAssignments = useCallback(() => {
     if (assignmentsLoaded) return
-    fetch('/api/admin/assignments')
+    adminFetch('/api/admin/assignments')
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -265,7 +269,7 @@ export default function ConfigPage() {
   const handleExport = async () => {
     setExporting(true)
     try {
-      const res = await fetch('/api/admin/data/export')
+      const res = await adminFetch('/api/admin/data/export')
       if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`)
       const data = await res.json()
       const json = JSON.stringify(data, null, 2)

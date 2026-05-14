@@ -5,6 +5,8 @@ import type { BlockEncoding, CookingDefinitions, ExperimentConfig, ExperimentRes
 const API_BASE = '/api'
 
 let _sessionToken: string | null = null
+let _adminKey: string | null =
+  typeof window !== 'undefined' ? sessionStorage.getItem('cff_admin_key') : null
 
 export function setSessionToken(token: string | null) {
   _sessionToken = token
@@ -14,15 +16,68 @@ export function getSessionToken() {
   return _sessionToken
 }
 
+export function setAdminKey(key: string | null) {
+  const normalized = key?.trim() || null
+  _adminKey = normalized
+  if (typeof window === 'undefined') return
+  if (normalized) sessionStorage.setItem('cff_admin_key', normalized)
+  else sessionStorage.removeItem('cff_admin_key')
+}
+
+export function getAdminKey() {
+  return _adminKey
+}
+
+function normalizeHeaders(headers?: HeadersInit): Record<string, string> {
+  if (!headers) return {}
+  if (headers instanceof Headers) return Object.fromEntries(headers.entries())
+  if (Array.isArray(headers)) return Object.fromEntries(headers)
+  return { ...headers }
+}
+
+function withAdminHeaders(headers?: HeadersInit): Record<string, string> {
+  const merged = normalizeHeaders(headers)
+  if (_adminKey) merged['X-Admin-Key'] = _adminKey
+  return merged
+}
+
+async function fetchWithOptionalAdminRetry(
+  url: string,
+  options: RequestInit = {},
+  needsAdminKey: boolean,
+): Promise<Response> {
+  const makeOptions = () => ({
+    ...options,
+    headers: needsAdminKey ? withAdminHeaders(options.headers) : options.headers,
+  })
+
+  let res = await fetch(url, makeOptions())
+  if (res.status !== 401 || !needsAdminKey || typeof window === 'undefined') {
+    return res
+  }
+
+  if (_adminKey) setAdminKey(null)
+  const key = window.prompt('Admin API key')
+  if (!key) return res
+  setAdminKey(key)
+  res = await fetch(url, makeOptions())
+  return res
+}
+
+export async function adminFetch(url: string, options?: RequestInit): Promise<Response> {
+  return fetchWithOptionalAdminRetry(url, options, true)
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (_sessionToken) {
     headers['X-Session-Token'] = _sessionToken
   }
-  const res = await fetch(`${API_BASE}${url}`, {
+  const needsAdminKey = url.startsWith('/admin')
+  const res = await fetchWithOptionalAdminRetry(`${API_BASE}${url}`, {
     headers,
     ...options,
-  })
+  }, needsAdminKey)
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.detail || `Request failed: ${res.status}`)
@@ -274,7 +329,7 @@ export async function getLiveSessions() {
 async function requestBlob(url: string): Promise<Blob> {
   const headers: Record<string, string> = {}
   if (_sessionToken) headers['X-Session-Token'] = _sessionToken
-  const res = await fetch(`${API_BASE}${url}`, { headers })
+  const res = await fetchWithOptionalAdminRetry(`${API_BASE}${url}`, { headers }, url.startsWith('/admin'))
   if (!res.ok) throw new Error(`Export failed: ${res.status}`)
   return res.blob()
 }

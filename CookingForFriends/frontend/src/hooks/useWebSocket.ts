@@ -247,7 +247,7 @@ export function useWebSocket(sessionId: string | null) {
     if (token) params.set('token', token)
     const url = `${proto}//${host}/ws/game/${sessionId}?${params.toString()}`
 
-    console.log('[WS] Connecting:', url)
+    console.log('[WS] Connecting:', { sessionId, autoStart, hasToken: Boolean(token) })
     const ws = new WebSocket(url)
     wsRef.current = ws
 
