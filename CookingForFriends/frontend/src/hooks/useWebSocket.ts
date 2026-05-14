@@ -162,6 +162,7 @@ export function useWebSocket(sessionId: string | null) {
         const d = msg.data
         const channel = d.channel || 'notification'
         const contactId = d.contact_id || undefined
+        const suppressPhonePush = store.pmPipelineState?.step === 'confidence_rating'
 
         if (channel === 'notification') {
           const bannerMsg = {
@@ -173,7 +174,9 @@ export function useWebSocket(sessionId: string | null) {
             read: false,
             answered: false,
           }
-          store.setPhoneBanner(bannerMsg)
+          if (!suppressPhonePush) {
+            store.setPhoneBanner(bannerMsg)
+          }
           store.addLockSystemNotification({ id: d.id, sender: d.sender || '', text: d.text, timestamp: now })
           break
         }
@@ -197,7 +200,7 @@ export function useWebSocket(sessionId: string | null) {
         const isActiveChat = !store.phoneLocked
           && store.activePhoneTab === 'chats'
           && contactId === store.activeContactId
-        if (!isActiveChat) {
+        if (!isActiveChat && !suppressPhonePush) {
           store.setPhoneBanner(phoneMsg)
         }
         break

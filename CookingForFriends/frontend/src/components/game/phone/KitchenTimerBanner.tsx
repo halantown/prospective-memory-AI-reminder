@@ -64,6 +64,7 @@ export default function KitchenTimerBanner() {
   const remaining = activeStep ? remainingSeconds(activeStep, estimatedGameSeconds, now) : 0
   const urgencyThreshold = activeStep ? activeStep.windowSeconds * 0.25 : 0
   const isUrgent = Boolean(activeStep && remaining > 0 && remaining <= urgencyThreshold)
+  const isPaused = gameTimeFrozen && Boolean(activeStep)
 
   const banner = useMemo(() => {
     if (missedItem) {
@@ -171,7 +172,7 @@ export default function KitchenTimerBanner() {
           animate={{
             opacity: 1,
             y: 0,
-            scale: isUrgent && !banner.missed ? [1, 1.025, 1] : 1,
+            scale: isUrgent && !isPaused && !banner.missed ? [1, 1.025, 1] : 1,
             borderColor: banner.missed
               ? ['rgba(254,202,202,1)', 'rgba(239,68,68,1)', 'rgba(254,202,202,1)']
               : undefined,
@@ -179,7 +180,7 @@ export default function KitchenTimerBanner() {
           exit={{ opacity: 0, y: -8, scale: 0.98 }}
           transition={{
             duration: 0.18,
-            scale: isUrgent && !banner.missed ? { repeat: Infinity, duration: 0.75 } : undefined,
+            scale: isUrgent && !isPaused && !banner.missed ? { repeat: Infinity, duration: 0.75 } : undefined,
             borderColor: banner.missed ? { repeat: 2, duration: 0.28 } : undefined,
           }}
           className="pointer-events-none absolute left-0 right-0 top-[38px] z-20 px-4 py-1.5"
@@ -188,6 +189,8 @@ export default function KitchenTimerBanner() {
             className={`rounded-lg border-2 px-3.5 py-2 shadow-xl ${
               banner.missed
                 ? 'bg-red-600 text-white border-red-200 shadow-red-950/50'
+                : isPaused
+                  ? 'bg-slate-600 text-white border-slate-300 shadow-slate-950/50'
                 : isUrgent
                   ? 'bg-orange-500 text-white border-orange-100 shadow-orange-950/60 ring-4 ring-orange-300/30'
                   : 'bg-orange-500 text-white border-orange-200 shadow-orange-950/40'
@@ -208,7 +211,7 @@ export default function KitchenTimerBanner() {
                   </span>
                   {banner.remainingLabel && (
                     <span className="ml-auto shrink-0 rounded bg-black/20 px-2 py-0.5 text-[14px] font-black tabular-nums">
-                      {banner.remainingLabel}
+                      {isPaused ? 'paused' : banner.remainingLabel}
                     </span>
                   )}
                 </div>
@@ -238,7 +241,7 @@ export default function KitchenTimerBanner() {
                       className="h-full rounded-full transition-all duration-1000"
                       style={{
                         width: `${Math.max(0, Math.min(1, banner.progressRatio)) * 100}%`,
-                        backgroundColor:
+                        backgroundColor: isPaused ? '#cbd5e1' :
                           banner.progressRatio > 0.5 ? '#86efac'
                           : banner.progressRatio > 0.25 ? '#fde047'
                           : '#fca5a5',

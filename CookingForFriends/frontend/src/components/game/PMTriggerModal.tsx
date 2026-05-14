@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
 import { emitMouseTrackingEvent } from '../../hooks/useMouseTracker'
 import { FAKE_TRIGGER_LINES, ITEM_SELECTION_OPTIONS, PM_TASKS } from '../../constants/pmTasks'
@@ -160,6 +161,8 @@ function ItemSelectionStep({
   onSelect: (option: DecoyOption, responseTimeMs: number) => void
 }) {
   const startRef = useRef(Date.now())
+  const submitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   useEffect(() => {
     startRef.current = Date.now()
@@ -174,24 +177,60 @@ function ItemSelectionStep({
     emitMouseTrackingEvent('item_selection_start', { task_id: taskId })
   }, [taskId])
 
+  useEffect(() => {
+    return () => {
+      if (submitTimerRef.current) clearTimeout(submitTimerRef.current)
+    }
+  }, [])
+
+  const handleSelect = (option: DecoyOption) => {
+    if (selectedId) return
+    setSelectedId(option.id)
+    emitMouseTrackingEvent('item_selection_end', {
+      task_id: taskId,
+      selected_item: option.id,
+    })
+    const responseTimeMs = Date.now() - startRef.current
+    submitTimerRef.current = setTimeout(() => {
+      onSelect(option, responseTimeMs)
+    }, 600)
+  }
+
   return (
-    <InGameShell>
-      <BubbleDialogue
-        speaker="AVATAR"
-        text="What did you promise?"
-        avatar="A"
-        choices={options.map((option) => ({ id: option.id, label: option.label }))}
-        onChoice={(choice) => {
-          const option = options.find((o) => o.id === choice.id)
-          if (!option) return
-          emitMouseTrackingEvent('item_selection_end', {
-            task_id: taskId,
-            selected_item: option.id,
-          })
-          onSelect(option, Date.now() - startRef.current)
-        }}
-      />
-    </InGameShell>
+    <FocusedOverlayShell>
+      <motion.div
+        className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-7 shadow-2xl"
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        transition={{ duration: 0.24, ease: 'easeOut' }}
+      >
+        <div className="text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-700">Pepper</p>
+          <h2 className="mt-2 text-2xl font-black text-slate-950">Choose the item:</h2>
+        </div>
+        <div className="mt-7 grid gap-4">
+          {options.map((option) => {
+            const selected = selectedId === option.id
+            return (
+              <button
+                key={option.id}
+                type="button"
+                disabled={Boolean(selectedId)}
+                onClick={() => handleSelect(option)}
+                className={`min-h-[72px] rounded-lg border-2 px-5 py-4 text-left text-xl font-black shadow-sm transition duration-150 ${
+                  selected
+                    ? 'border-emerald-600 bg-emerald-600 text-white shadow-lg shadow-emerald-950/20 scale-[0.99]'
+                    : 'border-slate-300 bg-white text-slate-900 hover:border-emerald-500 hover:bg-emerald-50 active:scale-[0.98] disabled:opacity-70'
+                }`}
+              >
+                {option.label}
+              </button>
+            )
+          })}
+        </div>
+      </motion.div>
+    </FocusedOverlayShell>
   )
 }
 
@@ -201,19 +240,53 @@ function ConfidenceStep({
   onSubmit: (rating: number, responseTimeMs: number) => void
 }) {
   const startRef = useRef(Date.now())
+  const submitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [selectedRating, setSelectedRating] = useState<number | null>(null)
+  const [isClosing, setIsClosing] = useState(false)
+
+  useEffect(() => {
+    return () => {
+      if (submitTimerRef.current) clearTimeout(submitTimerRef.current)
+    }
+  }, [])
+
+  const handleSubmit = (rating: number) => {
+    if (selectedRating !== null) return
+    setSelectedRating(rating)
+    const responseTimeMs = Date.now() - startRef.current
+    submitTimerRef.current = setTimeout(() => {
+      setIsClosing(true)
+      submitTimerRef.current = setTimeout(() => {
+        onSubmit(rating, responseTimeMs)
+      }, 260)
+    }, 520)
+  }
+
   return (
-    <InGameShell>
-      <div className="rounded-lg border border-slate-300 bg-white p-5 shadow-xl">
+    <FocusedOverlayShell closing={isClosing}>
+      <motion.div
+        className="w-[min(68vw,42rem)] rounded-xl border border-slate-200 bg-white p-7 shadow-2xl"
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        transition={{ duration: 0.24, ease: 'easeOut' }}
+      >
         <div>
           <h2 className="text-base font-bold text-slate-900">How confident are you in your choice?</h2>
           <p className="mt-2 text-sm text-slate-500">1 = Not at all confident, 7 = Extremely confident</p>
         </div>
-        <div className="mt-4 grid grid-cols-7 gap-2">
+        <div className="mt-5 grid grid-cols-7 gap-3">
           {[1, 2, 3, 4, 5, 6, 7].map((n) => (
             <button
               key={n}
-              onClick={() => onSubmit(n, Date.now() - startRef.current)}
-              className="rounded-md border border-slate-300 bg-white py-3 text-base font-bold text-slate-700 transition hover:border-amber-500 hover:bg-amber-50 hover:text-amber-700 active:scale-95"
+              type="button"
+              disabled={selectedRating !== null}
+              onClick={() => handleSubmit(n)}
+              className={`aspect-square rounded-lg border-2 text-lg font-black transition duration-150 ${
+                selectedRating === n
+                  ? 'border-emerald-600 bg-emerald-600 text-white shadow-lg shadow-emerald-950/20 scale-95'
+                  : 'border-slate-300 bg-white text-slate-800 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-800 active:scale-95 disabled:opacity-70'
+              }`}
             >
               {n}
             </button>
@@ -223,8 +296,8 @@ function ConfidenceStep({
           <span>Not at all confident</span>
           <span>Extremely confident</span>
         </div>
-      </div>
-    </InGameShell>
+      </motion.div>
+    </FocusedOverlayShell>
   )
 }
 
@@ -258,6 +331,21 @@ function InGameShell({ children }: { children: ReactNode }) {
         {children}
       </div>
     </div>
+  )
+}
+
+function FocusedOverlayShell({ children, closing = false }: { children: ReactNode; closing?: boolean }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-overlay-pm flex items-center justify-center bg-slate-950/72 p-6 backdrop-blur-[2px]"
+      style={{ pointerEvents: 'auto' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: closing ? 0 : 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.24, ease: 'easeOut' }}
+    >
+      {children}
+    </motion.div>
   )
 }
 
