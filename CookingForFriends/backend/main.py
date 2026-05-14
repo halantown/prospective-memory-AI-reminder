@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from config import HOST, PORT, HEARTBEAT_TIMEOUT_S
-from database import init_db, seed_dev_participant
+from database import init_db
 from engine.timeline import cancel_all
 
 logging.basicConfig(
@@ -59,7 +59,6 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Cooking for Friends backend...")
     await init_db()
     logger.info("Database initialized")
-    await seed_dev_participant()
 
     # Set db factory for timeline execution window callbacks
     from engine.timeline import set_db_factory

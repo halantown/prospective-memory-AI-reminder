@@ -161,16 +161,6 @@ SNAPSHOT_INTERVAL_S = 15
 HEARTBEAT_INTERVAL_S = 30   # Frontend sends ping every 30s
 HEARTBEAT_TIMEOUT_S = 60    # Backend marks offline after 60s with no ping
 
-# Development seed — set DEV_TOKEN env var to enable dev participant.
-# When set, a dev participant is auto-created/reset on every startup.
-# Only allowed in development mode.
-DEV_TOKEN: str | None = os.getenv("DEV_TOKEN") or None
-if DEV_TOKEN and IS_PRODUCTION:
-    raise RuntimeError(
-        "DEV_TOKEN must not be set in production! "
-        "Unset the DEV_TOKEN environment variable."
-    )
-
 if IS_PRODUCTION:
     placeholder_vars = []
     for key in ("DATABASE_URL", "POSTGRES_PASSWORD", "CORS_ORIGINS", "ADMIN_API_KEY"):
