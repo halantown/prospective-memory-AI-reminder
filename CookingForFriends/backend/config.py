@@ -37,8 +37,9 @@ def _bootstrap_environment(project_dir: Path) -> tuple[str, Path | None]:
     Selection order:
     1. `--env-file path` or `ENV_FILE`
     2. `--env name` or `ENVIRONMENT`, loading `.env.<name>`
-    3. development fallback, loading `.env.development`
+    3. legacy `.env` fallback for non-production environments
 
+    Example files are templates only; they are never loaded as runtime config.
     A legacy `.env` file is used only when the selected environment file does
     not exist. Real environment variables keep highest priority.
     """
@@ -59,12 +60,8 @@ def _bootstrap_environment(project_dir: Path) -> tuple[str, Path | None]:
         _load_env_file(selected_file)
         loaded_file = selected_file
     else:
-        example_file = project_dir / f".env.{selected_env}.example"
         legacy_file = project_dir / ".env"
-        if selected_env in {"development", "test"} and example_file.exists():
-            _load_env_file(example_file)
-            loaded_file = example_file
-        elif selected_env != "production" and legacy_file.exists():
+        if selected_env != "production" and legacy_file.exists():
             _load_env_file(legacy_file)
             loaded_file = legacy_file
 
@@ -173,6 +170,19 @@ if DEV_TOKEN and IS_PRODUCTION:
         "DEV_TOKEN must not be set in production! "
         "Unset the DEV_TOKEN environment variable."
     )
+
+if IS_PRODUCTION:
+    placeholder_vars = []
+    for key in ("DATABASE_URL", "POSTGRES_PASSWORD", "CORS_ORIGINS", "ADMIN_API_KEY"):
+        value = os.getenv(key, "")
+        if "<" in value or ">" in value or "replace-with" in value:
+            placeholder_vars.append(key)
+    if placeholder_vars:
+        raise RuntimeError(
+            "Production config contains placeholder values: "
+            + ", ".join(sorted(placeholder_vars))
+            + ". Replace them in .env.production before startup."
+        )
 
 if IS_PRODUCTION and ADMIN_API_KEY is None:
     raise RuntimeError(

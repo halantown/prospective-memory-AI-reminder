@@ -26,15 +26,14 @@ Backend startup loads environment files before reading config constants:
 
 ```bash
 python main.py --env development     # loads ../.env.development
-python main.py --env test            # loads ../.env.test
 python main.py --env production      # loads ../.env.production
 python main.py --env-file ../custom.env
 ```
 
-Real environment variables override values from files. If the selected
-development/test environment file is missing, the backend loads the committed
-`.env.<environment>.example` template. Production never loads the example file
-automatically. Legacy `.env` is only a local fallback for non-production use.
+Real environment variables override values from files. Example files are
+templates only and are not loaded at runtime. Legacy `.env` is only a local
+fallback for non-production use when the selected `.env.<environment>` file is
+missing.
 
 ### Paths & Database
 
@@ -375,22 +374,20 @@ data/
 docker compose up -d           # starts PostgreSQL 16 on port 5432
 ```
 
-The committed `.env.development.example` is enough for default local startup.
-Create `.env.development` only when you need local overrides:
+The committed `.env.development` is the default local startup config:
 
 ```bash
-cp .env.development.example .env.development
+docker compose up -d
+cd backend
+python main.py --env development
 ```
 
-Use `.env.production.example` only on the production host:
+Use `.env.production` only on the production host. Replace every placeholder
+before starting with `python main.py --env production`. The matching example
+file is only a template for creating another deployment-specific copy.
 
-```bash
-cp .env.production.example .env.production
-```
-
-Then replace every placeholder and start with `python main.py --env production`.
-`.env.example` is now an index file that points to the environment-specific
-templates.
+Only two example files are kept: `.env.development.example` and
+`.env.production.example`.
 
 | Env Var | Default | Description |
 |---------|---------|-------------|

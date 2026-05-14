@@ -9,23 +9,22 @@ Select the environment explicitly when starting the backend. The default command
 is `python main.py --env <environment>`, which loads `.env.<environment>` before
 the config constants are read.
 
-Production does not auto-load `.env.production.example`; create
-`.env.production` on the host first.
+Production loads `.env.production`; `.env.production.example` is only a
+template for new deployments.
 
 | Environment | Intended use | Relaxed behavior | Production guards |
 |-------------|--------------|------------------|-------------------|
-| `development` | Local development and thesis screenshots | Admin auth may be disabled, `DEV_TOKEN` may seed `DEV_TESTER`, test sessions are enabled, wildcard CORS is allowed | None |
-| `test` | Controlled local/pilot testing and screenshots | Same relaxed test hooks as development | None |
+| `development` | Local development, pilot testing, and thesis screenshots | Admin auth may be disabled, `DEV_TOKEN` may seed `DEV_TESTER`, test sessions are enabled, wildcard CORS is allowed | None |
 | `production` | Real participant data collection | No development token, no test-session shortcut, no runtime-plan edits, admin key required, wildcard CORS rejected | Enforced at startup/request time |
 
 The backend rejects any `ENVIRONMENT` value outside `development`, `test`, and
-`production`.
+`production`. Runtime configuration is maintained for `development` and
+`production`; the internal `test` mode has no committed env template.
 
 ## Required Production Environment
 
-Use production-specific values; do not copy the development template. Start from
-`.env.production.example`, save it as `.env.production`, and replace every
-placeholder.
+Use production-specific values; do not copy the development config. Replace
+every placeholder in `.env.production` before starting the backend.
 
 ```dotenv
 ENVIRONMENT=production
@@ -45,17 +44,18 @@ python main.py --env production
 
 Production startup fails if:
 
+- Any required production value still contains a template placeholder.
 - `DEV_TOKEN` is set.
 - `ADMIN_API_KEY` is missing.
 - `CORS_ORIGINS` contains `*`.
 - `ENVIRONMENT` is not one of the supported modes.
 
-## Development/Test Hooks
+## Development Hooks
 
 These are intentional convenience hooks. They are allowed in `development` and
-`test`, and disabled or guarded in `production`.
+internal `test` mode, and disabled or guarded in `production`.
 
-| Hook | Purpose | Dev/test behavior | Production behavior |
+| Hook | Purpose | Development/test behavior | Production behavior |
 |------|---------|-------------------|---------------------|
 | `DEV_TOKEN` | Reusable screenshot/dev participant | Auto-creates or resets `DEV_TESTER` on startup | Backend startup fails if set |
 | `/api/admin/test-session` | Create an `is_test=true` session and jump to a phase | Enabled behind optional admin auth | Returns `403` |

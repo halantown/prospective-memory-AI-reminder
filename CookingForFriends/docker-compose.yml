@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     container_name: cff-postgres
     restart: unless-stopped
-    env_file: .env
+    env_file: .env.development
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-cooking_for_friends}
       POSTGRES_USER: ${POSTGRES_USER:-cff}

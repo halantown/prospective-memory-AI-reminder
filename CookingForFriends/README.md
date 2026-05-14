@@ -28,8 +28,8 @@ npm run dev
 - Admin UI: `http://localhost:3000/admin`
 
 The backend selects config by startup argument. `--env development` loads
-`.env.development` when present, otherwise the committed
-`.env.development.example`. Use `.env.production` only on the production host.
+`.env.development`; `--env production` loads `.env.production`. The two
+`.example` files are templates only and are not loaded at runtime.
 
 ## Documentation
 
