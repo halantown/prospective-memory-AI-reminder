@@ -549,16 +549,19 @@ function CorrectCelebration({ dishEmoji }: { dishEmoji: string }) {
 // ── StationPopup ──────────────────────────────────────────────────────────────
 
 function StationPopup({
-  station, anchor, activeStep, pending, feedback, onOptionClick, onClose,
+  station, anchor, activeSteps, selectedStepIndex, onStepSwitch, pending, feedback, onOptionClick, onClose,
 }: {
   station: KitchenStationId
   anchor: { x: number; y: number } | null
-  activeStep: ActiveCookingStep | undefined
+  activeSteps: ActiveCookingStep[]
+  selectedStepIndex: number
+  onStepSwitch: (index: number) => void
   pending: boolean
   feedback: 'correct' | 'wrong' | null
   onOptionClick: (step: ActiveCookingStep, option: CookingStepOption) => void
   onClose: () => void
 }) {
+  const activeStep = activeSteps[selectedStepIndex]
   const info = STATION_INFO[station]
   const dishes = useGameStore((s) => s.dishes)
   const dishEmoji = activeStep ? (dishes[activeStep.dishId]?.emoji ?? '🍳') : '🍳'
@@ -625,6 +628,26 @@ function StationPopup({
           <span className="text-lg">{info.emoji}</span>
           <span className="text-sm font-semibold text-slate-200">{info.label}</span>
         </div>
+
+        {/* Step tabs when multiple active steps share this station */}
+        {activeSteps.length > 1 && (
+          <div className="flex gap-1 mb-3 -mt-1">
+            {activeSteps.map((s, i) => (
+              <button
+                key={cookingStepKey(s)}
+                onClick={() => onStepSwitch(i)}
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${
+                  i === selectedStepIndex
+                    ? 'bg-amber-500/30 border border-amber-400/60 text-amber-200'
+                    : 'bg-slate-700/50 border border-slate-600/40 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span>{dishes[s.dishId]?.emoji ?? '🍳'}</span>
+                <span className="truncate max-w-[80px]">{s.stepLabel}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ⑫ Correct celebration overlay */}
         {feedback === 'correct' && <CorrectCelebration dishEmoji={dishEmoji} />}
@@ -901,6 +924,7 @@ export function KitchenStationOverlay({
 
   const [submittedStepKeys, setSubmittedStepKeys] = useState<Set<string>>(() => new Set())
   const [pendingStep, setPendingStep]             = useState<ActiveCookingStep | null>(null)
+  const [selectedStepIdx, setSelectedStepIdx]     = useState(0)
 
   // Prune submitted keys when steps are removed from the store
   useEffect(() => {
@@ -945,12 +969,17 @@ export function KitchenStationOverlay({
     })
   }, [wsSend, submittedStepKeys])
 
-  const activeStepForStation = useMemo(() => {
-    if (!activeStation) return undefined
-    return activeCookingSteps.find(s =>
+  const activeStepsForStation = useMemo(() => {
+    if (!activeStation) return []
+    return activeCookingSteps.filter(s =>
       stationMatches(activeStation, s.station) && !submittedStepKeys.has(cookingStepKey(s))
     )
   }, [activeStation, activeCookingSteps, submittedStepKeys])
+
+  // Reset selection index when steps change
+  useEffect(() => {
+    setSelectedStepIdx(i => Math.min(i, Math.max(0, activeStepsForStation.length - 1)))
+  }, [activeStepsForStation.length])
 
   // ③ Wait step for current station
   const waitStepForStation = useMemo(() => {
@@ -967,7 +996,11 @@ export function KitchenStationOverlay({
   const scopedPendingStep = (pendingStep && activeStation && stationMatches(activeStation, pendingStep.station))
     ? pendingStep : undefined
 
-  const popupStep    = activeStepForStation ?? scopedPendingStep
+  const hasActiveSteps = activeStepsForStation.length > 0
+  const popupSteps = hasActiveSteps
+    ? activeStepsForStation
+    : scopedPendingStep ? [scopedPendingStep] : []
+  const popupStep = popupSteps[selectedStepIdx] ?? popupSteps[0]
   const popupFeedback = (scopedPendingStep && cookingStepFeedback
     && scopedPendingStep.dishId    === cookingStepFeedback.dishId
     && scopedPendingStep.stepIndex === cookingStepFeedback.stepIndex)
@@ -998,7 +1031,9 @@ export function KitchenStationOverlay({
           key={`${activeStation}-${stepKey}`}
           station={activeStation}
           anchor={anchor}
-          activeStep={popupStep}
+          activeSteps={popupSteps}
+          selectedStepIndex={selectedStepIdx}
+          onStepSwitch={setSelectedStepIdx}
           pending={Boolean(scopedPendingStep)}
           feedback={popupFeedback}
           onOptionClick={handleOptionClick}
