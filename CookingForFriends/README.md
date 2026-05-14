@@ -8,7 +8,7 @@ trigger encounters.
 
 ```bash
 cd CookingForFriends
-cp .env.example .env
+cp .env.development.example .env
 docker compose up -d
 ```
 

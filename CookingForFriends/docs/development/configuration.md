@@ -356,9 +356,13 @@ data/
 ### Docker Setup
 
 ```bash
-cp .env.example .env          # adjust credentials if needed
+cp .env.development.example .env
 docker compose up -d           # starts PostgreSQL 16 on port 5432
 ```
+
+Use `.env.production.example` only on the production host, then replace every
+placeholder before starting the backend. `.env.example` is now an index file that
+points to the environment-specific templates.
 
 | Env Var | Default | Description |
 |---------|---------|-------------|

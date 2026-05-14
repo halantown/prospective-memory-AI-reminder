@@ -18,7 +18,8 @@ The backend rejects any `ENVIRONMENT` value outside `development`, `test`, and
 
 ## Required Production Environment
 
-Use production-specific values; do not copy `.env.example` verbatim.
+Use production-specific values; do not copy the development template. Start from
+`.env.production.example` and replace every placeholder.
 
 ```dotenv
 ENVIRONMENT=production
@@ -82,4 +83,3 @@ Before collecting production data:
 7. Start one participant session and verify reload/reconnect during main
    experiment restores runtime state.
 8. Run `npm run build` and backend tests before using the build.
-
