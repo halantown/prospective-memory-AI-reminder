@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 from typing import Any
 
@@ -23,7 +24,7 @@ async def _verify_admin(x_admin_key: str | None = Header(None, alias="X-Admin-Ke
     """Verify admin API key if configured."""
     if not ADMIN_API_KEY:
         return
-    if x_admin_key != ADMIN_API_KEY:
+    if not x_admin_key or not hmac.compare_digest(x_admin_key, ADMIN_API_KEY):
         raise HTTPException(401, "Invalid or missing admin API key")
 
 

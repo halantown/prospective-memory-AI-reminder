@@ -124,10 +124,11 @@ async def websocket_game(ws: _WebSocket, session_id: str):
 @app.websocket("/ws/monitor")
 async def admin_monitor_ws(ws: _WebSocket):
     """Admin real-time monitoring WebSocket (requires admin API key as query param)."""
+    import hmac as _hmac
     from config import ADMIN_API_KEY
     if ADMIN_API_KEY:
         key = ws.query_params.get("key", "")
-        if key != ADMIN_API_KEY:
+        if not key or not _hmac.compare_digest(key, ADMIN_API_KEY):
             await ws.close(code=4003, reason="Unauthorized")
             return
     queue = await manager.connect_admin(ws)

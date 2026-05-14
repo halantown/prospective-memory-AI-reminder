@@ -1,5 +1,6 @@
 """Admin router — participant management, monitoring, data export."""
 
+import hmac
 import io
 import csv
 import uuid
@@ -37,7 +38,7 @@ async def verify_admin(x_admin_key: str | None = Header(None, alias="X-Admin-Key
     if not ADMIN_API_KEY:
         logger.warning("ADMIN_API_KEY not set — admin auth disabled (dev mode)")
         return
-    if x_admin_key != ADMIN_API_KEY:
+    if not x_admin_key or not hmac.compare_digest(x_admin_key, ADMIN_API_KEY):
         raise HTTPException(401, "Invalid or missing admin API key")
 
 
