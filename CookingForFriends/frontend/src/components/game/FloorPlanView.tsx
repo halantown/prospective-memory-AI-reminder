@@ -410,6 +410,9 @@ export default function FloorPlanView({
         if (doorbellActive && target === 'living_room') {
           answerDoorbellAtDoor()
         }
+        if (scriptedDoorEncounterId && target === 'living_room') {
+          window.dispatchEvent(new CustomEvent('tutorial:arrived_at_door'))
+        }
       }, TRANSIT_DELAY_MS)
 
       scheduleRobotFollow(target, TRANSIT_DELAY_MS + 600)
@@ -435,9 +438,12 @@ export default function FloorPlanView({
       teleportTo('living_room_idle')
       answerDoorbellAtDoor()
     }
+    if (scriptedDoorEncounterId && room === 'living_room') {
+      window.dispatchEvent(new CustomEvent('tutorial:arrived_at_door'))
+    }
 
     scheduleRobotFollow(room, ROBOT_FOLLOW_DELAY_MS)
-  }, [answerDoorbellAtDoor, disableNavigation, doorbellActive, setActiveStation, scheduleRobotFollow, teleportTo])
+  }, [answerDoorbellAtDoor, disableNavigation, doorbellActive, scriptedDoorEncounterId, setActiveStation, scheduleRobotFollow, teleportTo])
 
   useEffect(() => clearRobotTimers, [clearRobotTimers])
   useEffect(() => clearVisitorPathTimers, [clearVisitorPathTimers])

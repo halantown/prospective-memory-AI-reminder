@@ -1,19 +1,22 @@
 /** Trigger Effects — audio and visual feedback for PM trigger events.
  *
  * Supports 4 PM trigger types: visitor, communication, appliance, activity.
- * Each trigger_visual value maps to a distinct audio tone + visual cue.
+ * Each trigger_visual value maps to a sound (synthesized or file-backed
+ * via useSoundEffects) + visual cue.
  * Fake triggers (non-PM) show a brief banner but don't create PM trials.
- * Uses Web Audio API for synthesized tones.
  */
 
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../stores/gameStore'
+import { useSoundEffects, type SoundName } from '../../hooks/useSoundEffects'
 import type { RoomId } from '../../types'
 
-// Map trigger_visual values → source room, audio config, and display info
+// Map trigger_visual values → source room, audio config, and display info.
+// `soundName`, when set, takes precedence over the synthesized tone params.
 const TRIGGER_EFFECTS: Record<string, {
   sourceRoom: RoomId | null
+  soundName?: SoundName
   audioFreq: number
   audioDuration: number
   audioPattern: 'single' | 'double' | 'triple'
@@ -23,6 +26,7 @@ const TRIGGER_EFFECTS: Record<string, {
   // ── Visitor ──
   visitor_arrival: {
     sourceRoom: 'living_room',
+    soundName: 'doorbell',
     audioFreq: 880,
     audioDuration: 0.3,
     audioPattern: 'double',
@@ -32,6 +36,7 @@ const TRIGGER_EFFECTS: Record<string, {
   // ── Communication ──
   phone_message_banner: {
     sourceRoom: null,
+    soundName: 'phoneRing',
     audioFreq: 1000,
     audioDuration: 0.15,
     audioPattern: 'double',
@@ -136,6 +141,7 @@ function playTriggerTone(freq: number, duration: number, pattern: 'single' | 'do
 export default function TriggerEffects() {
   const activeTriggerEffects = useGameStore((s) => s.activeTriggerEffects)
   const clearTriggerEffect = useGameStore((s) => s.clearTriggerEffect)
+  const play = useSoundEffects()
   const playedRef = useRef<Set<string>>(new Set())
 
   // Play audio when new trigger effects appear and schedule auto-clear
@@ -149,7 +155,11 @@ export default function TriggerEffects() {
 
       const cfg = TRIGGER_EFFECTS[effect.triggerEvent]
       if (cfg) {
-        playTriggerTone(cfg.audioFreq, cfg.audioDuration, cfg.audioPattern)
+        if (cfg.soundName) {
+          play(cfg.soundName)
+        } else {
+          playTriggerTone(cfg.audioFreq, cfg.audioDuration, cfg.audioPattern)
+        }
       }
 
       // Fake triggers use their own duration; real triggers default to 4s

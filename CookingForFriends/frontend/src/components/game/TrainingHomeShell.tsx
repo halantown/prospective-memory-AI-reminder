@@ -43,10 +43,11 @@ const TRAINING_SCENES: Record<string, TrainingSceneConfig> = {
     highlightedRoom: 'kitchen',
   },
   TUTORIAL_TRIGGER: {
-    room: 'living_room',
+    room: 'kitchen',
     startMinute: 8 * 60 + 55,
     phoneDisabled: true,
-    disableNavigation: true,
+    disableNavigation: false,
+    highlightedRoom: 'living_room',
     scriptedDoorEncounterId: 'tutorial_sam',
   },
 }

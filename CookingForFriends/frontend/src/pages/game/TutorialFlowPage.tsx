@@ -6,6 +6,7 @@ import BubbleDialogue from '../../components/game/dialogue/BubbleDialogue'
 import ClickDialogueFlow from '../../components/game/dialogue/ClickDialogueFlow'
 import TrainingHomeShell from '../../components/game/TrainingHomeShell'
 import { getTriggerEncounterConfig } from '../../data/triggerEncounters'
+import { useSoundEffects } from '../../hooks/useSoundEffects'
 import type { CookingDefinitions, CookingStepOption } from '../../types'
 
 interface Option {
@@ -38,6 +39,8 @@ export default function TutorialFlowPage() {
   const setWsSend = useGameStore((s) => s.setWsSend)
   const setElapsedSeconds = useGameStore((s) => s.setElapsedSeconds)
   const setGameClock = useGameStore((s) => s.setGameClock)
+  const addTriggerEffect = useGameStore((s) => s.addTriggerEffect)
+  const play = useSoundEffects()
   const [config, setConfig] = useState<Record<string, unknown> | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -45,6 +48,7 @@ export default function TutorialFlowPage() {
   const [tabPromptTimedOut, setTabPromptTimedOut] = useState(false)
   const [triggerResting, setTriggerResting] = useState(false)
   const [triggerDialogueDone, setTriggerDialogueDone] = useState(false)
+  const [arrivedAtDoor, setArrivedAtDoor] = useState(false)
   const startedAtRef = useRef(Date.now())
   const phoneAdvancedRef = useRef(false)
   const cookingSetupRef = useRef(false)
@@ -61,6 +65,20 @@ export default function TutorialFlowPage() {
   }, [])
 
   useEffect(() => {
+    if (kind !== 'trigger') return
+    const timer = setTimeout(() => {
+      play('doorbell')
+      addTriggerEffect('visitor_arrival')
+    }, 800)
+    const handleArrival = () => setArrivedAtDoor(true)
+    window.addEventListener('tutorial:arrived_at_door', handleArrival)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('tutorial:arrived_at_door', handleArrival)
+    }
+  }, [addTriggerEffect, kind, play])
+
+  useEffect(() => {
     if (!sessionId) return
     setConfig(null)
     setStepIndex(0)
@@ -68,6 +86,7 @@ export default function TutorialFlowPage() {
     setTabPromptTimedOut(false)
     setTriggerResting(false)
     setTriggerDialogueDone(false)
+    setArrivedAtDoor(false)
     phoneAdvancedRef.current = false
     cookingSetupRef.current = false
     startedAtRef.current = Date.now()
@@ -425,6 +444,13 @@ export default function TutorialFlowPage() {
             speaker="AVATAR"
             text="OK, I can rest now and wait until tonight to start cooking."
             avatar="A"
+          />
+        ) : !arrivedAtDoor ? (
+          <BubbleDialogue
+            speaker="Pepper"
+            text="Someone's at the door! Click the living room to go answer it."
+            avatar="R"
+            align="right"
           />
         ) : !triggerDialogueDone ? (
           <ClickDialogueFlow

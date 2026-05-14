@@ -30,6 +30,7 @@ const ConfigPage = lazy(() => import('./pages/admin/ConfigPage'))
 const TimelineEditorPage = lazy(() => import('./pages/admin/TimelineEditorPage'))
 const ParticipantControlPage = lazy(() => import('./pages/admin/ParticipantControlPage'))
 const EncodingHotspotToolPage = lazy(() => import('./pages/admin/EncodingHotspotToolPage'))
+const SoundPreviewPage = lazy(() => import('./pages/admin/SoundPreviewPage'))
 
 function LoadingFallback() {
   return (
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/admin/participant/:participantId" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ParticipantControlWrapper /></Suspense></ErrorBoundary>} />
         <Route path="/admin/timeline-editor" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><TimelineEditorPage /></Suspense></ErrorBoundary>} />
         <Route path="/admin/encoding-hotspots" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><EncodingHotspotToolPage /></Suspense></ErrorBoundary>} />
+        <Route path="/admin/sounds" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><SoundPreviewPage /></Suspense></ErrorBoundary>} />
         <Route path="/timeline-editor" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><TimelineEditorPage /></Suspense></ErrorBoundary>} />
         <Route path="/dashboard" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>} />
         <Route path="/admin" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>} />
