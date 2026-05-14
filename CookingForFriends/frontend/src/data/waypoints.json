@@ -41,6 +41,9 @@
     ["burner1",        "cutting_board"],
     ["cutting_board",  "spice_rack"],
     ["spice_rack",     "fridge"],
+    ["cutting_board",  "kitchen_view_out_camera_switch"],
+    ["spice_rack",     "kitchen_view_out_camera_switch"],
+    ["fridge",         "kitchen_view_out_camera_switch"],
     ["kitchen_center", "plating_area"],
     ["kitchen_center", "kitchen_view_out_camera_switch"],
 
