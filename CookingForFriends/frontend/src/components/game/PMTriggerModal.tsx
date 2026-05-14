@@ -163,6 +163,14 @@ function ItemSelectionStep({
 
   useEffect(() => {
     startRef.current = Date.now()
+    const timestamp = nowSeconds()
+    const wsSend = useGameStore.getState().wsSend
+    if (wsSend) {
+      wsSend({
+        type: 'pm_item_options_shown',
+        data: { task_id: taskId, timestamp },
+      })
+    }
     emitMouseTrackingEvent('item_selection_start', { task_id: taskId })
   }, [taskId])
 

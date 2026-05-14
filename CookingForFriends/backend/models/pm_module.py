@@ -111,6 +111,8 @@ class PMTaskEvent(Base):
     pm_freeze_started_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
     pm_navigation_started_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
     pm_reminder_shown_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_reminder_ack_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pm_item_options_shown_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
     pm_item_selected_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
     pm_confidence_rated_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)
     pm_auto_execute_done_timestamp: Mapped[float | None] = mapped_column(Float, nullable=True)

@@ -332,6 +332,8 @@ async def _ws_receiver(
                     await _handle_pm_reminder_shown(participant_id, data, db_factory)
                 elif msg_type == "pm_reminder_ack":
                     await _handle_pm_reminder_ack(participant_id, data, db_factory)
+                elif msg_type == "pm_item_options_shown":
+                    await _handle_pm_item_options_shown(participant_id, data, db_factory)
                 elif msg_type == "pm_item_selected":
                     await _handle_pm_decoy_selected(participant_id, data, db_factory)
                 elif msg_type == "pm_decoy_selected":
@@ -360,6 +362,10 @@ async def _ws_receiver(
                     await _handle_interaction(participant_id, block_number, "phone_tab_switch", data, db_factory)
                 elif msg_type == "kitchen_timer_acknowledged":
                     await _handle_interaction(participant_id, block_number, "kitchen_timer_acknowledged", data, db_factory)
+                elif msg_type == "kitchen_timer_shown":
+                    await _handle_interaction(participant_id, block_number, "kitchen_timer_shown", data, db_factory)
+                elif msg_type == "kitchen_timer_hidden":
+                    await _handle_interaction(participant_id, block_number, "kitchen_timer_hidden", data, db_factory)
                 elif msg_type == "cooking_action":
                     await _handle_cooking_action(participant_id, block_number, data, db_factory)
                 elif msg_type == "recipe_view":
@@ -741,6 +747,28 @@ async def _handle_pm_reminder_ack(participant_id: str, data: dict, db_factory):
             if evt.reminder_display_time is None:
                 evt.reminder_display_time = ts
             evt.reminder_acknowledge_time = ts
+            evt.pm_reminder_ack_timestamp = data.get("timestamp", time.time())
+            await db.commit()
+
+
+async def _handle_pm_item_options_shown(participant_id: str, data: dict, db_factory):
+    """Record the wall-clock instant when the PM target options became visible."""
+    task_id = data.get("task_id")
+    if not task_id:
+        return
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.pm_module import PMTaskEvent
+        result = await db.execute(
+            select(PMTaskEvent).where(
+                PMTaskEvent.session_id == participant_id,
+                PMTaskEvent.task_id == task_id,
+                PMTaskEvent.action_animation_complete_time.is_(None),
+            ).order_by(PMTaskEvent.id.desc()).limit(1)
+        )
+        evt = result.scalar_one_or_none()
+        if evt and evt.pm_item_options_shown_timestamp is None:
+            evt.pm_item_options_shown_timestamp = data.get("timestamp", time.time())
             await db.commit()
 
 
@@ -1005,9 +1033,11 @@ async def _handle_phone_read(participant_id, block_number, data, db_factory):
     from sqlalchemy import select, update
 
     message_id = data.get("message_id", "")
+    message_ids = data.get("message_ids") or ([message_id] if message_id else [])
+    contact_id = data.get("contact_id")
     timestamp = data.get("timestamp", time.time())
 
-    if not message_id:
+    if not message_ids and not contact_id:
         return
 
     async with db_factory() as db:
@@ -1022,15 +1052,20 @@ async def _handle_phone_read(participant_id, block_number, data, db_factory):
         if block_id is None:
             return
 
+        filters = [
+            PhoneMessageLog.participant_id == participant_id,
+            PhoneMessageLog.block_id == block_id,
+            PhoneMessageLog.read_at.is_(None),
+        ]
+        if message_ids:
+            filters.append(PhoneMessageLog.message_id.in_(message_ids))
+        elif contact_id:
+            filters.append(PhoneMessageLog.sender == contact_id)
+
         await db.execute(
             update(PhoneMessageLog)
-            .where(
-                PhoneMessageLog.participant_id == participant_id,
-                PhoneMessageLog.block_id == block_id,
-                PhoneMessageLog.message_id == message_id,
-                PhoneMessageLog.read_at.is_(None),
-            )
-            .values(read_at=timestamp)
+            .where(*filters)
+            .values(read_at=timestamp, status="seen")
         )
         await db.commit()
 

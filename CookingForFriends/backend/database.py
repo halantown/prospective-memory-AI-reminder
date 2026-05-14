@@ -31,6 +31,8 @@ async def _patch_pm_schema(conn):
         "pm_freeze_started_timestamp FLOAT",
         "pm_navigation_started_timestamp FLOAT",
         "pm_reminder_shown_timestamp FLOAT",
+        "pm_reminder_ack_timestamp FLOAT",
+        "pm_item_options_shown_timestamp FLOAT",
         "pm_item_selected_timestamp FLOAT",
         "pm_confidence_rated_timestamp FLOAT",
         "pm_auto_execute_done_timestamp FLOAT",

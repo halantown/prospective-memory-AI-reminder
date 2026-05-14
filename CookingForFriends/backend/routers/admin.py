@@ -818,6 +818,12 @@ async def export_full_zip(
         w.writerows(rows)
         return buf.getvalue().encode("utf-8")
 
+    def has_timestamp(value) -> bool:
+        return value is not None and value != ""
+
+    def sort_timestamp(value) -> float:
+        return float(value) if has_timestamp(value) else 0.0
+
     # PM data: real + fake triggers.
     pm_rows: list[list] = []
     if session_ids:
@@ -838,10 +844,13 @@ async def export_full_zip(
                 e.task_id, export_trigger_type(e.trigger_type), False, e.condition,
                 e.trigger_actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
                 e.reminder_display_time, e.reminder_acknowledge_time,
-                e.decoy_selected_option, e.decoy_correct, e.confidence_rating,
+                json.dumps(e.decoy_options_order) if e.decoy_options_order else "",
+                e.decoy_selected_option, e.decoy_correct, e.decoy_response_time,
+                e.confidence_rating, e.confidence_response_time,
                 e.action_animation_start_time, e.action_animation_complete_time,
                 e.pm_trigger_fired_timestamp, e.pm_freeze_started_timestamp,
                 e.pm_navigation_started_timestamp, e.pm_reminder_shown_timestamp,
+                e.pm_reminder_ack_timestamp, e.pm_item_options_shown_timestamp,
                 e.pm_item_selected_timestamp, e.pm_confidence_rated_timestamp,
                 e.pm_auto_execute_done_timestamp, e.pm_resume_timestamp,
                 e.post_pm_first_action_timestamp,
@@ -853,9 +862,9 @@ async def export_full_zip(
                 participant_id, session_id,
                 "", export_trigger_type(e.trigger_type), True, p.condition if p else "",
                 e.actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
-                "", "", "", "", "", "", "",
+                "", "", "", "", "", "", "", "", "", "",
                 e.pm_trigger_fired_timestamp, e.pm_freeze_started_timestamp,
-                e.pm_navigation_started_timestamp, "", "", "", "",
+                e.pm_navigation_started_timestamp, "", "", "", "", "", "",
                 e.pm_resume_timestamp, e.post_pm_first_action_timestamp,
             ])
 
@@ -893,7 +902,7 @@ async def export_full_zip(
             phone_rows.append([
                 participant_id, session_id,
                 e.message_id, e.sender, e.category,
-                e.sent_at, e.replied_at, e.response_time_ms,
+                e.sent_at, e.read_at, e.replied_at, e.response_time_ms,
                 e.user_choice, e.correct_answer, e.reply_correct, e.status,
             ])
 
@@ -941,21 +950,29 @@ async def export_full_zip(
                 json.dumps(e.extra_metadata or {}, ensure_ascii=False),
             ])
 
+    interaction_rows: list[list] = []
+    event_log_rows: list[list] = []
     navigation_rows: list[list] = []
     recipe_rows: list[list] = []
     if block_ids:
         result = await db.execute(
             select(InteractionLog)
-            .where(
-                InteractionLog.block_id.in_(block_ids),
-                InteractionLog.event_type.in_(["room_switch", "recipe_view"]),
-            )
+            .where(InteractionLog.block_id.in_(block_ids))
             .order_by(InteractionLog.id)
         )
         for e in result.scalars().all():
             session_id = block_to_session.get(e.block_id, e.participant_id)
             participant_id, _ = participant_fields(session_id)
             data = e.event_data or {}
+            interaction_rows.append([
+                participant_id, session_id,
+                e.event_type, e.timestamp, e.room or "",
+                json.dumps(data, ensure_ascii=False),
+            ])
+            event_log_rows.append([
+                participant_id, session_id, e.timestamp, "interaction",
+                e.event_type, json.dumps(data, ensure_ascii=False),
+            ])
             if e.event_type == "room_switch":
                 navigation_rows.append([
                     participant_id, session_id,
@@ -966,6 +983,83 @@ async def export_full_zip(
                     participant_id, session_id,
                     data.get("start_ts", ""), data.get("end_ts", ""), data.get("duration_ms", ""),
                 ])
+
+    for row in pm_rows:
+        participant_id, session_id = row[0], row[1]
+        task_id, trigger_type, is_fake = row[2], row[3], row[4]
+        for label, index in [
+            ("pm_trigger_fired", 19),
+            ("pm_freeze_started", 20),
+            ("pm_navigation_started", 21),
+            ("pm_reminder_shown", 22),
+            ("pm_reminder_ack", 23),
+            ("pm_item_options_shown", 24),
+            ("pm_item_selected", 25),
+            ("pm_confidence_rated", 26),
+            ("pm_auto_execute_done", 27),
+            ("pm_resume", 28),
+            ("post_pm_first_action", 29),
+        ]:
+            timestamp = row[index] if index < len(row) else ""
+            if has_timestamp(timestamp):
+                event_log_rows.append([
+                    participant_id, session_id, timestamp, "pm",
+                    label,
+                    json.dumps({
+                        "task_id": task_id,
+                        "trigger_type": trigger_type,
+                        "is_fake": is_fake,
+                    }, ensure_ascii=False),
+                ])
+
+    for row in cooking_rows:
+        participant_id, session_id = row[0], row[1]
+        event_log_rows.append([
+            participant_id, session_id, row[6], "cooking", "step_activated",
+            json.dumps({"step_id": row[2], "dish_id": row[3], "step_index": row[4]}, ensure_ascii=False),
+        ])
+        if has_timestamp(row[7]):
+            event_log_rows.append([
+                participant_id, session_id, row[7], "cooking", "step_completed",
+                json.dumps({
+                    "step_id": row[2],
+                    "dish_id": row[3],
+                    "step_index": row[4],
+                    "status": row[8],
+                    "response_time_ms": row[9],
+                }, ensure_ascii=False),
+            ])
+
+    for row in phone_rows:
+        participant_id, session_id = row[0], row[1]
+        event_log_rows.append([
+            participant_id, session_id, row[5], "phone", "message_arrived",
+            json.dumps({"message_id": row[2], "contact_id": row[3], "category": row[4]}, ensure_ascii=False),
+        ])
+        if has_timestamp(row[6]):
+            event_log_rows.append([
+                participant_id, session_id, row[6], "phone", "message_read",
+                json.dumps({"message_id": row[2], "contact_id": row[3]}, ensure_ascii=False),
+            ])
+        if has_timestamp(row[7]):
+            event_log_rows.append([
+                participant_id, session_id, row[7], "phone", "message_replied",
+                json.dumps({"message_id": row[2], "is_correct": row[11], "response_time_ms": row[8]}, ensure_ascii=False),
+            ])
+
+    for row in phase_rows:
+        participant_id, session_id = row[0], row[1]
+        event_log_rows.append([
+            participant_id, session_id, row[3], "phase", "phase_entered",
+            json.dumps({"phase": row[2]}, ensure_ascii=False),
+        ])
+        if has_timestamp(row[4]):
+            event_log_rows.append([
+                participant_id, session_id, row[4], "phase", "phase_exited",
+                json.dumps({"phase": row[2]}, ensure_ascii=False),
+            ])
+
+    event_log_rows.sort(key=lambda row: (str(row[1]), sort_timestamp(row[2]), str(row[3]), str(row[4])))
 
     mouse_by_session: dict[str, list] = {sid: [] for sid in session_ids}
     if block_ids:
@@ -985,10 +1079,12 @@ async def export_full_zip(
             "task_id", "trigger_type", "is_fake", "condition",
             "trigger_fired_at", "trigger_responded_at", "trigger_timed_out",
             "reminder_shown_at", "reminder_dismissed_at",
-            "item_selected", "item_correct", "confidence_rating",
+            "item_options_order", "item_selected", "item_correct", "item_response_time_s",
+            "confidence_rating", "confidence_response_time_s",
             "auto_execute_started_at", "auto_execute_finished_at",
             "pm_trigger_fired_timestamp", "pm_freeze_started_timestamp",
             "pm_navigation_started_timestamp", "pm_reminder_shown_timestamp",
+            "pm_reminder_ack_timestamp", "pm_item_options_shown_timestamp",
             "pm_item_selected_timestamp", "pm_confidence_rated_timestamp",
             "pm_auto_execute_done_timestamp", "pm_resume_timestamp",
             "post_pm_first_action_timestamp",
@@ -1001,7 +1097,7 @@ async def export_full_zip(
         zf.writestr("phone_messages.csv", csv_bytes([
             "participant_id", "session_id",
             "message_id", "contact_id", "category",
-            "arrived_at", "responded_at", "response_time_ms",
+            "arrived_at", "read_at", "responded_at", "response_time_ms",
             "user_choice", "correct_answer", "is_correct", "status",
         ], phone_rows))
         zf.writestr("robot_idle_comments.csv", csv_bytes([
@@ -1025,6 +1121,14 @@ async def export_full_zip(
             "participant_id", "session_id",
             "opened_at", "closed_at", "duration_ms",
         ], recipe_rows))
+        zf.writestr("interaction_logs.csv", csv_bytes([
+            "participant_id", "session_id",
+            "event_type", "timestamp", "room", "event_data_json",
+        ], interaction_rows))
+        zf.writestr("event_log.csv", csv_bytes([
+            "participant_id", "session_id",
+            "timestamp", "source", "event_type", "event_data_json",
+        ], event_log_rows))
         for session_id, records in mouse_by_session.items():
             p = participant_by_session.get(session_id)
             if not p:
@@ -1080,10 +1184,12 @@ async def export_per_participant(
         "token", "session_id", "task_id", "trigger_type", "is_fake", "condition", "task_order",
         "trigger_fired_at", "trigger_responded_at", "trigger_timed_out",
         "reminder_shown_at", "reminder_dismissed_at",
-        "item_options_order", "item_selected", "item_correct",
-        "confidence_rating", "auto_execute_started_at", "auto_execute_finished_at",
+        "item_options_order", "item_selected", "item_correct", "item_response_time_s",
+        "confidence_rating", "confidence_response_time_s",
+        "auto_execute_started_at", "auto_execute_finished_at",
         "pm_trigger_fired_timestamp", "pm_freeze_started_timestamp",
         "pm_navigation_started_timestamp", "pm_reminder_shown_timestamp",
+        "pm_reminder_ack_timestamp", "pm_item_options_shown_timestamp",
         "pm_item_selected_timestamp", "pm_confidence_rated_timestamp",
         "pm_auto_execute_done_timestamp", "pm_resume_timestamp",
         "post_pm_first_action_timestamp",
@@ -1095,11 +1201,12 @@ async def export_per_participant(
             e.trigger_actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
             e.reminder_display_time, e.reminder_acknowledge_time,
             json.dumps(e.decoy_options_order) if e.decoy_options_order else "",
-            e.decoy_selected_option, e.decoy_correct,
-            e.confidence_rating,
+            e.decoy_selected_option, e.decoy_correct, e.decoy_response_time,
+            e.confidence_rating, e.confidence_response_time,
             e.action_animation_start_time, e.action_animation_complete_time,
             e.pm_trigger_fired_timestamp, e.pm_freeze_started_timestamp,
             e.pm_navigation_started_timestamp, e.pm_reminder_shown_timestamp,
+            e.pm_reminder_ack_timestamp, e.pm_item_options_shown_timestamp,
             e.pm_item_selected_timestamp, e.pm_confidence_rated_timestamp,
             e.pm_auto_execute_done_timestamp, e.pm_resume_timestamp,
             e.post_pm_first_action_timestamp,
@@ -1109,9 +1216,9 @@ async def export_per_participant(
         w.writerow([
             token, e.session_id, "", export_trigger_type(e.trigger_type), True, condition, p_task_order,
             e.actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
-            "", "", "", "", "", "", "", "",
+            "", "", "", "", "", "", "", "", "", "",
             e.pm_trigger_fired_timestamp, e.pm_freeze_started_timestamp,
-            e.pm_navigation_started_timestamp, "", "", "", "",
+            e.pm_navigation_started_timestamp, "", "", "", "", "", "",
             e.pm_resume_timestamp, e.post_pm_first_action_timestamp,
             e.pipeline_was_interrupted,
         ])

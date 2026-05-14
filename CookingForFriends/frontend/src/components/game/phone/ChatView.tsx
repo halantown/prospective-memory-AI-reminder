@@ -39,11 +39,12 @@ export default function ChatView() {
     if (!activeContactId) return
     const hasUnread = contactMessages.some((m) => !m.read)
     if (hasUnread) {
+      const unreadMessageIds = contactMessages.filter((m) => !m.read).map((m) => m.id)
       markContactMessagesRead(activeContactId)
       if (wsSend) {
         wsSend({
           type: 'phone_read',
-          data: { contact_id: activeContactId, timestamp: Date.now() / 1000 },
+          data: { contact_id: activeContactId, message_ids: unreadMessageIds, timestamp: Date.now() / 1000 },
         })
       }
     }

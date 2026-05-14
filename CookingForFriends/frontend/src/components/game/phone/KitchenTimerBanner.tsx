@@ -38,6 +38,7 @@ export default function KitchenTimerBanner() {
   const dishes = useGameStore((s) => s.dishes)
   const elapsedSeconds = useGameStore((s) => s.elapsedSeconds)
   const gameTimeFrozen = useGameStore((s) => s.gameTimeFrozen)
+  const wsSend = useGameStore((s) => s.wsSend)
   const [now, setNow] = useState(Date.now())
   const [elapsedSnapshot, setElapsedSnapshot] = useState(() => ({
     value: elapsedSeconds,
@@ -127,6 +128,30 @@ export default function KitchenTimerBanner() {
     }
     return null
   }, [activeCookingSteps, activeDish?.emoji, activeStep, cookingFinishedWaitSteps, cookingWaitSteps, dishes, missedItem, remaining])
+
+  useEffect(() => {
+    if (!banner || !wsSend) return
+    const timestamp = Date.now() / 1000
+    wsSend({
+      type: 'kitchen_timer_shown',
+      data: {
+        timer_key: banner.key,
+        title: banner.title,
+        detail: banner.detail,
+        missed: banner.missed,
+        timestamp,
+      },
+    })
+    return () => {
+      wsSend({
+        type: 'kitchen_timer_hidden',
+        data: {
+          timer_key: banner.key,
+          timestamp: Date.now() / 1000,
+        },
+      })
+    }
+  }, [banner?.key, wsSend])
 
   const queueItems = useMemo(() => {
     return activeCookingSteps.slice(0, 3).map(step => ({
