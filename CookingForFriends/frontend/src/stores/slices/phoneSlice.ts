@@ -18,7 +18,7 @@ export const createPhoneSlice: StateCreator<GameState, [], [], PhoneSlice> = (se
     return { phoneMessages: [...s.phoneMessages, msg] }
   }),
 
-  setPhoneLocked: (_locked) => set({ phoneLocked: false, phoneLastActivity: Date.now() }),
+  setPhoneLocked: (locked) => set({ phoneLocked: locked, phoneLastActivity: Date.now() }),
 
   markMessageRead: (id) => set((s) => ({
     phoneMessages: s.phoneMessages.map((m) =>

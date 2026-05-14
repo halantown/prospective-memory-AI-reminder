@@ -162,7 +162,11 @@ export function useWebSocket(sessionId: string | null) {
         const d = msg.data
         const channel = d.channel || 'notification'
         const contactId = d.contact_id || undefined
-        const suppressPhonePush = store.pmPipelineState?.step === 'confidence_rating'
+        const pmStep = store.pmPipelineState?.step
+        const suppressPhonePush = pmStep === 'confidence_rating'
+          || pmStep === 'item_selection'
+          || pmStep === 'greeting'
+          || pmStep === 'reminder'
 
         if (channel === 'notification') {
           const bannerMsg = {
