@@ -8,14 +8,13 @@ trigger encounters.
 
 ```bash
 cd CookingForFriends
-cp .env.development.example .env
 docker compose up -d
 ```
 
 ```bash
 cd CookingForFriends/backend
 conda activate thesis_server
-python main.py
+python main.py --env development
 ```
 
 ```bash
@@ -27,6 +26,10 @@ npm run dev
 - Frontend dev server: `http://localhost:3000`
 - Backend/API docs: `http://localhost:5000/docs`
 - Admin UI: `http://localhost:3000/admin`
+
+The backend selects config by startup argument. `--env development` loads
+`.env.development` when present, otherwise the committed
+`.env.development.example`. Use `.env.production` only on the production host.
 
 ## Documentation
 

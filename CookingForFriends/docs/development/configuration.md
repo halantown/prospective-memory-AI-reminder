@@ -11,14 +11,30 @@
 | Constant | Default | Env Var | Description |
 |----------|---------|---------|-------------|
 | `ENVIRONMENT` | `development` | `ENVIRONMENT` | Must be `development`, `test`, or `production` |
+| `ENV_FILE` | derived | `ENV_FILE` | Optional explicit env file path; same behavior as `--env-file` |
 | `IS_PRODUCTION` | derived | — | True only when `ENVIRONMENT=production` |
 | `IS_RELAXED_ENV` | derived | — | True for `development` and `test` |
+| `LOADED_ENV_FILE` | derived | — | Resolved env file loaded at startup, if any |
 
 Development and test environments allow local study/screenshot conveniences:
 admin auth may be disabled, `DEV_TOKEN` may seed the reusable `DEV_TESTER`, and
 test-session shortcuts are enabled. Production disables those hooks and enforces
 startup guards for admin auth and CORS. See
 [Production Readiness](../operations/production-readiness.md).
+
+Backend startup loads environment files before reading config constants:
+
+```bash
+python main.py --env development     # loads ../.env.development
+python main.py --env test            # loads ../.env.test
+python main.py --env production      # loads ../.env.production
+python main.py --env-file ../custom.env
+```
+
+Real environment variables override values from files. If the selected
+development/test environment file is missing, the backend loads the committed
+`.env.<environment>.example` template. Production never loads the example file
+automatically. Legacy `.env` is only a local fallback for non-production use.
 
 ### Paths & Database
 
@@ -356,13 +372,25 @@ data/
 ### Docker Setup
 
 ```bash
-cp .env.development.example .env
 docker compose up -d           # starts PostgreSQL 16 on port 5432
 ```
 
-Use `.env.production.example` only on the production host, then replace every
-placeholder before starting the backend. `.env.example` is now an index file that
-points to the environment-specific templates.
+The committed `.env.development.example` is enough for default local startup.
+Create `.env.development` only when you need local overrides:
+
+```bash
+cp .env.development.example .env.development
+```
+
+Use `.env.production.example` only on the production host:
+
+```bash
+cp .env.production.example .env.production
+```
+
+Then replace every placeholder and start with `python main.py --env production`.
+`.env.example` is now an index file that points to the environment-specific
+templates.
 
 | Env Var | Default | Description |
 |---------|---------|-------------|

@@ -487,7 +487,7 @@ async def get_config():
         SNAPSHOT_INTERVAL_S, HEARTBEAT_INTERVAL_S, HEARTBEAT_TIMEOUT_S,
         TOKEN_LENGTH, TRIGGER_SCHEDULE, TASK_ORDERS,
         EXECUTION_WINDOW_S, LATE_WINDOW_S, REMINDER_LEAD_S,
-        ENVIRONMENT, IS_PRODUCTION, IS_RELAXED_ENV,
+        ENVIRONMENT, IS_PRODUCTION, IS_RELAXED_ENV, LOADED_ENV_FILE,
     )
     task_order_values = list(TASK_ORDERS.values())
     return {
@@ -518,6 +518,7 @@ async def get_config():
             "environment": ENVIRONMENT,
             "is_production": IS_PRODUCTION,
             "test_hooks_enabled": IS_RELAXED_ENV,
+            "env_file": str(LOADED_ENV_FILE) if LOADED_ENV_FILE else None,
         },
     }
 

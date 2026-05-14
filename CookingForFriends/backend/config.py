@@ -1,7 +1,83 @@
 """Application configuration."""
 
 import os
+import sys
 from pathlib import Path
+
+
+def _cli_value(flag: str) -> str | None:
+    """Return a simple CLI flag value from `--flag value` or `--flag=value`."""
+    prefix = f"{flag}="
+    for index, arg in enumerate(sys.argv[1:], start=1):
+        if arg == flag and index + 1 < len(sys.argv):
+            return sys.argv[index + 1]
+        if arg.startswith(prefix):
+            return arg[len(prefix):]
+    return None
+
+
+def _load_env_file(path: Path) -> None:
+    """Load KEY=VALUE lines into os.environ without overriding real env vars."""
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+def _bootstrap_environment(project_dir: Path) -> tuple[str, Path | None]:
+    """Load the environment-specific config file before constants are read.
+
+    Selection order:
+    1. `--env-file path` or `ENV_FILE`
+    2. `--env name` or `ENVIRONMENT`, loading `.env.<name>`
+    3. development fallback, loading `.env.development`
+
+    A legacy `.env` file is used only when the selected environment file does
+    not exist. Real environment variables keep highest priority.
+    """
+    cli_env = _cli_value("--env")
+    cli_env_file = _cli_value("--env-file")
+
+    selected_env = (cli_env or os.getenv("ENVIRONMENT") or "development").strip().lower()
+    if cli_env:
+        os.environ["ENVIRONMENT"] = selected_env
+
+    env_file_value = cli_env_file or os.getenv("ENV_FILE")
+    selected_file = Path(env_file_value).expanduser() if env_file_value else project_dir / f".env.{selected_env}"
+    if not selected_file.is_absolute():
+        selected_file = project_dir / selected_file
+
+    loaded_file: Path | None = None
+    if selected_file.exists():
+        _load_env_file(selected_file)
+        loaded_file = selected_file
+    else:
+        example_file = project_dir / f".env.{selected_env}.example"
+        legacy_file = project_dir / ".env"
+        if selected_env in {"development", "test"} and example_file.exists():
+            _load_env_file(example_file)
+            loaded_file = example_file
+        elif selected_env != "production" and legacy_file.exists():
+            _load_env_file(legacy_file)
+            loaded_file = legacy_file
+
+    if cli_env:
+        os.environ["ENVIRONMENT"] = selected_env
+    return selected_env, loaded_file
+
+
+# Paths
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = BASE_DIR.parent
+REQUESTED_ENVIRONMENT, LOADED_ENV_FILE = _bootstrap_environment(PROJECT_DIR)
+
 from data.materials import (
     get_conditions,
     get_session_end_delay_after_last_trigger_s,
@@ -9,9 +85,7 @@ from data.materials import (
     get_trigger_schedule,
 )
 
-# Paths
-BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data")))
+DATA_DIR = Path(os.getenv("DATA_DIR") or str(BASE_DIR / "data"))
 
 # Environment
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
@@ -31,10 +105,10 @@ HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "5000"))
 
 # CORS — restrict in production
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "*").split(",") if origin.strip()]
 
 # Admin API key — required for admin endpoints
-ADMIN_API_KEY: str | None = os.getenv("ADMIN_API_KEY", None)
+ADMIN_API_KEY: str | None = os.getenv("ADMIN_API_KEY") or None
 
 # Session tokens
 TOKEN_LENGTH = 6
@@ -93,7 +167,7 @@ HEARTBEAT_TIMEOUT_S = 60    # Backend marks offline after 60s with no ping
 # Development seed — set DEV_TOKEN env var to enable dev participant.
 # When set, a dev participant is auto-created/reset on every startup.
 # Only allowed in development mode.
-DEV_TOKEN: str | None = os.getenv("DEV_TOKEN", None)
+DEV_TOKEN: str | None = os.getenv("DEV_TOKEN") or None
 if DEV_TOKEN and IS_PRODUCTION:
     raise RuntimeError(
         "DEV_TOKEN must not be set in production! "

@@ -5,7 +5,12 @@ development. It intentionally does not track research-material completeness.
 
 ## Environment Modes
 
-Set `ENVIRONMENT` explicitly before starting the backend.
+Select the environment explicitly when starting the backend. The default command
+is `python main.py --env <environment>`, which loads `.env.<environment>` before
+the config constants are read.
+
+Production does not auto-load `.env.production.example`; create
+`.env.production` on the host first.
 
 | Environment | Intended use | Relaxed behavior | Production guards |
 |-------------|--------------|------------------|-------------------|
@@ -19,7 +24,8 @@ The backend rejects any `ENVIRONMENT` value outside `development`, `test`, and
 ## Required Production Environment
 
 Use production-specific values; do not copy the development template. Start from
-`.env.production.example` and replace every placeholder.
+`.env.production.example`, save it as `.env.production`, and replace every
+placeholder.
 
 ```dotenv
 ENVIRONMENT=production
@@ -28,6 +34,13 @@ CORS_ORIGINS=https://<participant-host>,https://<admin-host>
 ADMIN_API_KEY=<long-random-secret>
 DEV_TOKEN=
 MESSAGE_COOLDOWN_S=10
+```
+
+Production startup:
+
+```bash
+cd CookingForFriends/backend
+python main.py --env production
 ```
 
 Production startup fails if:
