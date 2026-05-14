@@ -10,6 +10,7 @@ audience.
 | System shape and runtime ownership | [development/architecture.md](development/architecture.md) |
 | Local setup, env vars, runtime knobs | [development/configuration.md](development/configuration.md) |
 | Manual QA and test flow | [development/testing.md](development/testing.md) |
+| Production environment and security checklist | [operations/production-readiness.md](operations/production-readiness.md) |
 | PM doorbell / phone-call flow | [development/pm-trigger-flow.md](development/pm-trigger-flow.md) |
 | Cooking ongoing task and kitchen assets | [development/cooking.md](development/cooking.md) |
 | Incident log and post-mortem template | [operations/incidents.md](operations/incidents.md) |

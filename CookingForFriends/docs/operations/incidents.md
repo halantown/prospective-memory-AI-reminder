@@ -1530,3 +1530,75 @@ Added `test_fresh_shared_clock_keeps_zero_second_cooking_entry` to assert that a
 ### Follow-up Actions
 
 - [ ] Add an end-to-end runtime smoke test that starts `BlockRuntime` and asserts the first cooking `ongoing_task_event` is emitted.
+
+---
+
+## INC-027 — Production environment controls left test hooks and unauthenticated mouse data path too loose
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-14 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | Production readiness review |
+| Affected area| `backend/config.py`, admin/test hooks, mouse tracking, frontend admin API calls |
+
+### Background
+
+Development and test environments need relaxed controls for local testing and
+thesis screenshots. Production needs the same codebase to disable test hooks,
+require admin authentication, and protect participant data integrity.
+
+### Incident Description
+
+The backend had partial production guards (`DEV_TOKEN` and missing
+`ADMIN_API_KEY`) but did not reject wildcard CORS in production. The
+`/api/admin/test-session` shortcut and runtime-plan write endpoint were still
+callable behind admin auth in production. The `/api/mouse-tracking` endpoint
+accepted a body `session_id` without validating `X-Session-Token`, allowing
+behavioral data pollution if a session id was guessed or obtained. The frontend
+admin pages also did not send `X-Admin-Key`, so a properly configured production
+backend rejected most admin UI requests.
+
+### Timeline
+
+| Time (local) | Event |
+|--------------|-------|
+| 11:20 | Production readiness review identified environment/test-hook gaps |
+| 11:27 | Backend environment guards and mouse-tracking auth fix implemented |
+| 11:34 | Frontend admin key helper wired through admin pages |
+| 11:38 | Production readiness documentation and incident record added |
+
+### Root Cause
+
+Environment behavior was implicit: local development conveniences were
+controlled independently instead of through one explicit environment model. Most
+participant endpoints used URL-scoped session verification, but mouse tracking
+used a body session id and did not reuse the same ownership check. Admin frontend
+calls used raw `fetch` in several pages instead of one shared admin API helper.
+
+### Contributing Factors
+
+- No production-readiness document listed allowed backdoors/test hooks.
+- No automated test covered mouse-tracking auth.
+- Admin frontend code predated the production `ADMIN_API_KEY` guard.
+
+### Fix
+
+- Added explicit `ENVIRONMENT` validation with `development`, `test`, and `production` modes.
+- Production startup now rejects `DEV_TOKEN`, missing `ADMIN_API_KEY`, and wildcard `CORS_ORIGINS`.
+- `/api/admin/test-session` and `PUT /api/admin/timelines/runtime-plan` now return `403` in production.
+- `/api/mouse-tracking` validates `X-Session-Token` against the submitted `session_id` before writing data.
+- Frontend admin pages now send `X-Admin-Key` through a shared admin fetch helper and prompt for the key on first `401`.
+- WebSocket connection logging no longer prints the raw token-bearing URL.
+
+### Verification
+
+- `cd CookingForFriends/backend && conda run -n thesis_server pytest tests -q` passed: 50 tests.
+- `cd CookingForFriends/frontend && npm run build` passed.
+
+### Follow-up Actions
+
+- [ ] Add an automated regression test for mouse-tracking missing/wrong token.
+- [ ] Add startup smoke tests for production guard failures.
+- [ ] Add a lightweight admin UI flow test once frontend test tooling exists.

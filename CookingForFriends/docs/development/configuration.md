@@ -6,6 +6,20 @@
 
 ## Backend Configuration (`backend/config.py`)
 
+### Environment Modes
+
+| Constant | Default | Env Var | Description |
+|----------|---------|---------|-------------|
+| `ENVIRONMENT` | `development` | `ENVIRONMENT` | Must be `development`, `test`, or `production` |
+| `IS_PRODUCTION` | derived | — | True only when `ENVIRONMENT=production` |
+| `IS_RELAXED_ENV` | derived | — | True for `development` and `test` |
+
+Development and test environments allow local study/screenshot conveniences:
+admin auth may be disabled, `DEV_TOKEN` may seed the reusable `DEV_TESTER`, and
+test-session shortcuts are enabled. Production disables those hooks and enforces
+startup guards for admin auth and CORS. See
+[Production Readiness](../operations/production-readiness.md).
+
 ### Paths & Database
 
 | Constant | Default | Env Var | Description |
@@ -28,6 +42,9 @@
 | `TOKEN_LENGTH` | `6` | Participant login token length |
 | `TOKEN_CHARSET` | `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` | Charset (no 0/O/1/I ambiguity) |
 | `DEV_TOKEN` | `None` (env: `DEV_TOKEN`) | Dev participant auto-seed. Set `DEV_TOKEN=ABC123` to enable. |
+
+`DEV_TOKEN` is valid only in `development` or `test`. Backend startup fails when
+`DEV_TOKEN` is set with `ENVIRONMENT=production`.
 
 ### Experiment Design and Timing
 
