@@ -54,6 +54,62 @@ Each entry follows the standard template below.
 
 ---
 
+## INC-007 — WebSocket session auth and runtime reconnect loss
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-14 |
+| Severity     | P1 High |
+| Status       | Resolved |
+| Reported by  | Pre-production full-flow review |
+| Affected area| Participant WebSocket, main game reconnect, cooking runtime state |
+
+### Background
+> Participant REST endpoints are session-token scoped. The main gameplay WebSocket should only accept the owner of the participant session and should preserve in-progress gameplay state across normal browser refresh or transient reconnect.
+
+### Incident Description
+> The gameplay WebSocket accepted a `session_id` without validating the participant's session token. A client that knew a session id could connect to the game stream and send gameplay events. Separately, the frontend reset its local cooking/phone state on main-game mount and only restored PM pipeline state on automatic reconnects, so a refreshed participant could return to an empty local runtime while the backend block was still in progress.
+
+### Timeline
+| Time (local) | Event |
+|--------------|-------|
+| 10:20 | Pre-production review identified unauthenticated WS access and reconnect state loss |
+| 10:25 | Investigation started in `websocket/game_handler.py`, `useWebSocket.ts`, and `GamePage.tsx` |
+| 10:36 | Root cause identified: WS had no token check; reconnect restore was PM-only and retry-only |
+| 10:48 | Fix implemented for WS token validation, runtime snapshot restore, and delayed runtime cleanup |
+| 10:52 | Backend tests, frontend build, and manual WS auth/runtime snapshot probes completed |
+
+### Root Cause
+> REST endpoints used `X-Session-Token`, but browser WebSockets cannot set that header consistently and the WS route did not replace it with a query-token check. The reconnect logic also treated backend runtime as transient UI state: `GamePage` reset the local store on mount, `/session/state` did not expose active cooking runtime state, and `useWebSocket` only called state restore after retry-based reconnects.
+
+### Contributing Factors
+> - Session ids are short internal ids, so they should not be treated as bearer credentials.
+> - Runtime cleanup happened immediately on latest-connection disconnect, making browser refresh timing race-prone.
+> - Existing `CookingEngine.get_state()` snapshot omitted active step payloads needed to rebuild the frontend store.
+> - No integration test covered WS auth failure or reload during an active cooking step.
+
+### Fix
+> - `backend/websocket/game_handler.py`: require `token` query parameter before accepting `/ws/game/{session_id}` and match it to `Participant.token`.
+> - `backend/websocket/game_handler.py`: keep active runtimes for a 30-second reconnect grace period and cancel cleanup when a new connection attaches.
+> - `backend/websocket/game_handler.py` + `backend/routers/session.py`: expose the active in-memory runtime snapshot through `/session/{session_id}/state`.
+> - `backend/engine/cooking_engine.py`: extend `get_state()` with active/wait step payloads while preserving the previous dish-keyed shape.
+> - `frontend/src/hooks/useWebSocket.ts`: include the session token in the WS URL and restore server runtime state on every WS open.
+> - `frontend/src/stores/gameStore.ts`: add `restoreRuntimeState()` to rebuild active cooking steps, wait steps, dish phases, scores, and clock state.
+> - `backend/websocket/game_handler.py`: avoid treating a newly assigned `block.started_at` as a reconnect offset, preventing the first cooking event from being skipped.
+
+### Verification
+> - `conda run -n thesis_server pytest tests -q` passed: 50 tests.
+> - `npm run build` passed.
+> - Manual WS probe confirmed missing/bad token connections are rejected with HTTP 403, while the correct token connects.
+> - Manual `/session/{session_id}/state` probe during reconnect grace returned active runtime clock and cooking snapshot, including active step payload after the first cooking activation.
+
+### Follow-up Actions
+> - [ ] Add an automated WS auth regression test for missing, wrong, and correct session tokens.
+> - [ ] Add an integration test that reloads during an active cooking step and verifies the frontend restores the active task.
+> - [ ] Consider persisting a compact runtime snapshot to the database if production requirements include recovery after backend process restart.
+
+---
+
 ## INC-006 — Main session did not live-transition to post-test
 
 | Field        | Detail |
