@@ -294,6 +294,14 @@ export default function FloorPlanView({
       || pmPipelineState.step === 'auto_execute'
       || pmPipelineState.step === 'fake_resolution'
       || pmPipelineState.step === 'direct_request'))
+  const doorbellEncounterInProgress = pmPipelineState?.triggerType === 'doorbell'
+    && (pmPipelineState.step === 'greeting'
+      || pmPipelineState.step === 'reminder'
+      || pmPipelineState.step === 'item_selection'
+      || pmPipelineState.step === 'confidence_rating'
+      || pmPipelineState.step === 'auto_execute'
+      || pmPipelineState.step === 'fake_resolution'
+      || pmPipelineState.step === 'direct_request')
   const realDoorEncounterReadyToRest = pmPipelineState?.triggerType === 'doorbell'
     && !pmPipelineState.isFake
     && (pmPipelineState.step === 'confidence_rating'
@@ -337,6 +345,17 @@ export default function FloorPlanView({
     if (!doorbellActive || currentRoom !== 'living_room' || isMoving || isCharMoving) return
     answerDoorbellAtDoor()
   }, [answerDoorbellAtDoor, currentRoom, doorbellActive, isCharMoving, isMoving])
+
+  useEffect(() => {
+    if (!doorbellEncounterInProgress || currentRoom === 'living_room') return
+
+    setActiveStation(null)
+    setStationPopupAnchor(null)
+    setCurrentRoom('living_room')
+    setCharRoom('living_room')
+    setRobotRoom('living_room')
+    teleportTo('door_avatar')
+  }, [currentRoom, doorbellEncounterInProgress, setActiveStation, teleportTo])
 
   useEffect(() => {
     if (pmPipelineState?.triggerType === 'doorbell') {

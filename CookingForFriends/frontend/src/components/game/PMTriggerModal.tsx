@@ -353,14 +353,24 @@ export default function PMTriggerModal() {
       if (isFake) {
         close()
       } else {
-        advancePMPipelineStep('reminder')
+        const currentState = useGameStore.getState().pmPipelineState
+        if (currentState) {
+          setPMPipelineState({
+            ...currentState,
+            step: 'reminder',
+            triggerTimedOut: true,
+            triggerTimeoutStage: 2,
+          })
+        } else {
+          advancePMPipelineStep('reminder')
+        }
       }
     }, TRIGGER_TIMEOUT_MS)
     return () => {
       clearTimeout(nudge)
       clearTimeout(timeout)
     }
-  }, [advancePMPipelineStep, clearRobotSpeech, close, isFake, pmPipelineState, send, setRobotSpeaking, step, taskId, triggerType])
+  }, [advancePMPipelineStep, clearRobotSpeech, close, isFake, pmPipelineState, send, setPMPipelineState, setRobotSpeaking, step, taskId, triggerType])
 
   useEffect(() => {
     if (step === 'reminder' && taskId) {

@@ -1645,3 +1645,71 @@ calls used raw `fetch` in several pages instead of one shared admin API helper.
 - [ ] Add an automated regression test for mouse-tracking missing/wrong token.
 - [ ] Add startup smoke tests for production guard failures.
 - [ ] Add a lightweight admin UI flow test once frontend test tooling exists.
+
+---
+
+## INC-028 — Doorbell timeout skipped avatar relocation to living room
+
+| Field        | Detail |
+|--------------|--------|
+| Date         | 2026-05-14 |
+| Severity     | P2 Medium |
+| Status       | Resolved |
+| Reported by  | User observation during doorbell PM trigger testing |
+| Affected area| `frontend/src/components/game/PMTriggerModal.tsx`, `frontend/src/components/game/FloorPlanView.tsx` |
+
+### Background
+
+During a doorbell PM trigger, the participant normally navigates to the living
+room and the avatar walks to the door before the greeting/reminder pipeline
+continues. If the participant does not respond within 45 seconds, the system
+force-advances the real PM trigger so the participant can continue the PM task.
+
+### Incident Description
+
+When a real doorbell trigger timed out, the frontend advanced directly from the
+doorbell affordance to the reminder step. The door/living-room encounter became
+visible, but the main avatar could remain in the kitchen, so the forced PM
+interaction did not show the avatar in the same living-room scene.
+
+### Timeline
+
+| Time (local) | Event |
+|--------------|-------|
+| — | First symptom observed: timed-out doorbell PM trigger lacked avatar in living-room scene |
+| — | Investigation started in PM trigger modal and floor-plan navigation code |
+| — | Root cause identified: timeout path advanced pipeline state without relocating avatar/camera |
+| — | Fix deployed in frontend trigger timeout and doorbell encounter sync logic |
+| — | Frontend build used for verification |
+
+### Root Cause
+
+`PMTriggerModal` handled real trigger timeout by advancing the pipeline from
+`trigger_event` to `reminder`. `FloorPlanView` only moved the avatar to the
+living-room door when the participant actively navigated there or triggered the
+doorbell answer event. The timeout path therefore bypassed the relocation logic.
+
+### Contributing Factors
+
+- Doorbell timeout reused the same downstream reminder UI as a normal response,
+  but did not model the forced navigation state.
+- Floor-plan synchronization depended on the active `trigger_event` affordance,
+  which is already gone after the timeout transition.
+- No automated frontend regression test covers timed-out PM trigger visuals.
+
+### Fix
+
+- Real trigger timeout now marks the PM pipeline state as timed out while
+  advancing to `reminder`.
+- Doorbell encounters that are already in downstream PM steps now synchronize
+  the current room, avatar room, robot room, and avatar waypoint to the living
+  room door if the avatar is not already there.
+
+### Verification
+
+- `cd CookingForFriends/frontend && npm run build`
+
+### Follow-up Actions
+
+- [ ] Add a frontend interaction test for doorbell timeout: affordance timeout
+      -> reminder -> living-room avatar visible at door.
