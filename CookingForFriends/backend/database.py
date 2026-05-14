@@ -49,10 +49,15 @@ async def _patch_pm_schema(conn):
         "pm_resume_timestamp FLOAT",
         "post_pm_first_action_timestamp FLOAT",
     ]
+    phone_msg_columns = [
+        "correct_position_shown INTEGER",
+    ]
     for column_sql in pm_task_columns:
         await conn.execute(text(f"ALTER TABLE pm_task_events ADD COLUMN IF NOT EXISTS {column_sql}"))
     for column_sql in fake_trigger_columns:
         await conn.execute(text(f"ALTER TABLE fake_trigger_events ADD COLUMN IF NOT EXISTS {column_sql}"))
+    for column_sql in phone_msg_columns:
+        await conn.execute(text(f"ALTER TABLE phone_message_logs ADD COLUMN IF NOT EXISTS {column_sql}"))
 
 
 async def get_db() -> AsyncSession:

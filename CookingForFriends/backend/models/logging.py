@@ -116,4 +116,5 @@ class PhoneMessageLog(Base):
     user_choice: Mapped[str | None] = mapped_column(Text, nullable=True)   # selected reply text
     correct_answer: Mapped[str | None] = mapped_column(Text, nullable=True)  # correct reply text
     reply_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    correct_position_shown: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0 = correct first, 1 = correct second
     status: Mapped[str | None] = mapped_column(String(30), nullable=True)  # answered_correct | answered_incorrect | expired | seen

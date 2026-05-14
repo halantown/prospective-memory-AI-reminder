@@ -1016,6 +1016,7 @@ async def _handle_phone_reply(participant_id, block_number, data, db_factory):
                 replied_at=timestamp,
                 user_choice=chosen_text,
                 reply_correct=is_correct,
+                correct_position_shown=correct_position_shown,
                 response_time_ms=response_time_ms,
                 status=status,
             )

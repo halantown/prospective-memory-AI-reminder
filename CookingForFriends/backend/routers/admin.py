@@ -841,7 +841,7 @@ async def export_full_zip(
             participant_id, session_id = participant_fields(e.session_id)
             pm_rows.append([
                 participant_id, session_id,
-                e.task_id, export_trigger_type(e.trigger_type), False, e.condition,
+                e.task_id, e.position_in_order, export_trigger_type(e.trigger_type), False, e.condition,
                 e.trigger_actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
                 e.reminder_display_time, e.reminder_acknowledge_time,
                 json.dumps(e.decoy_options_order) if e.decoy_options_order else "",
@@ -860,7 +860,7 @@ async def export_full_zip(
             p = participant_by_session.get(e.session_id)
             pm_rows.append([
                 participant_id, session_id,
-                "", export_trigger_type(e.trigger_type), True, p.condition if p else "",
+                "", "", export_trigger_type(e.trigger_type), True, p.condition if p else "",
                 e.actual_game_time, e.trigger_responded_at, e.trigger_timed_out,
                 "", "", "", "", "", "", "", "", "", "",
                 e.pm_trigger_fired_timestamp, e.pm_freeze_started_timestamp,
@@ -904,6 +904,7 @@ async def export_full_zip(
                 e.message_id, e.sender, e.category,
                 e.sent_at, e.read_at, e.replied_at, e.response_time_ms,
                 e.user_choice, e.correct_answer, e.reply_correct, e.status,
+                e.correct_position_shown,
             ])
 
     robot_rows: list[list] = []
@@ -1076,7 +1077,7 @@ async def export_full_zip(
     with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("pm_events.csv", csv_bytes([
             "participant_id", "session_id",
-            "task_id", "trigger_type", "is_fake", "condition",
+            "task_id", "position_in_order", "trigger_type", "is_fake", "condition",
             "trigger_fired_at", "trigger_responded_at", "trigger_timed_out",
             "reminder_shown_at", "reminder_dismissed_at",
             "item_options_order", "item_selected", "item_correct", "item_response_time_s",
@@ -1096,9 +1097,10 @@ async def export_full_zip(
         ], cooking_rows))
         zf.writestr("phone_messages.csv", csv_bytes([
             "participant_id", "session_id",
-            "message_id", "contact_id", "category",
+            "message_id", "sender", "category",
             "arrived_at", "read_at", "responded_at", "response_time_ms",
             "user_choice", "correct_answer", "is_correct", "status",
+            "correct_position_shown",
         ], phone_rows))
         zf.writestr("robot_idle_comments.csv", csv_bytes([
             "participant_id", "session_id",
