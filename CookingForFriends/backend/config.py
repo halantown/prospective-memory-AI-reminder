@@ -14,7 +14,11 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data")))
 
 # Environment
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
+if ENVIRONMENT not in {"development", "test", "production"}:
+    raise RuntimeError("ENVIRONMENT must be one of: development, test, production.")
+IS_PRODUCTION = ENVIRONMENT == "production"
+IS_RELAXED_ENV = ENVIRONMENT in {"development", "test"}
 
 # Database — PostgreSQL via asyncpg
 DATABASE_URL = os.getenv(
@@ -90,14 +94,20 @@ HEARTBEAT_TIMEOUT_S = 60    # Backend marks offline after 60s with no ping
 # When set, a dev participant is auto-created/reset on every startup.
 # Only allowed in development mode.
 DEV_TOKEN: str | None = os.getenv("DEV_TOKEN", None)
-if DEV_TOKEN and ENVIRONMENT == "production":
+if DEV_TOKEN and IS_PRODUCTION:
     raise RuntimeError(
         "DEV_TOKEN must not be set in production! "
         "Unset the DEV_TOKEN environment variable."
     )
 
-if ENVIRONMENT == "production" and ADMIN_API_KEY is None:
+if IS_PRODUCTION and ADMIN_API_KEY is None:
     raise RuntimeError(
         "ADMIN_API_KEY must be set in production! "
         "Set the ADMIN_API_KEY environment variable."
+    )
+
+if IS_PRODUCTION and "*" in CORS_ORIGINS:
+    raise RuntimeError(
+        "CORS_ORIGINS must not include '*' in production! "
+        "Set explicit frontend/admin origins."
     )

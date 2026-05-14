@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 
-from config import ADMIN_API_KEY, CONDITIONS, MESSAGE_COOLDOWN_S
+from config import ADMIN_API_KEY, CONDITIONS, MESSAGE_COOLDOWN_S, IS_PRODUCTION
 from engine.runtime_plan_loader import (
     load_runtime_plan,
     save_runtime_plan,
@@ -58,6 +58,9 @@ async def get_runtime_plan():
 @router.put("/runtime-plan")
 async def update_runtime_plan(body: dict[str, Any]):
     """Validate and save the active runtime plan."""
+    if IS_PRODUCTION:
+        raise HTTPException(403, "Runtime plan editing is disabled in production")
+
     try:
         saved = save_runtime_plan(body)
     except ValueError as e:

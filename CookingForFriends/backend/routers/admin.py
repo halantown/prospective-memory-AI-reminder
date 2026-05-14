@@ -27,7 +27,7 @@ from models.schemas import (
 from engine.condition_assigner import assign_condition_and_order, generate_token, next_participant_id
 from engine.phase_state import enter_phase
 from websocket.connection_manager import manager
-from config import ADMIN_API_KEY, CONDITIONS, TASK_ORDERS
+from config import ADMIN_API_KEY, CONDITIONS, TASK_ORDERS, IS_PRODUCTION
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +132,9 @@ async def create_test_session(
     start_phase is provided the participant is immediately advanced to that
     phase so the frontend lands on the right screen without extra steps.
     """
+    if IS_PRODUCTION:
+        raise HTTPException(403, "Test sessions are disabled in production")
+
     participant_req: Optional[AdminParticipantCreateRequest] = None
     if req is not None:
         participant_req = AdminParticipantCreateRequest(
@@ -484,6 +487,7 @@ async def get_config():
         SNAPSHOT_INTERVAL_S, HEARTBEAT_INTERVAL_S, HEARTBEAT_TIMEOUT_S,
         TOKEN_LENGTH, TRIGGER_SCHEDULE, TASK_ORDERS,
         EXECUTION_WINDOW_S, LATE_WINDOW_S, REMINDER_LEAD_S,
+        ENVIRONMENT, IS_PRODUCTION, IS_RELAXED_ENV,
     )
     task_order_values = list(TASK_ORDERS.values())
     return {
@@ -511,6 +515,9 @@ async def get_config():
             "heartbeat_interval_s": HEARTBEAT_INTERVAL_S,
             "heartbeat_timeout_s": HEARTBEAT_TIMEOUT_S,
             "token_length": TOKEN_LENGTH,
+            "environment": ENVIRONMENT,
+            "is_production": IS_PRODUCTION,
+            "test_hooks_enabled": IS_RELAXED_ENV,
         },
     }
 

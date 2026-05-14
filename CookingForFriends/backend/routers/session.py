@@ -46,6 +46,15 @@ async def verify_session_owner(
     db: AsyncSession = Depends(get_db),
 ) -> Participant:
     """Verify the caller owns this session by matching their token."""
+    return await verify_session_token_for_id(db, session_id, x_session_token)
+
+
+async def verify_session_token_for_id(
+    db: AsyncSession,
+    session_id: str,
+    x_session_token: str | None,
+) -> Participant:
+    """Verify a session token for endpoints that do not carry session_id in the URL."""
     if not x_session_token:
         raise HTTPException(401, "Missing X-Session-Token header")
     result = await db.execute(
@@ -164,9 +173,12 @@ async def get_session_experiment_config(
 @router.post("/mouse-tracking")
 async def post_mouse_tracking_batch(
     req: MouseTrackingBatchRequest,
+    x_session_token: str | None = Header(None, alias="X-Session-Token"),
     db: AsyncSession = Depends(get_db),
 ):
     """Store batched mouse samples and embedded behavioral event markers."""
+    await verify_session_token_for_id(db, req.session_id, x_session_token)
+
     MAX_MOUSE_BATCH = 10000
     if len(req.records) > MAX_MOUSE_BATCH:
         raise HTTPException(413, f"Mouse tracking batch exceeds {MAX_MOUSE_BATCH} records")
