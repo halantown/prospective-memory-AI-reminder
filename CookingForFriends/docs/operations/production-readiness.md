@@ -14,8 +14,8 @@ template for new deployments.
 
 | Environment | Intended use | Relaxed behavior | Production guards |
 |-------------|--------------|------------------|-------------------|
-| `development` | Local development, pilot testing, and thesis screenshots | Admin auth may be disabled, `DEV_TOKEN` may seed `DEV_TESTER`, test sessions are enabled, wildcard CORS is allowed | None |
-| `production` | Real participant data collection | No development token, no test-session shortcut, no runtime-plan edits, admin key required, wildcard CORS rejected | Enforced at startup/request time |
+| `development` | Local development, pilot testing, and thesis screenshots | Admin auth may be disabled, test sessions are enabled, wildcard CORS is allowed | None |
+| `production` | Real participant data collection | No test-session shortcut, no runtime-plan edits, admin key required, wildcard CORS rejected | Enforced at startup/request time |
 
 The backend rejects any `ENVIRONMENT` value outside `development`, `test`, and
 `production`. Runtime configuration is maintained for `development` and
@@ -31,7 +31,6 @@ ENVIRONMENT=production
 DATABASE_URL=postgresql+asyncpg://<user>:<strong-password>@<host>:5432/<db>
 CORS_ORIGINS=https://<participant-host>,https://<admin-host>
 ADMIN_API_KEY=<long-random-secret>
-DEV_TOKEN=
 MESSAGE_COOLDOWN_S=10
 ```
 
@@ -45,7 +44,6 @@ python main.py --env production
 Production startup fails if:
 
 - Any required production value still contains a template placeholder.
-- `DEV_TOKEN` is set.
 - `ADMIN_API_KEY` is missing.
 - `CORS_ORIGINS` contains `*`.
 - `ENVIRONMENT` is not one of the supported modes.
@@ -57,7 +55,6 @@ internal `test` mode, and disabled or guarded in `production`.
 
 | Hook | Purpose | Development/test behavior | Production behavior |
 |------|---------|-------------------|---------------------|
-| `DEV_TOKEN` | Reusable screenshot/dev participant | Auto-creates or resets `DEV_TESTER` on startup | Backend startup fails if set |
 | `/api/admin/test-session` | Create an `is_test=true` session and jump to a phase | Enabled behind optional admin auth | Returns `403` |
 | Runtime plan editor `PUT /api/admin/timelines/runtime-plan` | Edit active gameplay timing | Enabled behind optional admin auth | Returns `403` |
 | Frontend waypoint controls | Floor-plan annotation aid | Vite dev-only via `import.meta.env.DEV` | Not present in production build |
@@ -87,7 +84,7 @@ Before collecting production data:
 
 1. Start backend with `ENVIRONMENT=production`, explicit `CORS_ORIGINS`, and a
    non-empty `ADMIN_API_KEY`.
-2. Confirm backend refuses startup when `DEV_TOKEN` is set.
+2. Confirm backend starts without creating a hard-coded development participant.
 3. Confirm backend refuses startup when `CORS_ORIGINS=*`.
 4. Open `/admin`, enter the admin key when prompted, and create a real
    participant.

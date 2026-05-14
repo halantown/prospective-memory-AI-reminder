@@ -19,7 +19,7 @@ Frontend runs on **http://localhost:3000** (proxies API to :5000)
 
 ### 3. Login with a Test Token
 - Navigate to **http://localhost:3000**
-- Enter a token created in the Admin dashboard, or set `DEV_TOKEN=ABC123` before backend startup and use **`ABC123`**
+- Enter a 6-character token created in the Admin dashboard or by `/api/admin/test-session`
 - Click "Start Session"
 
 ## Test Account Details
@@ -36,7 +36,7 @@ start phase without affecting round-robin counts.
 ## Test Flow
 
 1. **Welcome Page** (`/`)
-   - Enter token `ABC123`
+   - Enter the generated 6-character test token
    - Verify login succeeds
 
 2. **Encoding / Tutorial Flow**

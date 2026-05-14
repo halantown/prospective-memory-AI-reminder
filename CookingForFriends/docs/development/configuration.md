@@ -17,9 +17,8 @@
 | `LOADED_ENV_FILE` | derived | — | Resolved env file loaded at startup, if any |
 
 Development and test environments allow local study/screenshot conveniences:
-admin auth may be disabled, `DEV_TOKEN` may seed the reusable `DEV_TESTER`, and
-test-session shortcuts are enabled. Production disables those hooks and enforces
-startup guards for admin auth and CORS. See
+admin auth may be disabled and test-session shortcuts are enabled. Production
+disables those hooks and enforces startup guards for admin auth and CORS. See
 [Production Readiness](../operations/production-readiness.md).
 
 Backend startup loads environment files before reading config constants:
@@ -56,10 +55,6 @@ missing.
 |----------|-------|-------------|
 | `TOKEN_LENGTH` | `6` | Participant login token length |
 | `TOKEN_CHARSET` | `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` | Charset (no 0/O/1/I ambiguity) |
-| `DEV_TOKEN` | `None` (env: `DEV_TOKEN`) | Dev participant auto-seed. Set `DEV_TOKEN=ABC123` to enable. |
-
-`DEV_TOKEN` is valid only in `development` or `test`. Backend startup fails when
-`DEV_TOKEN` is set with `ENVIRONMENT=production`.
 
 ### Experiment Design and Timing
 
@@ -366,7 +361,7 @@ data/
 | `pool_size` | `5` | Connection pool size |
 | `max_overflow` | `10` | Extra connections beyond pool_size |
 | `expire_on_commit` | `False` | Objects accessible after commit |
-| Auto-seed | On startup if `DEV_TOKEN` set | Creates/resets dev participant |
+| Auto-seed | Disabled | Create test participants through Admin or `/api/admin/test-session` |
 
 ### Docker Setup
 
