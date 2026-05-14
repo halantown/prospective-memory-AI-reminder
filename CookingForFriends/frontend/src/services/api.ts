@@ -10,6 +10,10 @@ export function setSessionToken(token: string | null) {
   _sessionToken = token
 }
 
+export function getSessionToken() {
+  return _sessionToken
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (_sessionToken) {

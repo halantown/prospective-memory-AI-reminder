@@ -2,7 +2,7 @@ import type {
   Phase, RoomId, Pan, PhoneMessage, RobotState, SessionData,
   ActivePMTrial, DiningPhase, SeatState, UtensilType,
   DishId, DishState, KitchenStationId, Contact,
-  ActiveCookingStep, CookingWaitStep,
+  ActiveCookingStep, CookingWaitStep, CookingFinishedWaitStep,
   TaskOrder, PMPipelineState, PMPipelineStep,
   CookingDefinitions,
 } from '../../types'
@@ -32,6 +32,7 @@ export interface CookingSlice {
   missedStepFlashes: { dishId: string; stepIndex: number; stepLabel: string; emoji: string }[]
   cookingStepFeedback: { dishId: DishId; stepIndex: number; result: 'correct' | 'wrong'; station: KitchenStationId; timestamp: number } | null
   cookingWaitSteps: CookingWaitStep[]
+  cookingFinishedWaitSteps: CookingFinishedWaitStep[]
   cookingScore: { correct: number; wrong: number; missed: number }
   diningPhase: DiningPhase
   diningSeats: SeatState[]
@@ -52,6 +53,7 @@ export interface CookingSlice {
   handleCookingStepTimeout: (data: Record<string, unknown>) => void
   handleCookingWaitStart: (data: Record<string, unknown>) => void
   handleCookingWaitEnd: (data: Record<string, unknown>) => void
+  confirmCookingWaitFinished: (dishId: DishId, stepIndex: number) => void
   clearCookingStepFeedback: () => void
   getActiveStepForStation: (station: KitchenStationId) => ActiveCookingStep | undefined
   setDiningPhase: (phase: DiningPhase) => void
@@ -145,6 +147,7 @@ export interface UISlice {
 export interface CrossSlice {
   setSession: (data: SessionData) => void
   resetBlock: () => void
+  restoreRuntimeState: (state: Record<string, unknown>) => void
   totalScore: () => number
 }
 

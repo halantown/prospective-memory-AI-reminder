@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
-import { getSessionState, getSessionStatus } from '../services/api'
+import { getSessionState, getSessionStatus, getSessionToken } from '../services/api'
 import { frontendPhaseForBackend, isMainExperimentPhase } from '../utils/phase'
 import type { PMPipelineStep, RoomId } from '../types'
 import type { WSServerEvent } from '../types/wsEvents'
@@ -242,7 +242,10 @@ export function useWebSocket(sessionId: string | null) {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
     const autoStart = isMainExperimentPhase(useGameStore.getState().phase)
-    const url = `${proto}//${host}/ws/game/${sessionId}?auto_start=${autoStart}`
+    const token = getSessionToken()
+    const params = new URLSearchParams({ auto_start: String(autoStart) })
+    if (token) params.set('token', token)
+    const url = `${proto}//${host}/ws/game/${sessionId}?${params.toString()}`
 
     console.log('[WS] Connecting:', url)
     const ws = new WebSocket(url)
@@ -250,7 +253,6 @@ export function useWebSocket(sessionId: string | null) {
 
     ws.onopen = () => {
       console.log('[WS] Connected')
-      const isReconnect = retryCount.current > 0
       retryCount.current = 0
       useGameStore.getState().setWsConnected(true)
 
@@ -265,9 +267,14 @@ export function useWebSocket(sessionId: string | null) {
         sendFn({ type: 'start_game', data: {} })
       }
 
-      // On reconnect: restore PM pipeline state if server reports active pipeline
-      if (isReconnect && sessionId) {
+      // Restore authoritative runtime state on every connect. This covers both
+      // automatic reconnects and full page reloads where the Zustand store was
+      // recreated before the still-running backend runtime was reattached.
+      if (sessionId) {
         getSessionState(sessionId).then((state) => {
+          if (state?.runtime_state && typeof state.runtime_state === 'object') {
+            useGameStore.getState().restoreRuntimeState(state.runtime_state as Record<string, unknown>)
+          }
           if (state?.pipeline_step && state.pipeline_step !== 'idle') {
             useGameStore.getState().setPMPipelineState({
               step: (state.pipeline_step as PMPipelineStep) || 'trigger_event',
