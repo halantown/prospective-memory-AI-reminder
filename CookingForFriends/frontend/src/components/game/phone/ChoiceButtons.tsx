@@ -17,11 +17,13 @@ export default function ChoiceButtons({
   correctPosition,
   onChoose,
 }: ChoiceButtonsProps) {
-  // Randomize button order once on first render; stable across re-renders
+  const [randomPosition] = useState(() => Math.random() < 0.5 ? 0 : 1)
+
+  // Randomize button order once on first render; stable across re-renders.
   const resolvedPosition = useMemo(() => {
     if (correctPosition === 0 || correctPosition === 1) return correctPosition
-    return Math.random() < 0.5 ? 0 : 1
-  }, [correctPosition])
+    return randomPosition
+  }, [correctPosition, randomPosition])
 
   const buttons = useMemo(() => {
     return resolvedPosition === 0

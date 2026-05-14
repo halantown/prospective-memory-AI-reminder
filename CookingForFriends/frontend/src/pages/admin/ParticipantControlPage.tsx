@@ -57,8 +57,8 @@ interface PhoneLog {
   sent_at: number
   read_at: number | null
   replied_at: number | null
-  user_choice: number | null
-  correct_answer: number | null
+  user_choice: string | null
+  correct_answer: string | null
   reply_correct: boolean | null
   response_time_ms: number | null
   status: string | null
@@ -178,8 +178,15 @@ export default function ParticipantControlPage({ participantId }: { participantI
   // Load on mount and auto-refresh every 5s
   useEffect(() => {
     loadData()
-    refreshRef.current = setInterval(loadData, 5000)
-    return () => { if (refreshRef.current) clearInterval(refreshRef.current) }
+    const loadWhenVisible = () => {
+      if (document.visibilityState === 'visible') loadData()
+    }
+    refreshRef.current = setInterval(loadWhenVisible, 5000)
+    document.addEventListener('visibilitychange', loadWhenVisible)
+    return () => {
+      if (refreshRef.current) clearInterval(refreshRef.current)
+      document.removeEventListener('visibilitychange', loadWhenVisible)
+    }
   }, [loadData])
 
   // Load tab-specific data on tab change

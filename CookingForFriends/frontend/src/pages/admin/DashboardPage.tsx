@@ -608,8 +608,15 @@ function LiveSessionsTab() {
 
   useEffect(() => {
     load()
-    const interval = setInterval(load, 10_000)
-    return () => clearInterval(interval)
+    const loadWhenVisible = () => {
+      if (document.visibilityState === 'visible') load()
+    }
+    const interval = setInterval(loadWhenVisible, 10_000)
+    document.addEventListener('visibilitychange', loadWhenVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', loadWhenVisible)
+    }
   }, [load])
 
   if (loading) return <div className="text-slate-400 flex items-center gap-2 p-4"><RefreshCw className="w-4 h-4 animate-spin" /> Loading…</div>
@@ -850,8 +857,15 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 5000)
-    return () => clearInterval(interval)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    const interval = setInterval(refreshWhenVisible, 5000)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
   }, [refresh])
 
   /* ---------- derived counts ---------- */
