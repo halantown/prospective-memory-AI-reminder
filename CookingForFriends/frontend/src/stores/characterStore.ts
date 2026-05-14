@@ -10,6 +10,7 @@ import waypointData from '../data/waypoints.json'
 import { buildAdjacency, bfsPath, getFacing, dist, type FacingDir, type WaypointData } from '../utils/waypointGraph'
 
 const WALK_SPEED = 12 // % image units per second
+const KITCHEN_STATION_MOVE_DURATION_MS = 1500
 const TURN_DURATION = 400 // ms — brief facing animation on station arrival
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -28,6 +29,8 @@ interface CharacterState {
   path: string[]
   /** Station ID to interact with after arriving at destination */
   pendingInteraction: string | null
+  /** Optional movement speed override in % image units per second */
+  movementSpeed: number | null
   /** Callback invoked on arrival at final waypoint */
   onArrival: (() => void) | null
   /** Whether a "Nothing to do here" bubble should show */
@@ -97,6 +100,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
   currentWaypointId: 'kitchen_center',
   path: [],
   pendingInteraction: null,
+  movementSpeed: null,
   onArrival: null,
   showIdleBubble: false,
 
@@ -138,6 +142,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       path: remainingPath,
       isMoving: true,
       animation: 'walk',
+      movementSpeed: null,
       onArrival: onArrival ?? null,
       showIdleBubble: false,
     })
@@ -145,14 +150,48 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
   },
 
   moveToStation(stationId, onArrival) {
-    const { moveToWaypoint } = get()
     if (!wpData.waypoints[stationId]) {
       // Station not in waypoint graph yet — trigger interaction directly
       onArrival?.()
       return
     }
-    moveToWaypoint(stationId, onArrival)
-    set({ pendingInteraction: stationId })
+
+    invalidateDelayedMovementEffects()
+    const { currentWaypointId } = get()
+    const position = transientPosition
+    let fromId = currentWaypointId
+    if (!fromId || !wpData.waypoints[fromId]) {
+      fromId = findNearestWaypoint(position)
+    }
+    if (!fromId) {
+      get().teleportTo(stationId)
+      onArrival?.()
+      return
+    }
+
+    const path = bfsPath(adjacency, fromId, stationId)
+    if (!path || path.length === 0) return
+
+    const remainingPath = path.slice(1)
+    if (remainingPath.length === 0) {
+      set({ pendingInteraction: stationId })
+      onArrival?.()
+      return
+    }
+
+    const pathLength = getPathDistance(position, remainingPath)
+    const movementSpeed = pathLength / (KITCHEN_STATION_MOVE_DURATION_MS / 1000)
+
+    set({
+      path: remainingPath,
+      isMoving: true,
+      animation: 'walk',
+      pendingInteraction: stationId,
+      movementSpeed,
+      onArrival: onArrival ?? null,
+      showIdleBubble: false,
+    })
+    startMovementLoop()
   },
 
   teleportTo(waypointId) {
@@ -170,6 +209,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       path: [],
       onArrival: null,
       pendingInteraction: null,
+      movementSpeed: null,
       showIdleBubble: false,
     })
     stopMovementLoop()
@@ -184,6 +224,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       path: [],
       onArrival: null,
       pendingInteraction: null,
+      movementSpeed: null,
       showIdleBubble: false,
     })
     stopMovementLoop()
@@ -218,7 +259,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
     const dx = nextNode.x - position.x
     const dy = nextNode.y - position.y
     const distance = Math.sqrt(dx * dx + dy * dy)
-    const step = (WALK_SPEED * deltaMs) / 1000
+    const step = ((state.movementSpeed ?? WALK_SPEED) * deltaMs) / 1000
 
     const facing = getFacing(position, nextNode)
 
@@ -241,6 +282,7 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
           isMoving: false,
           animation: 'idle',
           pendingInteraction: null,
+          movementSpeed: null,
           onArrival: null,
         })
 
@@ -334,4 +376,16 @@ function findNearestWaypoint(pos: { x: number; y: number }): string | null {
     }
   }
   return bestId
+}
+
+function getPathDistance(start: { x: number; y: number }, waypointIds: string[]): number {
+  let total = 0
+  let current = start
+  for (const id of waypointIds) {
+    const next = getWaypoint(id)
+    if (!next) continue
+    total += dist(current, next)
+    current = next
+  }
+  return total
 }
