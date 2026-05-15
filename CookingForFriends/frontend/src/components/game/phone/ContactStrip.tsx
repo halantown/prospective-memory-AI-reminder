@@ -29,7 +29,7 @@ export default function ContactStrip() {
       if (unreadCount > 0) {
         badges[contact.id] = { type: 'count', count: unreadCount }
       } else {
-        const hasUnanswered = msgs.some((m) => m.correctChoice && !m.answered)
+        const hasUnanswered = msgs.some((m) => m.correctChoice && !m.answered && !m.expired)
         badges[contact.id] = hasUnanswered ? { type: 'dot' } : { type: 'none' }
       }
     }

@@ -201,6 +201,22 @@ recipe. The robot plays a `robotBeep` chirp before the speech bubble appears.
 - Does NOT fire during PM overlays (game time frozen).
 - Logged as `robot_proactive_prompt` event in backend.
 
+## Chat Message Expiry
+
+Chat messages with answer choices expire after 50 seconds if unanswered. The
+timer is per-message, starting when the message arrives on the frontend.
+
+- Reply window: 50 000 ms (`MESSAGE_REPLY_WINDOW_MS` in `useMessageExpiry.ts`).
+- On expiry: choice buttons disappear, a `feedbackMissed` bubble appears
+  (contact-specific text, mild social-friction tone), and a soft notification
+  sound (`phoneMessageSoft`) plays.
+- PM overlay pause: timers pause when `gameTimeFrozen` is true (PM pipeline
+  active) and resume with remaining time when gameplay resumes.
+- Backend logging: frontend sends `phone_message_expired` WS event; handler
+  marks `PhoneMessageLog.status = "missed"` and stores the expiry timestamp.
+- Badge logic: expired messages no longer show the red "unanswered" dot on the
+  contact avatar.
+
 ## Measures
 
 Logged cooking measures include:

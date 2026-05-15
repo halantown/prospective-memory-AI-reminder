@@ -326,6 +326,12 @@ function robotBeep() {
   playTone({ freq: 1000, duration: 0.06, gain: 0.2, startOffset: 0.1 })
 }
 
+/** Phone message soft — same as phoneMessage but at ~half volume for expiry cue */
+function phoneMessageSoft() {
+  playTone({ freq: 1200, duration: 0.08, type: 'triangle', gain: 0.05 })
+  playTone({ freq: 1400, duration: 0.1, type: 'triangle', gain: 0.05, startOffset: 0.1 })
+}
+
 /* ── Hook ────────────────────────────────────────────────── */
 
 export type SoundName =
@@ -351,6 +357,7 @@ export type SoundName =
   | 'cookingWrong'
   | 'cookingMissed'
   | 'robotBeep'
+  | 'phoneMessageSoft'
 
 const SYNTH_MAP: Record<SoundName, () => void> = {
   sizzle,
@@ -375,6 +382,7 @@ const SYNTH_MAP: Record<SoundName, () => void> = {
   cookingWrong,
   cookingMissed,
   robotBeep,
+  phoneMessageSoft,
 }
 
 export const ALL_SOUND_NAMES: SoundName[] = Object.keys(SYNTH_MAP) as SoundName[]

@@ -15,6 +15,7 @@
 import { useEffect, useMemo } from 'react'
 import { useGameStore } from '../../stores/gameStore'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
+import { useMessageExpiry } from '../../hooks/useMessageExpiry'
 import ContactStrip from './phone/ContactStrip'
 import ChatView from './phone/ChatView'
 import PhoneTabBar from './phone/PhoneTabBar'
@@ -31,6 +32,7 @@ export default function PhoneSidebar() {
   const missedStepFlashes = useGameStore((s) => s.missedStepFlashes)
 
   const play = useSoundEffects()
+  useMessageExpiry()
 
   const unreadCount = useMemo(
     () => phoneMessages.filter((m) => m.channel === 'chat' && !m.read).length,

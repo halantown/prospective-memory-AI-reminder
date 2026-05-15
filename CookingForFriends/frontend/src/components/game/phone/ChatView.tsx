@@ -167,19 +167,22 @@ function MessageGroup({
   onAnswer: (chosenText: string, isCorrect: boolean, correctPositionShown: number) => void
 }) {
   const isAnswered = msg.answered === true
+  const isExpired = msg.expired === true
   const feedbackVisible = msg.feedbackVisible === true
 
   // Determine feedback text
-  const feedbackText = isAnswered
-    ? (msg.answeredCorrect ? msg.feedbackCorrect : msg.feedbackIncorrect)
-    : undefined
+  const feedbackText = isExpired
+    ? msg.feedbackMissed
+    : isAnswered
+      ? (msg.answeredCorrect ? msg.feedbackCorrect : msg.feedbackIncorrect)
+      : undefined
 
   return (
     <div className="flex flex-col gap-1">
       <ChatBubble text={msg.text} variant="friend" />
 
-      {/* Choice buttons — only shown before answering */}
-      {msg.correctChoice && msg.wrongChoice && !isAnswered && (
+      {/* Choice buttons — shown before answering, fade out on expiry */}
+      {msg.correctChoice && msg.wrongChoice && !isAnswered && !isExpired && (
         <ChoiceButtons
           correctChoice={msg.correctChoice}
           wrongChoice={msg.wrongChoice}
@@ -196,8 +199,8 @@ function MessageGroup({
         />
       )}
 
-      {/* Feedback bubble from friend (appears after delay) */}
-      {isAnswered && feedbackVisible && feedbackText && (
+      {/* Feedback bubble from friend (appears after delay for answered, immediately for expired) */}
+      {feedbackVisible && feedbackText && (
         <ChatBubble text={feedbackText} variant="feedback" />
       )}
     </div>

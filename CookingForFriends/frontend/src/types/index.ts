@@ -382,6 +382,7 @@ export interface PhoneMessage {
   correctPosition?: number | null  // null = frontend randomizes, 0|1 = forced
   feedbackCorrect?: string
   feedbackIncorrect?: string
+  feedbackMissed?: string
   // Notification-specific fields (channel === 'notification')
   sender?: string
   // State tracking
@@ -389,8 +390,10 @@ export interface PhoneMessage {
   read: boolean
   answered: boolean
   answeredCorrect?: boolean
+  expired?: boolean            // true when reply window expired
   feedbackVisible?: boolean   // true after feedback delay has elapsed
   respondedAt?: number
+  expiredAt?: number
   userChoice?: string  // the actual text the participant chose
 }
 

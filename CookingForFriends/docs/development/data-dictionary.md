@@ -113,12 +113,12 @@ One row per phone message delivered. Chat-task (secondary ongoing task) performa
 | category | string | "chat" (requires response) or "notification" (informational) |
 | arrived_at | float | Wall timestamp when message was delivered |
 | read_at | float | Wall timestamp when participant opened/read the message |
-| responded_at | float | Wall timestamp when participant submitted a response |
+| responded_at | float | Wall timestamp when participant submitted a response, or when message expired (status="missed") |
 | response_time_ms | int | Milliseconds from delivery to response |
 | user_choice | string | Text of the answer option the participant selected |
 | correct_answer | string | Text of the correct answer option |
 | is_correct | bool | True if participant selected the correct answer |
-| status | string | "delivered", "read", "answered_correct", or "answered_incorrect" |
+| status | string | "delivered", "read", "answered_correct", "answered_incorrect", or "missed" (reply window expired) |
 | correct_position_shown | int | 0 or 1 — position index where the correct answer was displayed (randomized) |
 
 ---

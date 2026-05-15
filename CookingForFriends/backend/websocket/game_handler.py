@@ -356,6 +356,8 @@ async def _ws_receiver(
                     await _handle_phone_reply(participant_id, block_number, data, db_factory)
                 elif msg_type == "phone_read":
                     await _handle_phone_read(participant_id, block_number, data, db_factory)
+                elif msg_type == "phone_message_expired":
+                    await _handle_phone_message_expired(participant_id, block_number, data, db_factory)
                 elif msg_type == "phone_contact_switch":
                     await _handle_interaction(participant_id, block_number, "phone_contact_switch", data, db_factory)
                 elif msg_type == "phone_tab_switch":
@@ -1071,6 +1073,49 @@ async def _handle_phone_read(participant_id, block_number, data, db_factory):
             .values(read_at=timestamp, status="seen")
         )
         await db.commit()
+
+
+async def _handle_phone_message_expired(participant_id, block_number, data, db_factory):
+    """Handle phone message expiry — mark as missed in the log."""
+    from sqlalchemy import select, update
+    from engine.timeline import mark_chat_answered
+
+    message_id = data.get("message_id", "")
+    expired_at = data.get("expired_at", time.time())
+    reply_window_ms = data.get("reply_window_ms")
+
+    if not message_id:
+        return
+
+    mark_chat_answered(participant_id, message_id)
+
+    async with db_factory() as db:
+        from models.block import Block
+        result = await db.execute(
+            select(Block.id).where(
+                Block.participant_id == participant_id,
+                Block.block_number == block_number,
+            )
+        )
+        block_id = result.scalar_one_or_none()
+        if block_id is None:
+            return
+
+        await db.execute(
+            update(PhoneMessageLog)
+            .where(
+                PhoneMessageLog.participant_id == participant_id,
+                PhoneMessageLog.block_id == block_id,
+                PhoneMessageLog.message_id == message_id,
+            )
+            .values(
+                status="missed",
+                replied_at=expired_at,
+            )
+        )
+        await db.commit()
+
+    await _handle_interaction(participant_id, block_number, "phone_message_expired", data, db_factory)
 
 
 async def _handle_mouse(participant_id, block_number, data, db_factory):

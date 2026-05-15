@@ -87,6 +87,7 @@ def build_ws_payload(message: dict) -> dict:
             "wrong_choice": message.get("wrong_choice", ""),
             "feedback_correct": message.get("feedback_correct", "Thanks! 👍"),
             "feedback_incorrect": message.get("feedback_incorrect", "Hmm, I think that's not quite right 🤔"),
+            "feedback_missed": message.get("feedback_missed", "Guess you're busy, no worries 👍"),
         }
     else:
         # Notification — system banner

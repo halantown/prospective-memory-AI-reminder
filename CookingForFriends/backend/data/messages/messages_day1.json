@@ -16,7 +16,8 @@
       "correct_choice": "Yep, €48!",
       "wrong_choice": "Hmm no, should be €46",
       "feedback_correct": "Great, ordering now! 🎂",
-      "feedback_incorrect": "Wait, 12 × 4 = 48 actually! Thanks anyway 😄"
+      "feedback_incorrect": "Wait, 12 × 4 = 48 actually! Thanks anyway 😄",
+      "feedback_missed": "Nvm, I just calculated it myself 😅"
     },
     {
       "id": "q_002",
@@ -26,7 +27,8 @@
       "correct_choice": "You'll make it!",
       "wrong_choice": "Might be a bit late",
       "feedback_correct": "Perfect, leaving soon then! 🚗",
-      "feedback_incorrect": "Hmm 5:35 + 25 min = 6:00, should be fine actually!"
+      "feedback_incorrect": "Hmm 5:35 + 25 min = 6:00, should be fine actually!",
+      "feedback_missed": "Okay I'll just leave now and hope for the best 🚗"
     },
     {
       "id": "q_003",
@@ -36,7 +38,8 @@
       "correct_choice": "Yep, €18",
       "wrong_choice": "No, that's €15",
       "feedback_correct": "Cool, grabbing them now! 🧃",
-      "feedback_incorrect": "Wait, 6 × 3 = 18! Math checks out 🧃"
+      "feedback_incorrect": "Wait, 6 × 3 = 18! Math checks out 🧃",
+      "feedback_missed": "Did the math myself, all good 🧃"
     },
     {
       "id": "q_004",
@@ -46,7 +49,8 @@
       "correct_choice": "H₂O",
       "wrong_choice": "CO₂",
       "feedback_correct": "Thanks! Passing it on 😂",
-      "feedback_incorrect": "Wait that's carbon dioxide! It's H₂O right? 😂"
+      "feedback_incorrect": "Wait that's carbon dioxide! It's H₂O right? 😂",
+      "feedback_missed": "Googled it — H₂O, duh 😂"
     },
     {
       "id": "q_005",
@@ -56,7 +60,8 @@
       "correct_choice": "Yep, €24 each",
       "wrong_choice": "No that's €22 each",
       "feedback_correct": "Cool, I'll Tikkie her 💸",
-      "feedback_incorrect": "Wait, 48 ÷ 2 is definitely 24! 💸"
+      "feedback_incorrect": "Wait, 48 ÷ 2 is definitely 24! 💸",
+      "feedback_missed": "Figured it out, don't worry about it 💸"
     },
     {
       "id": "q_006",
@@ -66,7 +71,8 @@
       "correct_choice": "20 minutes",
       "wrong_choice": "15 minutes",
       "feedback_correct": "Okay 20 min, we're fine! ⏰",
-      "feedback_incorrect": "Wait, 6:00 minus 5:40 = 20 minutes right? ⏰"
+      "feedback_incorrect": "Wait, 6:00 minus 5:40 = 20 minutes right? ⏰",
+      "feedback_missed": "Counted it myself, no worries ⏰"
     },
     {
       "id": "q_007",
@@ -76,7 +82,8 @@
       "correct_choice": "Yep, 600g",
       "wrong_choice": "That's only 500g",
       "feedback_correct": "Great, should be enough! 🥳",
-      "feedback_incorrect": "3 × 200 = 600 right? I'll bring them anyway!"
+      "feedback_incorrect": "3 × 200 = 600 right? I'll bring them anyway!",
+      "feedback_missed": "Pretty sure it's 600g, bringing them anyway!"
     },
     {
       "id": "q_008",
@@ -86,7 +93,8 @@
       "correct_choice": "CO₂",
       "wrong_choice": "O₂",
       "feedback_correct": "Right, carbon dioxide. Thanks! 🫁",
-      "feedback_incorrect": "We breathe IN O₂ and OUT CO₂! 🫁"
+      "feedback_incorrect": "We breathe IN O₂ and OUT CO₂! 🫁",
+      "feedback_missed": "Looked it up, no worries 🫁"
     },
     {
       "id": "q_009",
@@ -96,7 +104,8 @@
       "correct_choice": "Yep, 30 minutes",
       "wrong_choice": "No, that's 20 minutes",
       "feedback_correct": "Cool, right on schedule! 🚗",
-      "feedback_incorrect": "30 ÷ 60 = 0.5 hours = 30 min. I was right! 🚗"
+      "feedback_incorrect": "30 ÷ 60 = 0.5 hours = 30 min. I was right! 🚗",
+      "feedback_missed": "I'll just leave now to be safe 🚗"
     },
     {
       "id": "q_010",
@@ -106,7 +115,8 @@
       "correct_choice": "Yep, €19",
       "wrong_choice": "No, it's €18",
       "feedback_correct": "Cool, splitting it now! 🍕",
-      "feedback_incorrect": "2 × 9.50 = 19! Math is hard 🍕"
+      "feedback_incorrect": "2 × 9.50 = 19! Math is hard 🍕",
+      "feedback_missed": "Figured it out myself 🍕"
     },
     {
       "id": "q_011",
@@ -116,7 +126,8 @@
       "correct_choice": "100°C",
       "wrong_choice": "90°C",
       "feedback_correct": "Right right, thanks! 😅",
-      "feedback_incorrect": "It's 100! I knew that really 😅"
+      "feedback_incorrect": "It's 100! I knew that really 😅",
+      "feedback_missed": "Right, it's 100°C. Remembered! 😅"
     },
     {
       "id": "q_012",
@@ -126,7 +137,8 @@
       "correct_choice": "Yep, 500ml",
       "wrong_choice": "No, 450ml",
       "feedback_correct": "Perfect, doubling the batch! 🍲",
-      "feedback_incorrect": "250 × 2 = 500! Almost messed up 🍲"
+      "feedback_incorrect": "250 × 2 = 500! Almost messed up 🍲",
+      "feedback_missed": "Going with 500ml, fingers crossed 🍲"
     },
     {
       "id": "q_013",
@@ -136,7 +148,8 @@
       "correct_choice": "28 days",
       "wrong_choice": "30 days",
       "feedback_correct": "Right, thanks! 📝",
-      "feedback_incorrect": "It's 28! Almost put wrong date 📝"
+      "feedback_incorrect": "It's 28! Almost put wrong date 📝",
+      "feedback_missed": "Checked the calendar — 28 days 📝"
     },
     {
       "id": "q_014",
@@ -146,7 +159,8 @@
       "correct_choice": "Yep, €12.50",
       "wrong_choice": "No, €11.50",
       "feedback_correct": "Cool, worth it for the vibe 🕯️",
-      "feedback_incorrect": "5 × 2.50 = 12.50! 🕯️"
+      "feedback_incorrect": "5 × 2.50 = 12.50! 🕯️",
+      "feedback_missed": "Used the calculator, all sorted 🕯️"
     },
     {
       "id": "q_015",
@@ -156,7 +170,8 @@
       "correct_choice": "5:55",
       "wrong_choice": "5:50",
       "feedback_correct": "Setting my timer! 🕐",
-      "feedback_incorrect": "5:10 + 45 min = 5:55! 🕐"
+      "feedback_incorrect": "5:10 + 45 min = 5:55! 🕐",
+      "feedback_missed": "Set the timer for 5:55, hope that's right 🕐"
     },
     {
       "id": "q_016",
@@ -166,7 +181,8 @@
       "correct_choice": "8 legs",
       "wrong_choice": "6 legs",
       "feedback_correct": "That's what I thought! 🕷️",
-      "feedback_incorrect": "6 is insects! Spiders have 8 🕷️"
+      "feedback_incorrect": "6 is insects! Spiders have 8 🕷️",
+      "feedback_missed": "Googled it — 8 legs! 🕷️"
     },
     {
       "id": "q_017",
@@ -176,7 +192,8 @@
       "correct_choice": "Yep, about $22",
       "wrong_choice": "No, about $20",
       "feedback_correct": "Cool, just checking 💱",
-      "feedback_incorrect": "20 × 1.10 = 22! 💱"
+      "feedback_incorrect": "20 × 1.10 = 22! 💱",
+      "feedback_missed": "Did the conversion myself 💱"
     },
     {
       "id": "q_018",
@@ -186,7 +203,8 @@
       "correct_choice": "5 more",
       "wrong_choice": "4 more",
       "feedback_correct": "Grabbing 5, thanks! 🧻",
-      "feedback_incorrect": "8 minus 3 = 5! 🧻"
+      "feedback_incorrect": "8 minus 3 = 5! 🧻",
+      "feedback_missed": "Grabbed some extra just in case 🧻"
     },
     {
       "id": "q_019",
@@ -196,7 +214,8 @@
       "correct_choice": "3 hours 30 minutes",
       "wrong_choice": "3 hours 15 minutes",
       "feedback_correct": "Nice, plenty of light left! 🌅",
-      "feedback_incorrect": "9:15 minus 5:45 = 3:30! 🌅"
+      "feedback_incorrect": "9:15 minus 5:45 = 3:30! 🌅",
+      "feedback_missed": "I'll just enjoy the view whenever 🌅"
     },
     {
       "id": "q_020",
@@ -206,7 +225,8 @@
       "correct_choice": "0°C",
       "wrong_choice": "-10°C",
       "feedback_correct": "Right, I knew that really 🥶",
-      "feedback_incorrect": "It's 0! 🥶"
+      "feedback_incorrect": "It's 0! 🥶",
+      "feedback_missed": "Looked it up — 0°C of course 🥶"
     },
     {
       "id": "q_021",
@@ -216,7 +236,8 @@
       "correct_choice": "Yep, €12 each",
       "wrong_choice": "No, €10 each",
       "feedback_correct": "Tikkies incoming! 💰",
-      "feedback_incorrect": "60 ÷ 5 = 12! 💰"
+      "feedback_incorrect": "60 ÷ 5 = 12! 💰",
+      "feedback_missed": "Used the calculator, sending Tikkies 💰"
     },
     {
       "id": "q_022",
@@ -226,7 +247,8 @@
       "correct_choice": "24 hours",
       "wrong_choice": "12 hours",
       "feedback_correct": "That's what I told him 😂",
-      "feedback_incorrect": "It's 24! Jake... 😂"
+      "feedback_incorrect": "It's 24! Jake... 😂",
+      "feedback_missed": "Told Jake it's 24, obviously 😂"
     },
     {
       "id": "q_023",
@@ -236,7 +258,8 @@
       "correct_choice": "60 km/h",
       "wrong_choice": "45 km/h",
       "feedback_correct": "Okay not too fast then! 🚗",
-      "feedback_incorrect": "15 km in 15 min = 60 km/h! 🚗"
+      "feedback_incorrect": "15 km in 15 min = 60 km/h! 🚗",
+      "feedback_missed": "Think it's 60 km/h, sounds about right 🚗"
     },
     {
       "id": "q_024",
@@ -246,7 +269,8 @@
       "correct_choice": "3 sides",
       "wrong_choice": "4 sides",
       "feedback_correct": "Right, easy one 📐",
-      "feedback_incorrect": "4 is a square! Triangle = 3 📐"
+      "feedback_incorrect": "4 is a square! Triangle = 3 📐",
+      "feedback_missed": "My kid figured it out — 3 sides 📐"
     },
     {
       "id": "q_025",
@@ -256,7 +280,8 @@
       "correct_choice": "6 bottles",
       "wrong_choice": "5 bottles",
       "feedback_correct": "That's a lot of wine! 🍷",
-      "feedback_incorrect": "3 × 2 = 6! 🍷"
+      "feedback_incorrect": "3 × 2 = 6! 🍷",
+      "feedback_missed": "Counted them up, we've got 6 bottles 🍷"
     },
     {
       "id": "q_026",
@@ -266,7 +291,8 @@
       "correct_choice": "60 minutes",
       "wrong_choice": "50 minutes",
       "feedback_correct": "That's what I said! Sophie... 😅",
-      "feedback_incorrect": "It's 60! 😅"
+      "feedback_incorrect": "It's 60! 😅",
+      "feedback_missed": "It's 60, told Sophie she was wrong 😅"
     },
     {
       "id": "q_027",
@@ -276,7 +302,8 @@
       "correct_choice": "Yep, 1200g",
       "wrong_choice": "No, 900g",
       "feedback_correct": "Boiling a big pot then! 🍝",
-      "feedback_incorrect": "4 × 300 = 1200! 🍝"
+      "feedback_incorrect": "4 × 300 = 1200! 🍝",
+      "feedback_missed": "Measured it out, should be enough 🍝"
     },
     {
       "id": "q_028",
@@ -286,7 +313,8 @@
       "correct_choice": "7 months",
       "wrong_choice": "6 months",
       "feedback_correct": "Okay I can still count! 🗓️",
-      "feedback_incorrect": "Jan, Mar, May, Jul, Aug, Oct, Dec — that's 7! 🗓️"
+      "feedback_incorrect": "Jan, Mar, May, Jul, Aug, Oct, Dec — that's 7! 🗓️",
+      "feedback_missed": "Counted on my knuckles — it's 7! 🗓️"
     }
   ],
   "notifications": [

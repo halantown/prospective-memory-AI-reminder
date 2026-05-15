@@ -75,6 +75,7 @@ interface PhoneMessageEvent {
     correct_position?: number | null
     feedback_correct?: string
     feedback_incorrect?: string
+    feedback_missed?: string
   }
 }
 

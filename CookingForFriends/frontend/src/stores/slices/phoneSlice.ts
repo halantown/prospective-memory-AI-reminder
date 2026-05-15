@@ -51,7 +51,12 @@ export const createPhoneSlice: StateCreator<GameState, [], [], PhoneSlice> = (se
     ),
   })),
 
-  expirePhoneMessage: (_id) => {},
+  expirePhoneMessage: (id) => set((s) => ({
+    phoneMessages: s.phoneMessages.map((m) => {
+      if (m.id !== id || m.answered || m.expired) return m
+      return { ...m, expired: true, expiredAt: Date.now(), feedbackVisible: true }
+    }),
+  })),
 
   removePhoneMessage: (id) => set((s) => ({
     phoneMessages: s.phoneMessages.filter((m) => m.id !== id),

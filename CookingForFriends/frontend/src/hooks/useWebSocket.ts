@@ -183,6 +183,7 @@ export function useWebSocket(sessionId: string | null) {
           correctPosition: d.correct_position ?? null,
           feedbackCorrect: d.feedback_correct,
           feedbackIncorrect: d.feedback_incorrect,
+          feedbackMissed: d.feedback_missed,
           timestamp: now,
           read: false,
           answered: false,
