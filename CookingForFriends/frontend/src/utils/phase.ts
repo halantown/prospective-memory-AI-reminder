@@ -10,6 +10,7 @@ type RenderPhase =
   | 'tutorial_flow'
   | 'evening_transition'
   | 'playing'
+  | 'session_transition'
   | 'post_test'
   | 'debrief'
   | 'complete'
@@ -50,6 +51,7 @@ const CANONICAL_TO_RENDER: Record<string, RenderPhase> = {
 
 const UI_TO_RENDER: Record<string, RenderPhase> = {
   welcome: 'welcome',
+  session_transition: 'session_transition',
   complete: 'complete',
 }
 

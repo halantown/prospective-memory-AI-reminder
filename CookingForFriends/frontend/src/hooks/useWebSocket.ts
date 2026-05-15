@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
-import { getSessionState, getSessionStatus, getSessionToken } from '../services/api'
-import { frontendPhaseForBackend, isMainExperimentPhase } from '../utils/phase'
+import { getSessionState, getSessionToken } from '../services/api'
+import { isMainExperimentPhase } from '../utils/phase'
 import type { PMPipelineStep, RoomId } from '../types'
 import type { WSServerEvent } from '../types/wsEvents'
 
@@ -11,26 +11,12 @@ const HEARTBEAT_INTERVAL = 30_000
 const RECONNECT_BASE_MS = 500
 const RECONNECT_MAX_MS = 15_000
 
-async function syncPhaseFromServer(sessionId: string | null, fallbackPhase = 'POST_MANIP_CHECK') {
-  const store = useGameStore.getState()
-  if (!sessionId) {
-    store.setPhase(frontendPhaseForBackend(fallbackPhase))
-    return
-  }
-  try {
-    const status = await getSessionStatus(sessionId)
-    store.setPhase(frontendPhaseForBackend(status.phase || fallbackPhase))
-  } catch (error) {
-    console.warn('[WS] Failed to sync phase after session end; using fallback', error)
-    store.setPhase(frontendPhaseForBackend(fallbackPhase))
-  }
-}
-
 export function useWebSocket(sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null)
   const retryCount = useRef(0)
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const robotSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Monotonically increasing connection id — only the latest connection should
   // attempt reconnects.  This prevents the race where a stale onclose handler
   // (whose closedByUser flag was already reset by the next effect run) spawns
@@ -144,7 +130,7 @@ export function useWebSocket(sessionId: string | null) {
         store.setPMPipelineState(null)
         store.setGameTimeFrozen(false)
         store.clearRobotSpeech()
-        void syncPhaseFromServer(sessionId, msg.data.next_phase || 'POST_MANIP_CHECK')
+        store.setPhase('session_transition')
         break
 
       case 'heartbeat_ack':
@@ -214,7 +200,7 @@ export function useWebSocket(sessionId: string | null) {
         store.setPMPipelineState(null)
         store.setGameTimeFrozen(false)
         store.clearRobotSpeech()
-        void syncPhaseFromServer(sessionId, 'POST_MANIP_CHECK')
+        store.setPhase('session_transition')
         break
 
       case 'block_error':
@@ -320,7 +306,7 @@ export function useWebSocket(sessionId: string | null) {
         )
         retryCount.current++
         console.log(`[WS] Reconnecting in ${delay}ms (attempt ${retryCount.current})`)
-        setTimeout(connect, delay)
+        reconnectTimerRef.current = setTimeout(connect, delay)
       }
     }
 
@@ -335,6 +321,7 @@ export function useWebSocket(sessionId: string | null) {
     return () => {
       // Bump connId so the closing WS won't attempt to reconnect
       connIdRef.current++
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
       if (heartbeatRef.current) clearInterval(heartbeatRef.current)
       if (robotSpeechTimerRef.current) clearTimeout(robotSpeechTimerRef.current)
       if (wsRef.current) {

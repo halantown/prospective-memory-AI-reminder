@@ -176,6 +176,7 @@ function GameShell() {
       case 'tutorial_flow':  return <TutorialFlowPage />
       case 'evening_transition': return <EveningTransitionPage />
       case 'playing':        return <GamePage />
+      case 'session_transition': return <SessionTransitionPage />
       case 'post_test':      return <PostTestFlowPage />
       case 'debrief':        return <DebriefPage />
       case 'complete':       return <CompletePage />
@@ -214,6 +215,41 @@ function ConnectionIssuePage({ participantId }: { participantId: string | null }
             Participant: {participantId}
           </p>
         )}
+      </div>
+    </div>
+  )
+}
+
+function SessionTransitionPage() {
+  const sessionId = useGameStore((s) => s.sessionId)
+  const setPhase = useGameStore((s) => s.setPhase)
+  const [loading, setLoading] = useState(false)
+
+  const handleContinue = async () => {
+    if (!sessionId || loading) return
+    setLoading(true)
+    try {
+      const status = await getSessionStatus(sessionId)
+      setPhase(frontendPhaseForBackend(status.phase))
+    } catch {
+      setPhase('POST_MANIP_CHECK')
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-stone-900 flex items-center justify-center p-6">
+      <div className="bg-stone-100 rounded-lg shadow-xl p-8 max-w-md text-center">
+        <h1 className="text-2xl font-bold text-slate-800 mb-3">Session Complete</h1>
+        <p className="text-slate-600">
+          The cooking session has ended. Please click Continue to proceed to the next part.
+        </p>
+        <button
+          onClick={handleContinue}
+          disabled={loading}
+          className="mt-6 w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+        >
+          {loading ? 'Loading...' : 'Continue'}
+        </button>
       </div>
     </div>
   )

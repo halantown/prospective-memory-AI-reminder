@@ -37,7 +37,7 @@ export type ExperimentPhase =
   | 'DEBRIEF'
   | 'COMPLETED'
 
-export type UIPhase = 'welcome' | 'complete'
+export type UIPhase = 'welcome' | 'session_transition' | 'complete'
 
 export type Phase = UIPhase | ExperimentPhase
 
