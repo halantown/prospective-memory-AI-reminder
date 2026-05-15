@@ -52,6 +52,34 @@ function playBuffer(buffer: AudioBuffer, vol = 0.8) {
   src.start()
 }
 
+function playBufferWithFadeIn(buffer: AudioBuffer, vol: number, fadeInSeconds: number) {
+  const ctx = getCtx()
+  const src = ctx.createBufferSource()
+  src.buffer = buffer
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(0.001, ctx.currentTime)
+  gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + fadeInSeconds)
+  src.connect(gain)
+  gain.connect(ctx.destination)
+  src.start()
+  return { source: src, gain }
+}
+
+let _activeDoorbellNodes: { source: AudioBufferSourceNode; gain: GainNode } | null = null
+
+export function stopDoorbell() {
+  if (!_activeDoorbellNodes) return
+  try {
+    const ctx = getCtx()
+    const { source, gain } = _activeDoorbellNodes
+    gain.gain.cancelScheduledValues(ctx.currentTime)
+    gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime)
+    gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+    source.stop(ctx.currentTime + 0.35)
+  } catch { /* already stopped */ }
+  _activeDoorbellNodes = null
+}
+
 function playFile(url: string, vol = 0.8) {
   loadAudioFile(url)
     .then((buffer) => playBuffer(buffer, vol))
@@ -395,6 +423,16 @@ export function isFileBackedSound(name: SoundName): boolean {
 export function playSound(name: SoundName) {
   try {
     const fileUrl = AUDIO_FILES[name]
+    if (name === 'doorbell' && fileUrl) {
+      stopDoorbell()
+      loadAudioFile(fileUrl)
+        .then((buffer) => {
+          _activeDoorbellNodes = playBufferWithFadeIn(buffer, 0.8, 3)
+          _activeDoorbellNodes.source.onended = () => { _activeDoorbellNodes = null }
+        })
+        .catch((err) => console.warn('[sound] failed to play', fileUrl, err))
+      return
+    }
     if (fileUrl) {
       playFile(fileUrl)
       return

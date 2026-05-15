@@ -28,9 +28,6 @@ export default function PhoneSidebar() {
   const banner = useGameStore((s) => s.phoneBanner)
   const activePhoneTab = useGameStore((s) => s.activePhoneTab)
   const phoneMessages = useGameStore((s) => s.phoneMessages)
-  const activeCookingSteps = useGameStore((s) => s.activeCookingSteps)
-  const missedStepFlashes = useGameStore((s) => s.missedStepFlashes)
-
   const play = useSoundEffects()
   useMessageExpiry()
 
@@ -38,7 +35,6 @@ export default function PhoneSidebar() {
     () => phoneMessages.filter((m) => m.channel === 'chat' && !m.read).length,
     [phoneMessages],
   )
-  const hasKitchenCue = activeCookingSteps.length > 0 || missedStepFlashes.length > 0
 
   // Play chime on new banner (visual pulse removed)
   useEffect(() => {
@@ -93,12 +89,12 @@ export default function PhoneSidebar() {
 
             {/* Tab content */}
             {activePhoneTab === 'chats' ? (
-              <div className={`flex-1 flex min-h-0 overflow-hidden ${hasKitchenCue ? 'pt-[var(--kitchen-banner-height)]' : ''}`}>
+              <div className="flex-1 flex min-h-0 overflow-hidden">
                 <ContactStrip />
                 <ChatView />
               </div>
             ) : (
-              <div className={`flex-1 flex min-h-0 overflow-hidden ${hasKitchenCue ? 'pt-[var(--kitchen-banner-height)]' : ''}`}>
+              <div className="flex-1 flex min-h-0 overflow-hidden">
                 <RecipeTab />
               </div>
             )}

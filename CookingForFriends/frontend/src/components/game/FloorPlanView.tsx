@@ -33,6 +33,7 @@ import type { WaypointData } from '../../utils/waypointGraph'
 import { buildAdjacency, bfsPath, resolveRoomPoint } from '../../utils/waypointGraph'
 import { getActiveTriggerEncounterConfig, getTriggerEncounterConfig } from '../../data/triggerEncounters'
 import { useRobotProactivePrompt } from '../../hooks/useRobotProactivePrompt'
+import { stopDoorbell } from '../../hooks/useSoundEffects'
 
 const wpData = waypointData as unknown as WaypointData
 const waypointAdjacency = buildAdjacency(wpData)
@@ -319,6 +320,7 @@ export default function FloorPlanView({
   const moveToWaypoint  = useCharacterStore((s) => s.moveToWaypoint)
   const teleportTo      = useCharacterStore((s) => s.teleportTo)
   const isCharMoving    = useCharacterStore((s) => s.isMoving)
+  const charPosition    = useCharacterStore((s) => s.position)
 
   const isZoomed = currentRoom !== null
   const isRoomAvailable = useCallback((room: FloorRoom) => {
@@ -359,6 +361,12 @@ export default function FloorPlanView({
     setRobotRoom('living_room')
     teleportTo('door_avatar')
   }, [currentRoom, doorbellEncounterInProgress, setActiveStation, teleportTo])
+
+  useEffect(() => {
+    if (pmPipelineState && pmPipelineState.step !== 'trigger_event') {
+      stopDoorbell()
+    }
+  }, [pmPipelineState?.step])
 
   useEffect(() => {
     if (pmPipelineState?.triggerType === 'doorbell') {
@@ -437,6 +445,9 @@ export default function FloorPlanView({
     setStationPopupAnchor(null)
     setCurrentRoom(room)
     setCharRoom(room)
+    if (room === 'living_room') {
+      stopDoorbell()
+    }
     if (doorbellActive && room === 'living_room') {
       teleportTo('living_room_idle')
       answerDoorbellAtDoor()
@@ -507,8 +518,8 @@ export default function FloorPlanView({
     if (!isZoomed) return 'translate3d(0px, 0px, 0) scale(1)'
     const room = encounterFocusActive && activeDoorEncounterConfig
       ? { ...ROOM_DEFS.living_room, ...DOOR_ENCOUNTER_FOCUS }
-      : encounterFocusActive && currentRoom
-        ? ROOM_DEFS[currentRoom]
+      : encounterFocusActive && !activeDoorEncounterConfig && currentRoom
+        ? { ...ROOM_DEFS[currentRoom], cx: charPosition.x, cy: charPosition.y }
       : ROOM_DEFS[currentRoom!]
     const isKitchen = currentRoom === 'kitchen'
     const S = encounterFocusActive ? ENCOUNTER_ZOOM_SCALE : isKitchen ? ZOOM_SCALE_KITCHEN : ZOOM_SCALE
@@ -523,7 +534,7 @@ export default function FloorPlanView({
     const txPx = snapToDevicePixel((tx / 100) * viewSize.width)
     const tyPx = snapToDevicePixel((ty / 100) * viewSize.height)
     return `translate3d(${txPx}px, ${tyPx}px, 0) scale(${S})`
-  }, [activeDoorEncounterConfig, encounterFocusActive, isZoomed, currentRoom, viewSize.height, viewSize.width])
+  }, [activeDoorEncounterConfig, charPosition.x, charPosition.y, encounterFocusActive, isZoomed, currentRoom, viewSize.height, viewSize.width])
 
   // Always keep transform-origin at top-left so the clamped math above is exact.
   const transformOrigin = '0% 0%'
