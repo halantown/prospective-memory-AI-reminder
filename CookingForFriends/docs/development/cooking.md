@@ -169,11 +169,37 @@ Recipe display rules:
 
 - Only open a popup when the clicked Kitchen Utensil has an active step.
 - Show 3-4 context-appropriate options.
-- Correct choice: brief green feedback, mark step complete, advance.
-- Wrong choice: brief red feedback, mark step failed, advance.
-- Timeout: mark step missed, show "Missed!" feedback in the Cooking Indicator,
-  advance.
+- Correct choice: ascending chime (`cookingCorrect`), green border + scale pulse
+  on selected card, popup holds for 600 ms then closes.
+- Wrong choice: low buzzer (`cookingWrong`), red border + horizontal shake on
+  selected card, popup holds for 1000 ms then closes.
+- Timeout: descending tone (`cookingMissed`), "Missed!" in Cooking Indicator,
+  no popup open.
 - Wait steps require no action and auto-transition.
+
+## Sound Effects
+
+All cooking/robot sounds are synthesized via Web Audio API (no asset files).
+
+| Sound ID | Trigger | Description |
+|----------|---------|-------------|
+| `cookingCorrect` | Correct option selected | Two-tone ascending chime (C5→E5) |
+| `cookingWrong` | Wrong option selected | Low buzzer (180 Hz square, bandpass filtered) |
+| `cookingMissed` | Step timeout | Two-tone descending (A4→E4, triangle) |
+| `robotBeep` | Robot idle comment / proactive prompt | Two quick sine blips (800→1000 Hz) |
+
+## Robot Proactive Prompt
+
+After 3 consecutive cooking errors (wrong + missed combined, reset on any
+correct answer), the robot speaks a brief supportive comment pointing to the
+recipe. The robot plays a `robotBeep` chirp before the speech bubble appears.
+
+- Threshold: 3 consecutive errors.
+- Cooldown: 90 seconds between triggers.
+- Speech bubble auto-dismisses after 4 seconds.
+- Non-modal — participant can keep cooking during the prompt.
+- Does NOT fire during PM overlays (game time frozen).
+- Logged as `robot_proactive_prompt` event in backend.
 
 ## Measures
 

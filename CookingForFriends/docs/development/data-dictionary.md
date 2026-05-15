@@ -171,6 +171,22 @@ One row per robot idle comment shown. Non-interactive ambient dialogue.
 
 ---
 
+## robot_proactive_prompts.csv
+
+One row per robot proactive prompt triggered by consecutive cooking errors. The robot speaks a supportive comment pointing the participant to the recipe.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| participant_id | string | Experimenter-assigned participant ID |
+| session_id | string(36) | Internal session UUID |
+| trigger_reason | string | Reason for trigger (currently always "consecutive_errors") |
+| error_count | int | Number of consecutive errors when triggered (threshold: 3) |
+| comment_text | string | The supportive comment displayed in the robot speech bubble |
+| game_time | float | Game-time (seconds) when the prompt was shown |
+| shown_at | float | Wall timestamp when prompt appeared |
+
+---
+
 ## phase_history.csv
 
 One row per experiment phase transition. Tracks progression through the experiment.

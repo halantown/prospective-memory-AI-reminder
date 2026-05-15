@@ -58,6 +58,27 @@ class RobotIdleCommentLog(Base):
     shown_at: Mapped[float] = mapped_column(Float, nullable=False)
 
 
+class RobotProactivePromptLog(Base):
+    """Robot proactive prompts triggered by consecutive cooking errors."""
+    __tablename__ = "robot_proactive_prompt_logs"
+    __table_args__ = (
+        Index('ix_robot_proactive_participant_block', 'participant_id', 'block_id'),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    participant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("participants.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    block_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("blocks.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    trigger_reason: Mapped[str] = mapped_column(String(50), nullable=False)
+    error_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    comment_text: Mapped[str] = mapped_column(Text, nullable=False)
+    game_time: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    shown_at: Mapped[float] = mapped_column(Float, nullable=False)
+
+
 class OngoingTaskScore(Base):
     __tablename__ = "ongoing_task_scores"
 

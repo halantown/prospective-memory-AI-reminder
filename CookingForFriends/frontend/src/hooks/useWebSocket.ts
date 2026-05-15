@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import { getSessionState, getSessionToken } from '../services/api'
 import { isMainExperimentPhase } from '../utils/phase'
+import { playSound } from './useSoundEffects'
 import type { PMPipelineStep, RoomId } from '../types'
 import type { WSServerEvent } from '../types/wsEvents'
 
@@ -58,6 +59,7 @@ export function useWebSocket(sessionId: string | null) {
         break
 
       case 'robot_idle_comment':
+        playSound('robotBeep')
         store.setRobotSpeaking(msg.data.text)
         if (store.wsSend) {
           store.wsSend({

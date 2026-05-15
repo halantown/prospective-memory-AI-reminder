@@ -19,6 +19,7 @@ import { useCallback, useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
 import { useCharacterStore } from '../../../stores/characterStore'
+import { useSoundEffects } from '../../../hooks/useSoundEffects'
 import PMTargetItems from '../PMTargetItems'
 import type {
   KitchenStationId,
@@ -549,7 +550,7 @@ function CorrectCelebration({ dishEmoji }: { dishEmoji: string }) {
 // ── StationPopup ──────────────────────────────────────────────────────────────
 
 function StationPopup({
-  station, anchor, activeSteps, selectedStepIndex, onStepSwitch, pending, feedback, onOptionClick, onClose,
+  station, anchor, activeSteps, selectedStepIndex, onStepSwitch, pending, feedback, selectedOptionId, onOptionClick, onClose,
 }: {
   station: KitchenStationId
   anchor: { x: number; y: number } | null
@@ -558,6 +559,7 @@ function StationPopup({
   onStepSwitch: (index: number) => void
   pending: boolean
   feedback: 'correct' | 'wrong' | null
+  selectedOptionId: string | null
   onOptionClick: (step: ActiveCookingStep, option: CookingStepOption) => void
   onClose: () => void
 }) {
@@ -652,11 +654,41 @@ function StationPopup({
         {/* ⑫ Correct celebration overlay */}
         {feedback === 'correct' && <CorrectCelebration dishEmoji={dishEmoji} />}
 
+        {/* Feedback overlay on selected option card */}
+        {feedback && selectedOptionId && activeStep && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+            {activeStep.options.map(opt => {
+              if (opt.id !== selectedOptionId) return null
+              return (
+                <motion.div
+                  key={opt.id}
+                  className={`mx-4 w-[calc(100%-2rem)] rounded-lg border-2 px-3 py-2.5 text-sm font-semibold text-center ${
+                    feedback === 'correct'
+                      ? 'border-green-500 bg-green-500/20 text-green-200'
+                      : 'border-red-500 bg-red-500/20 text-red-200'
+                  }`}
+                  initial={{ scale: 1 }}
+                  animate={
+                    feedback === 'correct'
+                      ? { scale: [1, 1.03, 1] }
+                      : { x: [0, -4, 4, -4, 4, 0] }
+                  }
+                  transition={
+                    feedback === 'correct'
+                      ? { duration: 0.2, ease: 'easeOut' }
+                      : { duration: 0.3 }
+                  }
+                >
+                  {feedback === 'correct' ? '✓ ' : '✗ '}{opt.text}
+                </motion.div>
+              )
+            })}
+          </div>
+        )}
+
         {activeStep ? (
           <>
             <p className="text-xs text-slate-300 font-medium mb-2">{activeStep.stepLabel}</p>
-
-            {/* ④ Scene animation removed — too abstract for ecological validity */}
 
             {/* ⑨ Cutting board: kinesthetic prep phase */}
             {station === 'cutting_board' && chopPhase === 'prep' ? (
@@ -921,9 +953,11 @@ export function KitchenStationOverlay({
   const clearCookingStepFeedback = useGameStore((s) => s.clearCookingStepFeedback)
   const confirmCookingWaitFinished = useGameStore((s) => s.confirmCookingWaitFinished)
   const wsSend                 = useGameStore((s) => s.wsSend)
+  const play                   = useSoundEffects()
 
   const [submittedStepKeys, setSubmittedStepKeys] = useState<Set<string>>(() => new Set())
   const [pendingStep, setPendingStep]             = useState<ActiveCookingStep | null>(null)
+  const [selectedOptionId, setSelectedOptionId]   = useState<string | null>(null)
   const [selectedStepIdx, setSelectedStepIdx]     = useState(0)
 
   // Prune submitted keys when steps are removed from the store
@@ -935,26 +969,31 @@ export function KitchenStationOverlay({
     })
   }, [activeCookingSteps])
 
-  // ⑫ Extended teardown: 800 ms so celebration animation plays fully
+  // Play sound on feedback and hold with result-dependent timing (600ms correct, 1000ms wrong)
   useEffect(() => {
     if (!pendingStep || !cookingStepFeedback) return
     if (
       pendingStep.dishId    !== cookingStepFeedback.dishId ||
       pendingStep.stepIndex !== cookingStepFeedback.stepIndex
     ) return
+    const isCorrect = cookingStepFeedback.result === 'correct'
+    play(isCorrect ? 'cookingCorrect' : 'cookingWrong')
+    const holdMs = isCorrect ? 600 : 1000
     const timer = setTimeout(() => {
       setPendingStep(null)
+      setSelectedOptionId(null)
       setActiveStation(null)
       clearCookingStepFeedback()
-    }, 800)
+    }, holdMs)
     return () => clearTimeout(timer)
-  }, [clearCookingStepFeedback, cookingStepFeedback, pendingStep, setActiveStation])
+  }, [clearCookingStepFeedback, cookingStepFeedback, pendingStep, setActiveStation, play])
 
   const handleOptionClick = useCallback((step: ActiveCookingStep, option: CookingStepOption) => {
     if (!wsSend) return
     const key = cookingStepKey(step)
     if (submittedStepKeys.has(key)) return
     setPendingStep(step)
+    setSelectedOptionId(option.id)
     setSubmittedStepKeys(prev => new Set(prev).add(key))
     wsSend({
       type: 'cooking_action',
@@ -1036,6 +1075,7 @@ export function KitchenStationOverlay({
           onStepSwitch={setSelectedStepIdx}
           pending={Boolean(scopedPendingStep)}
           feedback={popupFeedback}
+          selectedOptionId={scopedPendingStep ? selectedOptionId : null}
           onOptionClick={handleOptionClick}
           onClose={() => setActiveStation(null)}
         />

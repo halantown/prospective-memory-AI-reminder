@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, async_session
 from models.experiment import Experiment, ExperimentStatus, Participant, ParticipantStatus
 from models.block import Block, BlockStatus, PMTrial, PMAttemptRecord, ReminderMessage
-from models.logging import InteractionLog, PhoneMessageLog, GameStateSnapshot, MouseTrack, RobotIdleCommentLog
+from models.logging import InteractionLog, PhoneMessageLog, GameStateSnapshot, MouseTrack, RobotIdleCommentLog, RobotProactivePromptLog
 from models.cooking import CookingStepRecord, CookingDishScore
 from models.pm_module import PMTaskEvent, FakeTriggerEvent, PhaseEvent, IntentionCheckEvent, ExperimentResponse, CutsceneEvent
 from models.schemas import (
@@ -934,6 +934,21 @@ async def export_full_zip(
                 e.comment_id, e.text, e.shown_at,
             ])
 
+    proactive_rows: list[list] = []
+    if block_ids:
+        result = await db.execute(
+            select(RobotProactivePromptLog)
+            .where(RobotProactivePromptLog.block_id.in_(block_ids))
+            .order_by(RobotProactivePromptLog.id)
+        )
+        for e in result.scalars().all():
+            participant_id, session_id = participant_fields(e.participant_id)
+            proactive_rows.append([
+                participant_id, session_id,
+                e.trigger_reason, e.error_count, e.comment_text,
+                e.game_time, e.shown_at,
+            ])
+
     phase_rows: list[list] = []
     response_rows: list[list] = []
     if session_ids:
@@ -1160,6 +1175,11 @@ async def export_full_zip(
             "participant_id", "session_id",
             "comment_id", "text", "shown_at",
         ], robot_rows))
+        zf.writestr("robot_proactive_prompts.csv", csv_bytes([
+            "participant_id", "session_id",
+            "trigger_reason", "error_count", "comment_text",
+            "game_time", "shown_at",
+        ], proactive_rows))
         zf.writestr("phase_history.csv", csv_bytes([
             "participant_id", "session_id",
             "phase", "entered_at", "exited_at",

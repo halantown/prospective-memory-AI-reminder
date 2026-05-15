@@ -34,6 +34,9 @@ export interface CookingSlice {
   cookingWaitSteps: CookingWaitStep[]
   cookingFinishedWaitSteps: CookingFinishedWaitStep[]
   cookingScore: { correct: number; wrong: number; missed: number }
+  consecutiveCookingErrors: number
+  lastProactivePromptGameTime: number
+  lastProactiveComment: string | null
   diningPhase: DiningPhase
   diningSeats: SeatState[]
   diningSelectedUtensil: UtensilType | null

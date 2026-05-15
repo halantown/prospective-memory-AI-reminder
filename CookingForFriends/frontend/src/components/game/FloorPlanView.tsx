@@ -32,6 +32,7 @@ import waypointData from '../../data/waypoints.json'
 import type { WaypointData } from '../../utils/waypointGraph'
 import { buildAdjacency, bfsPath, resolveRoomPoint } from '../../utils/waypointGraph'
 import { getActiveTriggerEncounterConfig, getTriggerEncounterConfig } from '../../data/triggerEncounters'
+import { useRobotProactivePrompt } from '../../hooks/useRobotProactivePrompt'
 
 const wpData = waypointData as unknown as WaypointData
 const waypointAdjacency = buildAdjacency(wpData)
@@ -222,6 +223,8 @@ export default function FloorPlanView({
   const [visitorWalking, setVisitorWalking] = useState(false)
   const [visitorRenderWaypointId, setVisitorRenderWaypointId] = useState('door_visitor')
   const [stationPopupAnchor, setStationPopupAnchor] = useState<{ x: number; y: number } | null>(null)
+
+  useRobotProactivePrompt()
 
   // DEV-only: waypoint annotation tool
   const [showWaypointEditor, setShowWaypointEditor] = useState(false)

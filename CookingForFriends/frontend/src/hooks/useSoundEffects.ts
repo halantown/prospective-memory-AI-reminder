@@ -287,6 +287,45 @@ function error() {
   playTone({ freq: 330, duration: 0.18, type: 'square', gain: 0.06, startOffset: 0.1 })
 }
 
+/** Cooking correct — ascending two-tone chime (casual mobile-game ding) */
+function cookingCorrect() {
+  playTone({ freq: 523, duration: 0.08, gain: 0.3 })       // C5
+  playTone({ freq: 659, duration: 0.12, gain: 0.3, startOffset: 0.08 }) // E5
+}
+
+/** Cooking wrong — low buzzer (quiz-show style) */
+function cookingWrong() {
+  const ctx = getCtx()
+  const osc = ctx.createOscillator()
+  const filter = ctx.createBiquadFilter()
+  const gain = ctx.createGain()
+  osc.type = 'square'
+  osc.frequency.value = 180
+  filter.type = 'bandpass'
+  filter.frequency.value = 180
+  filter.Q.value = 5
+  osc.connect(filter)
+  filter.connect(gain)
+  gain.connect(ctx.destination)
+  const t = ctx.currentTime
+  gain.gain.setValueAtTime(0.35, t)
+  gain.gain.linearRampToValueAtTime(0, t + 0.3)
+  osc.start(t)
+  osc.stop(t + 0.32)
+}
+
+/** Cooking missed — descending two-tone (gentle "you lost this one") */
+function cookingMissed() {
+  playTone({ freq: 440, duration: 0.1, type: 'triangle', gain: 0.25 })
+  playTone({ freq: 330, duration: 0.15, type: 'triangle', gain: 0.25, startOffset: 0.1 })
+}
+
+/** Robot beep — two quick blips (friendly electronic chirp) */
+function robotBeep() {
+  playTone({ freq: 800, duration: 0.06, gain: 0.2 })
+  playTone({ freq: 1000, duration: 0.06, gain: 0.2, startOffset: 0.1 })
+}
+
 /* ── Hook ────────────────────────────────────────────────── */
 
 export type SoundName =
@@ -308,6 +347,10 @@ export type SoundName =
   | 'fridgeOpen'
   | 'success'
   | 'error'
+  | 'cookingCorrect'
+  | 'cookingWrong'
+  | 'cookingMissed'
+  | 'robotBeep'
 
 const SYNTH_MAP: Record<SoundName, () => void> = {
   sizzle,
@@ -328,6 +371,10 @@ const SYNTH_MAP: Record<SoundName, () => void> = {
   fridgeOpen,
   success,
   error,
+  cookingCorrect,
+  cookingWrong,
+  cookingMissed,
+  robotBeep,
 }
 
 export const ALL_SOUND_NAMES: SoundName[] = Object.keys(SYNTH_MAP) as SoundName[]
@@ -337,7 +384,7 @@ export function isFileBackedSound(name: SoundName): boolean {
   return Boolean(AUDIO_FILES[name])
 }
 
-function playSound(name: SoundName) {
+export function playSound(name: SoundName) {
   try {
     const fileUrl = AUDIO_FILES[name]
     if (fileUrl) {

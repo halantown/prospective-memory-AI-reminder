@@ -9,7 +9,7 @@ from websocket.connection_manager import manager, ws_pump
 from engine.block_runtime import BlockRuntime
 from engine.game_time import start_game_time, unfreeze_game_time, get_current_game_time
 from engine.pm_session import signal_pipeline_complete
-from models.logging import InteractionLog, MouseTrack, PhoneMessageLog, RobotIdleCommentLog
+from models.logging import InteractionLog, MouseTrack, PhoneMessageLog, RobotIdleCommentLog, RobotProactivePromptLog
 
 logger = logging.getLogger(__name__)
 
@@ -372,6 +372,8 @@ async def _ws_receiver(
                     await _handle_interaction(participant_id, block_number, "recipe_view", data, db_factory)
                 elif msg_type == "robot_idle_comment_shown":
                     await _handle_robot_idle_comment_shown(participant_id, block_number, data, db_factory)
+                elif msg_type == "robot_proactive_prompt":
+                    await _handle_robot_proactive_prompt(participant_id, block_number, data, db_factory)
                 elif msg_type == "mouse_position":
                     await _handle_mouse(participant_id, block_number, data, db_factory)
                 else:
@@ -1127,6 +1129,37 @@ async def _handle_robot_idle_comment_shown(participant_id, block_number, data, d
             comment_id=str(comment_id),
             text=str(text),
             shown_at=data.get("shown_at", time.time()),
+        ))
+        await db.commit()
+
+
+async def _handle_robot_proactive_prompt(participant_id, block_number, data, db_factory):
+    """Persist a robot proactive prompt triggered by consecutive cooking errors."""
+    comment_text = data.get("comment_text")
+    if not comment_text:
+        return
+
+    async with db_factory() as db:
+        from sqlalchemy import select
+        from models.block import Block
+        result = await db.execute(
+            select(Block.id).where(
+                Block.participant_id == participant_id,
+                Block.block_number == block_number,
+            )
+        )
+        block_id = result.scalar_one_or_none()
+        if block_id is None:
+            return
+
+        db.add(RobotProactivePromptLog(
+            participant_id=participant_id,
+            block_id=block_id,
+            trigger_reason=data.get("trigger_reason", "consecutive_errors"),
+            error_count=data.get("error_count", 0),
+            comment_text=str(comment_text),
+            game_time=data.get("game_time", 0.0),
+            shown_at=data.get("timestamp", time.time()),
         ))
         await db.commit()
 

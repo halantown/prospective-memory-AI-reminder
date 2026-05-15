@@ -73,6 +73,9 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
   cookingWaitSteps: [],
   cookingFinishedWaitSteps: [],
   cookingScore: { correct: 0, wrong: 0, missed: 0 },
+  consecutiveCookingErrors: 0,
+  lastProactivePromptGameTime: 0,
+  lastProactiveComment: null,
   diningPhase: 'idle',
   diningSeats: [{ ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }, { ...EMPTY_SEAT }],
   diningSelectedUtensil: null,
@@ -95,6 +98,9 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
     cookingWaitSteps: [],
     cookingFinishedWaitSteps: [],
     cookingScore: { correct: 0, wrong: 0, missed: 0 },
+    consecutiveCookingErrors: 0,
+    lastProactivePromptGameTime: 0,
+    lastProactiveComment: null,
     activeStation: null,
   }),
 
@@ -231,6 +237,7 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
           },
         },
         cookingScore: score,
+        consecutiveCookingErrors: result === 'correct' ? 0 : s.consecutiveCookingErrors + 1,
       }
     })
   },
@@ -287,6 +294,7 @@ export const createCookingSlice: StateCreator<GameState, [], [], CookingSlice> =
           },
         },
         cookingScore: score,
+        consecutiveCookingErrors: s.consecutiveCookingErrors + 1,
       }
     })
   },

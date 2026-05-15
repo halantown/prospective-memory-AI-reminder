@@ -1,8 +1,9 @@
 /** Kitchen timer banner — persistent primary cue for active cooking steps. */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../../stores/gameStore'
+import { useSoundEffects } from '../../../hooks/useSoundEffects'
 import type { ActiveCookingStep, KitchenStationId } from '../../../types'
 
 // ⑬ Station-contextual emoji shown alongside dish emoji in the banner header.
@@ -54,6 +55,15 @@ export default function KitchenTimerBanner() {
     const timer = setInterval(() => setNow(Date.now()), 250)
     return () => clearInterval(timer)
   }, [activeCookingSteps.length, gameTimeFrozen])
+
+  const play = useSoundEffects()
+  const prevMissedCountRef = useRef(missedStepFlashes.length)
+  useEffect(() => {
+    if (missedStepFlashes.length > prevMissedCountRef.current) {
+      play('cookingMissed')
+    }
+    prevMissedCountRef.current = missedStepFlashes.length
+  }, [missedStepFlashes.length, play])
 
   const missedItem = missedStepFlashes[missedStepFlashes.length - 1]
   const activeStep = activeCookingSteps[0]
