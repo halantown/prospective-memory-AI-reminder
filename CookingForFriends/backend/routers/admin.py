@@ -19,8 +19,8 @@ from database import get_db, async_session
 from models.experiment import Experiment, ExperimentStatus, Participant, ParticipantStatus
 from models.block import Block, BlockStatus, PMTrial, PMAttemptRecord, ReminderMessage
 from models.logging import InteractionLog, PhoneMessageLog, GameStateSnapshot, MouseTrack, RobotIdleCommentLog
-from models.cooking import CookingStepRecord
-from models.pm_module import PMTaskEvent, FakeTriggerEvent, PhaseEvent, IntentionCheckEvent, ExperimentResponse
+from models.cooking import CookingStepRecord, CookingDishScore
+from models.pm_module import PMTaskEvent, FakeTriggerEvent, PhaseEvent, IntentionCheckEvent, ExperimentResponse, CutsceneEvent
 from models.schemas import (
     ParticipantCreateResponse, ReminderImportItem,
     AdminParticipantCreateRequest, TestSessionRequest,
@@ -869,11 +869,6 @@ async def export_full_zip(
                 e.pm_resume_timestamp, e.post_pm_first_action_timestamp,
             ])
 
-    cooking_status = {
-        "correct": "success",
-        "wrong": "wrong_choice",
-        "missed": "timeout",
-    }
     cooking_rows: list[list] = []
     if block_ids:
         result = await db.execute(
@@ -887,8 +882,25 @@ async def export_full_zip(
                 participant_id, session_id,
                 e.step_id, e.dish_id, e.step_index, "active",
                 e.activated_at, e.completed_at,
-                cooking_status.get(e.result, e.result),
+                e.result,
                 e.response_time_ms,
+                e.station, e.chosen_option, e.correct_option,
+            ])
+
+    dish_score_rows: list[list] = []
+    if block_ids:
+        result = await db.execute(
+            select(CookingDishScore)
+            .where(CookingDishScore.block_id.in_(block_ids))
+            .order_by(CookingDishScore.id)
+        )
+        for e in result.scalars().all():
+            participant_id, session_id = participant_fields(e.participant_id)
+            dish_score_rows.append([
+                participant_id, session_id,
+                e.dish_id, e.total_steps,
+                e.steps_correct, e.steps_wrong, e.steps_missed,
+                e.started_at, e.completed_at, e.total_response_time_ms,
             ])
 
     phone_rows: list[list] = []
@@ -950,6 +962,37 @@ async def export_full_zip(
                 json.dumps(e.value, ensure_ascii=False),
                 e.timestamp,
                 json.dumps(e.extra_metadata or {}, ensure_ascii=False),
+            ])
+
+    cutscene_rows: list[list] = []
+    intention_rows: list[list] = []
+    if session_ids:
+        cutscene_result = await db.execute(
+            select(CutsceneEvent)
+            .where(CutsceneEvent.session_id.in_(session_ids))
+            .order_by(CutsceneEvent.session_id, CutsceneEvent.task_id, CutsceneEvent.segment_number)
+        )
+        for e in cutscene_result.scalars().all():
+            participant_id, session_id = participant_fields(e.session_id)
+            cutscene_rows.append([
+                participant_id, session_id,
+                e.task_id, e.segment_number,
+                e.display_time, e.dismiss_time,
+                e.detailcheck_question, e.detailcheck_answer, e.detailcheck_correct,
+            ])
+
+        intention_result = await db.execute(
+            select(IntentionCheckEvent)
+            .where(IntentionCheckEvent.session_id.in_(session_ids))
+            .order_by(IntentionCheckEvent.session_id, IntentionCheckEvent.position)
+        )
+        for e in intention_result.scalars().all():
+            participant_id, session_id = participant_fields(e.session_id)
+            intention_rows.append([
+                participant_id, session_id,
+                e.task_id, e.position,
+                e.selected_option_index, e.correct_option_index,
+                e.response_time_ms,
             ])
 
     interaction_rows: list[list] = []
@@ -1029,6 +1072,9 @@ async def export_full_zip(
                     "step_index": row[4],
                     "status": row[8],
                     "response_time_ms": row[9],
+                    "station": row[10],
+                    "chosen_option": row[11],
+                    "correct_option": row[12],
                 }, ensure_ascii=False),
             ])
 
@@ -1095,7 +1141,14 @@ async def export_full_zip(
             "participant_id", "session_id",
             "step_id", "dish_id", "step_index", "step_type",
             "activated_at", "completed_at", "status", "response_time_ms",
+            "station", "chosen_option", "correct_option",
         ], cooking_rows))
+        zf.writestr("cooking_dish_scores.csv", csv_bytes([
+            "participant_id", "session_id",
+            "dish_id", "total_steps",
+            "steps_correct", "steps_wrong", "steps_missed",
+            "started_at", "completed_at", "total_response_time_ms",
+        ], dish_score_rows))
         zf.writestr("phone_messages.csv", csv_bytes([
             "participant_id", "session_id",
             "message_id", "sender", "category",
@@ -1116,6 +1169,18 @@ async def export_full_zip(
             "phase", "question_id", "response_type",
             "value_json", "timestamp", "metadata_json",
         ], response_rows))
+        zf.writestr("cutscene_events.csv", csv_bytes([
+            "participant_id", "session_id",
+            "task_id", "segment_number",
+            "display_time", "dismiss_time",
+            "detailcheck_question", "detailcheck_answer", "detailcheck_correct",
+        ], cutscene_rows))
+        zf.writestr("intention_checks.csv", csv_bytes([
+            "participant_id", "session_id",
+            "task_id", "position",
+            "selected_option_index", "correct_option_index",
+            "response_time_ms",
+        ], intention_rows))
         zf.writestr("room_navigation.csv", csv_bytes([
             "participant_id", "session_id",
             "from_room", "to_room", "navigated_at",
