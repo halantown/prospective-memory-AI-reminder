@@ -8,9 +8,11 @@ interface ChatBubbleProps {
   variant?: 'friend' | 'participant' | 'feedback'
   /** Brief green/red border flash for participant bubbles */
   flashResult?: 'correct' | 'incorrect' | null
+  /** Visual accent for feedback bubbles */
+  feedbackType?: 'correct' | 'incorrect' | 'expired' | null
 }
 
-export default function ChatBubble({ text, variant = 'friend', flashResult }: ChatBubbleProps) {
+export default function ChatBubble({ text, variant = 'friend', flashResult, feedbackType }: ChatBubbleProps) {
   const isParticipant = variant === 'participant'
   const isFeedback = variant === 'feedback'
 
@@ -26,15 +28,24 @@ export default function ChatBubble({ text, variant = 'friend', flashResult }: Ch
       ? 'ring-2 ring-red-400 ring-offset-1 ring-offset-slate-800'
       : ''
 
+  const accentBar = feedbackType === 'correct'
+    ? 'border-l-[3px] border-green-400'
+    : feedbackType === 'incorrect'
+      ? 'border-l-[3px] border-orange-400'
+      : ''
+
+  const expiredStyle = feedbackType === 'expired' ? 'opacity-50' : ''
+
   return (
-    <div className={`flex ${isParticipant ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex ${isParticipant ? 'justify-end' : 'justify-start'} ${expiredStyle}`}>
       <motion.div
         initial={{ opacity: 0, y: 8, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
         className={`max-w-[85%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed
-                    ${bgClass} ${borderFlash}`}
+                    ${bgClass} ${borderFlash} ${accentBar}`}
       >
+        {feedbackType === 'expired' && <span className="mr-1">⏰</span>}
         {text}
       </motion.div>
     </div>

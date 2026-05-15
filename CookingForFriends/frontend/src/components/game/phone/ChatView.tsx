@@ -170,12 +170,18 @@ function MessageGroup({
   const isExpired = msg.expired === true
   const feedbackVisible = msg.feedbackVisible === true
 
-  // Determine feedback text
+  // Determine feedback text and type
   const feedbackText = isExpired
     ? msg.feedbackMissed
     : isAnswered
       ? (msg.answeredCorrect ? msg.feedbackCorrect : msg.feedbackIncorrect)
       : undefined
+
+  const feedbackType = isExpired
+    ? 'expired' as const
+    : isAnswered
+      ? (msg.answeredCorrect ? 'correct' as const : 'incorrect' as const)
+      : null
 
   return (
     <div className="flex flex-col gap-1">
@@ -201,7 +207,7 @@ function MessageGroup({
 
       {/* Feedback bubble from friend (appears after delay for answered, immediately for expired) */}
       {feedbackVisible && feedbackText && (
-        <ChatBubble text={feedbackText} variant="feedback" />
+        <ChatBubble text={feedbackText} variant="feedback" feedbackType={feedbackType} />
       )}
     </div>
   )
