@@ -1,19 +1,16 @@
 /** Experiment configuration viewer — read-only display of all config, tasks, reminders, assignments. */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings,
   Database,
   Grid3X3,
   MessageSquare,
-  Download,
   Layers,
   Clock,
   ChevronDown,
   ChevronUp,
-  MousePointerClick,
 } from 'lucide-react'
 import { adminFetch } from '../../services/api'
 
@@ -217,14 +214,12 @@ function Section({
 // ── Main Component ──
 
 export default function ConfigPage() {
-  const navigate = useNavigate()
   const [config, setConfig] = useState<ExperimentConfig | null>(null)
   const [tasks, setTasks] = useState<Record<string, PMTask[]> | null>(null)
   const [reminders, setReminders] = useState<Reminder[] | null>(null)
   const [assignments, setAssignments] = useState<Assignment[] | null>(null)
   const [assignmentsLoaded, setAssignmentsLoaded] = useState(false)
   const [activeBlock, setActiveBlock] = useState('1')
-  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Load config, tasks, reminders on mount
@@ -265,32 +260,9 @@ export default function ConfigPage() {
       .catch((err) => console.error('Failed to load assignments:', err))
   }, [assignmentsLoaded])
 
-  // Data export
-  const handleExport = async () => {
-    setExporting(true)
-    try {
-      const res = await adminFetch('/api/admin/data/export')
-      if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`)
-      const data = await res.json()
-      const json = JSON.stringify(data, null, 2)
-      const blob = new Blob([json], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const ts = new Date().toISOString().replace(/[:.]/g, '-')
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `experiment_data_${ts}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Export failed:', err)
-    } finally {
-      setExporting(false)
-    }
-  }
-
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <div className="bg-white rounded-xl shadow p-8 text-center max-w-md">
           <p className="text-red-500 font-medium mb-2">Failed to load configuration</p>
           <p className="text-sm text-slate-500">{error}</p>
@@ -301,7 +273,7 @@ export default function ConfigPage() {
 
   if (!config || !tasks || !reminders) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <div className="text-slate-400 text-sm">Loading configuration…</div>
       </div>
     )
@@ -310,45 +282,11 @@ export default function ConfigPage() {
   const { experiment, phone, mouse_tracking, system } = config
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <main className="p-6">
       <div className="max-w-5xl mx-auto space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">
-              🍳 Cooking for Friends — Configuration
-            </h1>
-            <p className="text-sm text-slate-500">
-              Read-only view of experiment parameters, tasks, and reminders
-            </p>
-          </div>
-        </div>
-
-        {/* Navigation tabs */}
-        <div className="flex gap-1 bg-white rounded-xl shadow border border-slate-200 p-1 w-fit">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700
-                       rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            Dashboard
-          </button>
-          <button
-            className="px-4 py-2 text-sm font-medium text-white bg-cooking-500 rounded-lg"
-          >
-            Config
-          </button>
-          <button
-            onClick={() => navigate('/admin/encoding-hotspots')}
-            className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700
-                       rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <MousePointerClick className="w-3.5 h-3.5" />
-              Encoding Hotspots
-            </span>
-          </button>
-        </div>
+        <p className="text-sm text-slate-500">
+          Read-only view of experiment parameters, tasks, and reminders
+        </p>
 
         {/* Section 1: Experiment Parameters */}
         <Section id="params" icon={Settings} title="Experiment Parameters" subtitle="Timing, tracking, and system settings" defaultOpen>
@@ -561,25 +499,8 @@ export default function ConfigPage() {
           )}
         </Section>
 
-        {/* Section 6: Data Export */}
-        <Section id="export" icon={Download} title="Data Export" subtitle="Download full experiment dataset">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleExport}
-              disabled={exporting}
-              className="flex items-center gap-2 px-6 py-2.5 bg-cooking-500 hover:bg-cooking-600
-                         disabled:bg-cooking-200 text-white font-medium rounded-xl transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              {exporting ? 'Exporting…' : 'Export All Data'}
-            </button>
-            <p className="text-sm text-slate-500">
-              Downloads a JSON file with all participants, blocks, events, and PM outcomes.
-            </p>
-          </div>
-        </Section>
       </div>
-    </div>
+    </main>
   )
 }
 

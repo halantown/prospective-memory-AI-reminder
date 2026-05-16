@@ -340,14 +340,11 @@ export default function EncodingHotspotToolPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6 text-slate-900">
+    <main className="p-6 text-slate-900">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-5">
-          <h1 className="text-2xl font-bold">Encoding Hotspot Tool</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Select a segment, pause on the final interaction frame, then draw a rectangle over the target.
-          </p>
-        </div>
+        <p className="mb-5 text-sm text-slate-600">
+          Select a segment, pause on the final interaction frame, then draw a rectangle over the target.
+        </p>
 
         <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
           <div className="rounded-lg border border-slate-300 bg-white p-4 shadow-sm">
@@ -471,6 +468,6 @@ export default function EncodingHotspotToolPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

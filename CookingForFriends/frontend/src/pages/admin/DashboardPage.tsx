@@ -1,6 +1,6 @@
 /** Feature-rich admin dashboard — overview, sortable table, expandable rows, actions. */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -21,14 +21,11 @@ import {
   ExternalLink,
   FlaskConical,
   BarChart2,
-  RadioTower,
-  CalendarClock,
-  MousePointerClick,
+  Search,
 } from 'lucide-react'
 import {
   createParticipant,
   getAssignmentCounts,
-  getLiveSessions,
   exportPerParticipant,
   exportAggregated,
   createTestSession,
@@ -89,7 +86,7 @@ interface ParticipantDetail {
 
 type SortKey = 'status' | 'created_at' | 'participant_id'
 type SortDir = 'asc' | 'desc'
-type AdminTab = 'participants' | 'token_management' | 'latin_square' | 'live_sessions' | 'data_export' | 'test_mode'
+type AdminTab = 'participants' | 'latin_square' | 'test_mode'
 
 interface ConfirmAction {
   kind: 'reset' | 'drop'
@@ -364,163 +361,6 @@ function ParticipantDetailView({ sessionId }: { sessionId: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Token Management Tab                                              */
-/* ------------------------------------------------------------------ */
-
-function TokenManagementTab() {
-  const [creating, setCreating] = useState(false)
-  const [lastCreated, setLastCreated] = useState<{ participant_id: string; token: string; entry_url?: string; task_order?: string } | null>(null)
-  const [participants, setParticipants] = useState<ParticipantRow[]>([])
-  const [copiedToken, setCopiedToken] = useState<string | null>(null)
-  const [manualCondition, setManualCondition] = useState<string>('EE1')
-  const [manualOrder, setManualOrder] = useState<string>('A')
-  const [manualCreating, setManualCreating] = useState(false)
-  const [manualResult, setManualResult] = useState<{ participant_id: string; token: string; entry_url?: string } | null>(null)
-
-  const load = useCallback(async () => {
-    const r = await adminFetch('/api/admin/participants')
-    if (r.ok) setParticipants(await r.json())
-  }, [])
-
-  useEffect(() => { load() }, [load])
-
-  const handleCreate = async () => {
-    setCreating(true)
-    try {
-      const result = await createParticipant()
-      setLastCreated({ participant_id: result.participant_id, token: result.token, entry_url: result.entry_url, task_order: result.task_order })
-      load()
-    } catch (e) { console.error(e) }
-    setCreating(false)
-  }
-
-  const handleManualCreate = async () => {
-    setManualCreating(true)
-    try {
-      const result = await createParticipant({ condition: manualCondition, order: manualOrder })
-      setManualResult({ participant_id: result.participant_id, token: result.token, entry_url: result.entry_url })
-      load()
-    } catch (e) { console.error(e) }
-    setManualCreating(false)
-  }
-
-  const copy = async (text: string) => {
-    await copyToClipboard(text)
-    setCopiedToken(text)
-    setTimeout(() => setCopiedToken(null), 2000)
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Create participant */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center justify-between">
-        <div>
-          <p className="font-semibold text-slate-800">Auto-assign participant</p>
-          <p className="text-sm text-slate-500">Latin-square assigns condition + order</p>
-        </div>
-        <button onClick={handleCreate} disabled={creating}
-          className="flex items-center gap-2 px-5 py-2 bg-cooking-500 hover:bg-cooking-600 disabled:bg-cooking-200 text-white font-medium rounded-lg transition-colors text-sm">
-          <Plus className="w-4 h-4" />
-          {creating ? 'Creating…' : 'Create Participant'}
-        </button>
-      </div>
-
-      {lastCreated && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-5 space-y-2">
-          <p className="font-semibold text-green-800">✓ Created: {lastCreated.participant_id}</p>
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-2xl font-bold text-green-700 tracking-widest">{lastCreated.token}</span>
-            <button onClick={() => copy(lastCreated.token)}
-              className="text-xs px-2 py-1 bg-green-200 hover:bg-green-300 text-green-800 rounded">
-              {copiedToken === lastCreated.token ? 'Copied!' : 'Copy'}
-            </button>
-          </div>
-          {lastCreated.entry_url && (
-            <p className="text-xs text-green-600 font-mono truncate">{lastCreated.entry_url}</p>
-          )}
-        </div>
-      )}
-
-      {/* Manual override */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
-        <p className="font-semibold text-slate-800 mb-3">Manual Override</p>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block">Condition</label>
-            <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm">
-              <option value="EE1">EE1</option>
-              <option value="EE0">EE0</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block">Order</label>
-            <select value={manualOrder} onChange={(e) => setManualOrder(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm">
-              {['A','B','C','D'].map((o) => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </div>
-          <div className="pt-4">
-            <button onClick={handleManualCreate} disabled={manualCreating}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-800 disabled:bg-slate-300 text-white rounded-lg text-sm">
-              {manualCreating ? 'Creating…' : 'Create'}
-            </button>
-          </div>
-        </div>
-        {manualResult && (
-          <div className="mt-3 p-3 bg-slate-50 rounded-lg text-sm">
-            <span className="font-medium">{manualResult.participant_id}</span>
-            {' — '}
-            <span className="font-mono font-bold">{manualResult.token}</span>
-            {manualResult.entry_url && <p className="text-xs text-slate-500 truncate mt-1">{manualResult.entry_url}</p>}
-          </div>
-        )}
-      </div>
-
-      {/* Participants table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-4 py-3 font-medium text-slate-600">ID</th>
-              <th className="text-left px-4 py-3 font-medium text-slate-600">Token</th>
-              <th className="text-left px-4 py-3 font-medium text-slate-600">Condition</th>
-              <th className="text-left px-4 py-3 font-medium text-slate-600">Status</th>
-              <th className="text-center px-4 py-3 font-medium text-slate-600">Copy URL</th>
-            </tr>
-          </thead>
-          <tbody>
-            {participants.map((p) => (
-              <tr key={p.session_id} className="border-b border-slate-100 hover:bg-slate-50">
-                <td className="px-4 py-2 font-medium text-slate-800 text-xs">{p.participant_id}</td>
-                <td className="px-4 py-2 font-mono text-xs text-cooking-600">{p.token}</td>
-                <td className="px-4 py-2 text-xs">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${conditionColor(p.condition)}`}>
-                    {p.condition}
-                  </span>
-                </td>
-                <td className="px-4 py-2">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusBadge(p.status)}`}>
-                    {p.status}
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-center">
-                  <button
-                    onClick={() => copy(`${window.location.origin}/?token=${p.token}`)}
-                    className="p-1.5 rounded hover:bg-slate-100 text-slate-500">
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
 /*  Latin Square Tab                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -582,140 +422,6 @@ function LatinSquareTab() {
             </div>
           ))}
         </div>
-      </div>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  Live Sessions Tab                                                  */
-/* ------------------------------------------------------------------ */
-
-function LiveSessionsTab() {
-  const [sessions, setSessions] = useState<Array<{
-    session_id: string; participant_id: string; condition: string; task_order: string;
-    current_phase: string; elapsed_s: number; disconnected_at: number | null;
-  }>>([])
-  const [loading, setLoading] = useState(true)
-
-  const load = useCallback(async () => {
-    try {
-      const data = await getLiveSessions()
-      setSessions(data)
-    } catch { /* ignore */ }
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    load()
-    const loadWhenVisible = () => {
-      if (document.visibilityState === 'visible') load()
-    }
-    const interval = setInterval(loadWhenVisible, 10_000)
-    document.addEventListener('visibilitychange', loadWhenVisible)
-    return () => {
-      clearInterval(interval)
-      document.removeEventListener('visibilitychange', loadWhenVisible)
-    }
-  }, [load])
-
-  if (loading) return <div className="text-slate-400 flex items-center gap-2 p-4"><RefreshCw className="w-4 h-4 animate-spin" /> Loading…</div>
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-slate-50 border-b border-slate-200">
-            <th className="text-left px-4 py-3 font-medium text-slate-600">Participant</th>
-            <th className="text-left px-4 py-3 font-medium text-slate-600">Condition</th>
-            <th className="text-left px-4 py-3 font-medium text-slate-600">Order</th>
-            <th className="text-left px-4 py-3 font-medium text-slate-600">Phase</th>
-            <th className="text-left px-4 py-3 font-medium text-slate-600">Elapsed</th>
-            <th className="text-center px-4 py-3 font-medium text-slate-600">Connection</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sessions.length === 0 ? (
-            <tr><td colSpan={6} className="text-center py-12 text-slate-400">No active sessions</td></tr>
-          ) : sessions.map((s) => (
-            <tr key={s.session_id} className="border-b border-slate-100 hover:bg-slate-50">
-              <td className="px-4 py-3 font-medium text-slate-800 text-xs">{s.participant_id}</td>
-              <td className="px-4 py-3">
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${conditionColor(s.condition)}`}>{s.condition}</span>
-              </td>
-              <td className="px-4 py-3 text-slate-600 font-medium">{s.task_order}</td>
-              <td className="px-4 py-3 text-slate-600 text-xs">{s.current_phase}</td>
-              <td className="px-4 py-3 text-slate-600 text-xs">
-                {s.elapsed_s > 0 ? `${Math.floor(s.elapsed_s / 60)}m ${s.elapsed_s % 60}s` : '—'}
-              </td>
-              <td className="px-4 py-3 text-center">
-                {s.disconnected_at ? (
-                  <span title="Disconnected"><WifiOff className="w-4 h-4 text-red-400 mx-auto" /></span>
-                ) : (
-                  <span title="Connected"><Wifi className="w-4 h-4 text-green-500 mx-auto" /></span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  Data Export Tab                                                    */
-/* ------------------------------------------------------------------ */
-
-function DataExportTab() {
-  const [includeTest, setIncludeTest] = useState(false)
-  const [loading, setLoading] = useState<string | null>(null)
-
-  const download = async (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const handlePerParticipant = async () => {
-    setLoading('per')
-    try {
-      const blob = await exportPerParticipant(includeTest)
-      download(blob, `per-participant-${new Date().toISOString().slice(0, 10)}.csv`)
-    } catch (e) { console.error(e) }
-    setLoading(null)
-  }
-
-  const handleAggregated = async () => {
-    setLoading('agg')
-    try {
-      const blob = await exportAggregated(includeTest)
-      download(blob, `aggregated-${new Date().toISOString().slice(0, 10)}.csv`)
-    } catch (e) { console.error(e) }
-    setLoading(null)
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-3">
-        <input type="checkbox" id="include-test" checked={includeTest} onChange={(e) => setIncludeTest(e.target.checked)}
-          className="w-4 h-4 rounded" />
-        <label htmlFor="include-test" className="text-sm text-slate-700 cursor-pointer">Include test sessions</label>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button onClick={handlePerParticipant} disabled={loading !== null}
-          className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl transition-colors">
-          <Download className="w-5 h-5" />
-          {loading === 'per' ? 'Exporting…' : 'Export Per-Participant CSV'}
-        </button>
-        <button onClick={handleAggregated} disabled={loading !== null}
-          className="flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold rounded-xl transition-colors">
-          <Download className="w-5 h-5" />
-          {loading === 'agg' ? 'Exporting…' : 'Export Aggregated CSV'}
-        </button>
       </div>
     </div>
   )
@@ -817,6 +523,100 @@ function TestModeTab() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Export Dropdown                                                     */
+/* ------------------------------------------------------------------ */
+
+function ExportDropdown() {
+  const [open, setOpen] = useState(false)
+  const [includeTest, setIncludeTest] = useState(false)
+  const [loading, setLoading] = useState<string | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const dl = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handlePerParticipant = async () => {
+    setLoading('per')
+    try {
+      const blob = await exportPerParticipant(includeTest)
+      dl(blob, `per-participant-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch (e) { console.error(e) }
+    setLoading(null)
+  }
+
+  const handleAggregated = async () => {
+    setLoading('agg')
+    try {
+      const blob = await exportAggregated(includeTest)
+      dl(blob, `aggregated-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch (e) { console.error(e) }
+    setLoading(null)
+  }
+
+  const handleJSON = async () => {
+    setLoading('json')
+    try {
+      const res = await adminFetch('/api/admin/data/export')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      dl(
+        new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
+        `experiment-export-${new Date().toISOString().slice(0, 10)}.json`,
+      )
+    } catch (e) { console.error(e) }
+    setLoading(null)
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+      >
+        <Download className="w-4 h-4" />
+        Export
+        <ChevronDown className="w-3 h-3" />
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-60 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-20">
+          <label className="flex items-center gap-2 px-4 py-2.5 text-xs text-slate-600 border-b border-slate-100 cursor-pointer">
+            <input type="checkbox" checked={includeTest} onChange={(e) => setIncludeTest(e.target.checked)} className="w-3.5 h-3.5 rounded" />
+            Include test sessions
+          </label>
+          <button onClick={handlePerParticipant} disabled={loading !== null}
+            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 disabled:text-slate-300 transition-colors">
+            {loading === 'per' ? 'Exporting…' : 'Per-Participant CSV'}
+          </button>
+          <button onClick={handleAggregated} disabled={loading !== null}
+            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 disabled:text-slate-300 transition-colors">
+            {loading === 'agg' ? 'Exporting…' : 'Aggregated CSV'}
+          </button>
+          <button onClick={handleJSON} disabled={loading !== null}
+            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 disabled:text-slate-300 transition-colors border-t border-slate-100">
+            {loading === 'json' ? 'Exporting…' : 'Full JSON'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Dashboard                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -829,6 +629,8 @@ export default function AdminDashboard() {
   const [lastCreated, setLastCreated] = useState<{
     participant_id: string
     token: string
+    entry_url?: string
+    task_order?: string
   } | null>(null)
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -836,6 +638,15 @@ export default function AdminDashboard() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [refreshing, setRefreshing] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [onlineOnly, setOnlineOnly] = useState(false)
+
+  const [showManualCreate, setShowManualCreate] = useState(false)
+  const [manualCondition, setManualCondition] = useState('EE1')
+  const [manualOrder, setManualOrder] = useState('A')
+  const [manualCreating, setManualCreating] = useState(false)
 
   /* ---------- data fetching ---------- */
 
@@ -906,19 +717,47 @@ export default function AdminDashboard() {
     return copy
   }, [participants, sortKey, sortDir])
 
+  /* ---------- filtering ---------- */
+
+  const filtered = useMemo(() => {
+    return sorted.filter((p) => {
+      if (search) {
+        const q = search.toLowerCase()
+        if (
+          !p.participant_id.toLowerCase().includes(q) &&
+          !p.token.toLowerCase().includes(q) &&
+          !p.condition.toLowerCase().includes(q)
+        ) return false
+      }
+      if (statusFilter !== 'all' && p.status !== statusFilter) return false
+      if (onlineOnly && !p.is_online) return false
+      return true
+    })
+  }, [sorted, search, statusFilter, onlineOnly])
+
   /* ---------- actions ---------- */
 
   const handleCreate = async () => {
     setCreating(true)
     try {
       const result = await createParticipant()
-      setLastCreated({ participant_id: result.participant_id, token: result.token })
+      setLastCreated({ participant_id: result.participant_id, token: result.token, entry_url: result.entry_url, task_order: result.task_order })
       refresh()
     } catch (err) {
       console.error('Failed to create participant:', err)
     } finally {
       setCreating(false)
     }
+  }
+
+  const handleManualCreate = async () => {
+    setManualCreating(true)
+    try {
+      const result = await createParticipant({ condition: manualCondition, order: manualOrder })
+      setLastCreated({ participant_id: result.participant_id, token: result.token, entry_url: result.entry_url })
+      refresh()
+    } catch (e) { console.error(e) }
+    setManualCreating(false)
   }
 
   const handleCopyToken = async (token: string) => {
@@ -939,23 +778,6 @@ export default function AdminDashboard() {
       console.error(`Failed to ${kind} participant:`, err)
     } finally {
       setConfirmAction(null)
-    }
-  }
-
-  const handleExport = async () => {
-    try {
-      const res = await adminFetch('/api/admin/data/export')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `experiment-export-${new Date().toISOString().slice(0, 10)}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Export failed:', err)
     }
   }
 
@@ -989,77 +811,59 @@ export default function AdminDashboard() {
   /* ---------- render ---------- */
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* ---- Header ---- */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <h1 className="text-xl font-bold text-slate-800">
-              🍳 Cooking for Friends — Dashboard
-            </h1>
-            <nav className="flex gap-1">
-              <button className="px-3 py-1.5 text-sm font-medium rounded-lg bg-cooking-100 text-cooking-700">
-                Dashboard
-              </button>
+    <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      {/* ---- Created token banner ---- */}
+      <AnimatePresence>
+        {lastCreated && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="bg-green-50 border border-green-200 rounded-xl p-5 flex items-center justify-between"
+          >
+            <div>
+              <p className="text-green-800 font-semibold">
+                ✓ Created: {lastCreated.participant_id}
+              </p>
+              <p className="text-green-600 text-sm">
+                Give this token to the participant
+              </p>
+              {lastCreated.entry_url && (
+                <p className="text-xs text-green-600 font-mono truncate mt-1">{lastCreated.entry_url}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-3xl font-mono font-bold text-green-700 tracking-widest select-all">
+                {lastCreated.token}
+              </span>
               <button
-                onClick={() => (navigate('/config'))}
-                className="px-3 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                onClick={() => handleCopyToken(lastCreated.token)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-200 hover:bg-green-300 text-green-800 rounded-lg transition-colors"
               >
-                Config
+                <Copy className="w-4 h-4" />
+                {copiedToken === lastCreated.token ? 'Copied!' : 'Copy Token'}
               </button>
-              <button
-                onClick={() => navigate('/admin/timeline-editor')}
-                className="px-3 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarClock className="w-3.5 h-3.5" />
-                  Runtime Plan
-                </span>
-              </button>
-              <button
-                onClick={() => navigate('/admin/encoding-hotspots')}
-                className="px-3 py-1.5 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <MousePointerClick className="w-3.5 h-3.5" />
-                  Encoding Hotspots
-                </span>
-              </button>
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={creating}
-              className="flex items-center gap-2 px-5 py-2 bg-cooking-500 hover:bg-cooking-600 disabled:bg-cooking-200
-                         text-white font-medium rounded-lg transition-colors text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              {creating ? 'Creating…' : 'New Participant'}
-            </button>
-            <RefreshCw
-              className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`}
-            />
-          </div>
-        </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* ---- Tab bar ---- */}
-        <div className="max-w-7xl mx-auto px-6 border-t border-slate-100 flex gap-1 overflow-x-auto">
+      {/* ---- Overview cards ---- */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Total" value={overview?.total_participants ?? participants.length} icon={Users} color="bg-slate-100 text-slate-600" />
+        <StatCard label="In Progress" value={overview?.in_progress ?? 0} icon={Clock} color="bg-blue-100 text-blue-600" badge={onlineCount} />
+        <StatCard label="Completed" value={overview?.completed ?? 0} icon={CheckCircle} color="bg-green-100 text-green-600" />
+        <StatCard label="Dropped" value={droppedCount} icon={AlertCircle} color="bg-red-100 text-red-600" />
+      </div>
+
+      {/* ---- Tab bar + actions ---- */}
+      <div className="flex items-center justify-between border-b border-slate-200">
+        <div className="flex gap-1">
           {([
-            { id: 'participants', label: 'Participants', icon: Users },
-            { id: 'token_management', label: 'Token Management', icon: Copy },
-            { id: 'latin_square', label: 'Latin Square', icon: BarChart2 },
-            { id: 'live_sessions', label: 'Live Sessions', icon: RadioTower },
-            { id: 'data_export', label: 'Data Export', icon: Download },
-            { id: 'test_mode', label: 'Test Mode', icon: FlaskConical },
-          ] as { id: AdminTab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
+            { id: 'participants' as AdminTab, label: 'Participants', icon: Users },
+            { id: 'latin_square' as AdminTab, label: 'Latin Square', icon: BarChart2 },
+            { id: 'test_mode' as AdminTab, label: 'Test Mode', icon: FlaskConical },
+          ]).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -1074,73 +878,96 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        {/* ---- Created token banner ---- */}
-        <AnimatePresence>
-          {lastCreated && (
-            <motion.div
-              initial={{ opacity: 0, y: -12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              className="bg-green-50 border border-green-200 rounded-xl p-5 flex items-center justify-between"
-            >
-              <div>
-                <p className="text-green-800 font-semibold">
-                  ✓ Created: {lastCreated.participant_id}
-                </p>
-                <p className="text-green-600 text-sm">
-                  Give this token to the participant
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-3xl font-mono font-bold text-green-700 tracking-widest select-all">
-                  {lastCreated.token}
-                </span>
-                <button
-                  onClick={() => handleCopyToken(lastCreated.token)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-200 hover:bg-green-300 text-green-800 rounded-lg transition-colors"
-                >
-                  <Copy className="w-4 h-4" />
-                  {copiedToken === lastCreated.token ? 'Copied!' : 'Copy Token'}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* ---- Overview cards (always visible) ---- */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard
-            label="Total"
-            value={overview?.total_participants ?? participants.length}
-            icon={Users}
-            color="bg-slate-100 text-slate-600"
-          />
-          <StatCard
-            label="In Progress"
-            value={overview?.in_progress ?? 0}
-            icon={Clock}
-            color="bg-blue-100 text-blue-600"
-            badge={onlineCount}
-          />
-          <StatCard
-            label="Completed"
-            value={overview?.completed ?? 0}
-            icon={CheckCircle}
-            color="bg-green-100 text-green-600"
-          />
-          <StatCard
-            label="Dropped"
-            value={droppedCount}
-            icon={AlertCircle}
-            color="bg-red-100 text-red-600"
-          />
+        <div className="flex items-center gap-2 pb-2">
+          <ExportDropdown />
+          <button
+            onClick={handleCreate}
+            disabled={creating}
+            className="flex items-center gap-2 px-4 py-2 bg-cooking-500 hover:bg-cooking-600 disabled:bg-cooking-200 text-white font-medium rounded-lg transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            {creating ? 'Creating…' : 'New Participant'}
+          </button>
+          <button
+            onClick={() => setShowManualCreate(!showManualCreate)}
+            className={`px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+              showManualCreate ? 'bg-slate-200 text-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            Manual
+          </button>
+          <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
         </div>
+      </div>
 
-        {/* ---- Tab content ---- */}
-        {activeTab === 'participants' && (
+      {/* ---- Manual create form ---- */}
+      <AnimatePresence>
+        {showManualCreate && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-end gap-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Condition</label>
+                <select value={manualCondition} onChange={(e) => setManualCondition(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                  <option value="EE1">EE1</option>
+                  <option value="EE0">EE0</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Order</label>
+                <select value={manualOrder} onChange={(e) => setManualOrder(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                  {['A', 'B', 'C', 'D'].map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <button onClick={handleManualCreate} disabled={manualCreating}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-800 disabled:bg-slate-300 text-white rounded-lg text-sm font-medium">
+                {manualCreating ? 'Creating…' : 'Create Manual'}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ---- Participants filter bar ---- */}
+      {activeTab === 'participants' && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by ID, token, condition…"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cooking-200 focus:border-cooking-400"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700"
+          >
+            <option value="all">All statuses</option>
+            <option value="registered">Registered</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="dropped">Dropped</option>
+          </select>
+          <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+            <input type="checkbox" checked={onlineOnly} onChange={(e) => setOnlineOnly(e.target.checked)} className="w-4 h-4 rounded" />
+            Online only
+          </label>
+          <span className="text-xs text-slate-400 ml-auto">{filtered.length} of {participants.length}</span>
+        </div>
+      )}
+
+      {/* ---- Tab content ---- */}
+      {activeTab === 'participants' && (
         <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
           <table className="w-full text-sm table-fixed">
             <thead>
@@ -1156,120 +983,77 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {sorted.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-16 text-slate-400">
+                  <td colSpan={8} className="text-center py-16 text-slate-400">
                     <Users className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-                    <p className="font-medium">No participants yet</p>
+                    <p className="font-medium">
+                      {participants.length === 0 ? 'No participants yet' : 'No matches'}
+                    </p>
                     <p className="text-xs mt-1">
-                      Click "New Participant" to create one.
+                      {participants.length === 0
+                        ? 'Click "New Participant" to create one.'
+                        : 'Try adjusting your filters.'}
                     </p>
                   </td>
                 </tr>
               ) : (
-                sorted.map((p) => {
+                filtered.map((p) => {
                   const isExpanded = expandedId === p.session_id
                   return (
                     <React.Fragment key={p.session_id}>
-                      {/* Main row */}
                       <tr
                         className={`border-b border-slate-100 cursor-pointer transition-colors ${
                           isExpanded ? 'bg-cooking-50' : 'hover:bg-slate-50'
                         }`}
-                        onClick={() =>
-                          setExpandedId(isExpanded ? null : p.session_id)
-                        }
+                        onClick={() => setExpandedId(isExpanded ? null : p.session_id)}
                       >
                         <td className="pl-3 pr-1 py-3 text-slate-400">
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4" />
-                          )}
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </td>
-                        <td className="px-4 py-3 font-medium text-slate-800">
-                          {p.participant_id}
-                        </td>
-                        <td className="px-4 py-3 font-mono tracking-wider text-cooking-600 text-xs">
-                          {p.token}
-                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{p.participant_id}</td>
+                        <td className="px-4 py-3 font-mono tracking-wider text-cooking-600 text-xs">{p.token}</td>
                         <td className="px-4 py-3 text-slate-600">{p.condition}</td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`text-xs font-medium px-2 py-1 rounded-full ${statusBadge(p.status)}`}
-                          >
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusBadge(p.status)}`}>
                             {p.status}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {p.is_online ? (
-                            <Wifi className="w-4 h-4 text-green-500 mx-auto" />
-                          ) : (
-                            <WifiOff className="w-4 h-4 text-slate-300 mx-auto" />
-                          )}
+                          {p.is_online ? <Wifi className="w-4 h-4 text-green-500 mx-auto" /> : <WifiOff className="w-4 h-4 text-slate-300 mx-auto" />}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500">
                           {p.created_at
-                            ? new Date(p.created_at).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
+                            ? new Date(p.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
                             : '—'}
                         </td>
                         <td className="px-4 py-3">
-                          <div
-                            className="flex items-center justify-center gap-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              title="Copy Token"
-                              onClick={() => handleCopyToken(p.token)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
-                            >
-                              {copiedToken === p.token ? (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <Copy className="w-4 h-4" />
-                              )}
+                          <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <button title="Copy Token" onClick={() => handleCopyToken(p.token)}
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                              {copiedToken === p.token ? <CheckCircle className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                             </button>
-                            <button
-                              title="Open Detail Page"
-                              onClick={() => navigate(`/admin/participant/${p.session_id}`)}
-                              className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition-colors"
-                            >
+                            <button title="Open Detail Page" onClick={() => navigate(`/admin/participant/${p.session_id}`)}
+                              className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition-colors">
                               <ExternalLink className="w-4 h-4" />
                             </button>
-                            <button
-                              title="Reset"
-                              onClick={() =>
-                                setConfirmAction({ kind: 'reset', participant: p })
-                              }
-                              className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors"
-                            >
+                            <button title="Reset" onClick={() => setConfirmAction({ kind: 'reset', participant: p })}
+                              className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors">
                               <RotateCcw className="w-4 h-4" />
                             </button>
                             {p.status !== 'dropped' && p.status !== 'completed' && (
-                              <button
-                                title="Drop"
-                                onClick={() =>
-                                  setConfirmAction({ kind: 'drop', participant: p })
-                                }
-                                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"
-                              >
+                              <button title="Drop" onClick={() => setConfirmAction({ kind: 'drop', participant: p })}
+                                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors">
                                 <XCircle className="w-4 h-4" />
                               </button>
                             )}
                           </div>
                         </td>
                       </tr>
-
-                      {/* Expanded detail */}
                       <AnimatePresence>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={10} className="p-0">
+                            <td colSpan={8} className="p-0">
                               <motion.div
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: 'auto', opacity: 1 }}
@@ -1290,14 +1074,10 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
-        )}
+      )}
 
-        {activeTab === 'token_management' && <TokenManagementTab />}
-        {activeTab === 'latin_square' && <LatinSquareTab />}
-        {activeTab === 'live_sessions' && <LiveSessionsTab />}
-        {activeTab === 'data_export' && <DataExportTab />}
-        {activeTab === 'test_mode' && <TestModeTab />}
-      </main>
+      {activeTab === 'latin_square' && <LatinSquareTab />}
+      {activeTab === 'test_mode' && <TestModeTab />}
 
       {/* ---- Confirmation Modal ---- */}
       {confirmAction && (
@@ -1307,6 +1087,6 @@ export default function AdminDashboard() {
           onCancel={() => setConfirmAction(null)}
         />
       )}
-    </div>
+    </main>
   )
 }

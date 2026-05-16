@@ -11,9 +11,8 @@ export default function SoundPreviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 p-6">
+    <main className="p-6">
       <div className="mx-auto max-w-2xl">
-        <h1 className="text-2xl font-bold text-slate-900 mb-1">Sound Effects Preview</h1>
         <p className="text-sm text-slate-500 mb-6">Click any sound to play it. File-backed sounds show a badge.</p>
 
         <div className="grid gap-2">
@@ -36,6 +35,6 @@ export default function SoundPreviewPage() {
           ))}
         </div>
       </div>
-    </div>
+    </main>
   )
 }

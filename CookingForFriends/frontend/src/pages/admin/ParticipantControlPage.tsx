@@ -234,7 +234,7 @@ export default function ParticipantControlPage({ participantId }: { participantI
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <div className="text-slate-400 animate-pulse">Loading participant…</div>
       </div>
     )
@@ -242,7 +242,7 @@ export default function ParticipantControlPage({ participantId }: { participantI
 
   if (error || !detail) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <div className="bg-white rounded-xl shadow p-6 max-w-md text-center">
           <p className="text-red-500 font-medium mb-2">Error loading participant</p>
           <p className="text-slate-500 text-sm">{error || 'Unknown error'}</p>
@@ -261,88 +261,84 @@ export default function ParticipantControlPage({ participantId }: { participantI
   ]
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/admin" className="text-slate-400 hover:text-slate-600 transition-colors">
-                ← Dashboard
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  {detail.participant_id}
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[detail.status] || ''}`}>
-                    {detail.status}
-                  </span>
-                  {detail.is_online && (
-                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" title="Online" />
-                  )}
-                </h1>
-                <p className="text-sm text-slate-500">
-                  Condition: {detail.condition} · Token <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">{detail.token}</code>
-                </p>
-              </div>
-            </div>
-
-            {/* Admin Controls */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => doAction('Force Trigger', `${API}/participant/${participantId}/force-trigger`)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
-              >
-                ⚡ Force Trigger
-              </button>
-              <button
-                onClick={() => doAction('Send Message', `${API}/participant/${participantId}/send-message`)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
-              >
-                💬 Send Message
-              </button>
-              <button
-                onClick={() => doAction('Advance Block', `${API}/participant/${participantId}/advance-block`)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors"
-              >
-                ⏭ Advance Block
-              </button>
-              <button
-                onClick={() => { if (confirm('Reset all progress?')) doAction('Reset', `${API}/participant/${participantId}/reset`) }}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
-              >
-                🔄 Reset
-              </button>
-              <button
-                onClick={() => { if (confirm('Drop this participant?')) doAction('Drop', `${API}/participant/${participantId}/drop`) }}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition-colors"
-              >
-                🚫 Drop
-              </button>
+    <div>
+      {/* Participant info bar */}
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link to="/admin" className="text-sm text-slate-400 hover:text-slate-600 transition-colors">
+              ← Dashboard
+            </Link>
+            <div>
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                {detail.participant_id}
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[detail.status] || ''}`}>
+                  {detail.status}
+                </span>
+                {detail.is_online && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" title="Online" />
+                )}
+              </h2>
+              <p className="text-sm text-slate-500">
+                Condition: {detail.condition} · Token <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">{detail.token}</code>
+              </p>
             </div>
           </div>
 
-          {/* Action feedback */}
-          <AnimatePresence>
-            {actionMsg && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className={`mt-2 text-sm font-medium px-3 py-1.5 rounded-lg inline-block ${
-                  actionMsg.startsWith('✓') ? 'bg-green-50 text-green-700' :
-                  actionMsg.startsWith('✗') ? 'bg-red-50 text-red-700' :
-                  'bg-blue-50 text-blue-700'
-                }`}
-              >
-                {actionMsg}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => doAction('Force Trigger', `${API}/participant/${participantId}/force-trigger`)}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
+            >
+              ⚡ Force Trigger
+            </button>
+            <button
+              onClick={() => doAction('Send Message', `${API}/participant/${participantId}/send-message`)}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
+            >
+              💬 Send Message
+            </button>
+            <button
+              onClick={() => doAction('Advance Block', `${API}/participant/${participantId}/advance-block`)}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors"
+            >
+              ⏭ Advance Block
+            </button>
+            <button
+              onClick={() => { if (confirm('Reset all progress?')) doAction('Reset', `${API}/participant/${participantId}/reset`) }}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
+            >
+              🔄 Reset
+            </button>
+            <button
+              onClick={() => { if (confirm('Drop this participant?')) doAction('Drop', `${API}/participant/${participantId}/drop`) }}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 transition-colors"
+            >
+              🚫 Drop
+            </button>
+          </div>
         </div>
+
+        <AnimatePresence>
+          {actionMsg && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className={`mt-2 text-sm font-medium px-3 py-1.5 rounded-lg inline-block ${
+                actionMsg.startsWith('✓') ? 'bg-green-50 text-green-700' :
+                actionMsg.startsWith('✗') ? 'bg-red-50 text-red-700' :
+                'bg-blue-50 text-blue-700'
+              }`}
+            >
+              {actionMsg}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Tabs */}
-      <div className="max-w-7xl mx-auto px-4 pt-4">
+      <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center gap-1 border-b border-slate-200">
           {tabs.map((tab) => (
             <button
@@ -390,6 +386,7 @@ export default function ParticipantControlPage({ participantId }: { participantI
         {activeTab === 'snapshots' && <SnapshotsTab snapshots={snapshots} />}
       </div>
     </div>
+
   )
 }
 

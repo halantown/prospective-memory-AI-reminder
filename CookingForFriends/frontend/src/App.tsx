@@ -25,6 +25,7 @@ const PostTestFlowPage = lazy(() => import('./pages/game/PostTestFlowPage'))
 const DebriefPage = lazy(() => import('./pages/game/DebriefPage'))
 
 // Admin pages — lazy loaded (separate user flow)
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
 const AdminDashboard = lazy(() => import('./pages/admin/DashboardPage'))
 const ConfigPage = lazy(() => import('./pages/admin/ConfigPage'))
 const TimelineEditorPage = lazy(() => import('./pages/admin/TimelineEditorPage'))
@@ -52,15 +53,17 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Admin routes — lazy loaded, SPA navigation */}
-        <Route path="/admin/participant/:participantId" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ParticipantControlWrapper /></Suspense></ErrorBoundary>} />
-        <Route path="/admin/timeline-editor" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><TimelineEditorPage /></Suspense></ErrorBoundary>} />
-        <Route path="/admin/encoding-hotspots" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><EncodingHotspotToolPage /></Suspense></ErrorBoundary>} />
-        <Route path="/admin/sounds" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><SoundPreviewPage /></Suspense></ErrorBoundary>} />
-        <Route path="/timeline-editor" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><TimelineEditorPage /></Suspense></ErrorBoundary>} />
-        <Route path="/dashboard" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>} />
-        <Route path="/admin" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>} />
-        <Route path="/config" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ConfigPage /></Suspense></ErrorBoundary>} />
+        {/* Admin routes — wrapped in shared layout with unified navigation */}
+        <Route element={<Suspense fallback={<LoadingFallback />}><AdminLayout /></Suspense>}>
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/dashboard" element={<AdminDashboard />} />
+          <Route path="/config" element={<ConfigPage />} />
+          <Route path="/admin/timeline-editor" element={<TimelineEditorPage />} />
+          <Route path="/timeline-editor" element={<TimelineEditorPage />} />
+          <Route path="/admin/encoding-hotspots" element={<EncodingHotspotToolPage />} />
+          <Route path="/admin/sounds" element={<SoundPreviewPage />} />
+          <Route path="/admin/participant/:participantId" element={<ParticipantControlWrapper />} />
+        </Route>
         {/* Game routes — phase-based rendering (not URL-driven) */}
         <Route path="*" element={<ErrorBoundary><GameShell /></ErrorBoundary>} />
       </Routes>

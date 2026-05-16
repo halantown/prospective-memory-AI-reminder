@@ -1,10 +1,8 @@
 /** Runtime plan editor — edits the active gameplay schedule lanes. */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
-  ArrowLeft,
   Bot,
   CheckCircle,
   Clock,
@@ -407,32 +405,24 @@ export default function TimelineEditorPage() {
   }, [plan, timelineText])
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-50 p-6 text-slate-500">Loading runtime plan...</div>
+    return <div className="flex items-center justify-center py-24 text-slate-500">Loading runtime plan...</div>
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1800px] items-center justify-between px-4 py-2">
-          <div className="flex items-center gap-3">
-            <Link to="/dashboard" className="text-slate-400 hover:text-slate-700" aria-label="Back to dashboard">
-              <ArrowLeft size={20} />
-            </Link>
-            <h1 className="text-xl font-bold text-slate-800">Runtime Plan</h1>
-            {dirty && <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Unsaved</span>}
-          </div>
-          <button
-            onClick={save}
-            disabled={!plan || saving || !dirty}
-            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Save size={16} />
-            {saving ? 'Saving...' : 'Save'}
-          </button>
+    <main className="mx-auto max-w-[1800px] space-y-3 px-4 py-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {dirty && <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Unsaved changes</span>}
         </div>
-      </header>
-
-      <main className="mx-auto max-w-[1800px] space-y-3 px-4 py-4">
+        <button
+          onClick={save}
+          disabled={!plan || saving || !dirty}
+          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Save size={16} />
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
         {error && (
           <Alert kind="error" onClose={() => setError(null)}>
             {error}
@@ -574,8 +564,7 @@ export default function TimelineEditorPage() {
             </div>
           </>
         )}
-      </main>
-    </div>
+    </main>
   )
 }
 
