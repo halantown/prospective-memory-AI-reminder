@@ -99,11 +99,12 @@ export default function GamePage() {
       try {
         const status = await getSessionStatus(sessionId)
         const serverPhase = frontendPhaseForBackend(status.phase)
-        if (!cancelled && !isMainExperimentPhase(serverPhase)) {
+        const currentPhase = useGameStore.getState().phase
+        if (!cancelled && !isMainExperimentPhase(serverPhase) && isMainExperimentPhase(currentPhase)) {
           setPMPipelineState(null)
           setGameTimeFrozen(false)
           clearRobotSpeech()
-          setPhase(serverPhase)
+          setPhase('session_transition')
         }
       } catch (error) {
         console.warn('[GamePage] Main-session phase sync failed', error)

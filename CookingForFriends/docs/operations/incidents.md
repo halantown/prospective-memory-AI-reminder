@@ -1713,3 +1713,96 @@ doorbell answer event. The timeout path therefore bypassed the relocation logic.
 
 - [ ] Add a frontend interaction test for doorbell timeout: affordance timeout
       -> reminder -> living-room avatar visible at door.
+
+---
+
+## INC-029 — White screen after main session ends (recurrence of INC-024)
+
+| Field         | Detail |
+| ------------- | ------ |
+| Date          | 2026-05-15 |
+| Severity      | P0 Critical |
+| Status        | Resolved |
+| Reported by   | User observation during test-participant session |
+| Affected area | `frontend/src/pages/game/GamePage.tsx` phase-sync polling, `frontend/src/hooks/useWebSocket.ts` session_end handler, `frontend/src/App.tsx` GameShell phase router |
+
+### Background
+
+When the main experiment ends, two independent mechanisms race to transition the frontend out of MAIN_EXPERIMENT phase:
+
+1. **WebSocket `session_end`** event → sets phase to `session_transition`
+2. **GamePage REST polling** (every 2.5 s) → calls `getSessionStatus`, sets phase to whatever the backend DB says (e.g. `POST_MANIP_CHECK`)
+
+AnimatePresence `mode="wait"` (framer-motion ^11.15.0) relies on a single key change to exit the old page and enter the new one.
+
+### Incident Description
+
+After the main session ended, the screen went completely white. F12 DevTools showed GamePage DOM elements (phone contact buttons for Alice, Tom, Emma, Jake) still present in the tree but invisible — the `motion.div` wrapper was at opacity 0. SessionTransitionPage never appeared.
+
+This is the same white-screen symptom as INC-024. The INC-024 fix (adding the `session_transition` UI phase and clearing frozen state) addressed the state-cleanup angle but did not eliminate the underlying race condition.
+
+### Timeline
+
+| Time (local) | Event |
+|--------------|-------|
+| 16:19 | White screen observed after test-participant main session ended |
+| 16:20 | F12 showed GamePage DOM present but invisible (opacity 0) |
+| 16:25 | Investigation started: traced phase transitions through WebSocket handler, GamePage polling, and AnimatePresence |
+| 16:40 | Root cause identified: polling/WS race producing two rapid key changes that stall AnimatePresence |
+| 16:45 | Fix deployed across GamePage.tsx and App.tsx |
+
+### Root Cause
+
+The backend session-end sequence is:
+
+1. `pm_session._enter_post_manip_check_if_active()` — advances DB phase to `POST_MANIP_CHECK`
+2. `send_fn("session_end", ...)` — sends WebSocket event
+
+Between steps 1 and 2 there is a ~100 ms window. If the GamePage 2.5 s polling response lands in this window:
+
+- Polling returns `POST_MANIP_CHECK` → `setPhase('POST_MANIP_CHECK')` → renderPhase key becomes `post_test`
+- ~100 ms later, WS delivers `session_end` → `setPhase('session_transition')` → renderPhase key becomes `session_transition`
+
+AnimatePresence `mode="wait"` sees two key swaps during a single exit animation (`playing` → `post_test` → `session_transition`). The exit animation completes (opacity → 0) but the enter animation for the final key never starts. Result: motion.div stuck at opacity 0, transparent over white `<body>` background.
+
+### Contributing Factors
+
+- **No store-phase guard in polling callback**: The async `syncPhase` callback checked the `cancelled` flag (set on effect cleanup) but not the live store phase. Because React batches state updates, the effect cleanup could lag behind the WS-triggered phase change, allowing the stale polling response to set `POST_MANIP_CHECK` before `cancelled` flipped.
+- **No default case in phase switch**: If `renderPhaseFor` returned an unexpected value (or was bypassed), `page` became `undefined` — nothing rendered.
+- **ErrorBoundary placement**: ErrorBoundary was a child of GameShell, so it could not catch errors thrown in GameShell's own render (e.g. `renderPhaseFor` throwing on an unknown phase). The error propagated to React root → white screen.
+- **No background on AnimatePresence wrapper**: Opacity 0 showed through to the white `<body>` default.
+
+### Fix
+
+**`GamePage.tsx` — eliminate the race** (primary fix):
+
+```tsx
+// Before: setPhase(serverPhase) — could be POST_MANIP_CHECK, causing double key-change
+// After:
+const currentPhase = useGameStore.getState().phase
+if (!cancelled && !isMainExperimentPhase(serverPhase) && isMainExperimentPhase(currentPhase)) {
+  setPhase('session_transition')
+}
+```
+
+Two changes:
+- Read the **live** store phase at response time (not the stale closure value) to skip if WS already transitioned
+- Always set `session_transition` instead of the raw server phase — both sources now produce the same single key change
+
+**`App.tsx` — defensive hardening** (4 changes):
+
+1. Wrapped `renderPhaseFor` in try-catch with fallback to `'welcome'`
+2. Added `default: return <WelcomePage />` to phase switch
+3. Wrapped `<GameShell />` route in `<ErrorBoundary>` (catches render errors that previously hit React root)
+4. Added `bg-stone-900` wrapper div around AnimatePresence (dark background instead of white if animation stalls)
+
+### Verification
+
+- `cd CookingForFriends/frontend && npx tsc --noEmit` — passes clean
+- Manual test: run test participant through main session end → SessionTransitionPage appears without white flash
+
+### Follow-up Actions
+
+- [ ] Consider removing GamePage phase-sync polling entirely — WS `session_end` + reconnect logic should be sufficient
+- [ ] Add integration test: simulate `session_end` arriving during in-flight `getSessionStatus` response
+- [ ] Audit other AnimatePresence `mode="wait"` transitions for similar multi-source phase races

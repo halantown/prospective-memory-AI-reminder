@@ -62,7 +62,7 @@ export default function App() {
         <Route path="/admin" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminDashboard /></Suspense></ErrorBoundary>} />
         <Route path="/config" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ConfigPage /></Suspense></ErrorBoundary>} />
         {/* Game routes — phase-based rendering (not URL-driven) */}
-        <Route path="*" element={<GameShell />} />
+        <Route path="*" element={<ErrorBoundary><GameShell /></ErrorBoundary>} />
       </Routes>
     </BrowserRouter>
   )
@@ -163,7 +163,13 @@ function GameShell() {
     return <ConnectionIssuePage participantId={participantId} />
   }
 
-  const renderPhase = renderPhaseFor(phase)
+  let renderPhase: string
+  try {
+    renderPhase = renderPhaseFor(phase)
+  } catch {
+    console.error('[GameShell] Unknown phase, resetting to welcome:', phase)
+    renderPhase = 'welcome'
+  }
 
   const page = (() => {
     switch (renderPhase) {
@@ -180,24 +186,27 @@ function GameShell() {
       case 'post_test':      return <PostTestFlowPage />
       case 'debrief':        return <DebriefPage />
       case 'complete':       return <CompletePage />
+      default:               return <WelcomePage />
     }
   })()
 
   return (
     <ErrorBoundary participantId={participantId}>
-      <Suspense fallback={<LoadingFallback />}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={renderPhase}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            {page}
-          </motion.div>
-        </AnimatePresence>
-      </Suspense>
+      <div className="min-h-screen bg-stone-900">
+        <Suspense fallback={<LoadingFallback />}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={renderPhase}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              {page}
+            </motion.div>
+          </AnimatePresence>
+        </Suspense>
+      </div>
     </ErrorBoundary>
   )
 }
